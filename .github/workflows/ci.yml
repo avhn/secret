@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ripgrep
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then brew install ripgrep; else sudo apt-get install -y ripgrep; fi
+      - name: CLI matrix
+        run: bash tests/test-secret.sh
+      - name: Guard matrix
+        run: bash tests/test-guard.sh
+      - name: Stock bash 3.2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          /bin/bash tests/test-secret.sh
+          /bin/bash tests/test-guard.sh

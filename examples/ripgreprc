@@ -1,0 +1,27 @@
+# ripgrep defaults that keep secret stores out of ordinary searches.
+#
+# The guard allows plain `rg` because these exclusions make it safe; without
+# them, `rg TOKEN .` prints matching lines from .env files. Point ripgrep at
+# this file (or merge the globs into your own config):
+#
+#   export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"
+#
+# Format: one argument per line, no shell quoting. Lines starting with # are
+# comments. Command-line flags override what is set here, which is why the
+# guard denies --no-ignore, --no-config, -uu and positive globs that re-include
+# protected names.
+
+# Searching dot-directories is common; never descend into .git/.
+--hidden
+--glob=!.git/
+
+# No positive template re-include: it turns the search into a whitelist. Use
+# Read or explicit-file rg for .env.example/.sample/.template outside stores.
+--glob=!.env
+--glob=!.env.*
+--glob=!*.env
+--glob=!*.secret
+--glob=!.secrets/
+--glob=!.secrets.env
+--glob=!.netrc
+--glob=!.git-credentials

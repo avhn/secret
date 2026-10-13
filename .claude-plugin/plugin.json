@@ -1,0 +1,10 @@
+{
+  "name": "secret",
+  "version": "0.1.0",
+  "description": "Use credentials from coding agents without reading their values into context: a secret CLI, a PreToolUse guard, and a skill.",
+  "author": { "name": "Mert Dede", "url": "https://github.com/avhn" },
+  "homepage": "https://github.com/avhn/secret",
+  "repository": "https://github.com/avhn/secret",
+  "license": "GPL-3.0-or-later",
+  "keywords": ["secrets", "credentials", "env", "hooks", "security"]
+}

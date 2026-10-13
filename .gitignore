@@ -1,0 +1,8 @@
+# Never commit a real store, even by accident.
+.env
+.env.*
+!.env.example
+*.secret
+.secrets/
+.secrets.env
+.DS_Store
