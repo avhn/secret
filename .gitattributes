@@ -1,0 +1,3 @@
+# Keep LF everywhere: Windows runners otherwise check out CRLF, which gofmt
+# rejects and which would also break the shell scripts and hooks.
+* text=auto eol=lf
