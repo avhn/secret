@@ -68,8 +68,15 @@ func TestDispatch(t *testing.T) {
 		if err != nil || b != strings.Split(ref, ":")[0] || service != "secret/"+strings.Split(ref, ":")[1] {
 			t.Errorf("dispatch %s: %v", ref, err)
 		}
-		if _, err := p.Get(service, "account"); err != ErrUnsupported {
-			t.Error("production provider was activated")
+		switch b {
+		case "libsecret":
+			if _, ok := p.(libsecret); !ok {
+				t.Error("libsecret provider not selected")
+			}
+		case "keychain":
+			if _, ok := p.(keychain); !ok {
+				t.Error("keychain provider not selected")
+			}
 		}
 	}
 	for _, ref := range []string{"keychain:../other", "libsecret:", "file:demo"} {

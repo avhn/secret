@@ -43,8 +43,13 @@ Gate: parser, label, stash and manifest goldens; race/concurrency tests; unchang
 Status: in progress. Estimate: 5-7 days. Goal: port CLI, provider transports and redacted child execution.
 
 - [ ] feat(cli): add inventory and human-only commands
+
+The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 11 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash; only the pending run and exec return 2. Keep this item open until the full CLI corpus and runner checks pass.
 - [ ] feat(backend): port libsecret transport
 - [ ] feat(backend): port keychain transport
+
+Provider transports and disposable Go integration tests are implemented; keep both boxes open until isolated Linux/macOS CI and review pass. The Bash CLI remains active.
+
 - [ ] feat(run): construct selected child environment
 - [ ] feat(run): filter both output streams and supervise child
 - [ ] test(cli): port CLI and backend assertions
