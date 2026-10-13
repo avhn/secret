@@ -1,0 +1,13 @@
+{
+  "name": "secret",
+  "owner": { "name": "Mert Dede", "url": "https://github.com/avhn" },
+  "plugins": [
+    {
+      "name": "secret",
+      "source": "./",
+      "description": "Use credentials from coding agents without reading their values into context.",
+      "version": "0.1.0",
+      "category": "security"
+    }
+  ]
+}
