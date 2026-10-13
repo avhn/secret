@@ -1092,5 +1092,45 @@ ln -s absent "$TMP/search/operand-missing.txt"
     secrets alias_grep_names allow Grep "$TMP/search/operand-alias.txt"
 }
 
+# Command-bearing metadata predicates and file-list options use synthetic paths.
+# shellcheck disable=SC2016  # test strings are passed to the guard, not executed
+{
+    for cmd in 'find . -name .env -exec cat {} \;' 'find . -name .env -exec cat {} +' 'find . -iname .ENV -execdir cat {} \;' 'find . -path "*/.env" -ok cat {} \;' 'find . -regex ".*\\.env" -okdir cat {} +' 'find . -name "*.env" -exec cat {} +' 'find . -name ".env*" -exec cat {} \;' 'find . -exec cat {} \; -name .env' 'find . -name .env -exec env cat {} +' 'find . -name .env -exec sh -c "cat \"\$1\"" _ {} \;' 'find . -exec printenv \;' 'find . -name .env -exec cat .env \;' 'find -files0-from .env -print' 'find -files0-from=.env -print'; do
+        secrets find_child_input deny Bash "$cmd"
+    done
+    for cmd in 'find . -name .env' 'find . -name .env -delete' 'find . -name .env -print' 'find . -name "*.ts" -exec grep -l TODO {} +' 'find . -type f -exec cat {} +' 'find . -name .env -exec echo {} \;'; do
+        secrets find_names_only allow Bash "$cmd"
+    done
+    for cmd in 'dotenv -e .env printenv' 'dotenv -e .env env' 'dotenv -e .env -v K=V -c dev --debug -o --no-expand printenv' 'dotenv -e .env -c printenv' 'dotenv -e .env -p TOKEN' 'dotenv --env=.env --print TOKEN' 'dotenv -e .env --mystery env'; do
+        secrets dotenv_child_or_print deny Bash "$cmd"
+    done
+    for cmd in 'dotenv -e .env -- npm start' 'dotenv -e .env -v K=V -c dev npm start' 'dotenv -e .env -c -- npm start'; do
+        secrets dotenv_safe_child allow Bash "$cmd"
+    done
+    for cmd in 'docker compose --env-file .env run app env' 'docker compose exec app printenv' 'docker compose --env-file .env exec -T app printenv' 'docker compose run -e K=V -u 1000 -w /src --name x -p 1:2 -d --rm --no-deps app env' 'docker exec CTR env' 'docker exec -e K=V -u 1000 -w /src -d CTR printenv'; do
+        secrets docker_child_printer deny Bash "$cmd"
+    done
+    for cmd in 'docker run --env-file .env alpine node app.js' 'docker compose up' 'docker compose run app npm test' 'docker compose exec -T app npm test' 'docker exec CTR npm test'; do
+        secrets docker_safe_child allow Bash "$cmd"
+    done
+    for cmd in "git -c alias.x='!cat .env' x" 'git -c alias.x=.env log' 'git -calias.x=.env log' 'git --config-env=alias.x=.env log' 'git --config-env alias.x=.env log'; do
+        secrets git_config_input deny Bash "$cmd"
+    done
+    secrets git_config_safe allow Bash 'git -c color.ui=always log'
+    for cmd in 'du --files0-from=.env' 'du --files0-from .env' 'du -X.env .' 'du -X .env .' 'du --exclude-from=.env .' 'du --exclude-from .env .' 'file -f.env' 'file -f .env' 'file --files-from=.env' 'file --files-from .env' 'file -m.env README.md' 'file -m .env README.md' 'file --magic-file=.env README.md' 'file --magic-file .env README.md' 'wc --files0-from=.env' 'wc --files0-from .env' 'sort --files0-from=.env' 'sort --files0-from .env'; do
+        secrets list_option_input deny Bash "$cmd"
+    done
+    for cmd in 'du -sh .' 'file README.md' 'wc -l src/x.ts' 'sort a.txt'; do
+        secrets metadata_safe allow Bash "$cmd"
+    done
+    ln -s .env.absent "$TMP/search/dangling-alias.txt"
+    secrets dangling_alias_input deny Bash 'cat dangling-alias.txt'
+    secrets ansi_unicode_dot deny Bash "cat \$'\\u002eenv'"
+    secrets ansi_long_unicode_dot deny Bash "cat \$'\\U0000002eenv'"
+    secrets ansi_unicode_command deny Bash "\$'\\u0063at' .env"
+    secrets ansi_unicode_all deny Bash "cat \$'\\u002e\\u0065\\u006e\\u0076'"
+    secrets ansi_unicode_safe allow Bash "echo \$'\\u0048ello'"
+}
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
