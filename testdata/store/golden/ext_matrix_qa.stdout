@@ -1,0 +1,4 @@
+matrix.store
+  KEY [env=qa]=<7 bytes>
+  ONLY [env=qa]=<7 bytes>
+  TOKEN=<6 bytes>

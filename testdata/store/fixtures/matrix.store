@@ -1,0 +1,14 @@
+KEY=base
+[env=prod]
+KEY=production
+[zone=west]
+KEY=western
+[zone=west,env=prod]
+KEY=joint
+[env=qa]
+KEY=testing
+ONLY=qa-only
+[]
+TOKEN=common
+[env=prod,zone=west]
+KEY=joint-last

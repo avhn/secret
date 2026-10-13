@@ -1,0 +1,9 @@
+matrix.store
+  KEY=<4 bytes>
+  KEY [env=prod]=<10 bytes>
+  KEY [zone=west]=<7 bytes>
+  KEY [env=prod,zone=west]=<5 bytes>
+  KEY [env=qa]=<7 bytes>
+  ONLY [env=qa]=<7 bytes>
+  TOKEN=<6 bytes>
+  KEY [env=prod,zone=west]=<10 bytes>

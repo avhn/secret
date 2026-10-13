@@ -1,0 +1,10 @@
+[env=qa]
+KEY=qa
+OTHER=qa-only
+SECOND=qa-second
+[]
+ONLY=last
+[env=prod]
+SECOND=prod-second
+[]
+NEW=added

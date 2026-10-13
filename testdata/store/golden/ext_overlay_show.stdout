@@ -1,0 +1,10 @@
+base.store
+  KEY=<4 bytes>
+  ONLY=<5 bytes>
+  OTHER=<6 bytes>
+overlay.store
+  KEY=<unset>
+  OTHER=<unset>
+  SECOND [env=prod]=<11 bytes>
+  ONLY=<4 bytes>
+  NEW=<5 bytes>

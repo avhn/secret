@@ -1,0 +1,4 @@
+matrix.store
+  KEY=<4 bytes>
+  ONLY=<unset>
+  TOKEN=<6 bytes>
