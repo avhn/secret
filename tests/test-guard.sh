@@ -989,5 +989,108 @@ if [[ -z "$(printf '%s' malformed | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$
 if [[ -z "$(printf '%s' 'malformed cat .env' | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 if [[ -z "$(PATH="$TMP/empty-search" "$BASH" "$SECRETS_GUARD" </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 
+# Operand redesign: fixtures are synthetic and command strings are never run.
+printf '%s\n' synthetic-only >"$TMP/search/.env.tmp"
+printf '%s\n' synthetic-only >"$TMP/search/{xa}.env"
+mkdir -p "$TMP/search/alias-parent" "$TMP/search/.secrets"
+printf '%s\n' synthetic-only >"$TMP/search/.secrets/plain.txt"
+ln -s .env "$TMP/search/operand-alias.txt"
+ln -s ../.secrets "$TMP/search/alias-parent/link"
+ln -s src/a.ts "$TMP/search/operand-safe.txt"
+ln -s absent "$TMP/search/operand-missing.txt"
+# shellcheck disable=SC2016  # literal commands under analysis, never executed
+{
+    secrets brace_list deny Bash 'cat .{env,x}'
+    secrets brace_empty deny Bash 'cat .en{v,}'
+    secrets brace_nested deny Bash 'cat .{x,{en,zz}v}'
+    secrets brace_letters deny Bash 'cat .en{u..w}'
+    secrets brace_descending deny Bash 'cat .en{w..u}'
+    secrets brace_numbers deny Bash 'cat /tmp/.env.{1..3}'
+    secrets brace_steps deny Bash 'cat /tmp/.env.{03..01..2}'
+    secrets brace_sources deny Bash 'cp {.env,x}'
+    secrets brace_command_fields allow Bash '{echo,cat} .env'
+    secrets brace_nested_order allow Bash '{echo,{cat,head}} .env'
+    secrets brace_literal_outer deny Bash 'cat {x{a,b}}.env'
+    secrets brace_literal_outer_sources deny Bash 'cp safe {x{a,b}}.env'
+    secrets brace_quoted allow Bash "cat '.{env,x}'"
+    secrets brace_double_quoted allow Bash 'cat ".en{v,}"'
+    secrets brace_escaped allow Bash 'cat .\{env,x\}'
+    secrets brace_prose allow Bash "echo '{a,b}'"
+    secrets brace_budget deny Bash 'cat .en{v,}{1..65}'
+    secrets brace_product_budget deny Bash 'cat .{env,x}{a,b}{c,d}{e,f}{g,h}{i,j}{k,l}'
+    secrets brace_budget_late deny Bash 'cat {1..65} .{env,x}'
+    secrets brace_malformed deny Bash 'cat .{env,x'
+    secrets brace_budget_safe allow Bash 'echo {1..65}'
+    secrets brace_budget_dot_prefix deny Bash 'cat {1..65} {.,x}env'
+    secrets brace_group_prose allow Bash '{ echo .env; }'
+    secrets brace_quoted_alternative deny Bash 'cat .en{"v",x}'
+    secrets brace_literal_comma allow Bash 'cat .en{v\,x,}'
+    secrets brace_ansi_literal allow Bash "cat \$'.en{v,}'"
+    secrets brace_many_budget deny Bash 'cat {1..64} {1..64} .{env,x}'
+    secrets ifs_command deny Bash 'cat${IFS}.env'
+    secrets ifs_brace deny Bash 'cat${IFS}.{env,x}'
+    secrets ifs_bare deny Bash 'cat$IFS.env'
+    secrets ifs_quote allow Bash "echo 'cat\${IFS}.env'"
+    secrets ifs_escape allow Bash 'echo cat\${IFS}.env'
+    secrets ifs_prose allow Bash 'echo $IFS'
+    secrets ifs_brace_alternative deny Bash 'cat .en{v,$IFS}'
+    secrets ifs_brace_prose allow Bash 'echo .en{v,$IFS}'
+    secrets active_command deny Bash 'c=cat; $c .env'
+    secrets active_double_command deny Bash 'c=cat; "$c" .env'
+    secrets active_wrapped_command deny Bash 'command -- "$c" .env'
+    secrets active_sub_command deny Bash '$(printf cat) .env'
+    secrets active_brace_command deny Bash '$c .{env,x}'
+    secrets active_safe_command allow Bash '$c package.json'
+    secrets builtin_source deny Bash 'builtin source .env'
+    secrets builtin_separator deny Bash 'builtin -- source .env'
+    secrets builtin_unknown deny Bash 'builtin -z source .env'
+    secrets builtin_echo allow Bash 'builtin echo .env'
+    for cmd in 'dd if=.env' 'paste .env' 'fold .env' 'column -t .env' 'look x .env' 'openssl enc -in .env' 'openssl pkey -inkey .env' 'view .env' 'split -l1 .env /tmp/p' 'install .env /tmp/x' 'rsync .env host:' 'scp .env host:' 'tar -cf x.tar .env' 'zip x.zip .env' 'gpg -c .env' 'sops -d .env' 'jq --rawfile k .env -n "$k"' 'jq --slurpfile k .env -n 1' 'git add .env' 'git add -f .env' 'git diff .env' 'git show HEAD:.env' 'git log -p .env' 'git log --patch .env' 'git blame .env' 'git cat-file blob HEAD:.env' 'git grep x .env' 'git status -v .env' 'git status --verbose .env' 'git mv .env x' 'git rm .env' 'cp .env x' 'mv .env x' 'ln -s .env x' 'cp -t /tmp .env' 'mv --target-directory /tmp .env' 'ln --target-directory=/tmp .env' 'mv .env.tmp .env' 'unknown-tool .env'; do
+        secrets operand_deny deny Bash "$cmd"
+    done
+    for cmd in 'cp .env.example .env' 'tee .env < /dev/null' 'dd of=.env' 'split src/a.ts .env' 'openssl enc -in src/a.ts -out .env' 'tar -cf .env src' 'zip .env src/a.ts' 'rsync src/a.ts .env' 'scp src/a.ts .env' 'install src/a.ts .env' 'cp -t .env src/a.ts' 'mv --target-directory=.env src/a.ts' 'ls -l .env' 'stat .env' 'test -f .env' '[ -f .env ]' '[[ -f .env ]]' 'file .env' 'du .env' 'realpath .env' 'readlink .env' 'basename .env' 'dirname .env' 'chmod 600 .env' 'chown user .env' 'chgrp group .env' 'rm .env' 'touch .env' 'git check-ignore .env' 'git ls-files .env' 'git status' 'git status .env' 'git status -v' 'echo .env' 'printf "%s" .env' 'find . -name .env' 'git commit -m "add .env handling"' 'jq --arg label .env -n "$label"' 'jq --rawfile .env src/a.ts -n 1' 'jq --slurpfile .env src/a.ts -n 1'; do
+        secrets operand_allow allow Bash "$cmd"
+    done
+    for cmd in 'dotenv -e .env -- printenv' 'dotenv -e .env -- env' 'docker run --env-file .env alpine env' 'docker run --env-file=.env alpine printenv' 'docker compose --env-file .env config' 'docker compose --env-file=.env config'; do
+        secrets consumer_deny deny Bash "$cmd"
+    done
+    for cmd in 'docker run --env-file .env alpine node app.js' 'docker run --env-file=.env alpine node app.js' 'docker compose --env-file .env up' 'dotenv -e .env -- npm start' 'node --env-file=.env app.js' 'node --env-file .env app.js'; do
+        secrets consumer_allow allow Bash "$cmd"
+    done
+    for cmd in 'cat package.json' 'sed -n 1,20p src/x.ts' 'cp a b' 'mv a b' 'ln -s a b' 'tar -cf x.tar src' 'git add src' 'git diff' 'git log -p' 'docker run alpine echo hi' 'node app.js' 'python3 script.py' 'make test' 'npm test'; do
+        secrets ordinary_command allow Bash "$cmd"
+    done
+    for tool in Read Edit Write; do
+        secrets "alias_${tool}" deny "$tool" "$TMP/search/operand-alias.txt"
+        secrets "ancestor_${tool}" deny "$tool" "$TMP/search/alias-parent/link/plain.txt"
+        secrets "alias_safe_${tool}" allow "$tool" "$TMP/search/operand-safe.txt"
+        secrets "alias_missing_${tool}" allow "$tool" "$TMP/search/operand-missing.txt"
+    done
+    for cmd in 'cat operand-alias.txt' 'cat alias-parent/link/plain.txt' 'paste operand-alias.txt' 'cp operand-alias.txt x' 'mv operand-alias.txt x' 'ln -s operand-alias.txt x' 'cat operand-alia*.txt'; do
+        secrets alias_file_role deny Bash "$cmd"
+    done
+    secrets docker_context_printer deny Bash 'docker --context local run --env-file .env alpine env'
+    secrets docker_context_compose deny Bash 'docker --context=local compose --env-file .env config'
+    secrets docker_context_consumer allow Bash 'docker --context local run --env-file .env alpine echo hi'
+    secrets docker_pull_printer deny Bash 'docker run --pull always --env-file .env alpine env'
+    secrets docker_pull_consumer allow Bash 'docker run --pull always --env-file .env alpine echo hi'
+    secrets docker_entrypoint_failure deny Bash 'docker run --env-file .env --entrypoint=printenv alpine'
+    secrets docker_unknown_option deny Bash 'docker run --env-file .env --unknown value alpine env'
+    secrets git_changed_directory deny Bash "cd '$TMP/empty-search'; git -C '$TMP/search' add operand-alias.txt"
+    secrets tar_changed_directory deny Bash "cd '$TMP/empty-search'; tar -cf x.tar -C '$TMP/search' operand-alias.txt"
+    secrets tar_old_output allow Bash 'tar cf .env src'
+    secrets tar_attached_output allow Bash 'tar -cf.env src'
+    secrets tar_archive_input deny Bash 'tar -tf.env code'
+    secrets source_implicit_target deny Bash 'ln -s operand-alias.txt'
+    secrets scp_identity_input deny Bash 'scp -i operand-alias.txt src/a.ts host:'
+    secrets cp_suffix_label allow Bash 'cp -S .env src/a.ts dest'
+    secrets assignment_not_file allow Bash 'export PATH="$HOME/bin:$PATH"'
+    secrets alias_safe_reader allow Bash 'cat operand-safe.txt'
+    secrets alias_names_ls allow Bash 'ls operand-alias.txt'
+    secrets alias_names_stat allow Bash 'stat operand-alias.txt'
+    secrets alias_grep_content deny Grep "$TMP/search/operand-alias.txt" '{"output_mode":"content"}'
+    secrets alias_grep_names allow Grep "$TMP/search/operand-alias.txt"
+}
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
