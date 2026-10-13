@@ -87,6 +87,50 @@ if command -v jq >/dev/null 2>&1; then
         secrets write_netrc deny Write "$HOME/.netrc"
         secrets grep_secrets allow Grep "$TMP/search" '{"output_mode":"files_with_matches"}'
         secrets grep_repo allow Grep /repo/src
+        # Credential paths share literal, selector, reader, and tree protection.
+        for entry in aws_credentials:.aws/credentials docker_config:.docker/config.json gh_hosts:.config/gh/hosts.yml npmrc:.npmrc pypirc:.pypirc ssh_rsa:.ssh/id_rsa ssh_ed25519:.ssh/id_ed25519 proc_self:proc/self/environ proc_thread:proc/thread-self/environ proc_pid:proc/123/environ proc_task:proc/123/task/456/environ 'proc_dollars:proc/$$/environ' 'proc_ppid:proc/$PPID/environ'; do
+            name="${entry%%:*}" credential="${entry#*:}"
+            for tool in Read Edit Write; do
+                secrets "${tool}_${name}" deny "$tool" "/$credential"
+            done
+            secrets "grep_path_${name}" deny Grep "/$credential"
+            secrets "grep_glob_${name}" deny Grep "$TMP/empty-search" "{\"glob\":\"$credential\",\"output_mode\":\"content\"}"
+            secrets "cat_${name}" deny Bash "cat ~/$credential"
+            secrets "redirect_${name}" deny Bash "wc < ~/$credential"
+            secrets "xargs_${name}" deny Bash "echo ~/$credential | xargs cat"
+            mkdir -p "$TMP/credential-$name"
+            if [[ "$credential" == */* ]]; then mkdir -p "$TMP/credential-$name/${credential%/*}"; fi
+            printf '%s\n' synthetic-only >"$TMP/credential-$name/$credential"
+            secrets "grep_tree_${name}" deny Grep "$TMP/credential-$name" '{"output_mode":"content"}'
+        done
+        mkdir -p "$TMP/credential-safe/.ssh"
+        printf '%s\n' synthetic-public >"$TMP/credential-safe/.ssh/id_ed25519.pub"
+        printf '%s\n' template-only >"$TMP/credential-safe/.npmrc.example"
+        printf '%s\n' ordinary >"$TMP/credential-safe/config.json"
+        secrets credential_safe_tree allow Grep "$TMP/credential-safe" '{"output_mode":"content"}'
+        secrets credential_component_lookalike allow Read /repo/xaws/credentials
+        secrets credential_basename_lookalike allow Read /repo/xnpmrc
+        secrets read_aws_credentials deny Read '~/.aws/credentials'
+        secrets uppercase_credential deny Read '/repo/.AWS/CREDENTIALS'
+        secrets uppercase_ssh_public allow Read '/repo/.SSH/ID_ED25519.PUB'
+        secrets cat_proc_environ deny Bash 'cat /proc/self/environ'
+        secrets redirect_proc_environ deny Bash 'wc < /proc/$$/environ'
+        secrets read_ssh_other_private deny Read '~/.ssh/id_custom'
+        secrets read_ssh_template_suffix deny Read '~/.ssh/id_custom.env.example'
+        secrets read_ssh_space deny Read '~/.ssh/id_custom key'
+        secrets cat_ssh_space deny Bash 'cat "~/.ssh/id_custom key"'
+        secrets read_ssh_space_public allow Read '~/.ssh/id_custom key.pub'
+        secrets credential_glob deny Bash 'cat ~/.docker/c*.json'
+        secrets credential_selector_glob deny Grep "$TMP/empty-search" '{"glob":"**/.config/gh/*.yml","output_mode":"content"}'
+        secrets ssh_private_glob deny Bash 'cat ~/.ssh/id_*'
+        secrets ssh_public_glob allow Bash 'cat ~/.ssh/id_*.pub'
+        safe_index=0
+        for safe_path in '~/.ssh/config' '~/.ssh/known_hosts' '~/.ssh/id_ed25519.pub' /repo/config.json /repo/package.json /repo/.npmrc.example /repo/.npmrc.sample /repo/.npmrc.template /repo/.pypirc.example /proc/self/status /proc/cpuinfo; do
+            secrets "read_safe_$safe_index" allow Read "$safe_path"
+            secrets "cat_safe_$safe_index" allow Bash "cat $safe_path"
+            secrets "glob_safe_$safe_index" allow Grep "$TMP/empty-search" "{\"glob\":\"$safe_path\",\"output_mode\":\"content\"}"
+            safe_index=$((safe_index + 1))
+        done
         # readers
         secrets cat_secret deny Bash 'cat ~/.secrets/svc.secret'
         secrets cat_home_var deny Bash 'cat "$HOME/.secrets/x.secret"'
@@ -121,6 +165,38 @@ if command -v jq >/dev/null 2>&1; then
         secrets keychain_piped allow Bash 'security find-generic-password -s foo -w | secret stash foo KEY'
         secrets gh_token deny Bash 'gh auth token'
         secrets gh_status allow Bash 'gh auth status'
+        PRINTER_CASES=('gcloud_token:gcloud auth print-access-token' 'gcloud_identity:gcloud auth print-identity-token' 'gcloud_default:gcloud auth application-default print-access-token' 'aws_get_secret:aws configure get aws_secret_access_key' 'aws_get_id:aws configure get aws_access_key_id' 'aws_get_session:aws configure get aws_session_token' 'aws_export:aws configure export-credentials' 'op_read:op read op://vault/item/password' 'op_reveal:op item get item --reveal' 'op_fields:op item get item --fields password' 'pass_show:pass show mail' 'pass_bare:pass mail' 'secret_tool_lookup:secret-tool lookup service mail' 'kwallet_read:kwallet-query -r mail wallet' 'ps_e:ps e' 'ps_eww:ps eww' 'ps_mac_environment:ps -E' 'declare_bare:declare' 'typeset_bare:typeset' 'jq_environment:jq -n env' 'jq_ENV:jq -n "$ENV"')
+        for entry in "${PRINTER_CASES[@]}"; do
+            name="${entry%%:*}" operation="${entry#*:}"
+            secrets "$name" deny Bash "$operation"
+            secrets "${name}_wrapped" deny Bash "timeout 5 $operation"
+            secrets "${name}_nested" deny Bash "bash -c '${operation//\'/\'\\\'\'}'"
+            secrets "${name}_to_stash" allow Bash "$operation | secret stash svc KEY"
+            secrets "${name}_indirect_stash" deny Bash "$operation | cat | secret stash svc KEY"
+        done
+        secrets aws_profile_before deny Bash 'aws --profile work configure get AWS_SECRET_ACCESS_KEY'
+        secrets aws_profile_after deny Bash 'aws configure get aws_session_token --profile work'
+        secrets aws_profile_get deny Bash 'aws configure get --profile work aws_access_key_id'
+        secrets aws_profile_equals deny Bash 'aws --profile=work configure export-credentials'
+        secrets aws_mixed_key deny Bash 'aws configure get AwS_SeCrEt_AcCeSs_KeY'
+        secrets op_fields_equals deny Bash 'op item get item --fields=password'
+        secrets op_fields_title deny Bash 'op item get item --fields title'
+        secrets secret_tool_search deny Bash 'secret-tool search service mail'
+        secrets secret_tool_search_to_stash deny Bash 'secret-tool search service mail | secret stash svc KEY'
+        secrets secret_tool_search_wrapped deny Bash 'nice -n 5 secret-tool search service mail'
+        secrets secret_tool_search_nested deny Bash 'bash -c "secret-tool search service mail"'
+        secrets ps_combined_environment deny Bash 'ps auxeww'
+        secrets ps_environment_after_options deny Bash 'ps -p 1 eww'
+        secrets jq_env_filter deny Bash 'jq "env | .TOKEN" input.json'
+        secrets jq_env_literal deny Bash "jq -n '\$ENV'"
+        secrets jq_env_arg deny Bash 'jq --arg label safe -n env'
+        secrets echo_lower_token deny Bash 'echo $token'
+        secrets echo_mixed_password deny Bash 'printf "%s" "${db_PassWord}"'
+        safe_index=0
+        for operation in 'ps aux' 'ps -ef' 'ps -e' 'ps -o user,pid' 'ps -C server' 'aws sts get-caller-identity' 'aws configure list' 'aws configure get region' 'gcloud auth list' 'op whoami' 'pass ls' 'pass insert x' 'secret-tool store service mail' "jq -n '1'" "jq -n '\"env\"'" 'jq --arg label env -n .label' 'declare -f name' 'typeset -i x=1'; do
+            secrets "printer_safe_$safe_index" allow Bash "$operation"
+            safe_index=$((safe_index + 1))
+        done
         secrets git_cred deny Bash 'git credential fill'
         secrets pbpaste deny Bash 'pbpaste'
         secrets pbpaste_piped allow Bash 'pbpaste | secret stash vault KEY'
@@ -361,6 +437,24 @@ if command -v jq >/dev/null 2>&1; then
             secrets "over_cap_safe_$risk_index" allow Bash "echo $safe_word $LONG_TEXT"
             risk_index=$((risk_index + 1))
         done
+        for entry in "${PRINTER_CASES[@]}"; do
+            name="${entry%%:*}" operation="${entry#*:}"
+            secrets "over_cap_${name}" deny Bash "$operation # $LONG_TEXT"
+        done
+        for operation in 'secret-tool search service mail' 'aws --profile work configure get aws_secret_access_key' 'aws configure get aws_access_key_id --profile work' 'aws configure get --profile work aws_session_token' 'op item get item --fields=password'; do
+            secrets "over_cap_printer_$risk_index" deny Bash "$operation # $LONG_TEXT"
+            risk_index=$((risk_index + 1))
+        done
+        for credential in '~/.aws/credentials' '~/.docker/config.json' '~/.config/gh/hosts.yml' .npmrc .pypirc '~/.ssh/id_custom' /proc/self/environ /proc/thread-self/environ /proc/123/environ /proc/123/task/456/environ '/proc/$$/environ' '/proc/$PPID/environ'; do
+            secrets "over_cap_path_$risk_index" deny Bash "cat $credential # $LONG_TEXT"
+            risk_index=$((risk_index + 1))
+        done
+        for operation in 'ps aux' 'ps -ef' 'ps -e' 'gh auth status' 'aws sts get-caller-identity' 'aws configure list' 'gcloud auth list' 'op whoami' 'pass ls' 'pass insert x' 'secret-tool store service mail' "jq -n '1'" 'cat ~/.ssh/id_ed25519.pub' 'cat ~/.ssh/config' 'cat ~/.ssh/known_hosts' 'cat .npmrc.example' 'cat .pypirc.template' 'cat /proc/self/status' 'cat /proc/cpuinfo' 'cat config.json' 'cat package.json' 'echo gcloudish opportune passage psalm secret-tooling kwallet-querying'; do
+            secrets "over_cap_safe_$risk_index" allow Bash "$operation # $LONG_TEXT"
+            risk_index=$((risk_index + 1))
+        done
+        secrets over_cap_pass_after_safe deny Bash "pass ls; pass show mail # $LONG_TEXT"
+        secrets over_cap_public_then_private deny Bash "cat ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa # $LONG_TEXT"
         secrets over_cap_case deny Bash "ENV # $LONG_TEXT"
         secrets failed_analysis_variable deny Bash "echo \$TOKEN '"
         secrets failed_analysis_env deny Bash "env '"
@@ -380,6 +474,8 @@ if command -v jq >/dev/null 2>&1; then
         secrets interpreter_python_getenv deny Bash 'python3 -c "import os; print(os.getenv(\"TOKEN\"))"'
         secrets interpreter_node_env deny Bash 'node -p "process.env"'
         secrets interpreter_export_operand allow Bash 'python3 manage.py export --format csv'
+        secrets interpreter_python_pass allow Bash "python3 -c 'if 1: pass  # noop'"
+        secrets interpreter_perl_pass_text allow Bash "perl -e 'print \"tests pass ok\"'"
         secrets shell_c_set_options allow Bash 'bash -c "set -euo pipefail; echo environment ready"'
         secrets shell_c_export_path allow Bash 'sh -c "export PATH=/usr/bin; make build"'
         secrets shell_c_printer_still_denied deny Bash 'bash -c "printenv"'
