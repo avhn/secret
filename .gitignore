@@ -6,3 +6,8 @@
 .secrets/
 .secrets.env
 .DS_Store
+
+# Local Go build outputs.
+/dist-local/
+*.test
+/secret
