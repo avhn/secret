@@ -1,37 +1,38 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SECRETS_DIR", filepath.Join(home, "stores"))
+	t.Setenv("SECRETS_ENV", filepath.Join(home, "fallback.store"))
 	originalVersion := version
 	t.Cleanup(func() { version = originalVersion })
-
 	tests := []struct {
-		name       string
-		args       []string
-		version    string
-		wantStdout string
-		wantStderr string
-		wantStatus int
+		name                    string
+		args                    []string
+		version, stdout, stderr string
+		status                  int
 	}{
-		{name: "default version", args: []string{"version"}, version: "dev", wantStdout: "secret dev (go)\n"},
-		{name: "release version", args: []string{"version"}, version: "v1.2.3", wantStdout: "secret v1.2.3 (go)\n"},
-		{name: "unsupported subcommand", args: []string{"list"}, wantStderr: "not yet implemented in the Go build; use bin/secret\n", wantStatus: 2},
-		{name: "no subcommand", wantStderr: "not yet implemented in the Go build; use bin/secret\n", wantStatus: 2},
-		{name: "extra version argument", args: []string{"version", "extra"}, wantStderr: "not yet implemented in the Go build; use bin/secret\n", wantStatus: 2},
+		{name: "default version", args: []string{"version"}, version: "dev", stdout: "secret dev (go)\n"},
+		{name: "release version", args: []string{"version"}, version: "v1.2.3", stdout: "secret v1.2.3 (go)\n"},
+		{name: "empty list", args: []string{"list"}, stderr: "no secret stores found\n"},
+		{name: "no subcommand", stderr: "secret: subcommand required; use secret help\n", status: 1},
+		{name: "extra version argument", args: []string{"version", "extra"}, stderr: "secret: version takes no arguments\n", status: 1},
+		{name: "run pending", args: []string{"run"}, stderr: "secret: not yet implemented in the Go build; use bin/secret\n", status: 2},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			version = tt.version
 			var stdout, stderr strings.Builder
 			status := run(tt.args, &stdout, &stderr)
-			if stdout.String() != tt.wantStdout || stderr.String() != tt.wantStderr || status != tt.wantStatus {
-				t.Errorf("run(%q) = stdout %q, stderr %q, status %d; want stdout %q, stderr %q, status %d",
-					tt.args, stdout.String(), stderr.String(), status, tt.wantStdout, tt.wantStderr, tt.wantStatus)
+			if stdout.String() != tt.stdout || stderr.String() != tt.stderr || status != tt.status {
+				t.Errorf("stdout %q, stderr %q, status %d; want %q, %q, %d", stdout.String(), stderr.String(), status, tt.stdout, tt.stderr, tt.status)
 			}
 		})
 	}

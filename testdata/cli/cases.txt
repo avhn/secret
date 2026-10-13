@@ -1,0 +1,15 @@
+# name|inventory key|arguments (space separated); fixtures are synthetic .store files only.
+# Covered secret.tsv keys: help, empty_list, empty_show, labels_no_selector,
+# labels_and, labels_ambiguous, get_pipe, stash_lf, unknown.
+# new:* keys mark additional synthetic cases not present in secret.tsv.
+help|help|help
+empty_list|empty_list|list
+empty_show|empty_show|show
+flat|labels_no_selector|show core.store
+selected|labels_and|show --env prod matrix.store
+ambiguous|labels_ambiguous|show --env prod tie.store
+selector_conflict|new:selector_conflict|show --env prod --label env=qa core.store
+get_pipe|get_pipe|get core.store TOKEN
+stash_invalid_key|new:stash_invalid_key|stash base.store 2BAD
+stash_valid|stash_lf|stash base.store TOKEN
+unknown|unknown|frobnicate

@@ -1,0 +1,4 @@
+matrix.store
+  KEY [env=prod]=<10 bytes>
+  ONLY=<unset>
+  TOKEN=<6 bytes>
