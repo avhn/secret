@@ -1,0 +1,15 @@
+KEY=base
+[zone=west,env=prod]
+KEY=synthetic-labeled
+[env=prod]
+KEY=prod
+KEY=again
+TOKEN='quoted $ # = \ internal'
+[]
+SECOND=plain
+[env=qa]
+ONLY=qa
+[env=prod,env=qa]
+KEY=legacy
+[]
+EMPTY=

@@ -1,0 +1,7 @@
+KEY=base
+[env=dev]
+KEY=first
+[env=prod]
+KEY=peer
+[env=dev]
+KEY=last
