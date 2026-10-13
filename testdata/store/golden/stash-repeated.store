@@ -1,0 +1,6 @@
+KEY=base
+[env=dev]
+[env=prod]
+KEY=peer
+[env=dev]
+KEY=synthetic-repeated

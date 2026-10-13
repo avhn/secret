@@ -1,0 +1,3 @@
+ONLY=first
+OTHER=before
+KEY=synthetic-new

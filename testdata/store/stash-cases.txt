@@ -1,0 +1,10 @@
+# name|fixture|key|labels|printf %b value
+flat|base.store|KEY||synthetic-new\n
+labeled|labels.store|KEY|env=prod,zone=west|synthetic-labeled\n
+missing-label|labels.store|ADDED|zone=east,env=prod|synthetic-added
+reset|labels.store|DEFAULT||synthetic-default\n
+quote|base.store|QUOTE||\'synthetic-edge
+crlf|bytes.store|BYTES||synthetic-bytes
+no-tail|bytes.store|TRAIL||synthetic-tail\n
+append-after-tail|bytes.store|ADDED|env=qa|synthetic-new
+repeated|repeated.store|KEY|env=dev|synthetic-repeated\n

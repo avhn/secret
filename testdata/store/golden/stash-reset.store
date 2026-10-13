@@ -1,0 +1,16 @@
+KEY=base
+DEFAULT=synthetic-default
+[zone=west,env=prod]
+KEY=both
+[env=prod]
+KEY=prod
+KEY=again
+TOKEN='quoted $ # = \ internal'
+[]
+SECOND=plain
+[env=qa]
+ONLY=qa
+[env=prod,env=qa]
+KEY=legacy
+[]
+EMPTY=
