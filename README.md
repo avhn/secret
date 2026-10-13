@@ -45,12 +45,33 @@ The guard and skill, as a Claude Code plugin:
 /plugin install secret@secret
 ```
 
-For Codex CLI, install the same CLI on `PATH` (the symlink above requires
-`~/.local/bin` on `PATH`). Copy the Codex hook snippet into `~/.codex/hooks.json`
-with an absolute command path, and install the skill in the user skills root:
+For Codex CLI, install the plugin from this repository's Codex marketplace.
+It bundles the guard and skill, without modifying `~/.codex/hooks.json`:
 
 ```bash
-mkdir -p ~/.codex ~/.codex/skills ~/.local/bin
+codex plugin marketplace add avhn/secret
+codex plugin add secret@secret
+```
+
+In Codex, open `/hooks` and trust the installed secret hook before relying on
+it. Untrusted hooks are listed but do not run; review and re-trust the hook
+when it changes. `/plugins` lets you inspect the installed plugin. The plugin
+does not put `bin/secret` on `PATH`. Install the CLI separately if you want to
+use it (the symlink requires `~/.local/bin` on `PATH`):
+
+```bash
+mkdir -p ~/.local/bin
+# If you have not already cloned the repo in the CLI step above:
+git clone https://github.com/avhn/secret ~/.local/share/secret
+ln -s ~/.local/share/secret/bin/secret ~/.local/bin/secret
+```
+
+If your Codex version has no plugin marketplace support, use the manual route
+with a checkout of the repo. Copy the hook template with an absolute command
+path and install the skill in the user skills root:
+
+```bash
+mkdir -p ~/.codex ~/.codex/skills
 jq --arg command "$HOME/.local/share/secret/hooks/guard-secrets" \
   '.hooks.PreToolUse[].hooks[].command = $command' \
   ~/.local/share/secret/codex/hooks.json >~/.codex/hooks.json
@@ -60,8 +81,9 @@ ln -s ~/.local/share/secret/skills/secrets ~/.codex/skills/secrets
 If `~/.codex/hooks.json` already exists, merge its `PreToolUse` groups rather
 than replacing the file. Codex also accepts inline `[hooks]` in `config.toml`;
 the snippet uses `hooks.json` so it can be copied without changing that file.
-Codex sends shell commands under the `Bash` hook name and patches under
-`apply_patch`. The guard needs `jq` and `perl` on the hook's `PATH`.
+Open `/hooks` to trust the manual hook as well. Codex sends shell commands
+under the `Bash` hook name and patches under `apply_patch`. The guard needs
+`jq` and `perl` on the hook's `PATH`.
 
 The guard allows plain `rg` because ripgrep can be told to skip store files.
 Install the protective config, or merge its globs into your own:
