@@ -510,6 +510,141 @@ if command -v jq >/dev/null 2>&1; then
         done
         secrets missing_wrapper_value deny Bash 'exec -a .env --unrecognised'
 
+        # Parser differentials and bounded name indirection, never evaluation.
+        secrets env_split deny Bash "env -S 'cat .env'"
+        secrets env_split_equals deny Bash "env --split-string='cat .env'"
+        secrets env_split_attached deny Bash 'env -S"cat .env"'
+        secrets env_split_long deny Bash "env --split-string 'cat .env'"
+        secrets env_split_operand deny Bash "env -S cat .env"
+        secrets env_split_end_options deny Bash "env -S '-- cat .env'"
+        secrets env_split_empty deny Bash "env -S ''"
+        secrets env_split_assignment deny Bash "env -S 'NAME=value'"
+        secrets env_split_options deny Bash "env -S '-i cat .env'"
+        secrets env_split_options_safe allow Bash "env -S '-u NAME cat src/a.ts'"
+        secrets env_split_unknown deny Bash "env -S '--unknown echo .env'"
+        secrets env_split_safe allow Bash "env -S 'cat src/a.ts'"
+        secrets env_split_safe_quote allow Bash "env -S echo \"don't\""
+        secrets env_split_nested deny Bash "env -S 'bash -c \"cat .env\"'"
+        secrets env_split_budget deny Bash "env -S '$DEEP_CMD'"
+        secrets env_split_tokens deny Bash "env -S 'echo $MANY_TOKENS .env'"
+        secrets env_unset deny Bash 'env -u NAME cat .env'
+        secrets env_unset_equals deny Bash 'env --unset=NAME cat .env'
+        secrets env_unset_safe allow Bash 'env -u cat echo .env'
+        secrets env_flags deny Bash 'env -i -0 -- cat .env'
+        secrets env_flags_safe allow Bash 'env -i -0 -- cat src/a.ts'
+        secrets env_chdir deny Bash "env -C '$TMP/descendant-only/sub' cat .env"
+        secrets env_chdir_equals deny Bash "env --chdir='$TMP/descendant-only/sub' cat .env"
+        secrets env_chdir_attached deny Bash "env -C'$TMP/descendant-only/sub' cat .env"
+        secrets env_chdir_empty allow Bash "env -C '$TMP/empty-search' cat .env"
+        secrets env_chdir_scoped deny Bash "env -C '$TMP/empty-search' true; cat .env"
+        secrets env_chdir_split deny Bash "env -C '$TMP/descendant-only/sub' -S 'cat .env'"
+        secrets env_unknown deny Bash 'env --unknown value cat .env'
+        secrets env_missing deny Bash 'env -u'
+        secrets env_missing_split deny Bash 'env -S'
+        for option in -u -g -h -p -C -D -R -T -U; do
+            secrets "sudo_value_${option#-}" deny Bash "sudo $option value cat .env"
+            secrets "sudo_value_safe_${option#-}" allow Bash "sudo $option cat echo .env"
+            secrets "sudo_missing_${option#-}" allow Bash "sudo $option"
+        done
+        secrets sudo_flags deny Bash 'sudo -n -E -H -- cat .env'
+        secrets sudo_attached deny Bash 'sudo -uroot cat .env'
+        secrets sudo_long deny Bash 'sudo --user=root cat .env'
+        secrets sudo_shell deny Bash "sudo -s 'cat .env'"
+        secrets sudo_login deny Bash "sudo -i 'cat .env'"
+        secrets sudo_shell_safe allow Bash "sudo -s 'cat src/a.ts'"
+        secrets sudo_unknown deny Bash 'sudo --unknown value cat .env'
+        secrets sudo_unknown_safe allow Bash 'sudo --unknown value echo hello'
+        secrets continuation_operand deny Bash $'cat \\\n.env'
+        secrets continuation_command deny Bash $'ca\\\nt .env'
+        secrets continuation_double deny Bash $'cat ".en\\\nv"'
+        secrets continuation_safe allow Bash $'ca\\\nt src/a.ts'
+        secrets continuation_single allow Bash $'echo \'hello\\\nworld\''
+        secrets ansi_plain deny Bash "cat \$'.env'"
+        secrets ansi_hex deny Bash "cat \$'\\x2eenv'"
+        secrets ansi_octal deny Bash "cat \$'\\056env'"
+        secrets ansi_join deny Bash "cat .e\$'n'v"
+        secrets ansi_command deny Bash "\$'c\\x61t' .env"
+        secrets ansi_newline allow Bash "echo \$'hello\\n'"
+        secrets ansi_newline_reader deny Bash "cat \$'hello\\n' .env"
+        secrets ansi_tab_reader deny Bash "cat \$'hello\\t' .env"
+        secrets ansi_hex_short allow Bash "echo \$'\\x9hello'"
+        secrets ansi_octal_short allow Bash "echo \$'\\7hello'"
+        secrets ansi_quotes allow Bash "echo \$'\\\\\\\'\\\"'"
+        secrets ansi_escapes allow Bash "echo \$'\\e\\a\\b\\f\\r\\v'"
+        secrets ansi_escapes_analysed allow Bash "echo \$'\\e\\a\\b\\f\\r\\v' .env"
+        secrets ansi_literal_substitution allow Bash "echo \$'\\'\$(cat .env)'"
+        secrets ansi_nested_literal allow Bash "echo \"\$(echo \$'\\'\$(cat .env)')\""
+        for escape in '.' '\U0000002e' '\cA' '\x' '\q' '\000' '\x1f' '\036'; do
+            secrets "ansi_failure_$escape" deny Bash "cat .env \$'$escape'"
+            secrets "ansi_failure_safe_$escape" allow Bash "echo \$'$escape'"
+        done
+        secrets locale_string deny Bash 'cat $".env"'
+        secrets locale_safe allow Bash 'echo $"hello"'
+        secrets control_separator deny Bash $'cat\x1f.env'
+        secrets control_safe allow Bash $'echo hello\x1fworld'
+        secrets control_carriage deny Bash $'cat .env\r'
+        secrets control_del deny Bash $'cat .env\x7f'
+        secrets unresolved_assignment deny Bash 'f=.env; cat $f'
+        secrets unresolved_echo deny Bash 'cat $(echo .env)'
+        secrets unresolved_printf deny Bash 'cat "$(printf .en; printf v)"'
+        secrets unresolved_printf_args deny Bash 'cat "$(printf %s .en v)"'
+        secrets unresolved_echo_args deny Bash 'cat "$(echo -n .en v)"'
+        secrets unresolved_concat deny Bash 'cat .e$(printf n)v'
+        secrets unresolved_backtick deny Bash 'cat `printf .en; printf v`'
+        secrets unresolved_redirect deny Bash 'f=.env; wc < "$f"'
+        secrets unresolved_redirect_literal deny Bash 'wc < "$(printf .en; printf v)"'
+        secrets unresolved_xargs deny Bash 'f=.env; printf "%s" "$f" | xargs cat'
+        secrets unresolved_xargs_literal deny Bash 'echo "$(printf .en; printf v)" | xargs cat'
+        secrets unresolved_xargs_argfile deny Bash 'f=.env; xargs -a "$f" cat'
+        secrets unresolved_file_safe allow Bash 'cat "$FILE"'
+        secrets unresolved_positional_safe allow Bash 'cat "$1"'
+        secrets unresolved_listing_safe allow Bash 'cat $(git ls-files | head -1)'
+        secrets unresolved_wc_safe allow Bash 'wc -l $(ls src/*.ts)'
+        secrets unresolved_redirect_safe allow Bash 'wc < "$FILE"'
+        secrets unresolved_xargs_safe allow Bash 'printf "%s" "$FILE" | xargs cat'
+        secrets unresolved_literal_safe allow Bash 'cat "$(printf src/; printf a.ts)"'
+        secrets unresolved_no_eval allow Bash 'cat "$(touch should-not-exist; printf src/a.ts)"'
+        secrets unresolved_quoted_parameter allow Bash "f=.env; cat '\$f'"
+        secrets unresolved_escaped_parameter allow Bash 'f=.env; cat \$f'
+        secrets unresolved_quoted_substitution allow Bash "cat '\$(echo .env)'"
+        secrets unresolved_quoted_literal_name allow Bash "cat '\$(printf .en; printf v)'"
+        secrets unresolved_pattern_file deny Bash 'f=.env; grep --file="$f" src/a.ts'
+        secrets stash_stdout_file deny Bash 'gh auth token > f | secret stash a K'
+        secrets stash_stdout_tight deny Bash 'gh auth token>f | secret stash a K'
+        secrets stash_stdout_prefix deny Bash '>f gh auth token | secret stash a K'
+        secrets stash_stdout_append deny Bash 'gh auth token >>f | secret stash a K'
+        secrets stash_stdout_both deny Bash 'gh auth token &>f | secret stash a K'
+        secrets stash_stdout_fd deny Bash 'gh auth token 1>f | secret stash a K'
+        secrets stash_stdout_zero_fd deny Bash 'gh auth token 01>f | secret stash a K'
+        secrets stash_stdout_dup deny Bash 'gh auth token >&2 | secret stash a K'
+        secrets stash_stdout_quoted_fd deny Bash 'gh auth token "2">f | secret stash a K'
+        secrets stash_stdout_escaped_fd deny Bash 'gh auth token \2>f | secret stash a K'
+        secrets stash_quoted_operator allow Bash 'gh auth token ">" | secret stash a K'
+        secrets stash_sink_output allow Bash 'gh auth token | secret stash a K > out'
+        secrets stash_sink_output_tight allow Bash 'gh auth token | secret stash a K>>out'
+        secrets stash_stderr_dup allow Bash 'gh auth token 2>&1 | secret stash a K'
+        secrets stash_stderr_file allow Bash 'gh auth token 2>err | secret stash a K'
+        secrets stash_tee deny Bash 'gh auth token | tee f | secret stash a K'
+        secrets stash_extra deny Bash 'gh auth token | secret stash a K extra'
+        secrets stash_wrapped deny Bash 'gh auth token | env secret stash a K'
+        secrets stash_absolute allow Bash 'gh auth token | /usr/bin/secret stash a K'
+        secrets stash_missing_redirect deny Bash 'gh auth token | secret stash a K >'
+        for operation in 'xclip -o' 'xclip -selection clipboard -o' 'xsel -o' 'xsel -b -o' 'xsel --output'; do
+            secrets "clipboard_$operation" deny Bash "$operation"
+            secrets "clipboard_stash_$operation" allow Bash "$operation | secret stash a K"
+            secrets "over_cap_clipboard_$operation" deny Bash "$operation # $LONG_TEXT"
+        done
+        secrets clipboard_write_xclip allow Bash 'xclip -i'
+        secrets clipboard_write_xsel allow Bash 'xsel -i'
+        for operation in 'kwallet-query --read-password mail wallet' 'kwallet-query --read-password=mail wallet' 'ps aEeww' 'security find-generic-password -w' 'gh auth token' 'git credential fill' declare 'jq -n env' 'wl-paste' pbpaste; do
+            secrets "over_cap_parity_$risk_index" deny Bash "$operation # $LONG_TEXT"
+            risk_index=$((risk_index + 1))
+        done
+        for safe_word in 'gcloudish auth print-access-token' 'awsome configure export-credentials' 'opportune read' 'passage show mail' 'secret-tooling lookup' 'kwallet-querying -r' 'psalm eww' 'declaration' 'typesetting' 'jqish environment' 'securityish find-password' 'ghastly auth token' 'git credentialed fill' 'xclipboard -o' 'xselection --output' 'wl-pasted' 'pbpasted'; do
+            secrets "over_cap_safe_parity_$risk_index" allow Bash "echo $safe_word # $LONG_TEXT"
+            risk_index=$((risk_index + 1))
+        done
+
     }
 else
     printf '%s\n' 'jq not installed; guard-secrets cases cannot run' >&2
@@ -534,6 +669,23 @@ if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpec
 else
     FAILED=$((FAILED + 1))
     printf 'FAIL fixed complexity reason\n'
+fi
+
+# Invalid control bytes must reach raw recovery, not change token boundaries.
+for json_command in '"echo .env\u0000"' '"echo .env\u001f"' '"echo .env\u000b"' '"echo .env\u007f"'; do
+    FAILURE_OUTPUT="$(jq -cn --argjson c "$json_command" '{tool_name:"Bash",tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
+    if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpecificOutput.permissionDecision == "deny" and .hookSpecificOutput.permissionDecisionReason == $reason' >/dev/null; then
+        PASSED=$((PASSED + 1))
+    else
+        FAILED=$((FAILED + 1))
+        printf 'FAIL control byte must use raw recovery: %s\n' "$json_command"
+    fi
+done
+if [[ ! -e "$TMP/search/should-not-exist" ]]; then
+    PASSED=$((PASSED + 1))
+else
+    FAILED=$((FAILED + 1))
+    printf 'FAIL command substitution was executed\n'
 fi
 
 # Missing jq and malformed JSON are intentional fail-open boundaries.
