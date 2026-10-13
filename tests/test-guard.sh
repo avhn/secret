@@ -455,6 +455,9 @@ if command -v jq >/dev/null 2>&1; then
         done
         secrets over_cap_pass_after_safe deny Bash "pass ls; pass show mail # $LONG_TEXT"
         secrets over_cap_public_then_private deny Bash "cat ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa # $LONG_TEXT"
+        secrets over_cap_escaped_dot deny Bash "cat \\.aws/credentials # $LONG_TEXT"
+        secrets over_cap_escaped_ssh deny Bash "cat foo\\\\.ssh/id_rsa # $LONG_TEXT"
+        secrets over_cap_escaped_suffix deny Bash "cat ~/.npmrc\\ x # $LONG_TEXT"
         secrets over_cap_case deny Bash "ENV # $LONG_TEXT"
         secrets failed_analysis_variable deny Bash "echo \$TOKEN '"
         secrets failed_analysis_env deny Bash "env '"
