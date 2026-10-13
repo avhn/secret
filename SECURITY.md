@@ -51,8 +51,13 @@ documentation or hardening suggestions, but they are not vulnerabilities:
 - **Executable substitution.** The guard trusts command names. A different
   program named `secret`, `cat` or `jq` earlier on PATH is not detected.
 - **Tools the guard does not see.** The hook covers Claude Code's Bash, Read,
-  Grep, Edit and Write tools. MCP servers, other agents and other editors are
-  not covered.
+  Grep, Edit and Write tools, and Codex's Bash shell hook and `apply_patch`.
+  Hosted tools such as web search, MCP servers, other agents and other editors
+  are not covered. Codex `write_stdin` input to an already running exec session
+  is not re-checked by this hook. Codex's current `exec_command` hook input
+  also omits its per-command `workdir`: if it differs from the hook's `cwd`,
+  relative file operands are checked against the wrong directory. The guard
+  honors `tool_input.workdir` when a shell adapter supplies it.
 - **Process-level visibility.** A child that puts a value in its own argv
   exposes it to the local process list. Descendants a `run` child leaves
   running are not supervised. Any process running as the same user can read

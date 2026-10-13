@@ -56,9 +56,12 @@ jobs:
         run: '"$BASH_BIN" tests/test-backends.sh'
       - name: Guard matrix
         run: '"$BASH_BIN" tests/test-guard.sh'
+      - name: Codex guard matrix
+        run: '"$BASH_BIN" tests/test-codex.sh'
       - name: Stock bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |
           /bin/bash tests/test-secret.sh
           /bin/bash tests/test-backends.sh
           /bin/bash tests/test-guard.sh
+          /bin/bash tests/test-codex.sh

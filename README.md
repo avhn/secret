@@ -10,11 +10,11 @@ straight into that child process's environment.
 
 Three parts, usable together or alone:
 
-| Part                      | What it does                                                                                                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/secret`              | CLI. Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                      |
-| `hooks/guard-secrets`     | Claude Code `PreToolUse` hook. Denies reads of store files, environment dumps, credential printers (`gh auth token`, `security -w`, `pbpaste`, ...) and searches that would print store contents. |
-| `skills/secrets/SKILL.md` | Tells the agent how to work with the CLI and how to recover from a guard denial without asking for values in chat.                                                                                |
+| Part                      | What it does                                                                                                                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin/secret`              | CLI. Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                                |
+| `hooks/guard-secrets`     | Claude Code and Codex `PreToolUse` hook. Denies reads of store files, environment dumps, credential printers (`gh auth token`, `security -w`, `pbpaste`, ...) and searches that would print store contents. |
+| `skills/secrets/SKILL.md` | Tells the agent how to work with the CLI and how to recover from a guard denial without asking for values in chat.                                                                                          |
 
 ## What this is not
 
@@ -44,6 +44,24 @@ The guard and skill, as a Claude Code plugin:
 /plugin marketplace add avhn/secret
 /plugin install secret@secret
 ```
+
+For Codex CLI, install the same CLI on `PATH` (the symlink above requires
+`~/.local/bin` on `PATH`). Copy the Codex hook snippet into `~/.codex/hooks.json`
+with an absolute command path, and install the skill in the user skills root:
+
+```bash
+mkdir -p ~/.codex ~/.codex/skills ~/.local/bin
+jq --arg command "$HOME/.local/share/secret/hooks/guard-secrets" \
+  '.hooks.PreToolUse[].hooks[].command = $command' \
+  ~/.local/share/secret/codex/hooks.json >~/.codex/hooks.json
+ln -s ~/.local/share/secret/skills/secrets ~/.codex/skills/secrets
+```
+
+If `~/.codex/hooks.json` already exists, merge its `PreToolUse` groups rather
+than replacing the file. Codex also accepts inline `[hooks]` in `config.toml`;
+the snippet uses `hooks.json` so it can be copied without changing that file.
+Codex sends shell commands under the `Bash` hook name and patches under
+`apply_patch`. The guard needs `jq` and `perl` on the hook's `PATH`.
 
 The guard allows plain `rg` because ripgrep can be told to skip store files.
 Install the protective config, or merge its globs into your own:
