@@ -24,7 +24,7 @@ func TestRun(t *testing.T) {
 		{name: "empty list", args: []string{"list"}, stderr: "no secret stores found\n"},
 		{name: "no subcommand", stderr: "secret: subcommand required; use secret help\n", status: 1},
 		{name: "extra version argument", args: []string{"version", "extra"}, stderr: "secret: version takes no arguments\n", status: 1},
-		{name: "run pending", args: []string{"run"}, stderr: "secret: not yet implemented in the Go build; use bin/secret\n", status: 2},
+		{name: "run requires file and command", args: []string{"run"}, stderr: "secret: run/exec require -f FILE and -- CMD\n", status: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

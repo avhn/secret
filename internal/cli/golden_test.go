@@ -38,6 +38,15 @@ func TestBashGoldens(t *testing.T) {
 			t.Fatalf("invalid case: %s", line)
 		}
 		name, args := fields[0], strings.Fields(fields[2])
+		for i := range args {
+			if args[i] == "@child" {
+				path, e := filepath.Abs(filepath.Join(root, "testdata", "cli", "child.pl"))
+				if e != nil {
+					t.Fatal(e)
+				}
+				args[i] = path
+			}
+		}
 		count++
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

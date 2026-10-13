@@ -44,14 +44,19 @@ Status: in progress. Estimate: 5-7 days. Goal: port CLI, provider transports and
 
 - [ ] feat(cli): add inventory and human-only commands
 
-The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 11 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash; only the pending run and exec return 2. Keep this item open until the full CLI corpus and runner checks pass.
+The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 15 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash; run and exec are wired on Unix. Keep this item open until the full CLI corpus and runner checks pass.
 - [ ] feat(backend): port libsecret transport
 - [ ] feat(backend): port keychain transport
 
 Provider transports and disposable Go integration tests are implemented; keep both boxes open until isolated Linux/macOS CI and review pass. The Bash CLI remains active.
 
 - [ ] feat(run): construct selected child environment
+
+Unix run and exec now load selected file and registered keystore records, remove unselected ambient keys, and preserve required and optional selection. Exec replaces the process on Unix; Windows rejects both commands with a value-free error pending the M5a Job Object gate. Go environment strings and GC copies remain visible to the same user. Keep open until CI runner checks pass.
+
 - [ ] feat(run): filter both output streams and supervise child
+
+Go run filters independent stdout and stderr byte streams, forwards INT/TERM/HUP to a Unix process group, and stops on filter failure or a two-second descendant drain timeout. Unlike Bash, Go run does not allocate a PTY or invoke script(1); Bash run currently also uses separate FIFO filters, not script(1). Direct terminal buffering and merged stream ordering can differ from an interactive PTY. Keep open until Linux/macOS runner checks pass.
 - [ ] test(cli): port CLI and backend assertions
 
 Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on appropriate runners; inject failures/signals; no values in argv or diagnostics; Bash 3.2 jobs green.

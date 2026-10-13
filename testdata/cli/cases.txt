@@ -13,3 +13,7 @@ get_pipe|get_pipe|get core.store TOKEN
 stash_invalid_key|new:stash_invalid_key|stash base.store 2BAD
 stash_valid|stash_lf|stash base.store TOKEN
 unknown|unknown|frobnicate
+run_streams|new:run_streams|run -f core.store -- perl @child streams
+run_selection|new:run_selection|run -f core.store --key KEY -- perl @child selection core.store
+run_status|new:run_status|run -f core.store -- perl @child status
+exec_streams|new:exec_streams|exec -f core.store -- perl @child streams
