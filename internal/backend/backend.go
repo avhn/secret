@@ -2,10 +2,14 @@ package backend
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/avhn/secret/internal/store"
 )
@@ -20,13 +24,31 @@ type Provider interface {
 
 var ErrUnsupported = errors.New("backend not yet supported in the Go build")
 
-type unsupported struct{}
+var providerPair = regexp.MustCompile(`^secret/[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
+var providerAccount = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
-func (unsupported) Get(string, string) ([]byte, error)       { return nil, ErrUnsupported }
-func (unsupported) Put(string, string, string, []byte) error { return ErrUnsupported }
-func (unsupported) Delete(string, string) error              { return ErrUnsupported }
+// validProviderPair rejects option injection even for direct provider calls.
+func validProviderPair(service, account string) bool {
+	return providerPair.MatchString(service) && providerAccount.MatchString(account)
+}
 
-// Dispatch validates the reference and returns a production placeholder.
+// commandRunner carries provider input on stdin and retains output only in memory.
+// Callers must never include provider output or command errors in returned errors.
+type commandRunner func(name string, args []string, input []byte) ([]byte, []byte, error)
+
+// runProvider bounds provider calls, including an unresponsive secret service.
+func runProvider(name string, args []string, input []byte) ([]byte, []byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdin = bytes.NewReader(input)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	return out, stderr.Bytes(), err
+}
+
+// Dispatch validates the reference and selects the real provider.
 // No environment variable can activate the test stub in this path.
 func Dispatch(ref string) (Provider, string, string, error) { return DispatchWith(ref, nil) }
 
@@ -41,7 +63,15 @@ func DispatchWith(ref string, provider Provider) (Provider, string, string, erro
 		return nil, "", "", err
 	}
 	if provider == nil {
-		provider = unsupported{}
+		if backend == "libsecret" {
+			provider = libsecret{run: runProvider}
+		} else {
+			selected := newKeychain(runProvider)
+			if !selected.valid {
+				return nil, "", "", errors.New("SECRET_KEYCHAIN must be an absolute path without spaces or quoting")
+			}
+			provider = selected
+		}
 	}
 	return provider, backend, "secret/" + name, nil
 }

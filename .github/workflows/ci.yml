@@ -13,19 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh testdata/store/gen.sh
+      - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh testdata/store/gen.sh testdata/cli/gen.sh
 
   libsecret:
     name: libsecret (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Install Secret Service test dependencies
         run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11
       - name: Isolated libsecret suite
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
         run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/libsecret-cases.tsv" bash tests/test-libsecret.sh
+      - name: Isolated Go libsecret integration
+        env:
+          SECRET_REQUIRE_LIBSECRET: "1"
+        run: go test ./internal/backend -run '^TestLibsecretIntegration$' -count=1
       - name: Check libsecret inventory
         run: bash tests/inventory.sh --check --suite libsecret
 
@@ -34,12 +42,20 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Identify missing Keychain inventory
         id: missing_keychain
         run: |
           if [ ! -f testdata/inventory/keychain.tsv ]; then echo "missing=true" >>"$GITHUB_OUTPUT"; fi
       - name: Isolated Keychain suite
         run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/keychain-cases.tsv" SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh
+      - name: Isolated Go Keychain integration
+        env:
+          SECRET_REQUIRE_KEYCHAIN: "1"
+        run: go test ./internal/backend -run '^TestKeychainIntegration$' -count=1
       - name: Check keychain inventory
         env:
           SECRET_INVENTORY_STRICT: "1"
@@ -117,8 +133,10 @@ jobs:
         run: |
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          bash testdata/store/gen.sh "$tmp"
-          diff -ru testdata/store/golden "$tmp"
+          bash testdata/store/gen.sh "$tmp/store"
+          diff -ru testdata/store/golden "$tmp/store"
+          bash testdata/cli/gen.sh "$tmp/cli"
+          diff -ru testdata/cli/golden "$tmp/cli"
       - name: Race test Go packages
         shell: bash
         env:
