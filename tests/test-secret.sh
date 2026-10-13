@@ -141,7 +141,24 @@ assert labels_conflict_message grep -q 'conflicting label selector for env' "$TM
 check labels_invalid 1 "$BASH" "$SECRET" run -f "$TMP/labels.store" --label 'env=bad value' -- true
 assert labels_invalid_message grep -q 'invalid label selector' "$TMP/err"
 check labels_show 0 "$BASH" "$SECRET" show "$TMP/labels.store"
-assert labels_show_masked grep -q 'KEY=<14 bytes>' "$TMP/out"
+cat >"$TMP/expected" <<EOF
+$TMP/labels.store
+  KEY=<15 bytes>
+  KEY [env=dev,region=eu]=<16 bytes>
+  ALPHA [env=dev,region=eu]=<18 bytes>
+  KEY=<15 bytes>
+  KEY [env=dev]=<13 bytes>
+  KEY [env=prod]=<14 bytes>
+  BROKEN=<16 bytes>
+  SECOND [env=dev]=<20 bytes>
+  THREE [env=dev]=<19 bytes>
+EOF
+assert labels_show_bytes cmp -s "$TMP/out" "$TMP/expected"
+check labels_show_selected 0 "$BASH" "$SECRET" show --env dev --label region=eu "$TMP/labels.store"
+assert labels_show_selected_key grep -q '^  KEY \[env=dev,region=eu\]=<16 bytes>$' "$TMP/out"
+assert labels_show_selected_unmatched bash -c '! grep -q "^  ALPHA=<unset>$" "$1"' test "$TMP/out"
+check labels_show_unmatched 0 "$BASH" "$SECRET" show --env prod "$TMP/labels.store"
+assert labels_show_unmatched_key grep -q '^  ALPHA=<unset>$' "$TMP/out"
 
 cat >"$TMP/ambiguous.store" <<'EOF'
 [env=dev]
@@ -152,6 +169,8 @@ EOF
 check labels_ambiguous 1 "$BASH" "$SECRET" exec -f "$TMP/ambiguous.store" --env dev --label region=eu -- true
 assert labels_ambiguous_key grep -q 'ambiguous labels for KEY' "$TMP/err"
 assert labels_ambiguous_no_value bash -c '! grep -E "first-synthetic|second-synthetic" "$1" "$2"' test "$TMP/out" "$TMP/err"
+check labels_show_ambiguous 1 "$BASH" "$SECRET" show --env dev --label region=eu "$TMP/ambiguous.store"
+assert labels_show_ambiguous_key grep -q 'ambiguous labels for KEY' "$TMP/err"
 check labels_not_ambiguous 0 "$BASH" "$SECRET" exec -f "$TMP/ambiguous.store" --env dev -- "$BASH" -c '[[ "$KEY" == first-synthetic ]]'
 cat >"$TMP/reordered.store" <<'EOF'
 [env=dev,region=eu]
@@ -160,6 +179,8 @@ KEY=first-synthetic
 KEY=second-synthetic
 EOF
 check labels_same_set_last_wins 0 "$BASH" "$SECRET" exec -f "$TMP/reordered.store" --env dev --label region=eu -- "$BASH" -c '[[ "$KEY" == second-synthetic ]]'
+check labels_show_canonical 0 "$BASH" "$SECRET" show "$TMP/reordered.store"
+assert labels_show_canonical_count test "$(grep -c '^  KEY \[env=dev,region=eu\]=' "$TMP/out")" -eq 2
 cat >"$TMP/specificity.store" <<'EOF'
 [env=dev]
 KEY=first-synthetic
@@ -184,21 +205,43 @@ check labels_run_selection 0 "$BASH" "$SECRET" run -f "$TMP/labels.store" --env 
 check labels_redact_unselected 0 "$BASH" "$SECRET" run -f "$TMP/labels.store" --env prod -- perl -e 'open my $f, "<", $ARGV[0] or die; while (<$f>) { if (/^ALPHA=(.*)/) { print $1; last } }' "$TMP/labels.store"
 printf '<redacted>' >"$TMP/expected"
 assert labels_redact_unselected_bytes cmp -s "$TMP/out" "$TMP/expected"
-cp "$TMP/labels.store" "$TMP/labels-before"
-check labels_stash_refused 1 "$BASH" "$SECRET" stash "$TMP/labels.store" KEY < /dev/null
-assert labels_stash_hint grep -q 'labeled stores are not supported by stash' "$TMP/err"
-assert labels_stash_unchanged cmp -s "$TMP/labels.store" "$TMP/labels-before"
-printf '[]\nKEY=reset-only-synthetic\n' >"$TMP/reset.store"
-check labels_reset_stash_refused 1 "$BASH" "$SECRET" stash "$TMP/reset.store" KEY < /dev/null
-assert labels_reset_stash_unchanged grep -q '^KEY=reset-only-synthetic$' "$TMP/reset.store"
-check labels_clip_refused 1 "$BASH" "$SECRET" clip "$TMP/labels.store" KEY
-assert labels_clip_hint grep -q 'labeled stores are not supported' "$TMP/err"
-check labels_get_refused 1 "$BASH" "$SECRET" get "$TMP/labels.store" --env
-assert labels_get_flag_hint grep -q 'label flags are only supported' "$TMP/err"
-check labels_stash_flag_refused 1 "$BASH" "$SECRET" stash "$TMP/bytes.store" KEY --label env=dev < /dev/null
-assert labels_stash_flag_hint grep -q 'label flags are only supported' "$TMP/err"
-check labels_clip_flag_refused 1 "$BASH" "$SECRET" clip "$TMP/labels.store" KEY --env dev
-assert labels_clip_flag_hint grep -q 'label flags are only supported' "$TMP/err"
+# The expected fixtures include comments, unusual line endings, and sibling
+# sections so cmp catches any change outside the selected record.
+printf 'new-synthetic' >"$TMP/input"
+printf '# first\r\nKEY=old-synthetic\r\n[region=eu,env=dev]\r\n# sibling\r\nKEY=other-synthetic\r\nSECOND=kept-synthetic\r\n[]\r\nKEY=reset-synthetic\r\n' >"$TMP/edit.store"
+printf '# first\r\nKEY=old-synthetic\r\n[region=eu,env=dev]\r\n# sibling\r\nSECOND=kept-synthetic\r\nKEY=new-synthetic\n[]\r\nKEY=reset-synthetic\r\n' >"$TMP/expected"
+check labels_stash_existing 0 "$BASH" "$SECRET" stash --env dev --label region=eu "$TMP/edit.store" KEY <"$TMP/input"
+assert labels_stash_existing_bytes cmp -s "$TMP/edit.store" "$TMP/expected"
+check labels_stash_existing_selected 0 "$BASH" "$SECRET" exec -f "$TMP/edit.store" --env dev --label region=eu -- "$BASH" -c '[[ "$KEY" == new-synthetic ]]'
+printf 'new-synthetic' >"$TMP/input"
+printf '# first\r\nKEY=old-synthetic\r\n[region=eu,env=dev]\r\n# sibling\r\nSECOND=kept-synthetic\r\nKEY=new-synthetic\n[]\r\nKEY=reset-synthetic\r\n[env=prod,region=eu]\nKEY=new-synthetic\n' >"$TMP/expected"
+check labels_stash_new 0 "$BASH" "$SECRET" stash --label region=eu --env=prod "$TMP/edit.store" KEY <"$TMP/input"
+assert labels_stash_new_bytes cmp -s "$TMP/edit.store" "$TMP/expected"
+check labels_stash_new_file 0 "$BASH" "$SECRET" stash --label region=eu --env prod "$TMP/brand-new.store" KEY <"$TMP/input"
+printf '[env=prod,region=eu]\nKEY=new-synthetic\n' >"$TMP/expected-new"
+assert labels_stash_new_file_bytes cmp -s "$TMP/brand-new.store" "$TMP/expected-new"
+printf '# first\r\n[region=eu,env=dev]\r\n# sibling\r\nSECOND=kept-synthetic\r\nKEY=new-synthetic\n[]\r\n[env=prod,region=eu]\nKEY=new-synthetic\n[]\nKEY=plain-new-synthetic\n' >"$TMP/expected"
+printf 'plain-new-synthetic' >"$TMP/input"
+check labels_stash_plain 0 "$BASH" "$SECRET" stash "$TMP/edit.store" KEY <"$TMP/input"
+assert labels_stash_plain_bytes cmp -s "$TMP/edit.store" "$TMP/expected"
+printf '[env=dev]\n# keep\n' >"$TMP/end-labeled.store"
+check labels_stash_reset 0 "$BASH" "$SECRET" stash "$TMP/end-labeled.store" KEY <"$TMP/input"
+printf '[env=dev]\n# keep\n[]\nKEY=plain-new-synthetic\n' >"$TMP/expected"
+assert labels_stash_reset_bytes cmp -s "$TMP/end-labeled.store" "$TMP/expected"
+printf '# leading\nKEY=original-synthetic\n[env=dev]\nSECOND=kept-synthetic\n[]\n# reset\n' >"$TMP/leading.store"
+printf '# leading\nKEY=plain-new-synthetic\n[env=dev]\nSECOND=kept-synthetic\n[]\n# reset\n' >"$TMP/expected"
+check labels_stash_leading 0 "$BASH" "$SECRET" stash "$TMP/leading.store" KEY <"$TMP/input"
+assert labels_stash_leading_bytes cmp -s "$TMP/leading.store" "$TMP/expected"
+printf '[env=dev]\nSECOND=kept-synthetic\n[]\n# trailing\n' >"$TMP/reset-end.store"
+printf '[env=dev]\nSECOND=kept-synthetic\n[]\n# trailing\nKEY=plain-new-synthetic\n' >"$TMP/expected"
+check labels_stash_after_reset 0 "$BASH" "$SECRET" stash "$TMP/reset-end.store" KEY <"$TMP/input"
+assert labels_stash_after_reset_bytes cmp -s "$TMP/reset-end.store" "$TMP/expected"
+printf '"edge-synthetic' >"$TMP/input"
+check labels_stash_quote 0 "$BASH" "$SECRET" stash --env dev "$TMP/reset-end.store" KEY <"$TMP/input"
+check labels_stash_quote_roundtrip 0 "$BASH" "$SECRET" exec -f "$TMP/reset-end.store" --env dev -- perl -e 'exit($ENV{KEY} eq "\x22edge-synthetic" ? 0 : 1)'
+cp "$TMP/edit.store" "$TMP/edit-before"
+check labels_stash_invalid_selector 1 "$BASH" "$SECRET" stash --label 'env=bad value' "$TMP/edit.store" KEY <"$TMP/input"
+assert labels_stash_invalid_unchanged cmp -s "$TMP/edit.store" "$TMP/edit-before"
 
 printf 'byte-safe-[]$x' >"$TMP/input"
 check stash_eof 0 "$BASH" "$SECRET" stash "$TMP/bytes.store" KEY <"$TMP/input"
@@ -467,12 +510,29 @@ fi
 assert tty_value grep -Fq 'byte-safe-[]$x' "$TMP/tty.out"
 if [[ "$OSTYPE" == darwin* ]]; then
     # BSD script returns the child's status; util-linux script without -e does not.
-    check labels_get_tty 1 script -q "$TMP/tty.out" "$BASH" "$SECRET" get "$TMP/labels.store" KEY </dev/null
+    check labels_get_tty 0 script -q "$TMP/tty.out" "$BASH" "$SECRET" get --env=dev --label region=eu "$TMP/labels.store" KEY </dev/null
+    cp "$TMP/tty.out" "$TMP/selected-tty"
+    check labels_get_ambiguous 1 script -q "$TMP/tty.out" "$BASH" "$SECRET" get --env dev --label region=eu "$TMP/ambiguous.store" KEY </dev/null
 else
-    check labels_get_tty 0 script -q -c "'$BASH' '$SECRET' get '$TMP/labels.store' KEY" "$TMP/tty.out" </dev/null
+    check labels_get_tty 0 script -q -c "'$BASH' '$SECRET' get --env=dev --label region=eu '$TMP/labels.store' KEY" "$TMP/tty.out" </dev/null
+    cp "$TMP/tty.out" "$TMP/selected-tty"
+    check labels_get_ambiguous 0 script -q -c "'$BASH' '$SECRET' get --env dev --label region=eu '$TMP/ambiguous.store' KEY" "$TMP/tty.out" </dev/null
 fi
-assert labels_get_tty_hint grep -q 'labeled stores are not supported' "$TMP/tty.out"
-assert labels_get_tty_no_value bash -c '! grep -Fq prod-synthetic "$1"' test "$TMP/tty.out"
+assert labels_get_selected grep -Fq dev-eu-synthetic "$TMP/selected-tty"
+assert labels_get_ambiguous_hint grep -q 'ambiguous labels for KEY' "$TMP/tty.out"
+if [[ "$OSTYPE" == darwin* ]]; then
+    check labels_get_unmatched 1 script -q "$TMP/tty.out" "$BASH" "$SECRET" get --env prod "$TMP/labels.store" ALPHA </dev/null
+else
+    check labels_get_unmatched 0 script -q -c "'$BASH' '$SECRET' get --env prod '$TMP/labels.store' ALPHA" "$TMP/tty.out" </dev/null
+fi
+assert labels_get_unmatched_hint grep -q 'key is not set' "$TMP/tty.out"
+check labels_clip_selected 0 "$BASH" "$SECRET" clip --env=dev --label region=eu "$TMP/labels.store" KEY 2
+printf 'dev-eu-synthetic' >"$TMP/expected"
+assert labels_clip_selected_bytes cmp -s "$CLIPBOARD" "$TMP/expected"
+check labels_clip_ambiguous 1 "$BASH" "$SECRET" clip --env dev --label region=eu "$TMP/ambiguous.store" KEY
+assert labels_clip_ambiguous_hint grep -q 'ambiguous labels for KEY' "$TMP/err"
+check labels_clip_unmatched 1 "$BASH" "$SECRET" clip --env prod "$TMP/labels.store" ALPHA
+assert labels_clip_unmatched_hint grep -q 'key is not set' "$TMP/err"
 check clip 0 "$BASH" "$SECRET" clip "$TMP/bytes.store" KEY 1
 printf 'byte-safe-[]$x' >"$TMP/expected"
 assert clipboard_copy cmp -s "$CLIPBOARD" "$TMP/expected"
