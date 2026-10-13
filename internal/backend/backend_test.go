@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/avhn/secret/internal/store"
@@ -186,5 +187,68 @@ func TestBackendOrdering(t *testing.T) {
 	}
 	if _, err := ListNames(dir, "libsecret:demo"); err == nil {
 		t.Error("backend mismatch accepted")
+	}
+}
+
+type labelStub struct {
+	*stub
+	label string
+}
+
+func (s *labelStub) Put(service, account, label string, value []byte) error {
+	s.label = label
+	return s.stub.Put(service, account, label, value)
+}
+
+func TestBackendDisplayLabels(t *testing.T) {
+	for _, tc := range []struct {
+		ref, want string
+		labels    map[string]string
+	}{
+		{"keychain:demo", "secret/demo/TOKEN", nil},
+		{"keychain:demo", "secret/demo/TOKEN/env=dev,zone=west", map[string]string{"zone": "west", "env": "dev"}},
+		{"libsecret:demo", "secret demo TOKEN", nil},
+		{"libsecret:demo", "secret demo TOKEN [env=dev,zone=west]", map[string]string{"zone": "west", "env": "dev"}},
+	} {
+		t.Run(tc.ref+"/"+tc.want, func(t *testing.T) {
+			dir := t.TempDir()
+			s := &labelStub{stub: &stub{dir: filepath.Join(dir, "stub")}}
+			if err := Stash(dir, tc.ref, "TOKEN", tc.labels, []byte("synthetic"), s); err != nil {
+				t.Fatal(err)
+			}
+			if s.label != tc.want {
+				t.Errorf("label = %q, want %q", s.label, tc.want)
+			}
+		})
+	}
+}
+
+func TestConcurrentBackendSameIdentity(t *testing.T) {
+	dir := t.TempDir()
+	s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
+	const count = 16
+	errs := make(chan error, count)
+	var wg sync.WaitGroup
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- Stash(dir, "libsecret:demo", "TOKEN", map[string]string{"env": "dev", "zone": "west"}, []byte("synthetic"), s)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	records, err := ListNames(dir, "libsecret:demo")
+	if err != nil || len(records) != 1 {
+		t.Fatalf("records = %d, %v", len(records), err)
+	}
+	entries, err := os.ReadDir(s.path("secret/demo", ""))
+	if err != nil || len(entries) != 1 || entries[0].Name() != records[0].Account {
+		t.Fatalf("accounts = %v, %v", entries, err)
 	}
 }

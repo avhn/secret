@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+func testStash(path, key string, labels map[string]string, value []byte) error {
+	return StashWithSecretsDir(filepath.Dir(path), path, key, labels, value)
+}
+
 func TestStashBashBytes(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(storeTestdata, "stash-cases.txt"))
 	if err != nil {
@@ -48,7 +52,7 @@ func TestStashBashBytes(t *testing.T) {
 			}
 			value := []byte(fields[4])
 			value = bytes.ReplaceAll(value, []byte(`\n`), []byte{'\n'})
-			if err = Stash(path, fields[2], labels, value); err != nil {
+			if err = testStash(path, fields[2], labels, value); err != nil {
 				t.Fatal(err)
 			}
 			got, err := os.ReadFile(path)
@@ -77,7 +81,7 @@ func TestStashValidationAndTargets(t *testing.T) {
 	for i, v := range []string{"", "\n", "space ", "\tlead", "bad\x00x", "bad\ry", "bad\ny\n", "'pair'", "\"pair\""} {
 		t.Run(fmt.Sprintf("value-%d", i), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "item.store")
-			err := Stash(path, "KEY", nil, []byte(v))
+			err := testStash(path, "KEY", nil, []byte(v))
 			if err == nil {
 				t.Error("accepted invalid value")
 			}
@@ -94,19 +98,19 @@ func TestStashValidationAndTargets(t *testing.T) {
 	if err := os.Mkdir(path, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := Stash(path, "KEY", nil, []byte("safe")); err == nil {
+	if err := testStash(path, "KEY", nil, []byte("safe")); err == nil {
 		t.Error("directory target accepted")
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(dir, path); err == nil {
-		if err := Stash(path, "KEY", nil, []byte("safe")); err == nil {
+		if err := testStash(path, "KEY", nil, []byte("safe")); err == nil {
 			t.Error("symlink target accepted")
 		}
 		linkedDir := filepath.Join(t.TempDir(), "linked")
 		if err := os.Symlink(dir, linkedDir); err == nil {
-			if err := Stash(filepath.Join(linkedDir, "new.store"), "KEY", nil, []byte("safe")); err == nil {
+			if err := testStash(filepath.Join(linkedDir, "new.store"), "KEY", nil, []byte("safe")); err == nil {
 				t.Error("symlink secrets directory accepted")
 			}
 		}
@@ -118,12 +122,15 @@ func TestStashValidationAndTargets(t *testing.T) {
 // TestMain re-executes this binary for independent process writers.
 func TestMain(m *testing.M) {
 	mode := os.Getenv("GO_STORE_CHILD")
+	if mode != "" {
+		lockWait = 30 * time.Second
+	}
 	if mode == "" {
 		os.Exit(m.Run())
 	}
 	path := os.Getenv("GO_STORE_PATH")
 	if mode == "hold" {
-		if err := withLock(filepath.Dir(path), func() error {
+		if err := withLock(filepath.Dir(path), 3*time.Second, func() error {
 			// Pause after the same private file write as atomicReplace, before rename.
 			scratch, err := os.MkdirTemp(filepath.Dir(path), ".secret-stash.")
 			if err != nil {
@@ -156,12 +163,15 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	if err := Stash(path, mode, nil, []byte("synthetic-"+mode)); err != nil {
+	if err := testStash(path, mode, nil, []byte("synthetic-"+mode)); err != nil {
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 func TestConcurrentStash(t *testing.T) {
+	old := lockWait
+	lockWait = 30 * time.Second
+	defer func() { lockWait = old }()
 	for _, subprocess := range []bool{false, true} {
 		t.Run(fmt.Sprint("process-", subprocess), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "parallel.store")
@@ -180,7 +190,7 @@ func TestConcurrentStash(t *testing.T) {
 							errors <- fmt.Errorf("child failed: %v (%s)", err, output)
 						}
 					} else {
-						errors <- Stash(path, key, nil, []byte("synthetic-"+key))
+						errors <- testStash(path, key, nil, []byte("synthetic-"+key))
 					}
 				}(i)
 			}
@@ -248,7 +258,7 @@ func TestKilledWriterLeavesLock(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, ".write-lock")); err != nil {
 		t.Fatal(err)
 	}
-	if err := Stash(path, "RECOVERED", nil, []byte("synthetic-recovery")); err != nil {
+	if err := testStash(path, "RECOVERED", nil, []byte("synthetic-recovery")); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := os.ReadDir(dir)
@@ -268,7 +278,7 @@ func FuzzStash(f *testing.F) {
 	f.Fuzz(func(t *testing.T, value []byte) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "fuzz.store")
-		err := Stash(path, "KEY", nil, value)
+		err := testStash(path, "KEY", nil, value)
 		normal, valid := NormalizeValue(value)
 		if valid != nil {
 			if err == nil {
@@ -291,4 +301,73 @@ func FuzzStash(f *testing.F) {
 			t.Error("stash round trip failed")
 		}
 	})
+}
+
+func TestExplicitStashWaitsForSecretsDirLock(t *testing.T) {
+	base := t.TempDir()
+	secrets := filepath.Join(base, "secrets")
+	explicit := filepath.Join(base, "elsewhere", "file.store")
+	t.Setenv("SECRETS_DIR", secrets)
+	locked := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- WithWriteLock(secrets, func() error { close(locked); <-release; return nil })
+	}()
+	<-locked
+	result := make(chan error, 1)
+	go func() { result <- Stash(explicit, "KEY", nil, []byte("synthetic")) }()
+	// Wait until the Go writer observes contention; it must not publish early.
+	time.Sleep(150 * time.Millisecond)
+	select {
+	case err := <-result:
+		t.Errorf("explicit stash bypassed secrets lock: %v", err)
+	default:
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(explicit); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteLockTimeout(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".write-lock"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	err := withLock(dir, 20*time.Millisecond, func() error { t.Error("acquired held lock"); return nil })
+	if err == nil || !strings.Contains(err.Error(), "write lock timed out") {
+		t.Fatalf("timeout = %v", err)
+	}
+}
+
+func TestAnchoredReadRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "store")
+	if err := os.WriteFile(path, []byte("KEY=synthetic\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := os.Symlink("store", filepath.Join(dir, "alias")); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skip("symlink privileges unavailable")
+		}
+		t.Fatal(err)
+	}
+	if _, err := readRegular(root, "alias"); err == nil {
+		t.Error("followed symlinked store")
+	}
+	if _, err := ReadManifest(filepath.Join(dir, "alias"), "libsecret"); err == nil {
+		t.Error("followed symlinked manifest")
+	}
 }

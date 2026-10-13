@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,14 +98,32 @@ func ParseManifest(data []byte, backend string) ([]ManifestRecord, error) {
 // ReadManifest requires a private, regular inventory; missing inventories are
 // represented by os.ErrNotExist so the caller can opt into creation explicitly.
 func ReadManifest(path, backend string) ([]ManifestRecord, error) {
-	info, err := os.Lstat(path)
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	return readManifestRoot(root, filepath.Base(path), backend)
+}
+
+func readManifestRoot(root *os.Root, name, backend string) ([]ManifestRecord, error) {
+	info, err := root.Lstat(name)
 	if err != nil {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) {
 		return nil, errManifest
 	}
-	data, err := os.ReadFile(path)
+	file, err := openNoFollow(root, name)
+	if err != nil {
+		return nil, errors.New("cannot read manifest")
+	}
+	defer file.Close()
+	info, err = file.Stat()
+	if err != nil || !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) {
+		return nil, errManifest
+	}
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, errors.New("cannot read manifest")
 	}
@@ -117,32 +136,46 @@ func UpdateManifest(path, backend, key string, labels map[string]string, account
 	if !manifestBackend(backend) || !validRecord(ManifestRecord{key, labels, account}) {
 		return errManifest
 	}
-	return withLock(filepath.Dir(path), func() error {
-		records, err := ReadManifest(path, backend)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		if os.IsNotExist(err) {
-			records = nil
-		}
-		wanted := CanonicalLabels(labels)
-		var out []byte
-		out = append(out, []byte("secret-manifest-v1\nbackend="+backend+"\n")...)
-		for _, r := range records {
-			if r.Key == key && CanonicalLabels(r.Labels) == wanted {
-				if r.Account != account {
-					return errManifest
-				}
-				continue
-			}
-			if r.Account == account {
+	return WithWriteLock(filepath.Dir(path), func() error {
+		return UpdateManifestLocked(path, backend, key, labels, account)
+	})
+}
+
+// UpdateManifestLocked publishes while the caller holds the secrets write lock.
+func UpdateManifestLocked(path, backend, key string, labels map[string]string, account string) error {
+	if !manifestBackend(backend) || !validRecord(ManifestRecord{key, labels, account}) {
+		return errManifest
+	}
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	name := filepath.Base(path)
+	records, err := readManifestRoot(root, name, backend)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if os.IsNotExist(err) {
+		records = nil
+	}
+	wanted := CanonicalLabels(labels)
+	var out []byte
+	out = append(out, []byte("secret-manifest-v1\nbackend="+backend+"\n")...)
+	for _, r := range records {
+		if r.Key == key && CanonicalLabels(r.Labels) == wanted {
+			if r.Account != account {
 				return errManifest
 			}
-			out = append(out, []byte(r.Key+"\t"+CanonicalLabels(r.Labels)+"\t"+r.Account+"\n")...)
+			continue
 		}
-		out = append(out, []byte(key+"\t"+wanted+"\t"+account+"\n")...)
-		return atomicReplace(path, out)
-	})
+		if r.Account == account {
+			return errManifest
+		}
+		out = append(out, []byte(r.Key+"\t"+CanonicalLabels(r.Labels)+"\t"+r.Account+"\n")...)
+	}
+	out = append(out, []byte(key+"\t"+wanted+"\t"+account+"\n")...)
+	return atomicReplace(root, name, out)
 }
 
 // NewAccount generates an unpredictable 128-bit, lowercase hexadecimal ID.
