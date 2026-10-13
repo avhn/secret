@@ -41,6 +41,8 @@ jobs:
       - name: Isolated Keychain suite
         run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/keychain-cases.tsv" SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh
       - name: Check keychain inventory
+        env:
+          SECRET_INVENTORY_STRICT: "1"
         run: bash tests/inventory.sh --check --suite keychain
       - name: Generate missing keychain inventory artifact
         if: steps.missing_keychain.outputs.missing == 'true'

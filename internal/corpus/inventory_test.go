@@ -26,7 +26,8 @@ func TestInventory(t *testing.T) {
 	validStatus := regexp.MustCompile(`^[0-9]+$`)
 	seen := make(map[string]string)
 	for _, path := range files {
-		suite := strings.TrimSuffix(filepath.Base(path), ".tsv")
+		// SUITE.darwin.tsv overrides carry the same suite name as SUITE.tsv.
+		suite := strings.TrimSuffix(strings.TrimSuffix(filepath.Base(path), ".tsv"), ".darwin")
 		f, err := os.Open(path)
 		if err != nil {
 			t.Fatal(err)
@@ -40,7 +41,8 @@ func TestInventory(t *testing.T) {
 				t.Errorf("%s:%d: invalid suite, name or field count", path, line)
 				continue
 			}
-			key := fields[0] + "/" + fields[1]
+			// Keys are unique within each file; an override repeats its base keys.
+			key := path + "|" + fields[0] + "/" + fields[1]
 			if first, exists := seen[key]; exists {
 				t.Errorf("%s:%d: duplicate %s (first in %s)", path, line, key, first)
 			}

@@ -1,6 +1,8 @@
 # Synthetic case inventory
 
-Each `inventory/<suite>.tsv` row contains `suite<TAB>name<TAB>kind<TAB>expected`.
+On macOS, `inventory/<suite>.darwin.tsv` replaces the base file where cases
+differ by platform (no `/proc`, BSD `script` exit status). Each
+`inventory/<suite>.tsv` row contains `suite<TAB>name<TAB>kind<TAB>expected`.
 Kinds are `check` (expected exit status), `assert` (zero status) and `decision`
 (`allow` or `deny`). Repeated case names receive an encounter-order `#2`,
 `#3`, etc. suffix. The key is `suite/name`, including any suffix. Later Go
