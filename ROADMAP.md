@@ -1,0 +1,145 @@
+# Roadmap
+
+Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
+
+**Current milestone:** M0, parity substrate (planned). This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
+
+## Owner decisions (2026-10-13)
+
+- Deny indeterminate content-producing commands and malformed supported hook calls, with fixed recovery guidance.
+- Cut over Claude Code only on v2.1.295+ with `onFailure: "block"` on every synchronous hook entry and verified host failure tests. Keep Codex on the Bash guard until Codex blocks hook failures. Claim no Windows shell protection until its adapter and host tests exist.
+- Keep audit off by default and MCP off until configured; allow names-only JSON.
+
+## Done: Bash-era phases
+
+- Hardened guard: protected input roles and aliases (`b430d30`), parser and search fixes (`3aba0f2`, `fc59cd1`, `ab4fa37`) and fail-safe redaction (`020c540`).
+- Labels: parsing and selection (`6ef692d`, `e27df53`), documented in `9078661`.
+- Keystore dispatch and libsecret backend: `87d739d`, `fd6f49e`.
+- macOS Keychain backend: `ddac1e2`.
+- Codex guard support: `a80b9ee`; Codex plugin: `d34251f`.
+
+## M0: Parity substrate
+
+Status: planned. Estimate: 4-6 days. Goal: establish Go module, synthetic parity corpus, labeled stores and stub backend.
+
+- [ ] chore(go): add module and pinned toolchain
+- [ ] test(corpus): preserve synthetic fixtures and case inventory
+- [ ] feat(store): parse file records and explicit labels with golden assertions
+- [ ] test(store): extend parser and selection corpus
+- [ ] feat(store): implement locked atomic stash and v1 manifests
+- [ ] feat(backend): add stub dispatch and provider interface
+
+Gate: parser, label, stash and manifest goldens; race/concurrency tests; unchanged Bash CI; no real provider access.
+
+## M1: CLI parity
+
+Status: planned. Estimate: 5-7 days. Goal: port CLI, provider transports and redacted child execution.
+
+- [ ] feat(cli): add inventory and human-only commands
+- [ ] feat(backend): port libsecret transport
+- [ ] feat(backend): port keychain transport
+- [ ] feat(run): construct selected child environment
+- [ ] feat(run): filter both output streams and supervise child
+- [ ] test(cli): port CLI and backend assertions
+
+Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on appropriate runners; inject failures/signals; no values in argv or diagnostics; Bash 3.2 jobs green.
+
+## M2: Go hook parity and tightening
+
+Status: planned. Estimate: 7-10 days. Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax.
+
+- [ ] feat(hook): decode host envelopes and path roles
+- [ ] feat(hook): analyse bash AST and bounded expansions
+- [ ] feat(hook): port command and printer role tables
+- [ ] feat(hook): certify search config and git grep scope
+- [ ] feat(hook): guard Codex patches and workdir
+- [ ] test(hook): classify every bash differential and fuzz seeds
+
+Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s host timeout; cross-platform Go and race tests green. Bash guard stays active.
+
+## M3: Operator workflow
+
+Status: planned. Estimate: 5-8 days. Goal: add names-only inventory and consent-gated operator features.
+
+- [ ] feat(cli): add name-only diff and structured inventory
+- [ ] feat(cli): add import and keystore export
+- [ ] feat(cli): add rename rotate delete and orphan doctor
+- [ ] feat(run): add private template injection
+- [ ] feat(cli): add completion audit and names-only mcp
+- [ ] test(feature): enforce names-only and no-value transport
+
+Gate: human-only operator path; import/export mocks and implemented real backends; no persistent rendered plaintext; typed JSON goldens; fuzz/race and prior matrix green. Audit remains opt-in and MCP disabled until configured.
+
+## M4: Releasable Linux/macOS core
+
+Status: planned. Estimate: 4-6 days. Goal: ship verified binaries and gate Claude Code cutover on real host failure behavior.
+
+- [ ] build(release): add deterministic artifacts and attestations
+- [ ] feat(plugin): add symlink-safe verified launchers with bootstrap-denial and symlink assertions
+- [ ] test(plugin): extend cold offline corruption timeout and concurrent-install matrix
+- [ ] docs(install): document pins host versions and failure modes
+- [ ] chore(plugin): add claude onFailure block and bump manifests
+- [ ] feat(hook): stage claude activation on release branch before S
+- [ ] test(codex): record host failure behavior before codex cutover
+
+Gate: two green candidates, source commit S, checksum commit C and final tag at C; reproducible final-tag artifacts with verified repository/workflow/commit/ref/subject attestations; symlink install from another cwd; Claude Code v2.1.295+ blocks missing/failed executable, post-exec crash, invalid output and timeout with `onFailure: "block"` on both entries; pre-exec failures return fixed denial. Linux/macOS CI, corpus, providers and race green before default-branch switch. Codex stays on Bash; no Windows release or protection claim.
+
+## M5a: Windows CLI and Credential Manager
+
+Status: conditional. Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
+
+- [ ] feat(windows): implement handle-safe paths acl and job cleanup
+- [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions
+- [ ] test(windows): expand real-runner and hook-shim matrix
+
+Gate: Windows runner proves ACLs, rename/lock, drive/UNC/junction paths, child lifecycle, exact fetch, no value in argv/output, and file/patch hooks. Shell calls deny when shim runs; document fail-open hosts. Publish Windows assets/Scoop only after M4-equivalent provenance gate.
+
+## M5b: pass backend
+
+Status: conditional. Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
+
+- [ ] feat(backend): implement pass stdin writes and private reads with stub and isolated gpg assertions
+- [ ] test(pass): extend provider collision matrix
+
+Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and licensing review green; otherwise disabled.
+
+## M5c: 1Password backend
+
+Status: conditional. Estimate: 3-5 days. Goal: registered item reads without value exposure.
+
+- [ ] feat(backend): add registered item reads with isolated cli and failure assertions
+- [ ] test(onepassword): extend unsupported-write and redaction matrix
+
+Gate: fixed-reference read and all-record redaction integration; writes/export only with tested stdin/API transport and exact readback, else read-only.
+
+## M5d: age store
+
+Status: conditional. Estimate: 4-7 days. Goal: opt-in encrypted file storage.
+
+- [ ] feat(backend): add opt-in encrypted file store with envelope and crash assertions
+- [ ] test(age): expand fuzz corpus and recipient matrix
+
+Gate: dependency license/security review, no persisted plaintext, atomic recovery and recipient/identity isolation green; otherwise omit.
+
+## M5e: PowerShell AST
+
+Status: conditional. Estimate: 8-14 days. Goal: host-tested Windows PowerShell shell classification.
+
+- [ ] feat(hook): classify powershell ast with safe-source and failure assertions
+- [ ] test(hook): expand real windows host dialect matrix
+
+Gate: host/version/workdir contract, static literals/pipelines/redirects/nested blocks checked against PowerShell, dynamic syntax denied, and missing/crash/timeout blocks. Only then claim Windows shell protection; CMD remains denied.
+
+## M6: Bash compatibility
+
+Status: planned (after two green M4 releases). Estimate: 2-3 days. Goal: maintain explicit rollback until supported hosts can safely retire it.
+
+- [ ] docs(compat): mark bash implementation maintenance-only
+- [ ] test(compat): retain differential corpus and explicit rollback CI
+- [ ] chore(compat): retire bash rollback (later owner-approved major release only)
+
+Gate: host-by-host docs and manifests, green rollback tests; never remove the installed Codex guard while hook failures remain open. Retirement requires blocking hosts and verified offline binary installation.
+
+## Keeping this tracker current
+
+Tick each commit item in the same PR as the change and append its commit hash, for example `- [x] type(scope): summary (abc1234)`. When a milestone gate passes, set status to `done` and record links to the passing GitHub Actions runs alongside its gate. Do not mark gates passed from local tests alone; keep [CHANGELOG.md](CHANGELOG.md) aligned with shipped behavior.
