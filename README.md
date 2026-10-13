@@ -181,8 +181,14 @@ bash tests/test-backends.sh # disposable keystore stub matrix
 bash tests/test-guard.sh    # guard matrix, needs jq
 ```
 
-Both use disposable directories and synthetic values only. CI runs them on
+The suites use disposable directories and synthetic values only. CI runs them on
 Linux and macOS, including stock `/bin/bash` 3.2.
+
+## Development
+
+The Go rewrite is in progress; track milestones in [ROADMAP.md](ROADMAP.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR guidance and
+[AGENTS.md](AGENTS.md) for coding agent rules.
 
 ## License
 
