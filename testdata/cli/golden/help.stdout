@@ -1,0 +1,33 @@
+Usage: secret list | show [--env ENV] [--label N=V ...] [FILE ...] | help
+       secret run|exec -f FILE [-f FILE ...] [--env ENV] [--label N=V] [--key KEY] [--optional-key KEY] -- CMD [ARG ...]
+       secret stash [--env ENV] [--label N=V ...] FILE KEY
+       secret get [--env ENV] [--label N=V ...] FILE KEY
+       secret clip [--env ENV] [--label N=V ...] FILE KEY [SECONDS]
+Bare NAME resolves to ~/.secrets/NAME.secret, then ~/.secrets/.NAME.secret.
+keychain:NAME uses macOS Keychain; libsecret:NAME uses Linux Secret Service.
+SECRET_KEYCHAIN selects an explicit keychain path (without spaces or quoting).
+file:PATH forces a literal file path. Keystore names must be
+simple names, not paths. Their names-only manifests live at ~/.secrets/NAME.keys.
+list prints store references; show prints file lengths or keystore <stored>.
+run and exec require explicit files and --. Later files win. Selectors export
+only selected keys; required keys must be nonempty, missing optional keys vanish.
+--env ENV means --label env=ENV; repeated labels are ANDed. Without labels,
+only unlabeled records qualify. Unmatched store keys are removed from the child.
+Exact [N=V,...] store headers scope following keys; [] resets the scope.
+show without selectors lists every labeled record; selected show marks unmatched keys.
+stash updates the exact label set; get and clip select like run.
+run redacts ALL nonempty loaded values, longest first, on stdout and stderr.
+Redaction cannot catch transformed values. Do not print or inspect credentials.
+exec is unfiltered: only human interactive or configured MCP launchers use it.
+get prints a value only to a human terminal, never through Claude's ! command.
+stash reads hidden terminal input or stdin; writes reject empty, NUL, CR, embedded
+newline, boundary whitespace, and surrounding quote pairs. One final LF is allowed.
+clip copies and conditionally clears the clipboard (default 45 seconds).
+Values are not in this tool's argv or filter argv; a child can expose its own
+values in argv. Prefer stdin/header files for consumers that support them.
+Exit: 0 success/help/empty inventory, 1 usage/store/filter error; run preserves
+a failing child status unless a filter fails (filter failure takes precedence).
+run supervises only the direct child and filters, not descendants the child leaves
+running. Filter draining stops after 2 s when descendants hold the output open;
+remaining output is dropped, never printed unfiltered.
+exec preserves child status, framing, and signals.

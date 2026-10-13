@@ -1,0 +1,3 @@
+tie.store
+  KEY [env=prod]=<3 bytes>
+  OTHER=<5 bytes>
