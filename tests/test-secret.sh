@@ -348,7 +348,9 @@ sleep 1.2
 assert clipboard_replacement grep -q '^user-replaced$' "$CLIPBOARD"
 # Verify actual rg defaults against synthetic files, not real project stores.
 mkdir "$TMP/rg-fixture"
-for file in .env .env.example app.secret .netrc .git-credentials normal.ts; do printf 'SYNTHETIC_MATCH\n' >"$TMP/rg-fixture/$file"; done
+mkdir -p "$TMP/rg-fixture/.aws" "$TMP/rg-fixture/.ssh" "$TMP/rg-fixture/.config/gh"
+# Distinct uppercase names: a case-insensitive macOS filesystem folds .ENV onto .env.
+for file in .env .env.example app.secret prod.ENV UPPER.SECRET .netrc .git-credentials .npmrc .aws/credentials .ssh/id_ed25519 .config/gh/hosts.yml normal.ts; do printf 'SYNTHETIC_MATCH\n' >"$TMP/rg-fixture/$file"; done
 check rg_default_exclusions 0 env RIPGREP_CONFIG_PATH="$ROOT/examples/ripgreprc" rg -l SYNTHETIC_MATCH "$TMP/rg-fixture"
 assert rg_only_code grep -q '/normal.ts$' "$TMP/out"
 assert rg_one_file test "$(wc -l <"$TMP/out" | tr -d ' ')" = 1
