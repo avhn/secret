@@ -61,6 +61,8 @@ Go run filters independent stdout and stderr byte streams with a bounded streami
 
 Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on appropriate runners; inject failures/signals; no values in argv or diagnostics; Bash 3.2 jobs green.
 
+M1 test progress (box stays open): the four existing shell suites accept `SECRET_CLI` with the Bash CLI still the default. CI builds regular and `secretstub` test-only Go binaries and runs the same cases on their existing runner jobs. `tests/go-cli.sh` checks every case against `testdata/inventory/go-expected-divergence.tsv`, failing for new failures or a listed case that now passes. Local Linux results: 183 passed and 18 deliberate Bash-only Perl fault-injection divergences for CLI, 63 passed and 0 divergences for stub. Go filter failure and signal tests inject directly in `internal/cli/supervise_test.go`. The isolated 85 libsecret and 129 keychain Go cases, plus macOS Bash 3.2, require CI runner confirmation; do not tick this item until those jobs pass.
+
 ## M2: Go hook parity and tightening
 
 Status: planned. Estimate: 7-10 days. Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax.

@@ -14,7 +14,9 @@ bash tests/test-codex.sh     # Codex guard
 shellcheck bin/secret hooks/guard-secrets tests/*.sh
 ```
 
-In isolated provider environments, run `SECRET_REQUIRE_LIBSECRET=1 bash tests/test-libsecret.sh` on Linux and `SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh` on macOS. These suites use synthetic fixtures; CI provides the required isolation. For Go changes, check `gofmt -l .`, `go vet ./...` and `go test ./...`; CI also runs `go test -race ./...`, a `go mod tidy` diff check and cross-compilation. The macOS CI matrix also tests stock Bash 3.2.
+The four CLI/provider suites also accept `SECRET_CLI=/absolute/path/to/secret` to run an alternate executable instead of `bin/secret`. Build a regular Go CLI for `secret`, `libsecret` and `keychain`, and a separate `go build -tags secretstub` executable for `backends`. The tag enables the disposable directory provider only in that test binary; the default build ignores `SECRET_BACKEND_STUB_DIR`. `bash tests/go-cli.sh SUITE /absolute/path/to/binary` compares every case with `testdata/inventory/go-expected-divergence.tsv`: listed failures must still fail and unlisted cases must pass. The current `deliberate` entries cover Bash-specific Perl fault injection, not Go filter tests; Go filter failure and signal injection are covered in `internal/cli/supervise_test.go`. Do not add values to diagnostics or argv.
+
+In isolated provider environments, run `SECRET_REQUIRE_LIBSECRET=1 bash tests/test-libsecret.sh` on Linux and `SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh` on macOS. These suites use synthetic fixtures; CI provides the required isolation. Run the Go versions only on the corresponding isolated CI runners, never against a normal keyring or Keychain. For Go changes, check `gofmt -l .`, `go vet ./...` and `go test ./...`; CI also runs `go test -race ./...`, a `go mod tidy` diff check and cross-compilation. The macOS CI matrix also tests stock Bash 3.2.
 
 ## Propose changes
 

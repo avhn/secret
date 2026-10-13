@@ -371,3 +371,28 @@ func TestAnchoredReadRejectsSymlink(t *testing.T) {
 		t.Error("followed symlinked manifest")
 	}
 }
+
+func TestStashProtectsSecretsDirectoryAndResetsTrailingScope(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix directory permissions")
+	}
+	dir := filepath.Join(t.TempDir(), "secrets")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "labeled.store")
+	if err := os.WriteFile(path, []byte("[env=dev]\n# keep\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := StashWithSecretsDir(dir, path, "KEY", nil, []byte("synthetic")); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(dir)
+	if err != nil || info.Mode().Perm() != 0700 {
+		t.Fatalf("secrets directory mode: %v, %v", info, err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != "[env=dev]\n# keep\n[]\nKEY=synthetic\n" {
+		t.Fatalf("unlabeled stash did not reset trailing scope: %v", err)
+	}
+}

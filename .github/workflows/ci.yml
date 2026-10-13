@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh testdata/store/gen.sh testdata/cli/gen.sh
+      - run: python3 -I tests/test-go-divergence.py
 
   libsecret:
     name: libsecret (ubuntu-latest)
@@ -26,6 +27,12 @@ jobs:
           cache: true
       - name: Install Secret Service test dependencies
         run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11
+      - name: Build Go CLI for provider suite
+        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+      - name: Go libsecret suite
+        env:
+          SECRET_REQUIRE_LIBSECRET: "1"
+        run: bash tests/go-cli.sh libsecret "$RUNNER_TEMP/secret-go"
       - name: Isolated libsecret suite
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
@@ -50,6 +57,12 @@ jobs:
         id: missing_keychain
         run: |
           if [ ! -f testdata/inventory/keychain.tsv ]; then echo "missing=true" >>"$GITHUB_OUTPUT"; fi
+      - name: Build Go CLI for provider suite
+        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+      - name: Go Keychain suite
+        env:
+          SECRET_REQUIRE_KEYCHAIN: "1"
+        run: bash tests/go-cli.sh keychain "$RUNNER_TEMP/secret-go"
       - name: Isolated Keychain suite
         run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/keychain-cases.tsv" SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh
       - name: Isolated Go Keychain integration
@@ -85,6 +98,18 @@ jobs:
       - name: Select current bash
         run: |
           if [ "$RUNNER_OS" = macOS ]; then echo "BASH_BIN=$(brew --prefix)/bin/bash" >>"$GITHUB_ENV"; else echo "BASH_BIN=bash" >>"$GITHUB_ENV"; fi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build Go CLI suites
+        run: |
+          go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+          go build -tags secretstub -o "$RUNNER_TEMP/secret-go-stub" ./cmd/secret
+      - name: Go CLI matrix
+        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh secret "$RUNNER_TEMP/secret-go"
+      - name: Go backend matrix
+        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh backends "$RUNNER_TEMP/secret-go-stub"
       - name: CLI matrix
         run: '"$BASH_BIN" tests/test-secret.sh'
       - name: Backend matrix
