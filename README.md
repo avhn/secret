@@ -93,9 +93,15 @@ session. Values are sent to the provider through stdin and retrieved into a
 private file. Stash accepts values without a terminal newline or with one
 terminal newline (which it removes). Empty values, embedded newlines or CR,
 NUL, leading or trailing whitespace, and wrapping quotes are rejected.
-`keychain:NAME` still requires the isolated `SECRET_BACKEND_STUB_DIR` test
-backend; without it, keychain reads and writes fail closed. Never use the stub
-with real credentials.
+On macOS, `keychain:NAME` uses the user's default Keychain, or an explicit
+`SECRET_KEYCHAIN` absolute keychain path (only letters, digits, `_`, `.`, `/`,
+and `-`; paths requiring quoting are rejected). Values are hex-encoded into a
+`security -i` stdin command, never placed in process arguments. Keychain stash
+accepts printable UTF-8 text without Unicode controls or line separators;
+values outside this subset are rejected because `security -w` is a text interface. A private-file readback
+must match before the manifest is published. Reads strip exactly the one newline
+added by `security -w`. The test stub remains available for isolated tests;
+never use it with real credentials.
 
 `--env dev` means `--label env=dev`; repeat `--label name=value` to select
 multiple labels. Without selectors only unlabeled records qualify. For each key,
