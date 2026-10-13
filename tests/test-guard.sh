@@ -149,7 +149,9 @@ if command -v jq >/dev/null 2>&1; then
         secrets quoted_prose allow Bash 'git commit -m "never cat .env again"'
         # the sanctioned path
         secrets secret_show allow Bash 'secret show svc'
+        secrets libsecret_show allow Bash 'secret show libsecret:demo'
         secrets secret_run allow Bash 'secret run -f ~/.secrets/svc.secret -- curl -H "Authorization: token $API_TOKEN" https://x'
+        secrets libsecret_run allow Bash 'secret run -f libsecret:demo -- true'
         secrets secret_stash allow Bash 'gh auth token | secret stash github TOKEN'
         # environment dumps and credential printers
         secrets bare_env deny Bash 'env'
@@ -183,6 +185,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets aws_mixed_key deny Bash 'aws configure get AwS_SeCrEt_AcCeSs_KeY'
         secrets op_fields_equals deny Bash 'op item get item --fields=password'
         secrets op_fields_title deny Bash 'op item get item --fields title'
+        secrets secret_tool_lookup deny Bash 'secret-tool lookup service mail account synthetic'
         secrets secret_tool_search deny Bash 'secret-tool search service mail'
         secrets secret_tool_search_to_stash deny Bash 'secret-tool search service mail | secret stash svc KEY'
         secrets secret_tool_search_wrapped deny Bash 'nice -n 5 secret-tool search service mail'

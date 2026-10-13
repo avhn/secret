@@ -15,6 +15,18 @@ jobs:
       - uses: actions/checkout@v4
       - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh
 
+  libsecret:
+    name: libsecret (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Secret Service test dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11
+      - name: Isolated libsecret suite
+        env:
+          SECRET_REQUIRE_LIBSECRET: "1"
+        run: bash tests/test-libsecret.sh
+
   test:
     strategy:
       fail-fast: false
