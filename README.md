@@ -22,9 +22,9 @@ Three parts, usable together or alone:
 by habit or by mistake. It does not stop a determined or compromised agent with
 a shell: transformed output (base64, URL encoding, substrings) is not redacted,
 shell indirection the guard cannot parse is allowed unless it names a protected
-file or operation, MCP search tools are not covered, and the guard fails open
-when `jq` is missing or its input is malformed. Treat it as one layer, not the
-boundary.
+file or operation, MCP search tools are not covered, and the guard makes no
+decision when its input is malformed (without `jq` it denies every request).
+Treat it as one layer, not the boundary.
 
 ## Install
 

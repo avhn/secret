@@ -748,6 +748,11 @@ printf '%s\n' '--iglob=!.env' '--iglob=!*.secret' '--iglob=!.secrets/' >"$TMP/pa
 export RIPGREP_CONFIG_PATH="$TMP/partial-rg-config"
 secrets rg_partial_config deny Bash 'rg TOKEN .'
 secrets rg_partial_config_clean allow Bash 'rg TOKEN src'
+# Display and matching flags keep the scan fallback instead of denying outright.
+printf '%s\n' '--iglob=!.env' '--smart-case' '--max-columns=200' '--max-columns-preview' >"$TMP/display-rg-config"
+export RIPGREP_CONFIG_PATH="$TMP/display-rg-config"
+secrets rg_display_config deny Bash 'rg TOKEN .'
+secrets rg_display_config_clean allow Bash 'rg TOKEN src'
 cat "$REPO_ROOT/examples/ripgreprc" >"$TMP/reinclude-rg-config"
 printf '%s\n' '--iglob=.env' >>"$TMP/reinclude-rg-config"
 export RIPGREP_CONFIG_PATH="$TMP/reinclude-rg-config"
@@ -814,6 +819,144 @@ PATH="$TMP/find-bin:$PATH" secrets rg_timeout_names allow Bash 'rg -l TOKEN src'
 PATH="$TMP/find-bin:$PATH" secrets git_grep_timeout deny Bash 'git grep TOKEN -- src'
 export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 
+# Audit regressions: certification must not hide command-line scope changes.
+for flag in '--follow' '-L' '-u' '--search-zip' '--pre=cat' '--ignore-file=other' '--ignore-file-case-insensitive' '--no-ignore-vcs'; do
+    secrets "rg_config_scope_$flag" deny Bash "rg $flag TOKEN src"
+done
+secrets rg_config_follow_names allow Bash 'rg --follow -l TOKEN src'
+secrets rg_json_overrides_names deny Bash 'rg -l --json TOKEN .env'
+mkdir "$TMP/search/.secrets"
+printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/.secrets/nested.ts"
+secrets rg_glob_private_child deny Bash 'rg -g "*.ts" TOKEN .'
+for flag in --no-index --untracked --cached; do
+    secrets "git_scope_$flag" deny Bash "git grep $flag TOKEN -- src"
+    secrets "git_scope_names_$flag" allow Bash "git grep $flag -l TOKEN -- src"
+done
+secrets git_revision_colon deny Bash 'git grep TOKEN HEAD:.env'
+
+# Explicit pruned roots, including clean ones, are scanned rather than dropped.
+unset RIPGREP_CONFIG_PATH
+for directory in .git node_modules; do
+    secrets "grep_explicit_$directory" deny Grep "$TMP/pruned-$directory/$directory" '{"output_mode":"content"}'
+    secrets "grep_explicit_count_$directory" deny Grep "$TMP/pruned-$directory/$directory" '{"output_mode":"count"}'
+    secrets "grep_explicit_names_$directory" allow Grep "$TMP/pruned-$directory/$directory"
+    secrets "rg_explicit_$directory" deny Bash "rg --hidden TOKEN '$TMP/pruned-$directory/$directory'"
+    secrets "rg_hidden_parent_$directory" deny Bash "rg --hidden TOKEN '$TMP/pruned-$directory'"
+    mkdir -p "$TMP/clean-pruned/$directory"
+    secrets "grep_explicit_clean_$directory" allow Grep "$TMP/clean-pruned/$directory" '{"output_mode":"content"}'
+done
+
+# Root aliases and aliases to individual files use resolved metadata, not data.
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$TMP/search/.env" "$TMP/search/alias.txt"
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$TMP/search/src/a.ts" "$TMP/search/code-link"
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$TMP/upper-private/.Secrets" "$TMP/private-link"
+secrets grep_alias deny Grep "$TMP/search/alias.txt" '{"output_mode":"content","glob":"*.txt","type":"txt","multiline":true,"-A":2,"head_limit":1}'
+secrets grep_alias_count deny Grep alias.txt '{"output_mode":"count"}'
+secrets grep_alias_names allow Grep alias.txt
+secrets grep_code_alias allow Grep code-link '{"output_mode":"content"}'
+secrets grep_missing_content deny Grep "$TMP/missing-input" '{"output_mode":"content"}'
+secrets rg_alias_unconfigured deny Bash 'rg TOKEN alias.txt'
+secrets git_pattern_alias deny Bash 'git grep -f alias.txt -- src'
+secrets git_pattern_alias_attached deny Bash 'git grep -falias.txt -- src'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+secrets rg_alias_configured deny Bash 'rg TOKEN alias.txt'
+secrets rg_code_alias allow Bash 'rg TOKEN code-link'
+secrets rg_private_directory_alias deny Bash "rg TOKEN '$TMP/private-link'"
+secrets rg_private_cwd_alias deny Bash "cd '$TMP/private-link' && rg TOKEN"
+secrets rg_inline_config_clean deny Bash 'RIPGREP_CONFIG_PATH=other rg TOKEN src'
+secrets rg_wrapper_config_clean deny Bash 'env -u OTHER rg TOKEN src'
+secrets rg_config_filesystem_root deny Bash 'rg TOKEN /'
+if [[ -d /proc/self ]]; then
+    secrets rg_config_proc_root deny Bash 'rg TOKEN /proc/self'
+fi
+secrets rg_pattern_alias deny Bash 'rg --file=alias.txt src'
+secrets rg_pattern_alias_names deny Bash 'rg -l -f alias.txt src'
+
+# Config bytes and flags must be certified in full, never before a NUL.
+for suffix in nul trailing crlf follow pre ignore reinclude; do
+    cat "$REPO_ROOT/examples/ripgreprc" >"$TMP/audit-config"
+    case "$suffix" in
+        nul) printf '\000\n--glob=.env\n' >>"$TMP/audit-config" ;;
+        trailing) printf '%s\n' '--iglob=!.env ' >>"$TMP/audit-config" ;;
+        crlf) printf '%s\r\n' '--no-ignore' >>"$TMP/audit-config" ;;
+        follow) printf '%s\n' '--follow' >>"$TMP/audit-config" ;;
+        pre) printf '%s\n' '--pre=cat' >>"$TMP/audit-config" ;;
+        ignore) printf '%s\n' '--ignore-file=other' >>"$TMP/audit-config" ;;
+        reinclude) printf '%s\n' '--glob=.env' >>"$TMP/audit-config" ;;
+    esac
+    export RIPGREP_CONFIG_PATH="$TMP/audit-config"
+    # Extra negative globs with whitespace do not undo existing exclusions.
+    expected=deny
+    [[ "$suffix" != trailing ]] || expected=allow
+    secrets "rg_config_bytes_$suffix" "$expected" Bash 'rg TOKEN .'
+    if [[ "$suffix" != trailing ]]; then
+        secrets "rg_config_clean_$suffix" deny Bash 'rg TOKEN src'
+    fi
+done
+for format in crlf spaces; do
+    perl -pe 'BEGIN { $format = shift } if ($format eq "crlf") { s/\n/\r\n/ } else { s/\n/ \n/ }' "$format" <"$REPO_ROOT/examples/ripgreprc" >"$TMP/formatted-config"
+    export RIPGREP_CONFIG_PATH="$TMP/formatted-config"
+    secrets "rg_formatted_config_$format" deny Bash 'rg TOKEN .'
+done
+if ((EUID != 0)); then
+    chmod 000 "$TMP/audit-config"
+    export RIPGREP_CONFIG_PATH="$TMP/audit-config"
+    secrets rg_unreadable_config deny Bash 'rg TOKEN src'
+    chmod 600 "$TMP/audit-config"
+fi
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$REPO_ROOT/examples/ripgreprc" "$TMP/config-link"
+export RIPGREP_CONFIG_PATH="$TMP/config-link"
+secrets rg_config_symlink allow Bash 'rg TOKEN .'
+export RIPGREP_CONFIG_PATH="$TMP/search/alias.txt"
+secrets rg_config_protected_alias deny Bash 'rg TOKEN src'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+
+# JSON controls are rejected before raw extraction can silently alter fields.
+for field in path glob type output_mode; do
+    secrets "grep_nul_$field" deny Grep "$TMP/empty-search" "{\"output_mode\":\"content\",\"$field\":\".env\\u0000x\"}"
+done
+secrets grep_nul_traversal deny Grep "$TMP/empty-search" '{"path":"src\u0000/../.env","output_mode":"content"}'
+secrets grep_control_glob deny Grep "$TMP/empty-search" '{"glob":"*.ts\u001f","output_mode":"count"}'
+secrets bash_nul_reader deny Bash '' '{"command":"cat .env\u0000x"}'
+secrets bash_nul_search deny Bash '' '{"command":"rg TOKEN src\u0000/../.env"}'
+for tool in Read Edit Write; do
+    secrets "file_nul_$tool" deny "$tool" '' '{"file_path":".env\u0000x"}'
+done
+
+# Missing scan dependencies cannot establish a clean content search.
+mkdir "$TMP/missing-scan-bin"
+for executable in bash cat jq tr; do
+    perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$(command -v "$executable")" "$TMP/missing-scan-bin/$executable"
+done
+# The harness needs Perl for its outer watchdog; this shim removes the scan
+# tools only from the guard process, without changing the parent test runner.
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/missing-scan-bin" "$BASH" "$REPO_ROOT/hooks/guard-secrets" >"$TMP/missing-scan-guard"
+SECRETS_GUARD="$TMP/missing-scan-guard"
+secrets grep_missing_perl deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
+secrets grep_missing_perl_names allow Grep "$TMP/empty-search"
+secrets rg_missing_perl_config deny Bash 'rg TOKEN src'
+unset RIPGREP_CONFIG_PATH
+secrets rg_missing_perl deny Bash 'rg TOKEN src'
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$(command -v perl)" "$TMP/missing-scan-bin/perl"
+secrets grep_missing_find deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
+secrets rg_missing_find deny Bash 'rg TOKEN src'
+SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+
+mkdir "$TMP/missing-jq-bin"
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/missing-jq-bin" "$BASH" "$REPO_ROOT/hooks/guard-secrets" >"$TMP/missing-jq-guard"
+SECRETS_GUARD="$TMP/missing-jq-guard"
+secrets grep_missing_jq deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
+secrets rg_missing_jq deny Bash 'rg TOKEN src'
+SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
+FAILURE_OUTPUT="$(printf '%s' '{"tool_name":"Grep","cwd":"src\u0000/../.env","tool_input":{"output_mode":"content"}}' | "$BASH" "$SECRETS_GUARD")"
+if printf '%s' "$FAILURE_OUTPUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then
+    PASSED=$((PASSED + 1))
+else
+    FAILED=$((FAILED + 1))
+    printf 'FAIL NUL in cwd must be denied before extraction\n'
+fi
+
 # Narrow analysis failures use an exact fixed reason, never command text.
 FIXED_REASON='command too complex to analyse for secret access; split it or use secret run'
 FAILURE_OUTPUT="$(jq -cn --arg c "cat .env '" --arg w "$TMP/search" '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
@@ -841,7 +984,7 @@ else
     printf 'FAIL command substitution was executed\n'
 fi
 
-# Missing jq and malformed JSON are intentional fail-open boundaries.
+# Malformed JSON and empty stdin still produce no decision.
 if [[ -z "$(printf '%s' malformed | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 if [[ -z "$(printf '%s' 'malformed cat .env' | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 if [[ -z "$(PATH="$TMP/empty-search" "$BASH" "$SECRETS_GUARD" </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
