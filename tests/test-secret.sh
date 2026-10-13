@@ -114,6 +114,15 @@ check exec_bytes 0 "$BASH" "$SECRET" exec -f "$TMP/bytes.store" -- "$BASH" -c 'p
 assert exec_byte_equality cmp -s "$TMP/out" "$TMP/expected"
 printf 'next-value\n' >"$TMP/input"
 check stash_lf 0 "$BASH" "$SECRET" stash "$TMP/bytes.store" SECOND <"$TMP/input"
+printf '"abc' >"$TMP/input"
+check stash_leading_quote 0 "$BASH" "$SECRET" stash "$TMP/quoted.store" KEY <"$TMP/input"
+check stash_leading_quote_roundtrip 0 "$BASH" "$SECRET" exec -f "$TMP/quoted.store" -- perl -e 'exit($ENV{KEY} eq "\x22abc" ? 0 : 1)'
+printf "abc'" >"$TMP/input"
+check stash_trailing_quote 0 "$BASH" "$SECRET" stash "$TMP/quoted.store" KEY <"$TMP/input"
+check stash_trailing_quote_roundtrip 0 "$BASH" "$SECRET" exec -f "$TMP/quoted.store" -- perl -e 'exit($ENV{KEY} eq "abc\x27" ? 0 : 1)'
+printf "'ab\"" >"$TMP/input"
+check stash_mixed_quote 0 "$BASH" "$SECRET" stash "$TMP/quoted.store" KEY <"$TMP/input"
+check stash_mixed_quote_roundtrip 0 "$BASH" "$SECRET" exec -f "$TMP/quoted.store" -- perl -e 'exit($ENV{KEY} eq "\x27ab\x22" ? 0 : 1)'
 cp "$TMP/bytes.store" "$TMP/before"
 for kind in empty leading trailing quotes singlequotes embedded nul cr doublelf; do
     case "$kind" in
@@ -139,6 +148,64 @@ printf 'new-value' >"$TMP/input"
 check symlink_refusal 1 "$BASH" "$SECRET" stash "$TMP/link.store" KEY <"$TMP/input"
 assert symlink_unchanged cmp -s "$TMP/bytes.store" "$TMP/before"
 check directory_refusal 1 "$BASH" "$SECRET" stash "$TMP/cwd" KEY <"$TMP/input"
+
+# Observe a public parent throughout replacement, not just after the write.
+PUBLIC_PARENT="$TMP/public-parent"
+mkdir "$PUBLIC_PARENT"
+chmod 755 "$PUBLIC_PARENT"
+perl -e 'print "# padding\n" x 100000' >"$PUBLIC_PARENT/store"
+chmod 600 "$PUBLIC_PARENT/store"
+perl -e '
+    use strict; use warnings;
+    my ($dir, $ready, $done, $found) = @ARGV;
+    open my $r, ">", $ready or die "watcher readiness failed\n"; close $r;
+    for (1..3000) {
+        opendir my $d, $dir or die "watcher directory failed\n";
+        my @names = readdir $d; closedir $d;
+        for my $name (@names) {
+            next if $name eq "." || $name eq ".." || $name eq "store";
+            if (-f "$dir/$name") {
+                open my $f, ">", $found or die "watcher record failed\n"; close $f;
+            }
+        }
+        last if -e $done;
+        select undef, undef, undef, .001;
+    }
+' "$PUBLIC_PARENT" "$TMP/watcher-ready" "$TMP/watcher-done" "$TMP/watcher-found" &
+WATCH_PID=$!
+for ((i = 0; i < 100; i++)); do
+    [[ ! -e "$TMP/watcher-ready" ]] || break
+    sleep 0.01
+done
+assert stash_public_watcher_ready test -e "$TMP/watcher-ready"
+check stash_public_parent 0 "$BASH" "$SECRET" stash "$PUBLIC_PARENT/store" KEY <"$TMP/input"
+touch "$TMP/watcher-done"
+assert stash_public_watcher wait "$WATCH_PID"
+assert stash_public_no_regular_file test ! -e "$TMP/watcher-found"
+assert stash_public_no_leftover bash -c 'shopt -s nullglob; dirs=("$1"/.secret-stash.*); ((${#dirs[@]} == 0))' test "$PUBLIC_PARENT"
+
+mkdir "$TMP/failure-parent"
+printf 'KEY=original-value\nSECOND=keep-value\n' >"$TMP/failure-parent/store"
+cp "$TMP/failure-parent/store" "$TMP/failure-before"
+REAL_PERL="$(command -v perl)"
+export REAL_PERL
+export STASH_FAIL_FILE="$TMP/failure-parent/store" STASH_FAIL_PARENT="$TMP/failure-parent" STASH_FAIL_MARKER="$TMP/failure-marker"
+cat >"$TMP/bin/perl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${2:-}" == "$STASH_FAIL_FILE" && "${3:-}" == KEY ]]; then
+    shopt -s nullglob
+    dirs=("$STASH_FAIL_PARENT"/.secret-stash.*)
+    if ((${#dirs[@]})); then touch "$STASH_FAIL_MARKER"; fi
+    exit 91
+fi
+exec "$REAL_PERL" "$@"
+EOF
+chmod +x "$TMP/bin/perl"
+check stash_failure_cleanup 1 "$BASH" "$SECRET" stash "$STASH_FAIL_FILE" KEY <"$TMP/input"
+assert stash_failure_reached_private_dir test -e "$STASH_FAIL_MARKER"
+assert stash_failure_original cmp -s "$STASH_FAIL_FILE" "$TMP/failure-before"
+assert stash_failure_no_leftover bash -c 'shopt -s nullglob; dirs=("$1"/.secret-stash.*); ((${#dirs[@]} == 0))' test "$STASH_FAIL_PARENT"
+rm "$TMP/bin/perl"
 
 # Parallel writers share one lock even for explicitly named external stores.
 cat >"$TMP/tty-stash.py" <<'PYTTY'
