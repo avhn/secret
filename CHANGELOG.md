@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
+- Machine-checked synthetic shell case inventories with a Go format test and isolated provider CI checks.
+
 - A Go module skeleton and Go CI on Linux, macOS and Windows runners.
 - Explicit label sections and label-aware selection for file and keystore records.
 - Manifest-backed keystore dispatch, Linux libsecret and macOS Keychain backends, with isolated provider tests.

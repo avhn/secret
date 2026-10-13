@@ -17,6 +17,7 @@ PASSED=0 FAILED=0
 check() {
     local name="$1" want="$2" got=0
     shift 2
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tcheck\t%s\n' backends "$name" "$want" >>"$SECRET_TEST_INVENTORY"
     perl -e 'alarm 10; exec @ARGV' "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
     if [[ "$got" == "$want" ]]; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
@@ -29,6 +30,7 @@ check() {
 assert() {
     local name="$1"
     shift
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' backends "$name" >>"$SECRET_TEST_INVENTORY"
     if "$@"; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s\n' "$name"
