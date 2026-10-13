@@ -56,15 +56,31 @@ export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"  # in your shell profi
 
 ## Usage
 
-Stores are plain `KEY=VALUE` files: `~/.secrets.env` and `~/.secrets/*.secret`
-by default (`SECRETS_ENV` and `SECRETS_DIR` override them).
+Stores use `KEY=VALUE` lines: `~/.secrets.env` and `~/.secrets/*.secret`
+by default (`SECRETS_ENV` and `SECRETS_DIR` override them). Exact section
+headers such as `[env=dev,region=eu]` scope following assignments; `[]` resets
+to unlabeled. Other bracket lines are ignored. Labels use identifier names and
+values made of letters, digits, underscores, dots, or hyphens (starting with a
+letter, digit, or underscore). A labeled file is no longer plain dotenv for
+other tools. Older `secret` versions read all sections as one flat store, so
+upgrade before introducing headers.
 
 ```bash
 secret list                                   # store paths, never contents
 secret show ~/.secrets.env                    # API_TOKEN=<40 bytes>
 secret stash ~/.secrets.env API_TOKEN         # hidden prompt, atomic write
 secret run -f ~/.secrets.env --key API_TOKEN -- ./deploy.sh
+secret show --env dev ~/.secrets.env          # selected masked keys and unset keys
+secret stash --env dev ~/.secrets.env API_TOKEN
+secret run -f ~/.secrets.env --env dev --key API_TOKEN -- ./deploy.sh
 ```
+
+`--env dev` means `--label env=dev`; repeat `--label name=value` to select
+multiple labels. Without selectors only unlabeled records qualify. For each key,
+the most specific matching label set wins; equally specific distinct matches
+fail as ambiguous. `show` without selectors lists every record with canonical
+sorted labels and masked lengths. `stash` updates only the exact label set,
+while `get` and `clip` select the same record as `run`.
 
 `run` exports only the selected keys (`--key` required, `--optional-key`
 optional; no selector exports all), and replaces every loaded value in the

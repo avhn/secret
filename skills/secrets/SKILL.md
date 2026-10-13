@@ -4,7 +4,7 @@ description: >
   Use API tokens, credentials, .env stores, auth headers, deploy keys, or "use my
   token" requests without reading secret values into context. Discover masked key
   names, select a child environment, and recover from secret-guard denials.
-argument-hint: '[list | show FILE | use FILE KEY]'
+argument-hint: "[list | show FILE | use FILE KEY]"
 ---
 
 # Secrets
@@ -16,11 +16,19 @@ conversation. This is accident prevention, not a vault or a sandbox.
 ## Workflow
 
 1. `secret list` discovers default store paths without opening them.
-2. `secret show FILE` shows key names, masked lengths, duplicate warnings, and
-   ignored line numbers. It parses, never sources. Bare `NAME` resolves to
-   `~/.secrets/NAME.secret`, then `~/.secrets/.NAME.secret`.
+2. `secret show FILE` shows key names, masked lengths, canonical sorted labels,
+   duplicate warnings, and ignored line numbers. With selectors, it shows the
+   selected record per key or `<unset>`. It parses, never sources. Bare `NAME`
+   resolves to `~/.secrets/NAME.secret`, then `~/.secrets/.NAME.secret`.
 3. Select explicit files and keys. Later `-f` files override earlier ones.
    Missing required or empty keys fail. Missing optional keys are not exported.
+   Exact `[env=dev,region=eu]` headers scope following assignments; `[]` resets
+   to unlabeled. Use `--env dev` (alias for `--label env=dev`) and repeated
+   `--label name=value` on `show`, `stash`, `get`, `clip`, `run`, or `exec`.
+   Most-specific matching labels win; equal-specificity ties fail. Without
+   selectors, only unlabeled records qualify. `stash` changes the exact label
+   set, not all matching records. Labeled stores are not plain dotenv for other
+   tools, and older `secret` versions read every section as one flat store.
 4. When a key is missing, ask the user to run `secret stash FILE KEY` in their
    own terminal and type the value at the hidden prompt. Never request a value
    in chat, and do not ask them to send it back.
