@@ -24,7 +24,7 @@ if [[ "${1:-}" != --session ]]; then
     # Drop the inherited bus, keyring paths, and shell startup hooks.
     env -i PATH="$PATH" HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" \
         XDG_RUNTIME_DIR="$TMP/run" XDG_CONFIG_HOME="$TMP/config" \
-        SECRET_TEST_ROOT="$TMP" SECRET_REQUIRE_LIBSECRET="${SECRET_REQUIRE_LIBSECRET:-}" \
+        SECRET_TEST_ROOT="$TMP" SECRET_TEST_INVENTORY="${SECRET_TEST_INVENTORY:-}" SECRET_REQUIRE_LIBSECRET="${SECRET_REQUIRE_LIBSECRET:-}" \
         dbus-run-session -- bash -c '
             [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] || exit 77
             export SECRET_TEST_BUS="$DBUS_SESSION_BUS_ADDRESS"
@@ -57,6 +57,7 @@ PASSED=0 FAILED=0
 check() {
     local name="$1" want="$2" got=0
     shift 2
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tcheck\t%s\n' libsecret "$name" "$want" >>"$SECRET_TEST_INVENTORY"
     perl -e 'alarm 15; exec @ARGV' "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
     if [[ "$got" == "$want" ]]; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
@@ -69,6 +70,7 @@ check() {
 assert() {
     local name="$1"
     shift
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' libsecret "$name" >>"$SECRET_TEST_INVENTORY"
     if "$@"; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s\n' "$name"

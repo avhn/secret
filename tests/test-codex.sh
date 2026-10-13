@@ -20,6 +20,7 @@ ln -s .env "$TMP/work/alias.txt"
 manifest_case() {
     local name="$1"
     shift
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' codex "$name" >>"$SECRET_TEST_INVENTORY"
     if "$@" >/dev/null; then
         PASSED=$((PASSED + 1))
     else
@@ -31,6 +32,7 @@ manifest_case() {
 # file_case NAME KIND PATH: check a referenced file, executable, or directory.
 file_case() {
     local name="$1" kind="$2" path="$3"
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' codex "$name" >>"$SECRET_TEST_INVENTORY"
     if [[ "$kind" == file && -f "$path" ]] ||
         [[ "$kind" == exec && -x "$path" ]] ||
         [[ "$kind" == dir && -d "$path" ]]; then
@@ -69,6 +71,7 @@ file_case manual_fallback file "$ROOT/codex/hooks.json"
 # check NAME EXPECTED TOOL COMMAND [WORKDIR] [GUARD]: feed recorded-shaped hook JSON.
 check() {
     local name="$1" expected="$2" tool="$3" command="$4" workdir="${5:-}" guard="${6:-$ROOT/hooks/guard-secrets}" got
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
     got="$(jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
         '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:$t,tool_input:({command:$c} + (if $d == "" then {} else {workdir:$d} end))}' |
         perl -e 'alarm 5; exec @ARGV' "$BASH" "$guard" | jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end')" || got=crash

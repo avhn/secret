@@ -24,8 +24,8 @@ Status: in progress. Estimate: 4-6 days. Goal: establish Go module, synthetic pa
 
 The first item is pending its commit hash; leave it unticked until the commit is recorded.
 
-- [ ] chore(go): add module and pinned toolchain
-- [ ] test(corpus): preserve synthetic fixtures and case inventory
+- [x] chore(go): add module and pinned toolchain (`672322d`, LF fix `191ad14`)
+- [ ] test(corpus): preserve synthetic fixtures and case inventory (synthetic and libsecret inventories generated; macOS keychain inventory awaits CI artifact review)
 - [ ] feat(store): parse file records and explicit labels with golden assertions
 - [ ] test(store): extend parser and selection corpus
 - [ ] feat(store): implement locked atomic stash and v1 manifests

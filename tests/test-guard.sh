@@ -59,6 +59,7 @@ printf '%s\n' 'KEY=synthetic-private' >"$TMP/upper-private/.Secrets/file.txt"
 printf '%s\n' 'TOKEN=template-only' >"$TMP/template-search/.ENV.EXAMPLE"
 secrets() {
     local name="$1" want="$2" tool="$3" value="$4" extra="${5:-}" got
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\t%s\n' guard "$name" "$want" >>"$SECRET_TEST_INVENTORY"
     [[ -n "$extra" ]] || extra='{}'
     got="$(jq -cn --arg t "$tool" --arg v "$value" --arg w "$TMP/search" --argjson extra "$extra" \
         '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
@@ -964,6 +965,7 @@ secrets grep_missing_jq deny Grep "$TMP/empty-search" '{"output_mode":"content"}
 secrets rg_missing_jq deny Bash 'rg TOKEN src'
 SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
 FAILURE_OUTPUT="$(printf '%s' '{"tool_name":"Grep","cwd":"src\u0000/../.env","tool_input":{"output_mode":"content"}}' | "$BASH" "$SECRETS_GUARD")"
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard nul_cwd >>"$SECRET_TEST_INVENTORY"
 if printf '%s' "$FAILURE_OUTPUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then
     PASSED=$((PASSED + 1))
 else
@@ -974,6 +976,7 @@ fi
 # Narrow analysis failures use an exact fixed reason, never command text.
 FIXED_REASON='command too complex to analyse for secret access; split it or use secret run'
 FAILURE_OUTPUT="$(jq -cn --arg c "cat .env '" --arg w "$TMP/search" '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard fixed_complexity_reason >>"$SECRET_TEST_INVENTORY"
 if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpecificOutput.permissionDecision == "deny" and .hookSpecificOutput.permissionDecisionReason == $reason' >/dev/null; then
     PASSED=$((PASSED + 1))
 else
@@ -984,6 +987,7 @@ fi
 # Invalid control bytes must reach raw recovery, not change token boundaries.
 for json_command in '"echo .env\u0000"' '"echo .env\u001f"' '"echo .env\u000b"' '"echo .env\u007f"'; do
     FAILURE_OUTPUT="$(jq -cn --argjson c "$json_command" '{tool_name:"Bash",tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
+    [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard "control_byte_${json_command}" >>"$SECRET_TEST_INVENTORY"
     if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpecificOutput.permissionDecision == "deny" and .hookSpecificOutput.permissionDecisionReason == $reason' >/dev/null; then
         PASSED=$((PASSED + 1))
     else
@@ -991,6 +995,7 @@ for json_command in '"echo .env\u0000"' '"echo .env\u001f"' '"echo .env\u000b"' 
         printf 'FAIL control byte must use raw recovery: %s\n' "$json_command"
     fi
 done
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard no_command_substitution >>"$SECRET_TEST_INVENTORY"
 if [[ ! -e "$TMP/search/should-not-exist" ]]; then
     PASSED=$((PASSED + 1))
 else
@@ -999,8 +1004,11 @@ else
 fi
 
 # Malformed JSON and empty stdin still produce no decision.
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_json >>"$SECRET_TEST_INVENTORY"
 if [[ -z "$(printf '%s' malformed | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_sensitive >>"$SECRET_TEST_INVENTORY"
 if [[ -z "$(printf '%s' 'malformed cat .env' | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard empty_stdin >>"$SECRET_TEST_INVENTORY"
 if [[ -z "$(PATH="$TMP/empty-search" "$BASH" "$SECRETS_GUARD" </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 
 # Operand redesign: fixtures are synthetic and command strings are never run.
