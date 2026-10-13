@@ -27,6 +27,14 @@ jobs:
           SECRET_REQUIRE_LIBSECRET: "1"
         run: bash tests/test-libsecret.sh
 
+  keychain:
+    name: keychain (macos-latest)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Isolated Keychain suite
+        run: SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh
+
   test:
     strategy:
       fail-fast: false
