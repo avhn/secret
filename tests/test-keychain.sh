@@ -90,7 +90,7 @@ for kind in unicode dollar slash equals hash quote double_quote space large raw;
     assert "reused_$kind" test "$(cut -f3 < <(tail -n 1 "$SECRETS_DIR/demo.keys"))" = "$account"
     # security -w prints non-ASCII passwords as bare hex; secret reads -g instead.
     check "lookup_$kind" 0 security find-generic-password -s secret/demo -a "$account" -w "$SECRET_KEYCHAIN"
-    assert "lookup_bytes_$kind" perl -e 'open my $a,"<",$ARGV[0] or die; open my $b,"<",$ARGV[1] or die; binmode $a; binmode $b; local $/; my $got=<$a>; my $want=<$b>; $want = unpack("H*", $want) if $want =~ /[^\x20-\x7e]/; exit(lc($got) ne "$want\n")' "$TMP/out" "$TMP/expected"
+    assert "lookup_bytes_$kind" perl -e 'open my $a,"<",$ARGV[0] or die; open my $b,"<",$ARGV[1] or die; binmode $a; binmode $b; local $/; my $got=<$a>; my $want=<$b>; if ($want =~ /[^\x20-\x7e]/) { $want = unpack("H*", $want); $got = lc $got } exit($got ne "$want\n")' "$TMP/out" "$TMP/expected"
     check "run_$kind" 0 "$SECRET" run -f keychain:demo --env dev --key TOKEN -- \
         bash -c 'printf %s "$TOKEN" >"$1"' test "$TMP/actual"
     assert "roundtrip_$kind" cmp -s "$TMP/expected" "$TMP/actual"
