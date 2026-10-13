@@ -81,7 +81,7 @@ for kind in unicode dollar slash equals hash quote double_quote space large raw;
         quote) printf '%s' "synthetic'quoted" >"$TMP/expected" ;;
         double_quote) printf '%s' 'synthetic"quoted' >"$TMP/expected" ;;
         space) printf '%s' 'synthetic space inside' >"$TMP/expected" ;;
-        large) perl -e 'print "q" x 4096' >"$TMP/expected" ;;
+        large) perl -e 'print "q" x 1700' >"$TMP/expected" ;;
         raw) printf '%s' 'synthetic-without-newline' >"$TMP/expected" ;;
     esac
     cp "$TMP/expected" "$TMP/input"
@@ -112,6 +112,10 @@ assert utf8_not_published bash -c '! grep -q "^INVALID[[:space:]]" "$1"' test "$
 printf 'synthetic\302\205internal' >"$TMP/input"
 check rejected_unicode_control 1 "$SECRET" stash keychain:demo INVALID <"$TMP/input"
 assert unicode_control_not_published bash -c '! grep -q "^INVALID[[:space:]]" "$1"' test "$SECRETS_DIR/demo.keys"
+perl -e 'print "q" x 4096' >"$TMP/input"
+check rejected_oversize 1 "$SECRET" stash keychain:demo INVALID <"$TMP/input"
+assert oversize_message grep -q 'limited to about 1800 bytes' "$TMP/err"
+assert oversize_not_published bash -c '! grep -q "^INVALID[[:space:]]" "$1"' test "$SECRETS_DIR/demo.keys"
 
 # No secret appears in any process arguments, even while security -i is active.
 perl -e 'print "synthetic-argv-", "A" x 96, "-END"' >"$TMP/expected"
