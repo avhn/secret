@@ -314,7 +314,36 @@ EOF
 check filter_drain_failure 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'printf "%s" "$LONG"; touch "$1"' test "$TMP/child-started"
 assert filter_failure_no_raw test ! -s "$TMP/out"
 assert filter_failure_started test -f "$TMP/child-started"
+check filter_failure_child_nonzero 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'printf "%s" "$LONG"; exit 37'
+assert filter_failure_precedence grep -q '^secret: redaction filter failed$' "$TMP/err"
+assert filter_failure_child_no_raw test ! -s "$TMP/out"
+
+# Crash the stdout filter after one byte, while the child is still running.
+# Neither a writing nor an idle child may postpone reporting the failure.
+cat >"$TMP/bin/perl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${2:-}" == */values && "${3:-}" == */out ]]; then
+    exec 3<"$3"
+    printf 'ready\n' >"$4"
+    dd bs=1 count=1 of=/dev/null <&3 2>/dev/null
+    exit 91
+fi
+exec "$REAL_PERL" "$@"
+EOF
+check filter_dies_mid_run 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'while :; do printf "%s" "$LONG" || break; done; sleep 15'
+assert filter_dies_message grep -q '^secret: redaction filter failed$' "$TMP/err"
+assert filter_dies_no_raw test ! -s "$TMP/out"
+check child_idle_after_filter_death 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'printf "%s" "$LONG"; sleep 15'
+assert idle_filter_message grep -q '^secret: redaction filter failed$' "$TMP/err"
+assert idle_filter_no_raw test ! -s "$TMP/out"
 rm "$TMP/bin/perl"
+
+# Only the direct child is supervised; its descendant can hold a FIFO open.
+check descendant_holds_stdout 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'sleep 12 & printf "%s" "$LONG"'
+assert descendant_filter_message grep -q '^secret: redaction filter failed$' "$TMP/err"
+printf '<redacted>' >"$TMP/expected"
+assert descendant_redacted cmp -s "$TMP/out" "$TMP/expected"
+assert descendant_no_raw bash -c '! grep -Fq abcdef "$1" && ! grep -Fq abcdef "$2"' test "$TMP/out" "$TMP/err"
 mkdir "$TMP/no-perl-bin"
 check missing_perl 1 env PATH="$TMP/no-perl-bin" "$BASH" "$SECRET" run -f "$TMP/redact.store" -- touch "$TMP/without-perl"
 assert missing_perl_no_child test ! -e "$TMP/without-perl"
