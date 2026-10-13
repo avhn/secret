@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/avhn/secret/internal/store"
 )
@@ -257,5 +258,44 @@ func TestConcurrentBackendSameIdentity(t *testing.T) {
 	entries, err := os.ReadDir(s.path("secret/demo", ""))
 	if err != nil || len(entries) != 1 || entries[0].Name() != records[0].Account {
 		t.Fatalf("accounts = %v, %v", entries, err)
+	}
+}
+
+func TestRunProviderInheritedPipe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix shell process inheritance required")
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "provider")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 10 &\nprintf synthetic\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	out, stderr, err := runProvider(script, nil, nil)
+	if err == nil || len(out) != 0 || len(stderr) != 0 || time.Since(start) > 3*time.Second {
+		t.Fatalf("inherited pipe: out %q stderr %q err %v elapsed %s", out, stderr, err, time.Since(start))
+	}
+}
+
+func TestRunProviderOutputLimit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix shell provider required")
+	}
+	for _, stream := range []string{"stdout", "stderr"} {
+		t.Run(stream, func(t *testing.T) {
+			script := filepath.Join(t.TempDir(), "provider")
+			redirect := ""
+			if stream == "stderr" {
+				redirect = "1>&2"
+			}
+			if err := os.WriteFile(script, []byte("#!/bin/sh\nhead -c 2097152 /dev/zero "+redirect+"\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			start := time.Now()
+			out, stderr, err := runProvider(script, nil, nil)
+			if err == nil || len(out) != 0 || len(stderr) != 0 || time.Since(start) > 4*time.Second {
+				t.Fatalf("output limit: out %d stderr %d err %v elapsed %s", len(out), len(stderr), err, time.Since(start))
+			}
+		})
 	}
 }

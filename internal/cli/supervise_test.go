@@ -3,9 +3,11 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"github.com/avhn/secret/internal/store"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -88,5 +90,46 @@ func TestRunForwardsSignal(t *testing.T) {
 	var status *exec.ExitError
 	if !errors.As(e, &status) || status.ExitCode() != 143 {
 		t.Fatalf("forwarded status: %v", e)
+	}
+}
+
+// blockingWriter simulates a caller that never drains filtered output.
+type blockingWriter struct{ blocked chan struct{} }
+
+func (w blockingWriter) Write([]byte) (int, error) { <-w.blocked; return 0, nil }
+
+func TestRunBlockedOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix child supervision required")
+	}
+	var errOut bytes.Buffer
+	blocked := make(chan struct{})
+	defer close(blocked)
+	c := command{in: os.Stdin, out: blockingWriter{blocked}, errOut: &errOut}
+	start := time.Now()
+	status := c.runChild([]string{"sh", "-c", "printf synthetic-token; sleep 10"}, os.Environ(), [][]byte{[]byte("synthetic-token")})
+	if status != 1 || !strings.Contains(errOut.String(), "redaction filter failed") || time.Since(start) > 4*time.Second {
+		t.Fatalf("status %d stderr %q elapsed %s", status, errOut.String(), time.Since(start))
+	}
+}
+
+func TestChildPathFromSelectedEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix executable mode and PATH required")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "synthetic-command")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nprintf synthetic-command"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	selection := store.Selection{Keys: []string{"PATH"}, Matched: map[string]store.Record{"PATH": {Value: []byte(dir)}}}
+	env, err := childEnvironment([]string{"PATH=/nonexistent"}, selection, nil, nil, "fallback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	c := command{in: os.Stdin, out: &out, errOut: &errOut}
+	if got := c.runChild([]string{"synthetic-command"}, env, nil); got != 0 || out.String() != "synthetic-command" {
+		t.Fatalf("status %d stdout %q stderr %q", got, out.String(), errOut.String())
 	}
 }

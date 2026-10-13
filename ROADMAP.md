@@ -44,7 +44,7 @@ Status: in progress. Estimate: 5-7 days. Goal: port CLI, provider transports and
 
 - [ ] feat(cli): add inventory and human-only commands
 
-The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 15 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash; run and exec are wired on Unix. Keep this item open until the full CLI corpus and runner checks pass.
+The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 15 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash on all platforms before the Windows launch rejection; run and exec are wired on Unix. Child PATH lookup uses the selected environment. Keep this item open until the full CLI corpus and runner checks pass.
 - [ ] feat(backend): port libsecret transport
 - [ ] feat(backend): port keychain transport
 
@@ -56,7 +56,7 @@ Unix run and exec now load selected file and registered keystore records, remove
 
 - [ ] feat(run): filter both output streams and supervise child
 
-Go run filters independent stdout and stderr byte streams, forwards INT/TERM/HUP to a Unix process group, and stops on filter failure or a two-second descendant drain timeout. Unlike Bash, Go run does not allocate a PTY or invoke script(1); Bash run currently also uses separate FIFO filters, not script(1). Direct terminal buffering and merged stream ordering can differ from an interactive PTY. Keep open until Linux/macOS runner checks pass.
+Go run filters independent stdout and stderr byte streams with a bounded streaming matcher, subscribes to INT/TERM/HUP before starting the Unix process group, and stops on filter failure, a stalled output writer or a two-second descendant drain timeout. Provider calls now limit captured output, bound inherited pipes and terminate Unix process groups on timeout. Unlike Bash, Go run does not allocate a PTY or invoke script(1); Bash run currently also uses separate FIFO filters, not script(1). Direct terminal buffering and merged stream ordering can differ from an interactive PTY. Keep open until Linux/macOS runner checks pass.
 - [ ] test(cli): port CLI and backend assertions
 
 Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on appropriate runners; inject failures/signals; no values in argv or diagnostics; Bash 3.2 jobs green.

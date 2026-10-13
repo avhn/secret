@@ -18,7 +18,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ### Changed
 
 - Hardened the guard's protected file and input-role detection, command parsing, search-scope checks and credential-printer rules.
-- Made redaction stop the child on filter failure instead of risking unfiltered output.
+- Bounded Go provider output and inherited-pipe waits, with Unix process-group cancellation. Go run now times out blocked output sinks, selects child commands using the constructed PATH, and validates usage before Windows launch rejection. Missing option arguments exit 1 like Bash. Replaced repeated redaction rescans with a streaming matcher.
 
 ### In progress
 
