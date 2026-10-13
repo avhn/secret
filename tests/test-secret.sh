@@ -466,7 +466,8 @@ else
 fi
 assert tty_value grep -Fq 'byte-safe-[]$x' "$TMP/tty.out"
 if [[ "$OSTYPE" == darwin* ]]; then
-    check labels_get_tty 0 script -q "$TMP/tty.out" "$BASH" "$SECRET" get "$TMP/labels.store" KEY </dev/null
+    # BSD script returns the child's status; util-linux script without -e does not.
+    check labels_get_tty 1 script -q "$TMP/tty.out" "$BASH" "$SECRET" get "$TMP/labels.store" KEY </dev/null
 else
     check labels_get_tty 0 script -q -c "'$BASH' '$SECRET' get '$TMP/labels.store' KEY" "$TMP/tty.out" </dev/null
 fi
