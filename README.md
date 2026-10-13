@@ -88,10 +88,14 @@ stop the child and `run` can redact values from unselected environments.
 `get` and `clip` fetch only the selected item. A failed manifest publish after
 a successful backend put can leave an unregistered keystore item.
 
-OS keystore implementations are not available yet. This phase supports only
-`SECRET_BACKEND_STUB_DIR` for isolated tests; without it, backend reads and
-writes fail with `backend not yet supported`. Do not use the stub with real
-credentials.
+On Linux, `libsecret:NAME` uses `secret-tool` and an unlocked Secret Service
+session. Values are sent to the provider through stdin and retrieved into a
+private file. Stash accepts values without a terminal newline or with one
+terminal newline (which it removes). Empty values, embedded newlines or CR,
+NUL, leading or trailing whitespace, and wrapping quotes are rejected.
+`keychain:NAME` still requires the isolated `SECRET_BACKEND_STUB_DIR` test
+backend; without it, keychain reads and writes fail closed. Never use the stub
+with real credentials.
 
 `--env dev` means `--label env=dev`; repeat `--label name=value` to select
 multiple labels. Without selectors only unlabeled records qualify. For each key,
