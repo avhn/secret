@@ -1,0 +1,15 @@
+# case|show/run|options|space-separated files|child keys for run
+ext_matrix_all|show||matrix.store|
+ext_matrix_plain|show|--label tier=gold|matrix.store|
+ext_matrix_prod|show|--env prod|matrix.store|
+ext_matrix_west|show|--label zone=west|matrix.store|
+ext_matrix_both|show|--label zone=west --env prod|matrix.store|
+ext_matrix_qa|show|--env qa|matrix.store|
+ext_matrix_run|run|--env prod --label zone=west|matrix.store|KEY ONLY TOKEN OTHER
+ext_overlay_prod|run|--env prod|base.store overlay.store|KEY ONLY OTHER SECOND NEW TOKEN
+ext_overlay_qa|run|--env qa|base.store overlay.store|KEY ONLY OTHER SECOND NEW
+ext_overlay_plain|run||base.store overlay.store|KEY ONLY OTHER SECOND NEW
+ext_overlay_show|show|--env prod|base.store overlay.store|
+ext_overlay_reverse|run|--env prod|overlay.store base.store|KEY ONLY OTHER SECOND NEW
+ext_ambient|run|--env prod|ambient.store|KEY TOKEN SECOND ONLY OTHER
+ext_ambient_show|show|--env prod|ambient.store|

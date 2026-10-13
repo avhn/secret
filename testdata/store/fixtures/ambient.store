@@ -1,0 +1,6 @@
+[env=qa]
+KEY=hidden
+TOKEN=hidden-two
+SECOND=hidden-three
+[]
+ONLY=visible

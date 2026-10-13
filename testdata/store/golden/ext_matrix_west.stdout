@@ -1,0 +1,4 @@
+matrix.store
+  KEY [zone=west]=<7 bytes>
+  ONLY=<unset>
+  TOKEN=<6 bytes>
