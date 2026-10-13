@@ -1,3 +1,6 @@
 # Keep LF everywhere: Windows runners otherwise check out CRLF, which gofmt
 # rejects and which would also break the shell scripts and hooks.
 * text=auto eol=lf
+# Store fixtures and goldens are byte-exact test data, CRLF cases included.
+testdata/store/fixtures/** -text
+testdata/store/golden/** -text
