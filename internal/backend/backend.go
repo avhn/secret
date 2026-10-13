@@ -193,8 +193,8 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 			label += "/" + wanted
 		}
 		if err = p.Put(service, account, label, normalized); err != nil {
-			if errors.Is(err, ErrUnsupported) {
-				return ErrUnsupported
+			if errors.Is(err, ErrUnsupported) || errors.Is(err, ErrValueTooLarge) {
+				return err
 			}
 			return errors.New("backend put failed")
 		}

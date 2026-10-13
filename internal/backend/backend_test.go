@@ -231,6 +231,20 @@ func TestBackendDisplayLabels(t *testing.T) {
 	}
 }
 
+type tooLargeStub struct{ *stub }
+
+func (s *tooLargeStub) Put(string, string, string, []byte) error { return ErrValueTooLarge }
+
+// The keychain size limit reaches the user like Bash's message, not as a generic failure.
+func TestStashKeepsSizeLimitMessage(t *testing.T) {
+	dir := t.TempDir()
+	s := &tooLargeStub{stub: &stub{dir: filepath.Join(dir, "stub")}}
+	err := Stash(dir, "keychain:demo", "TOKEN", nil, []byte("synthetic"), s)
+	if !errors.Is(err, ErrValueTooLarge) {
+		t.Fatalf("err = %v, want size limit", err)
+	}
+}
+
 func TestConcurrentBackendSameIdentity(t *testing.T) {
 	dir := t.TempDir()
 	s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}

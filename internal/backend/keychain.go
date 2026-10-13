@@ -24,6 +24,9 @@ type keychain struct {
 }
 
 // newKeychain validates the optional path at the boundary before any provider call.
+// ErrValueTooLarge is user-facing: Bash reports the same keychain size limit.
+var ErrValueTooLarge = errors.New("keychain values are limited to about 1800 bytes")
+
 func newKeychain(run commandRunner) keychain {
 	path := os.Getenv("SECRET_KEYCHAIN")
 	return keychain{run: run, path: path, valid: path == "" || keychainPath.MatchString(path)}
@@ -107,7 +110,7 @@ func (p keychain) Put(service, account, label string, value []byte) error {
 		return errors.New("backend put failed")
 	}
 	if len(value) > 1800 {
-		return errors.New("keychain values are limited to about 1800 bytes")
+		return ErrValueTooLarge
 	}
 	var line strings.Builder
 	line.Grow(128 + 2*len(value) + len(p.path))
@@ -125,7 +128,7 @@ func (p keychain) Put(service, account, label string, value []byte) error {
 	}
 	line.WriteByte('\n')
 	if line.Len() > 4000 {
-		return errors.New("keychain values are limited to about 1800 bytes")
+		return ErrValueTooLarge
 	}
 	_, _, err = p.run("security", []string{"-i"}, []byte(line.String()))
 	if err != nil {
