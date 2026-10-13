@@ -17,11 +17,20 @@
 
 # No positive template re-include: it turns the search into a whitelist. Use
 # Read or explicit-file rg for .env.example/.sample/.template outside stores.
---glob=!.env
---glob=!.env.*
---glob=!*.env
---glob=!*.secret
---glob=!.secrets/
---glob=!.secrets.env
---glob=!.netrc
---glob=!.git-credentials
+--iglob=!.env
+--iglob=!.env.*
+--iglob=!*.env
+--iglob=!*.secret
+--iglob=!.secrets/
+--iglob=!.secrets.env
+--iglob=!.netrc
+--iglob=!.git-credentials
+
+# Tool credential files the guard also protects. SSH public keys are excluded
+# with the private ones; read them directly when needed.
+--iglob=!.npmrc
+--iglob=!.pypirc
+--iglob=!**/.aws/credentials
+--iglob=!**/.docker/config.json
+--iglob=!**/gh/hosts.yml
+--iglob=!**/.ssh/id_*

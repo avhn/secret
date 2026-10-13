@@ -81,8 +81,11 @@ Human-only commands, which the guard denies to agents:
 - `secret get FILE KEY` prints a value, and only to a terminal.
 - `secret exec ...` is `run` without redaction, for interactive tools and MCP
   server launchers that need byte-exact stdio.
-- `secret clip FILE KEY [SECONDS]` copies a value and clears the clipboard
-  after 45 seconds unless you have copied something else since.
+
+`secret clip FILE KEY [SECONDS]` copies a value and clears the clipboard after
+45 seconds unless you have copied something else since. The value never reaches
+the agent's output, so the guard allows it; the skill tells the agent to use it
+only when you ask for the clipboard, and reading the clipboard back is denied.
 
 Run `secret help` for the full reference, including exit statuses.
 
