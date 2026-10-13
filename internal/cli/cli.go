@@ -78,8 +78,6 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	case "help", "--help", "-h":
 		fmt.Fprint(out, usage)
 		return 0
-	case "run", "exec":
-		return c.fail("not yet implemented in the Go build; use bin/secret", 2)
 	case "version":
 		if len(args) != 0 {
 			return c.fail("version takes no arguments", 1)
@@ -90,7 +88,7 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 		if !isTerminal(out) {
 			return c.fail("get is human-terminal-only; use show or run instead", 1)
 		}
-	case "list", "show", "stash", "clip":
+	case "list", "show", "stash", "clip", "run", "exec":
 	default:
 		return c.fail("unknown subcommand; use secret help", 1)
 	}
@@ -105,6 +103,9 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	}
 	c.dir = dir
 	c.loc = store.Locator{Home: home, SecretsDir: dir, SecretsEnv: env, IsFile: func(p string) bool { s, e := os.Stat(p); return e == nil && s.Mode().IsRegular() }, Glob: filepath.Glob}
+	if sub == "run" || sub == "exec" {
+		return c.launch(sub, args)
+	}
 	if sub == "list" {
 		if len(args) != 0 {
 			return c.fail("list takes no arguments", 1)

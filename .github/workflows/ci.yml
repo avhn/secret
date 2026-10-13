@@ -33,7 +33,7 @@ jobs:
       - name: Isolated Go libsecret integration
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
-        run: go test ./internal/backend -run '^TestLibsecretIntegration$' -count=1
+        run: go test -v ./internal/backend -run '^TestLibsecretIntegration$' -count=1
       - name: Check libsecret inventory
         run: bash tests/inventory.sh --check --suite libsecret
 
@@ -55,7 +55,7 @@ jobs:
       - name: Isolated Go Keychain integration
         env:
           SECRET_REQUIRE_KEYCHAIN: "1"
-        run: go test ./internal/backend -run '^TestKeychainIntegration$' -count=1
+        run: go test -v ./internal/backend -run '^TestKeychainIntegration$' -count=1
       - name: Check keychain inventory
         env:
           SECRET_INVENTORY_STRICT: "1"

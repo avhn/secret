@@ -15,6 +15,9 @@ while IFS='|' read -r name inventory arguments; do
     [[ -n "$inventory" ]] || { printf 'missing inventory mapping\n' >&2; exit 2; }
     args=()
     read -r -a args <<<"$arguments"
+    for i in "${!args[@]}"; do
+        [[ "${args[i]}" != @child ]] || args[i]="$ROOT/testdata/cli/child.pl"
+    done
     rc=0
     if [[ "$name" == stash_valid ]]; then
         printf 'synthetic\n' | env -i HOME="$TMP/home" SECRETS_DIR="$TMP/stores" SECRETS_ENV="$TMP/home/fallback.store" PATH="$PATH" LC_ALL=C BASH_ENV='' ENV='' \

@@ -1,0 +1,5 @@
+secret: duplicate KEY (lines: 2,4); last wins
+secret: malformed assignment ignored (line: 5)
+secret: malformed assignment ignored (line: 6)
+3 non-assignment lines ignored (lines: 5,6,7)
+<redacted>
