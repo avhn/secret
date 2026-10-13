@@ -23,13 +23,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install ripgrep
+      - name: Install dependencies
         run: |
-          if [ "$RUNNER_OS" = macOS ]; then brew install ripgrep; else sudo apt-get install -y ripgrep; fi
+          if [ "$RUNNER_OS" = macOS ]; then brew install bash ripgrep; else sudo apt-get install -y ripgrep; fi
+      # Explicit path: macOS runners put stock /bin/bash 3.2 first on PATH.
+      - name: Select current bash
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then echo "BASH_BIN=$(brew --prefix)/bin/bash" >>"$GITHUB_ENV"; else echo "BASH_BIN=bash" >>"$GITHUB_ENV"; fi
       - name: CLI matrix
-        run: bash tests/test-secret.sh
+        run: '"$BASH_BIN" tests/test-secret.sh'
       - name: Guard matrix
-        run: bash tests/test-guard.sh
+        run: '"$BASH_BIN" tests/test-guard.sh'
       - name: Stock bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |
