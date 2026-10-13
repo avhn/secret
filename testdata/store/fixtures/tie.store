@@ -1,0 +1,6 @@
+[env=prod]
+KEY=one
+[zone=west]
+KEY=two
+[]
+OTHER=plain

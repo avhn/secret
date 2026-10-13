@@ -1,0 +1,5 @@
+core.store
+  KEY=<4 bytes>
+  TOKEN=<28 bytes>
+  EMPTY=<0 bytes>
+  SECOND=<8 bytes>

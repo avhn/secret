@@ -1,0 +1,16 @@
+# case|show/run|options|space-separated files|child keys for run
+core_all|show||core.store|
+core_selected|show|--env prod|core.store|
+core_run|run||core.store|KEY TOKEN SECOND EMPTY BROKEN
+bytes_all|show||bytes.store|
+bytes_run|run||bytes.store|BYTES BAD CR TRAIL
+labels_all|show||labels.store|
+labels_prod|show|--env prod|labels.store|
+labels_both|show|--label zone=west --env prod|labels.store|
+labels_qa|show|--env qa|labels.store|
+labels_run|run|--env prod|labels.store|KEY TOKEN SECOND ONLY EMPTY
+labels_repeat|show|--env prod --label env=prod|labels.store|
+selector_conflict|show|--env prod --label env=qa|labels.store|
+tie_plain|show||tie.store|
+tie_ambiguous|show|--env prod --label zone=west|tie.store|
+tie_run_ambiguous|run|--env prod --label zone=west|tie.store|KEY OTHER

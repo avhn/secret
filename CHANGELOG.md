@@ -20,4 +20,5 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### In progress
 
+- Go file-store parsing, resolution, label selection, and merge helpers have synthetic tests and Bash-generated golden assertions, including an extended selection corpus and CI drift check; runner validation remains pending.
 - The Go rewrite is tracked in [ROADMAP.md](ROADMAP.md); no Go cutover or release is claimed yet.

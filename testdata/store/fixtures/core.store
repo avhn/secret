@@ -1,0 +1,10 @@
+# synthetic values only
+export KEY='dollar$ # = \ internal space'
+TOKEN="quoted without unescaping \\"
+KEY=last
+BROKEN='unterminated
+NOT KEY=bad
+[legacy]
+EMPTY=
+[]
+SECOND=trailing
