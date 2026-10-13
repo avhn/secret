@@ -59,7 +59,7 @@ func ListNames(dir, ref string) ([]store.ManifestRecord, error) {
 // Stash puts and verifies the bytes before publishing the names-only record.
 // A failed publish leaves an orphan; it never publishes an invalid link.
 func Stash(dir, ref, key string, labels map[string]string, value []byte, provider Provider) error {
-	return stashWithPublish(dir, ref, key, labels, value, provider, store.UpdateManifest)
+	return stashWithPublish(dir, ref, key, labels, value, provider, store.UpdateManifestLocked)
 }
 
 // stashWithPublish injects only the publish step for failure-path tests.
@@ -75,45 +75,49 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 	if err := store.ValidateIdentity(key, labels); err != nil {
 		return err
 	}
-	if err := store.ValidateDirectory(dir); err != nil {
-		return err
-	}
 	_, name, _ := strings.Cut(ref, ":")
 	path := filepath.Join(dir, name+".keys")
-	records, err := store.ReadManifest(path, backend)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	account := ""
-	wanted := store.CanonicalLabels(labels)
-	for _, r := range records {
-		if r.Key == key && store.CanonicalLabels(r.Labels) == wanted {
-			account = r.Account
-			break
-		}
-	}
-	if account == "" {
-		account, err = store.NewAccount()
-		if err != nil {
+	return store.WithWriteLock(dir, func() error {
+		records, err := store.ReadManifest(path, backend)
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-	}
-	label := "secret/" + name + "/" + key
-	if wanted != "" {
-		label += "/" + wanted
-	}
-	if err = p.Put(service, account, label, normalized); err != nil {
-		if errors.Is(err, ErrUnsupported) {
-			return ErrUnsupported
+		account := ""
+		wanted := store.CanonicalLabels(labels)
+		for _, r := range records {
+			if r.Key == key && store.CanonicalLabels(r.Labels) == wanted {
+				account = r.Account
+				break
+			}
 		}
-		return errors.New("backend put failed")
-	}
-	got, err := p.Get(service, account)
-	if err != nil || !bytes.Equal(got, normalized) {
-		return errors.New("backend lookup failed")
-	}
-	if err := publish(path, backend, key, labels, account); err != nil {
-		return errors.New("manifest publish failed")
-	}
-	return nil
+		if account == "" {
+			account, err = store.NewAccount()
+			if err != nil {
+				return err
+			}
+		}
+		label := "secret/" + name + "/" + key
+		if backend == "libsecret" {
+			label = "secret " + name + " " + key
+			if wanted != "" {
+				label += " [" + wanted + "]"
+			}
+		} else if wanted != "" {
+			label += "/" + wanted
+		}
+		if err = p.Put(service, account, label, normalized); err != nil {
+			if errors.Is(err, ErrUnsupported) {
+				return ErrUnsupported
+			}
+			return errors.New("backend put failed")
+		}
+		got, err := p.Get(service, account)
+		if err != nil || !bytes.Equal(got, normalized) {
+			return errors.New("backend lookup failed")
+		}
+		if err := publish(path, backend, key, labels, account); err != nil {
+			return errors.New("manifest publish failed")
+		}
+		return nil
+	})
 }
