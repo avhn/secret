@@ -6,6 +6,7 @@
 # artifact. Download and commit that artifact, then set SECRET_INVENTORY_STRICT=1
 # in CI to require the committed file. Never run the Keychain suite on Linux.
 # SECRET_INVENTORY_DIR overrides the write destination for read-only mounts.
+# On macOS, SUITE.darwin.tsv (when present) replaces SUITE.tsv for --check.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -88,6 +89,11 @@ for suite in "${SUITES[@]}"; do
     ' "$raw" >"$TMP/$suite.numbered" || { FAILED=1; continue; }
     LC_ALL=C sort -t "$(printf '\t')" -k2,2 "$TMP/$suite.numbered" >"$TMP/$suite.tsv"
     dest="$ROOT/testdata/inventory/$suite.tsv"
+    # Platform-specific cases (no /proc on macOS, BSD script exit status) live in
+    # an override that replaces the base inventory on that OS.
+    if [[ "$(uname -s)" == Darwin && -f "$ROOT/testdata/inventory/$suite.darwin.tsv" ]]; then
+        dest="$ROOT/testdata/inventory/$suite.darwin.tsv"
+    fi
     if [[ "$MODE" == --write ]]; then
         dest="${SECRET_INVENTORY_DIR:-$ROOT/testdata/inventory}/$suite.tsv"
         mkdir -p "$(dirname "$dest")"
