@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M0, parity substrate (planned). This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
+**Current milestone:** M0, parity substrate (in progress). This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -20,7 +20,9 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 
 ## M0: Parity substrate
 
-Status: planned. Estimate: 4-6 days. Goal: establish Go module, synthetic parity corpus, labeled stores and stub backend.
+Status: in progress. Estimate: 4-6 days. Goal: establish Go module, synthetic parity corpus, labeled stores and stub backend.
+
+The first item is pending its commit hash; leave it unticked until the commit is recorded.
 
 - [ ] chore(go): add module and pinned toolchain
 - [ ] test(corpus): preserve synthetic fixtures and case inventory

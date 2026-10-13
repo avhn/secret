@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
+- A Go module skeleton and Go CI on Linux, macOS and Windows runners.
 - Explicit label sections and label-aware selection for file and keystore records.
 - Manifest-backed keystore dispatch, Linux libsecret and macOS Keychain backends, with isolated provider tests.
 - Codex shell and patch guard support and a Codex plugin bundling the guard and skill.
