@@ -38,25 +38,33 @@ security set-keychain-settings "$SECRET_KEYCHAIN" >/dev/null 2>&1 || { printf 'F
 export HOME="$TMP/home" SECRETS_DIR="$TMP/home/.secrets" SECRETS_ENV="$TMP/home/.secrets.env" BASH_ENV='' ENV=''
 unset SECRET_BACKEND_STUB_DIR TOKEN OTHER
 mkdir -p "$HOME"
-SECRET="$ROOT/bin/secret"
+SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
 PASSED=0 FAILED=0
 check() {
     local name="$1" want="$2" got=0
     shift 2
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tcheck\t%s\n' keychain "$name" "$want" >>"$SECRET_TEST_INVENTORY"
-    perl -e 'alarm 20; exec @ARGV' "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
+    perl -MPOSIX=setsid -e '$pid=fork(); defined($pid) or exit 124; if (!$pid) { setsid(); exec @ARGV; exit 127 } $SIG{ALRM}=sub { kill "TERM", -$pid; waitpid($pid,0); exit 124 }; alarm 20; waitpid($pid,0); exit($? & 127 ? 128+($? & 127) : $? >> 8)'  "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
+    if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
+        if [[ "$got" == "$want" ]]; then result=pass; else result=fail; fi
+        printf '%s\t%s\t%s\n' keychain "$name" "$result" >>"$SECRET_TEST_RESULTS"
+    fi
     if [[ "$got" == "$want" ]]; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: exit %s, expected %s\n' "$name" "$got" "$want"
         # Provider errors are suppressed; diagnostics must never include a value.
-        cat "$TMP/err"
+        if [[ -z "${SECRET_CLI:-}" ]]; then cat "$TMP/err"; fi
     fi
 }
 assert() {
     local name="$1"
     shift
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' keychain "$name" >>"$SECRET_TEST_INVENTORY"
-    if "$@"; then PASSED=$((PASSED + 1)); else
+    if "$@"; then
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tpass\n' keychain "$name" >>"$SECRET_TEST_RESULTS"
+        PASSED=$((PASSED + 1))
+    else
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' keychain "$name" >>"$SECRET_TEST_RESULTS"
         FAILED=$((FAILED + 1))
         printf 'FAIL %s\n' "$name"
     fi

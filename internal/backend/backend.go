@@ -102,8 +102,8 @@ func runProvider(name string, args []string, input []byte) ([]byte, []byte, erro
 	return stdout.Bytes(), stderr.Bytes(), nil
 }
 
-// Dispatch validates the reference and selects the real provider.
-// No environment variable can activate the test stub in this path.
+// Dispatch validates the reference and selects the provider. Only the
+// secretstub test build can select a directory provider through the environment.
 func Dispatch(ref string) (Provider, string, string, error) { return DispatchWith(ref, nil) }
 
 // DispatchWith permits explicit test injection, not environment activation.
@@ -115,6 +115,9 @@ func DispatchWith(ref string, provider Provider) (Provider, string, string, erro
 	loc := store.Locator{}
 	if _, err := loc.Resolve(ref); err != nil {
 		return nil, "", "", err
+	}
+	if provider == nil {
+		provider = testProvider(backend)
 	}
 	if provider == nil {
 		if backend == "libsecret" {
@@ -198,6 +201,9 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 		got, err := p.Get(service, account)
 		if err != nil || !bytes.Equal(got, normalized) {
 			return errors.New("backend lookup failed")
+		}
+		if err := stubPublishFailure(p); err != nil {
+			return errors.New("manifest publish failed")
 		}
 		if err := publish(path, backend, key, labels, account); err != nil {
 			return errors.New("manifest publish failed")

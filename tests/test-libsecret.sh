@@ -24,7 +24,7 @@ if [[ "${1:-}" != --session ]]; then
     # Drop the inherited bus, keyring paths, and shell startup hooks.
     env -i PATH="$PATH" HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" \
         XDG_RUNTIME_DIR="$TMP/run" XDG_CONFIG_HOME="$TMP/config" \
-        SECRET_TEST_ROOT="$TMP" SECRET_TEST_INVENTORY="${SECRET_TEST_INVENTORY:-}" SECRET_REQUIRE_LIBSECRET="${SECRET_REQUIRE_LIBSECRET:-}" \
+        SECRET_TEST_ROOT="$TMP" SECRET_TEST_INVENTORY="${SECRET_TEST_INVENTORY:-}" SECRET_TEST_RESULTS="${SECRET_TEST_RESULTS:-}" SECRET_CLI="${SECRET_CLI:-}" SECRET_REQUIRE_LIBSECRET="${SECRET_REQUIRE_LIBSECRET:-}" \
         dbus-run-session -- bash -c '
             [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] || exit 77
             export SECRET_TEST_BUS="$DBUS_SESSION_BUS_ADDRESS"
@@ -50,7 +50,7 @@ printf '\n' | gnome-keyring-daemon --unlock --components=secrets >"$TMP/daemon-o
     printf 'FAIL: temporary keyring failed to start\n' >&2
     exit 1
 }
-SECRET="$ROOT/bin/secret"
+SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
 PASSED=0 FAILED=0
 
 # check NAME STATUS COMMAND: bound each synthetic operation and count its status.
@@ -58,11 +58,15 @@ check() {
     local name="$1" want="$2" got=0
     shift 2
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tcheck\t%s\n' libsecret "$name" "$want" >>"$SECRET_TEST_INVENTORY"
-    perl -e 'alarm 15; exec @ARGV' "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
+    perl -MPOSIX=setsid -e '$pid=fork(); defined($pid) or exit 124; if (!$pid) { setsid(); exec @ARGV; exit 127 } $SIG{ALRM}=sub { kill "TERM", -$pid; waitpid($pid,0); exit 124 }; alarm 15; waitpid($pid,0); exit($? & 127 ? 128+($? & 127) : $? >> 8)'  "$@" >"$TMP/out" 2>"$TMP/err" || got=$?
+    if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
+        if [[ "$got" == "$want" ]]; then result=pass; else result=fail; fi
+        printf '%s\t%s\t%s\n' libsecret "$name" "$result" >>"$SECRET_TEST_RESULTS"
+    fi
     if [[ "$got" == "$want" ]]; then PASSED=$((PASSED + 1)); else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: exit %s, expected %s\n' "$name" "$got" "$want"
-        cat "$TMP/err"
+        if [[ -z "${SECRET_CLI:-}" ]]; then cat "$TMP/err"; fi
     fi
 }
 
@@ -71,7 +75,11 @@ assert() {
     local name="$1"
     shift
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' libsecret "$name" >>"$SECRET_TEST_INVENTORY"
-    if "$@"; then PASSED=$((PASSED + 1)); else
+    if "$@"; then
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tpass\n' libsecret "$name" >>"$SECRET_TEST_RESULTS"
+        PASSED=$((PASSED + 1))
+    else
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' libsecret "$name" >>"$SECRET_TEST_RESULTS"
         FAILED=$((FAILED + 1))
         printf 'FAIL %s\n' "$name"
     fi

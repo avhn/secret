@@ -74,6 +74,9 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 		return errors.New("cannot open secret directory")
 	}
 	defer root.Close()
+	if err := root.Chmod(".", 0700); err != nil {
+		return errors.New("cannot protect secret directory")
+	}
 	const lock = ".write-lock"
 	deadline := time.Now().Add(wait)
 	for {
@@ -85,7 +88,7 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 			return errors.New("cannot acquire write lock")
 		}
 		if !time.Now().Before(deadline) {
-			return fmt.Errorf("write lock timed out after %s; verify its owner then manually remove .write-lock (never auto-stolen)", wait)
+			return fmt.Errorf("write lock timed out after %d s; verify its owner then manually remove .write-lock (never auto-stolen)", int(wait/time.Second))
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -368,12 +371,7 @@ func rewriteStash(source []byte, key, wanted string, assignmentLine []byte) []by
 			}
 		}
 	}
-	found := wanted == "" && firstHeader < 0
-	if wanted != "" {
-		found = current >= 0
-	} else if firstHeader >= 0 {
-		found = firstHeader > 0 || lastSection == ""
-	}
+	found := wanted == "" || current >= 0
 	var out []byte
 	if !found {
 		for i, s := range lines {
