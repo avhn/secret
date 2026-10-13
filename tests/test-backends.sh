@@ -131,7 +131,9 @@ assert invalid_name_message grep -q 'invalid keystore name' "$TMP/err"
 printf 'BARE=synthetic-bare\n' >"$SECRETS_DIR/plain.secret"
 check bare_name 0 "$BASH" "$SECRET" show plain
 assert bare_file_mask grep -q 'BARE=<14 bytes>' "$TMP/out"
-check unsupported 1 env -u SECRET_BACKEND_STUB_DIR "$BASH" "$SECRET" run -f keychain:demo -- true
-assert unsupported_message grep -q 'backend not yet supported' "$TMP/err"
+# A deliberately absent explicit keychain prevents touching the user's default.
+check missing_provider 1 env -u SECRET_BACKEND_STUB_DIR SECRET_KEYCHAIN="$TMP/absent.keychain-db" \
+    "$BASH" "$SECRET" run -f keychain:demo -- true
+assert missing_provider_message grep -Eq 'security is required for keychain|backend lookup failed' "$TMP/err"
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 ((FAILED == 0))
