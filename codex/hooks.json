@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPLACE_WITH_CHECKOUT/hooks/guard-secrets",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

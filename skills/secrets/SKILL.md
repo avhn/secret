@@ -61,20 +61,20 @@ Use `secret clip FILE KEY` only on an explicit user request for the clipboard.
 
 ## Denial recovery
 
-| Denied operation                     | Safe next step                                              |
-| ------------------------------------ | ----------------------------------------------------------- |
-| Read/Edit/Write of a protected store | Use masked `show`; the user stashes changes                 |
-| Credential printer or clipboard read | Human pipes it directly to `secret stash FILE KEY`          |
-| `security ... -g` (also with a pipe) | Human uses `-w` piped directly into `stash`                 |
-| `secret get` or `secret exec`        | Use filtered `secret run`                                   |
-| Recursive grep or unrestricted rg    | Use plain `rg PATTERN DIR` with the protective config       |
-| Grep content/count tree with secrets | Use `files_with_matches` or narrow to a safe file/directory |
-| Missing key                          | Ask the user to stash it privately                          |
+| Denied operation                          | Safe next step                                              |
+| ----------------------------------------- | ----------------------------------------------------------- |
+| Tool access or patch of a protected store | Use masked `show`; the user stashes changes                 |
+| Credential printer or clipboard read      | Human pipes it directly to `secret stash FILE KEY`          |
+| `security ... -g` (also with a pipe)      | Human uses `-w` piped directly into `stash`                 |
+| `secret get` or `secret exec`             | Use filtered `secret run`                                   |
+| Recursive grep or unrestricted rg         | Use plain `rg PATTERN DIR` with the protective config       |
+| Grep content/count tree with secrets      | Use `files_with_matches` or narrow to a safe file/directory |
+| Missing key                               | Ask the user to stash it privately                          |
 
 Do not disguise a command, disable a hook, or change permissions to get past a
 denial. Template files (`.env.example`, `.env.sample`, `.env.template`) outside
 `~/.secrets` are readable; the protective rg config excludes `.env.*`
-entirely, so use Read or an explicit-file rg for templates.
+entirely, so use an explicit-file read for templates.
 
 ## Limits
 
@@ -86,6 +86,7 @@ its own argv can expose it to the local process list; prefer stdin or header
 files. `exec` is intentionally unfiltered and preserves stdio, status, and
 signals.
 
-The guard hook is heuristic and fails open on missing jq, malformed input, or
-analysis failure that names no protected file or operation. MCP search tools
-are not covered. A deliberately malicious agent with a shell is out of scope.
+The guard hook is heuristic. Missing jq denies nonempty requests; malformed
+input or analysis failure naming no protected file or operation receives no
+decision. Hosted and MCP search tools are not covered. A deliberately malicious
+agent with a shell is out of scope.
