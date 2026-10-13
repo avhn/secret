@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,7 +25,7 @@ func TestHumanBoundary(t *testing.T) {
 		{"get refuses before missing store", []string{"get", "does-not-exist.store", "TOKEN"}, "", "secret: get is human-terminal-only; use show or run instead\n", 1},
 		{"stash rejects invalid bytes", []string{"stash", "file:" + filepath.Join(home, "sample.store"), "TOKEN"}, "synth\x00etic\n", "secret: invalid value (empty, whitespace, quotes, newline, NUL, or CR)\n", 1},
 		{"clip validates seconds", []string{"clip", "does-not-exist.store", "TOKEN", "not-a-number"}, "", "secret: SECONDS must be a number\n", 1},
-		{"show option needs argument", []string{"show", "--env"}, "", "secret: option needs an argument\n", 2},
+		{"show option needs argument", []string{"show", "--env"}, "", "secret: option needs an argument\n", 1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			f, err := os.CreateTemp(home, "stdin-*")
@@ -107,5 +108,14 @@ func TestListRejectsSymlinkManifest(t *testing.T) {
 	_, err := c.defaults()
 	if err == nil {
 		t.Error("symlink manifest accepted")
+	}
+}
+
+func TestMissingOptionArgument(t *testing.T) {
+	for _, args := range [][]string{{"show", "--env"}, {"stash", "--label"}, {"run", "--key"}, {"exec", "-f"}} {
+		var out, errOut bytes.Buffer
+		if status := Main(args, os.Stdin, &out, &errOut); status != 1 || errOut.String() != "secret: option needs an argument\n" {
+			t.Errorf("%v: status %d stderr %q", args, status, errOut.String())
+		}
 	}
 }

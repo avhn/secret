@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,16 +37,69 @@ func validProviderPair(service, account string) bool {
 // Callers must never include provider output or command errors in returned errors.
 type commandRunner func(name string, args []string, input []byte) ([]byte, []byte, error)
 
-// runProvider bounds provider calls, including an unresponsive secret service.
+const providerOutputLimit = 1 << 20
+
+// limitedOutput cancels the provider as soon as either captured stream exceeds the bound.
+type limitedOutput struct {
+	bytes.Buffer
+	cancel   context.CancelFunc
+	exceeded bool
+}
+
+func (w *limitedOutput) Write(p []byte) (int, error) {
+	if len(p) > providerOutputLimit-w.Len() {
+		w.exceeded = true
+		w.cancel()
+		return 0, errors.New("provider output limit exceeded")
+	}
+	return w.Buffer.Write(p)
+}
+
+// ReadFrom routes exec's optimized pipe copy through the same output bound.
+func (w *limitedOutput) ReadFrom(r io.Reader) (int64, error) {
+	chunk := make([]byte, 8192)
+	var total int64
+	for {
+		n, err := r.Read(chunk)
+		if n > 0 {
+			written, writeErr := w.Write(chunk[:n])
+			total += int64(written)
+			if writeErr != nil {
+				return total, writeErr
+			}
+		}
+		if err == io.EOF {
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
+}
+
+// runProvider bounds provider lifetime, inherited pipes, and captured output.
 func runProvider(name string, args []string, input []byte) ([]byte, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
+	configureProviderProcess(cmd)
+	cmd.WaitDelay = 250 * time.Millisecond
 	cmd.Stdin = bytes.NewReader(input)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	return out, stderr.Bytes(), err
+	stdout := &limitedOutput{cancel: cancel}
+	stderr := &limitedOutput{cancel: cancel}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	err := cmd.Run()
+	if errors.Is(err, exec.ErrWaitDelay) {
+		stopProviderProcess(cmd)
+	}
+	if stdout.exceeded || stderr.exceeded {
+		return nil, nil, errors.New("provider output limit exceeded")
+	}
+	if err != nil {
+		return nil, nil, errors.New("provider call failed")
+	}
+	return stdout.Bytes(), stderr.Bytes(), nil
 }
 
 // Dispatch validates the reference and selects the real provider.

@@ -125,7 +125,7 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	sel, rest, e := selectors(args)
 	if e != nil {
 		if errors.Is(e, errOptionArgument) {
-			return c.fail(e.Error(), 2)
+			return c.fail(e.Error(), 1)
 		}
 		return c.failure(e)
 	}

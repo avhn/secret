@@ -197,15 +197,15 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err
 }
 
 func (c command) launch(mode string, args []string) int {
-	if launchUnsupported() {
-		return c.fail("run and exec are unsupported on Windows before M5a", 1)
-	}
 	o, e := parseLaunch(args, c.loc)
 	if e != nil {
 		if errors.Is(e, errOptionArgument) {
-			return c.fail(e.Error(), 2)
+			return c.fail(e.Error(), 1)
 		}
 		return c.failure(e)
+	}
+	if launchUnsupported() {
+		return c.fail("run and exec are unsupported on Windows before M5a", 1)
 	}
 	env, values, e := c.prepareLaunch(o)
 	if e != nil {
