@@ -1,0 +1,3 @@
+bytes.store
+  BYTES=<3 bytes>
+  TRAIL=<4 bytes>

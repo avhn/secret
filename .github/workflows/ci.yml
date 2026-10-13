@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh
+      - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh testdata/store/gen.sh
 
   libsecret:
     name: libsecret (ubuntu-latest)
@@ -111,6 +111,14 @@ jobs:
       - name: Test Go packages
         shell: bash
         run: go test ./...
+      - name: Compare Bash store goldens
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          bash testdata/store/gen.sh "$tmp"
+          diff -ru testdata/store/golden "$tmp"
       - name: Race test Go packages
         shell: bash
         env:

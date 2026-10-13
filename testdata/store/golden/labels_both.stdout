@@ -1,0 +1,6 @@
+labels.store
+  KEY [env=prod,zone=west]=<4 bytes>
+  TOKEN [env=prod]=<23 bytes>
+  SECOND=<5 bytes>
+  ONLY=<unset>
+  EMPTY=<0 bytes>

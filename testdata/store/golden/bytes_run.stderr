@@ -1,0 +1,3 @@
+secret: malformed assignment ignored (line: 3)
+secret: malformed assignment ignored (line: 4)
+2 non-assignment lines ignored (lines: 3,4)

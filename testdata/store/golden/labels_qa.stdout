@@ -1,0 +1,6 @@
+labels.store
+  KEY [env=qa]=<6 bytes>
+  TOKEN=<unset>
+  SECOND=<5 bytes>
+  ONLY [env=qa]=<2 bytes>
+  EMPTY=<0 bytes>
