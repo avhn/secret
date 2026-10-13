@@ -10,11 +10,11 @@ straight into that child process's environment.
 
 Three parts, usable together or alone:
 
-| Part                           | What it does                                                                                                                                                                                       |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/secret`                   | CLI. Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                       |
-| `hooks/guard-secrets`          | Claude Code `PreToolUse` hook. Denies reads of store files, environment dumps, credential printers (`gh auth token`, `security -w`, `pbpaste`, ...) and searches that would print store contents. |
-| `skills/secrets/SKILL.md`      | Tells the agent how to work with the CLI and how to recover from a guard denial without asking for values in chat.                                                                                |
+| Part                      | What it does                                                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin/secret`              | CLI. Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                      |
+| `hooks/guard-secrets`     | Claude Code `PreToolUse` hook. Denies reads of store files, environment dumps, credential printers (`gh auth token`, `security -w`, `pbpaste`, ...) and searches that would print store contents. |
+| `skills/secrets/SKILL.md` | Tells the agent how to work with the CLI and how to recover from a guard denial without asking for values in chat.                                                                                |
 
 ## What this is not
 
