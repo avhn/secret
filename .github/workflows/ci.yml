@@ -32,10 +32,13 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then echo "BASH_BIN=$(brew --prefix)/bin/bash" >>"$GITHUB_ENV"; else echo "BASH_BIN=bash" >>"$GITHUB_ENV"; fi
       - name: CLI matrix
         run: '"$BASH_BIN" tests/test-secret.sh'
+      - name: Backend matrix
+        run: '"$BASH_BIN" tests/test-backends.sh'
       - name: Guard matrix
         run: '"$BASH_BIN" tests/test-guard.sh'
       - name: Stock bash 3.2 (macOS)
         if: runner.os == 'macOS'
         run: |
           /bin/bash tests/test-secret.sh
+          /bin/bash tests/test-backends.sh
           /bin/bash tests/test-guard.sh

@@ -75,6 +75,24 @@ secret stash --env dev ~/.secrets.env API_TOKEN
 secret run -f ~/.secrets.env --env dev --key API_TOKEN -- ./deploy.sh
 ```
 
+Explicit `keychain:NAME` and `libsecret:NAME` references use keystore stores;
+`file:PATH` forces a literal file path, including paths that look like backend
+references. Bare names and paths still use file stores. Keystore names must
+contain only letters, digits, underscores, dots, and hyphens (and start with
+an alphanumeric or underscore). Each keystore store has a private, atomically
+written `~/.secrets/NAME.keys` manifest containing only key names, canonical
+labels, and random account identifiers, never values. `list` and `show` use
+only the manifest; `show` displays `<stored>` instead of a byte count. `run`
+and `exec` load every registered item before selecting keys, so failed lookups
+stop the child and `run` can redact values from unselected environments.
+`get` and `clip` fetch only the selected item. A failed manifest publish after
+a successful backend put can leave an unregistered keystore item.
+
+OS keystore implementations are not available yet. This phase supports only
+`SECRET_BACKEND_STUB_DIR` for isolated tests; without it, backend reads and
+writes fail with `backend not yet supported`. Do not use the stub with real
+credentials.
+
 `--env dev` means `--label env=dev`; repeat `--label name=value` to select
 multiple labels. Without selectors only unlabeled records qualify. For each key,
 the most specific matching label set wins; equally specific distinct matches
@@ -109,6 +127,7 @@ Run `secret help` for the full reference, including exit statuses.
 
 ```bash
 bash tests/test-secret.sh   # CLI matrix, needs perl, python3 and rg
+bash tests/test-backends.sh # disposable keystore stub matrix
 bash tests/test-guard.sh    # guard matrix, needs jq
 ```
 
