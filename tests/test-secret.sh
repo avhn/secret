@@ -333,6 +333,12 @@ EOF
 check filter_dies_mid_run 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'while :; do printf "%s" "$LONG" || break; done; sleep 15'
 assert filter_dies_message grep -q '^secret: redaction filter failed$' "$TMP/err"
 assert filter_dies_no_raw test ! -s "$TMP/out"
+# The stderr filter holds back the tail of child stderr when the stdout filter
+# dies (CI runners ignore SIGPIPE, so children print write errors there); the
+# message still starts on its own line, after the flushed child stderr.
+check filter_dies_partial_stderr 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'printf "child error line\n" >&2; sleep 0.3; printf "%s" "$LONG"; exec sleep 15'
+assert partial_stderr_flushed grep -q "^child error line$" "$TMP/err"
+assert partial_stderr_message grep -q '^secret: redaction filter failed$' "$TMP/err"
 check child_idle_after_filter_death 1 "$BASH" "$SECRET" run -f "$TMP/redact.store" -- "$BASH" -c 'printf "%s" "$LONG"; sleep 15'
 assert idle_filter_message grep -q '^secret: redaction filter failed$' "$TMP/err"
 assert idle_filter_no_raw test ! -s "$TMP/out"
