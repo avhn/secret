@@ -39,6 +39,8 @@ command -v jq >/dev/null 2>&1 || {
 # secrets NAME DECISION TOOL VALUE: run guard-secrets on a TOOL call whose
 # command (Bash), file_path (Read/Edit/Write), or path (Grep) is VALUE.
 SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
+# Existing plain-rg cases model the installed defaults, independent of CI env.
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 mkdir -p "$TMP/descendant-only/sub" "$TMP/search/sub" "$TMP/search/web" "$TMP/empty-search" "$TMP/search/src"
 printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/.env"
 printf '%s\n' 'KEY=synthetic-only' >"$TMP/search/one.secret"
@@ -651,6 +653,151 @@ else
     FAILED=$((FAILED + 1))
 fi
 
+# Covered scope scans preserve NUL-delimited names and fail closed beyond
+# depth 12. Empty directories at the limit are still complete.
+DEEP="$TMP/beyond-depth/a/b/c/d/e/f/g/h/i/j/k/l"
+mkdir -p "$DEEP" "$TMP/newline-clean" "$TMP/newline-protected"
+secrets depth_limit_empty allow Grep "$TMP/beyond-depth" '{"output_mode":"content"}'
+mkdir "$DEEP/m"
+printf '%s\n' synthetic >"$DEEP/m/private.secret"
+secrets beyond_depth deny Grep "$TMP/beyond-depth" '{"output_mode":"content"}'
+secrets beyond_depth_count deny Grep "$TMP/beyond-depth" '{"output_mode":"count"}'
+secrets beyond_depth_names allow Grep "$TMP/beyond-depth" '{"output_mode":"files_with_matches"}'
+printf '%s\n' synthetic >"$TMP/newline-clean/"$'.env\nordinary'
+printf '%s\n' synthetic >"$TMP/newline-protected/"$'ordinary\nprivate.secret'
+secrets newline_filename_clear allow Grep "$TMP/newline-clean" '{"output_mode":"content"}'
+secrets newline_filename_protected deny Grep "$TMP/newline-protected" '{"output_mode":"content"}'
+mkdir -p "$TMP/newline-ssh/.ssh"
+printf '%s\n' synthetic >"$TMP/newline-ssh/.ssh/"$'id_demo.pub\n'
+secrets newline_public_suffix deny Grep "$TMP/newline-ssh" '{"output_mode":"content"}'
+# Hidden Git metadata and dependency trees are deliberately outside coverage;
+# committed vendor trees remain covered regardless of ignore configuration.
+for directory in node_modules .git vendor; do
+    mkdir -p "$TMP/pruned-$directory/$directory/sub"
+    secrets "pruned_clear_$directory" allow Grep "$TMP/pruned-$directory" '{"output_mode":"content"}'
+    printf '%s\n' synthetic >"$TMP/pruned-$directory/$directory/sub/private.secret"
+    expected=allow
+    [[ "$directory" != vendor ]] || expected=deny
+    secrets "pruned_protected_$directory" "$expected" Grep "$TMP/pruned-$directory" '{"output_mode":"content"}'
+    secrets "pruned_names_$directory" allow Grep "$TMP/pruned-$directory" '{"output_mode":"files_with_matches"}'
+done
+for directory in node_modules .git; do
+    mkdir -p "$TMP/pruned-deep-$directory/$directory/a/b/c/d/e/f/g/h/i/j/k/l/m"
+    secrets "pruned_deep_$directory" allow Grep "$TMP/pruned-deep-$directory" '{"output_mode":"content"}'
+    secrets "pruned_deep_count_$directory" allow Grep "$TMP/pruned-deep-$directory" '{"output_mode":"count"}'
+done
+if ((EUID != 0)); then
+    mkdir -p "$TMP/find-error/unreadable"
+    chmod 000 "$TMP/find-error/unreadable"
+    secrets find_error deny Grep "$TMP/find-error" '{"output_mode":"content"}'
+    secrets find_error_names allow Grep "$TMP/find-error" '{"output_mode":"files_with_matches"}'
+    chmod 700 "$TMP/find-error/unreadable"
+else
+    printf '%s\n' 'SKIP find_error permissions: root can read mode-000 directories'
+fi
+
+# An absent, partial, unreadable or re-including config is not certification.
+unset RIPGREP_CONFIG_PATH
+secrets rg_without_config deny Bash 'rg TOKEN .'
+secrets rg_without_config_default deny Bash 'rg TOKEN'
+secrets rg_without_config_clean allow Bash 'rg TOKEN src'
+secrets rg_without_config_file allow Bash 'rg TOKEN src/a.ts'
+secrets rg_without_config_names allow Bash 'rg -l TOKEN .'
+secrets rg_without_config_names_cluster allow Bash 'rg -nl TOKEN .'
+secrets rg_without_config_names_long allow Bash 'rg --files-with-matches TOKEN .'
+secrets rg_without_config_files allow Bash 'rg --files .'
+secrets rg_without_config_count deny Bash 'rg -c TOKEN .'
+secrets rg_without_config_count_long deny Bash 'rg --count TOKEN .'
+secrets rg_without_config_count_cluster deny Bash 'rg -nc TOKEN .'
+secrets rg_without_config_regexp deny Bash 'rg -e TOKEN .'
+secrets rg_without_config_regexp_equals deny Bash 'rg --regexp=TOKEN .'
+secrets rg_without_config_double_dash deny Bash 'rg TOKEN -- .'
+secrets rg_without_config_multiple deny Bash 'rg TOKEN src sub'
+secrets rg_without_config_cd allow Bash 'cd src && rg TOKEN'
+secrets rg_without_config_glob deny Bash 'rg TOKEN s*'
+secrets rg_without_config_unknown deny Bash 'rg --unknown src'
+secrets rg_without_config_depth deny Bash "rg TOKEN '$TMP/beyond-depth'"
+secrets rg_without_config_depth_names allow Bash "rg -l TOKEN '$TMP/beyond-depth'"
+secrets rg_without_config_newline allow Bash "rg TOKEN '$TMP/newline-clean'"
+secrets rg_without_config_pruned deny Bash "rg TOKEN '$TMP/pruned-vendor'"
+for directory in node_modules .git; do
+    secrets "rg_pruned_$directory" allow Bash "rg TOKEN '$TMP/pruned-$directory'"
+    secrets "git_grep_pruned_$directory" allow Bash "git -C '$TMP/pruned-$directory' grep TOKEN"
+    secrets "rg_pruned_deep_$directory" allow Bash "rg TOKEN '$TMP/pruned-deep-$directory'"
+done
+secrets git_grep deny Bash 'git grep TOKEN'
+secrets git_grep_clean allow Bash 'git grep TOKEN -- src'
+secrets git_grep_names allow Bash 'git grep -l TOKEN'
+secrets git_grep_names_long allow Bash 'git grep --files-with-matches TOKEN'
+secrets git_grep_count deny Bash 'git grep -c TOKEN'
+secrets git_grep_file deny Bash 'git grep TOKEN -- .env'
+secrets git_grep_regexp deny Bash 'git grep -e TOKEN'
+secrets git_grep_pattern_file deny Bash 'git grep -f .env -- src'
+secrets git_grep_global deny Bash 'git --no-pager grep TOKEN'
+secrets git_grep_chdir allow Bash 'git -C src grep TOKEN'
+secrets git_grep_chdir_protected deny Bash 'git -C sub grep TOKEN'
+secrets git_grep_multiple_chdir allow Bash 'git -C sub -C ../src grep TOKEN'
+secrets git_grep_config deny Bash 'git -c core.bare=false grep TOKEN'
+secrets git_grep_revision deny Bash 'git grep TOKEN HEAD -- src'
+secrets git_grep_over_cap deny Bash "git grep TOKEN # $LONG_TEXT"
+secrets git_grep_global_over_cap deny Bash "git -C sub grep TOKEN # $LONG_TEXT"
+secrets git_grep_unclosed deny Bash "git grep 'TOKEN"
+export RIPGREP_CONFIG_PATH="$TMP/missing-rg-config"
+secrets rg_missing_config deny Bash 'rg TOKEN .'
+printf '%s\n' '--iglob=!.env' '--iglob=!*.secret' '--iglob=!.secrets/' >"$TMP/partial-rg-config"
+export RIPGREP_CONFIG_PATH="$TMP/partial-rg-config"
+secrets rg_partial_config deny Bash 'rg TOKEN .'
+secrets rg_partial_config_clean allow Bash 'rg TOKEN src'
+cat "$REPO_ROOT/examples/ripgreprc" >"$TMP/reinclude-rg-config"
+printf '%s\n' '--iglob=.env' >>"$TMP/reinclude-rg-config"
+export RIPGREP_CONFIG_PATH="$TMP/reinclude-rg-config"
+secrets rg_reinclude_config deny Bash 'rg TOKEN .'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+secrets rg_with_config allow Bash 'rg TOKEN .'
+secrets rg_with_config_count allow Bash 'rg -c TOKEN .'
+secrets rg_with_config_explicit deny Bash 'rg TOKEN .env'
+secrets rg_with_config_env_unset deny Bash 'env -u RIPGREP_CONFIG_PATH rg TOKEN .'
+secrets rg_with_config_env_empty deny Bash 'env -i rg TOKEN .'
+secrets rg_with_config_env_tab deny Bash $'env\t-i rg TOKEN .'
+secrets rg_with_config_env_quoted deny Bash "'env' -i rg TOKEN ."
+secrets rg_with_config_nested_env deny Bash "env -i bash -c 'rg TOKEN .'"
+secrets rg_with_config_env_sibling allow Bash 'env -i true; rg TOKEN .'
+secrets rg_with_config_exec deny Bash 'exec -lc rg TOKEN .'
+secrets rg_with_config_sudo deny Bash 'sudo rg TOKEN .'
+secrets rg_with_config_unset_nested deny Bash "unset RIPGREP_CONFIG_PATH; bash -c 'rg TOKEN .'"
+secrets rg_with_config_env_override deny Bash 'RIPGREP_CONFIG_PATH=other rg TOKEN .'
+secrets git_grep_ignores_rg_config deny Bash 'git grep TOKEN'
+cat "$REPO_ROOT/examples/ripgreprc" >"$TMP/search/rg-config"
+export RIPGREP_CONFIG_PATH=rg-config
+secrets rg_relative_config allow Bash 'rg TOKEN .'
+secrets rg_relative_config_chdir deny Bash 'cd sub && rg TOKEN .'
+export RIPGREP_CONFIG_PATH="$TMP/empty-search"
+secrets rg_directory_config deny Bash 'rg TOKEN .'
+perl -e 'print "#", "x" x 9000' >"$TMP/large-rg-config"
+export RIPGREP_CONFIG_PATH="$TMP/large-rg-config"
+secrets rg_large_config deny Bash 'rg TOKEN .'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+printf '%s\n' synthetic >"$TMP/search/HEAD"
+secrets git_grep_existing_revision deny Bash 'git grep TOKEN HEAD -- src'
+perl -e 'symlink $ARGV[0], $ARGV[1] or die $!' "$TMP/search" "$TMP/search-link"
+secrets grep_root_symlink deny Grep "$TMP/search-link" '{"output_mode":"content"}'
+unset RIPGREP_CONFIG_PATH
+secrets rg_root_symlink deny Bash "rg TOKEN '$TMP/search-link'"
+secrets rg_missing_path deny Bash "rg TOKEN '$TMP/no-such-search'"
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+
+# Deterministic find failures cover root CI too, separately from permissions.
+mkdir "$TMP/find-error-bin"
+printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$TMP/find-error-bin/find"
+chmod +x "$TMP/find-error-bin/find"
+PATH="$TMP/find-error-bin:$PATH" secrets grep_find_exit deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
+PATH="$TMP/find-error-bin:$PATH" secrets grep_find_exit_count deny Grep "$TMP/empty-search" '{"output_mode":"count"}'
+PATH="$TMP/find-error-bin:$PATH" secrets grep_find_exit_names allow Grep "$TMP/empty-search" '{"output_mode":"files_with_matches"}'
+unset RIPGREP_CONFIG_PATH
+PATH="$TMP/find-error-bin:$PATH" secrets rg_find_exit deny Bash 'rg TOKEN src'
+PATH="$TMP/find-error-bin:$PATH" secrets rg_find_exit_names allow Bash 'rg -l TOKEN src'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
+
 # A timeout in the names-only Grep fallback denies content but not filenames.
 mkdir "$TMP/find-bin"
 cat >"$TMP/find-bin/find" <<'EOF'
@@ -660,6 +807,12 @@ EOF
 chmod +x "$TMP/find-bin/find"
 PATH="$TMP/find-bin:$PATH" secrets grep_timeout deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
 PATH="$TMP/find-bin:$PATH" secrets grep_timeout_names allow Grep "$TMP/empty-search" '{"output_mode":"files_with_matches"}'
+PATH="$TMP/find-bin:$PATH" secrets grep_timeout_count deny Grep "$TMP/empty-search" '{"output_mode":"count"}'
+unset RIPGREP_CONFIG_PATH
+PATH="$TMP/find-bin:$PATH" secrets rg_timeout deny Bash 'rg TOKEN src'
+PATH="$TMP/find-bin:$PATH" secrets rg_timeout_names allow Bash 'rg -l TOKEN src'
+PATH="$TMP/find-bin:$PATH" secrets git_grep_timeout deny Bash 'git grep TOKEN -- src'
+export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 
 # Narrow analysis failures use an exact fixed reason, never command text.
 FIXED_REASON='command too complex to analyse for secret access; split it or use secret run'
