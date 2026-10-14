@@ -1,5 +1,11 @@
 # Hook tightening decisions for M2
 
+## Fifth-audit policy replacement
+
+P1a now denies every Git subcommand outside the case-sensitive built-in table, including custom aliases, without reading Git configuration. Users can run an alias's expanded built-in command instead. Inline `-c alias.*` also denies; the inert-key allowlist, index gate and command-running surface checks remain. Earlier alias-resolution discussion below is a historical snapshot, not the current policy.
+
+P9 analyzes `-c` text for additional shell dialects and BusyBox/ToyBox shell applets; a multicall applet is dispatched by its applet name. P10 validates complete sed scripts, including addresses, flags, blocks, substitution and transliteration delimiters, before classifying file and execution surfaces. P11 normalizes Bash option words before invalidating uncertain path semantics. P12 tracks indirect assignment to environment names consulted by later Git, shell or ripgrep commands. `internal/hook/policy/audit5_test.go` holds the synthetic fifth-audit reproductions; they do not establish installed-hook containment.
+
 The default Go build now analyzes Bash tool calls through the bounded AST policy. The installed hook is still `hooks/guard-secrets`; no plugin manifest or `hooks.json` has changed. Passing synthetic tests does not establish a host shell-dialect or failure-blocking contract.
 
 ## Reviewed differences

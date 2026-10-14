@@ -82,6 +82,7 @@ type analyzer struct {
 	structuralUncertain bool
 	env                 map[string]string
 	cdpath              bool
+	indirect            bool
 	deadline            time.Time
 }
 
@@ -298,10 +299,11 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			name := path.Base(words[0])
 			args := words[1:]
-			if name == "shopt" && (optionIn(strings.Join(args, " "), "cdable_vars") || optionIn(strings.Join(args, " "), "autocd")) {
+			if shellPathOptions(name, args) {
 				cwd = ""
 				a.cdpath = true
 			}
+			a.recordIndirect(name, args, unknown)
 			if name == "cd" || name == "pushd" || name == "popd" || name == "dirs" {
 				for len(args) > 0 && len(args[0]) > 1 && strings.HasPrefix(args[0], "-") {
 					option := args[0]
@@ -469,12 +471,22 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					}
 					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
 				}
-				if assign.Value != nil {
-					args = append(args, literal(assign.Value))
-				} else if assign.Name != nil {
-					args = append(args, assign.Name.Value)
+				if assign.Name != nil {
+					if assign.Value != nil {
+						args = append(args, assign.Name.Value+"="+literal(assign.Value))
+					} else {
+						args = append(args, assign.Name.Value)
+					}
+				} else if assign.Value != nil {
+					values, ok := a.expandWord(assign.Value, cwd)
+					if !ok {
+						a.indirect = true
+					} else {
+						args = append(args, values...)
+					}
 				}
 			}
+			a.recordIndirect(cmd.Variant.Value, args, false)
 			if reason := roles.PrinterReason(cmd.Variant.Value, args, false); reason != "" {
 				a.reason = reason
 			}
@@ -669,12 +681,16 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	name := path.Base(words[0])
 	args := words[1:]
-	if name == "busybox" {
+	if name == "busybox" || name == "toybox" {
 		if len(args) == 0 || strings.HasPrefix(args[0], "-") {
 			a.reason = roles.Indeterminate
 			return
 		}
 		a.command(args, depth+1, cwd, direct)
+		return
+	}
+	if a.indirect && indirectConsumer(name) {
+		a.reason = roles.Indeterminate
 		return
 	}
 	if name == "git" {
@@ -821,16 +837,31 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		return
-	case "bash", "sh", "zsh", "eval":
+	case "bash", "sh", "zsh", "ksh", "ksh93", "mksh", "dash", "ash", "yash", "posh", "fish", "csh", "tcsh", "eval":
 		if name == "eval" {
+			a.indirect = true
 			if len(args) > 0 {
 				a.fragmentAt(strings.Join(args, " "), depth+1, cwd)
 			}
 			return
 		}
 		for i, v := range args {
-			if (v == "-c" || v == "-lc" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "c")) && i+1 < len(args) {
-				a.fragmentAt(args[i+1], depth+1, cwd)
+			if name == "bash" && (v == "-O" || v == "+O") {
+				if i+1 >= len(args) {
+					a.reason = roles.Indeterminate
+					return
+				}
+				if shellPathOption(args[i+1]) {
+					cwd = ""
+				}
+				continue
+			}
+			if v == "-c" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v[1:], "c") {
+				if i+1 >= len(args) {
+					a.reason = roles.Indeterminate
+					return
+				}
+				a.shellValue(args[i+1], depth, cwd)
 				return
 			}
 		}

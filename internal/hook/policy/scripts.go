@@ -10,9 +10,6 @@ import (
 	"github.com/avhn/secret/internal/hook/roles"
 )
 
-var sedFileCommand = regexp.MustCompile(`(?:^|[^A-Za-z_])[ \t]*[rRwW][ \t]*([^\n]+)`)
-var sedShellCommand = regexp.MustCompile(`(?:^|[^A-Za-z_])[ \t]*e[ \t]*([^\n}]*)`)
-var sedSubstitution = regexp.MustCompile(`(?:^|[^A-Za-z_])[ \t]*s([^A-Za-z0-9\s])`)
 var awkFileCommand = regexp.MustCompile(`(?:getline|print|printf)[^;\n{}]*[<>][ \t]*["']([^"']+)["']`)
 var awkShellCommand = regexp.MustCompile(`system[ \t]*\([ \t]*["']([^"']*)["'][ \t]*\)`)
 
@@ -31,47 +28,7 @@ func (a *analyzer) scriptInputs(name string, args []string, depth int, cwd strin
 			return
 		}
 		if name == "sed" {
-			code := arg
-			for _, match := range sedFileCommand.FindAllStringSubmatch(code, -1) {
-				if strings.ContainsAny(match[1], ";}") || a.inputProtected(strings.TrimSpace(match[1]), cwd) {
-					a.reason = roles.FileInput
-					return
-				}
-			}
-			for _, match := range sedShellCommand.FindAllStringSubmatch(code, -1) {
-				// A bare e executes pattern-space text, which is not static shell code.
-				a.shellValue(strings.TrimSpace(match[1]), depth, cwd)
-			}
-			for _, match := range sedSubstitution.FindAllStringSubmatchIndex(code, -1) {
-				delimiter := code[match[2]]
-				pos, separators := match[1], 0
-				for pos < len(code) && separators < 2 {
-					if code[pos] == '\\' {
-						pos += 2
-						continue
-					}
-					if code[pos] == delimiter {
-						separators++
-					}
-					pos++
-				}
-				if separators != 2 {
-					continue
-				}
-				end := strings.IndexAny(code[pos:], ";\n}")
-				if end < 0 {
-					end = len(code) - pos
-				}
-				flags := strings.TrimSpace(code[pos : pos+end])
-				if strings.Contains(flags, "e") {
-					a.reason = roles.Indeterminate
-					return
-				}
-				if i := strings.IndexByte(flags, 'w'); i >= 0 && a.inputProtected(strings.TrimSpace(flags[i+1:]), cwd) {
-					a.reason = roles.FileInput
-					return
-				}
-			}
+			a.parseSedScript(arg, depth, cwd)
 		} else {
 			for _, match := range awkFileCommand.FindAllStringSubmatch(arg, -1) {
 				if a.inputProtected(match[1], cwd) {
