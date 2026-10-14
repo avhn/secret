@@ -27,6 +27,9 @@ func TestSixthAuditGitAndShellAssignments(t *testing.T) {
 		"SSH_ASKPASS=vi git status", "GIT_PROXY_COMMAND=vi git status",
 		"GIT_EDITOR='vi; cat app.env' git status", "PAGER='less app.env' git status",
 		"GIT_EDITOR='vi\ncat app.env' git status",
+		// P13 strict no longer certifies editor or pager arguments outside inert sets.
+		"export VISUAL='vim -f'; git status", "export EDITOR='vim -f'; git status",
+		"declare PAGER='delta --paging=never'; git status",
 	} {
 		t.Run(command, func(t *testing.T) {
 			if got := Analyze(command, repo, root, check); got == "" {
@@ -37,7 +40,7 @@ func TestSixthAuditGitAndShellAssignments(t *testing.T) {
 	for _, command := range []string{
 		"git -c color.ui=always status", "git -c pager.log=false status",
 		"GIT_EDITOR='code -w' git status", "env PAGER='less -FRX' git status",
-		"export VISUAL='vim -f'; git status", "export EDITOR='vim -f'; git status", "declare PAGER='delta --paging=never'; git status",
+		"GIT_EDITOR=vim git status",
 	} {
 		t.Run(command, func(t *testing.T) {
 			if got := Analyze(command, repo, root, check); got != "" {

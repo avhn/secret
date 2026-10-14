@@ -47,6 +47,10 @@ func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 	if gitShellEnv(key) {
 		a.editorPagerValue(key, value, cwd)
 	}
+	if optionIn("LESSOPEN LESSCLOSE LESSKEY LESSKEYIN", key) || key == "LESS" && !inertLessOption("-"+value) {
+		a.reason = roles.Indeterminate
+		return
+	}
 	switch key {
 	case "BASH_ENV", "ENV":
 		if value == "" || a.inputProtected(value, cwd) {

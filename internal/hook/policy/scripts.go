@@ -120,14 +120,26 @@ func (a *analyzer) sedScripts(args []string, cwd string) []string {
 	return scripts
 }
 
-// sedFile resolves symlinks through the shared path gate before reading
-// synthetic script code; oversize, missing or non-regular files deny.
+// sedFile reads only bounded regular script files; symlinks, stdin sources,
+// missing files and oversized scripts deny because their content is uncertain.
 func (a *analyzer) sedFile(name, cwd string) string {
+	// Standard-input script sources cannot be read from the command line.
+	if name == "-" || name == "/dev/stdin" || name == "/proc/self/fd/0" {
+		a.reason = roles.Indeterminate
+		return ""
+	}
 	if name == "" || a.inputProtected(name, cwd) {
 		a.reason = roles.FileInput
 		return ""
 	}
 	file := filepath.FromSlash(a.resolve(name, cwd))
+	// A symlink can lead to /dev/stdin in the child even when the hook's
+	// own stdin resolves to an innocuous regular file.
+	info, statErr := os.Lstat(file)
+	if statErr != nil || !info.Mode().IsRegular() {
+		a.reason = roles.Indeterminate
+		return ""
+	}
 	target, err := filepath.EvalSymlinks(file)
 	if err != nil {
 		a.reason = roles.Indeterminate

@@ -35,6 +35,33 @@ func (a *analyzer) editorPagerValue(key, value, cwd string) {
 			return
 		}
 	}
+	if words[0] == "less" && len(words) > 2 {
+		// Only one inert flag cluster is accepted for less.
+		a.reason = roles.Indeterminate
+		return
+	}
+	for _, option := range words[1:] {
+		allowed := false
+		switch words[0] {
+		case "code", "codium":
+			allowed = optionIn("-w --wait -n --new-window -r --reuse-window", option)
+		case "subl", "mate":
+			allowed = optionIn("-w --wait", option)
+		case "emacs", "emacsclient":
+			allowed = optionIn("-nw -t -c --no-window-system --tty --create-frame", option)
+		case "less":
+			allowed = inertLessOption(option)
+		}
+		if !allowed {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
+}
+
+// inertLessOption accepts only a single cluster of flags that cannot load files.
+func inertLessOption(option string) bool {
+	return len(option) > 1 && option[0] == '-' && strings.Trim(option[1:], "FRXSKNMi-") == ""
 }
 
 // shellValue checks literal command text without expanding or executing it.
@@ -127,19 +154,21 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	}
 	gitDir, workTree := "", ""
 	bareGlobal := false
+	// Command-text repository overrides (P1c) leave content-producing forms
+	// indeterminate; relative resolution after -C is too easy to misjudge.
 	if value, ok := a.env["GIT_DIR"]; ok {
 		if !staticGitPath(value) {
 			a.reason = roles.Indeterminate
 			return
 		}
-		gitDir = value
+		gitDir, repoUncertain = value, true
 	}
 	if value, ok := a.env["GIT_WORK_TREE"]; ok {
 		if !staticGitPath(value) {
 			a.reason = roles.Indeterminate
 			return
 		}
-		workTree = value
+		workTree, repoUncertain = value, true
 	}
 	countValue, countPresent := a.env["GIT_CONFIG_COUNT"]
 	if !countPresent {
