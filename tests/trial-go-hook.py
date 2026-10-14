@@ -19,8 +19,8 @@ with tempfile.TemporaryDirectory(prefix="go-hook-trial-") as tmp:
     results, times = tmp / "results", tmp / "times"
     # Keep the absolute binary argument for existing callers; build only in the
     # disposable directory so an installed or supplied binary is never replaced.
-    trial_binary = tmp / "secret-hooktrial"
-    subprocess.run(["go", "build", "-tags", "hooktrial", "-o", str(trial_binary), "./cmd/secret"],
+    trial_binary = tmp / "secret-hook"
+    subprocess.run(["go", "build", "-o", str(trial_binary), "./cmd/secret"],
                    cwd=root, check=True)
     env = os.environ.copy()
     env.update(SECRET_GUARD=f"python3 -I {root}/tests/measure-go-hook.py {trial_binary} {host} {times}",

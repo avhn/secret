@@ -24,7 +24,7 @@ def check():
     inventory = {name for item, name, _, _ in rows(inventory_path, 4) if item == suite}
     expected = {}
     for item, name, category in rows(divergence_path, 3):
-        if category not in ("pending-M2-ast", "pending-M2-search", "pending-M2-paths", "tightening", "deliberate-tightening"):
+        if category not in ("deliberate-find-shim", "deliberate-tightening"):
             raise ValueError(f"invalid category: {item}/{name}")
         if item == suite:
             if name in expected:

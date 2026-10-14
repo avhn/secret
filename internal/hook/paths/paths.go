@@ -9,81 +9,93 @@ import (
 	"time"
 )
 
-// Resolve anchors a file operand at the effective working directory.
-func Resolve(name, cwd, workdir, home string) string {
+// unresolved anchors path text without collapsing .. across a symlink.
+func unresolved(name, cwd, workdir, home string) string {
+	join := func(a, b string) string { return a + string(os.PathSeparator) + b }
 	if workdir != "" {
 		if filepath.IsAbs(workdir) {
 			cwd = workdir
 		} else {
-			cwd = filepath.Join(cwd, workdir)
+			cwd = join(cwd, workdir)
 		}
 	}
-	switch {
-	case strings.HasPrefix(name, "~/"):
-		name = filepath.Join(home, name[2:])
-	case strings.HasPrefix(name, "$HOME/"):
-		name = filepath.Join(home, name[6:])
-	case strings.HasPrefix(name, "${HOME}/"):
-		name = filepath.Join(home, name[8:])
-	}
-	if !filepath.IsAbs(name) {
-		name = filepath.Join(cwd, name)
-	}
-	return filepath.Clean(name)
-}
-
-// Protected reports protected lexical names or symlink aliases, including dangling links.
-// Unresolvable existing links are conservatively protected.
-func Protected(name, cwd, workdir, home string) bool {
-	p := Resolve(name, cwd, workdir, home)
-	if lexical(p) {
-		return true
-	}
-	for i := 0; i < 32; i++ {
-		next, changed, uncertain := step(p)
-		if uncertain {
-			return true
-		}
-		if !changed {
-			return false
-		}
-		p = next
-		if lexical(p) {
-			return true
-		}
-	}
-	return true
-}
-
-// step resolves the first linked ancestor, preserving the remaining suffix.
-func step(p string) (string, bool, bool) {
-	probe := p
-	for {
-		info, err := os.Lstat(probe)
-		if err == nil && info.Mode()&os.ModeSymlink != 0 {
-			link, err := os.Readlink(probe)
-			if err != nil {
-				return "", false, true
-			}
-			if !filepath.IsAbs(link) {
-				link = filepath.Join(filepath.Dir(probe), link)
-			}
-			suffix, err := filepath.Rel(probe, p)
-			if err != nil {
-				return "", false, true
-			}
-			return filepath.Join(link, suffix), true, false
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return "", false, true
-		}
-		parent := filepath.Dir(probe)
-		if parent == probe {
+	for _, prefix := range []string{"~/", "$HOME/", "${HOME}/"} {
+		if strings.HasPrefix(name, prefix) {
+			name = join(home, strings.TrimPrefix(name, prefix))
 			break
 		}
-		probe = parent
 	}
-	return p, false, false
+	if !filepath.IsAbs(name) {
+		name = join(cwd, name)
+	}
+	return name
+}
+
+// Resolve anchors a path while preserving components for physical OS lookup.
+// In particular, link/.. must not be collapsed before the link is followed.
+func Resolve(name, cwd, workdir, home string) string {
+	return unresolved(name, cwd, workdir, home)
+}
+
+// Protected checks both lexical intent and physical component traversal. It
+// reads only metadata and denies link loops and non-ENOENT resolution errors.
+func Protected(name, cwd, workdir, home string) bool {
+	raw := unresolved(name, cwd, workdir, home)
+	if lexical(filepath.Clean(raw)) {
+		return true
+	}
+	resolved, err := physical(raw)
+	return err != nil || lexical(resolved)
+}
+
+// physical resolves one component at a time with a shared symlink-hop budget.
+// Cleaning the full string first would turn link/../credentials into the wrong
+// file when link points into a protected directory outside the lexical parent.
+func physical(raw string) (string, error) {
+	volume := filepath.VolumeName(raw)
+	root := volume + string(os.PathSeparator)
+	current := root
+	pending := strings.Split(filepath.ToSlash(strings.TrimPrefix(raw, volume)), "/")
+	hops := 0
+	for len(pending) > 0 {
+		part := pending[0]
+		pending = pending[1:]
+		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			current = filepath.Dir(current)
+			continue
+		}
+		next := filepath.Join(current, part)
+		info, err := os.Lstat(next)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return next, err
+			}
+			current = next
+			continue
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			current = next
+			continue
+		}
+		hops++
+		if hops > 32 {
+			return next, fs.ErrInvalid
+		}
+		target, err := os.Readlink(next)
+		if err != nil {
+			return next, err
+		}
+		if filepath.IsAbs(target) {
+			volume = filepath.VolumeName(target)
+			current = volume + string(os.PathSeparator)
+			target = strings.TrimPrefix(target, volume)
+		}
+		pending = append(strings.Split(filepath.ToSlash(target), "/"), pending...)
+	}
+	return filepath.Clean(current), nil
 }
 
 // lexical recognises store directories, credentials and protected basenames.
@@ -215,4 +227,10 @@ func digits(s string) bool {
 		}
 	}
 	return true
+}
+
+// LexicalProtected distinguishes an explicitly protected spelling from an
+// ordinary alias, for names-only tools which may return alias names.
+func LexicalProtected(name, cwd, home string) bool {
+	return lexical(filepath.Clean(unresolved(name, cwd, "", home)))
 }

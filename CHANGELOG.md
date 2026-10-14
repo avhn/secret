@@ -6,7 +6,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
-- Bounded Go PreToolUse envelope and protected-path checks with `secret hook claude|codex`, synthetic decoding and alias tests, fuzz seed, and exact Bash-vs-Go hook case inventories. The active installed hook remains Bash; shell analysis and certified search scope are later M2 work.
+- Default Go hook Bash AST analysis with 64 KiB envelopes, 40 KiB fragments, explicit wrapper and grep/sed/split option arity, scoped directory checks and value-free denials. The installed Bash hook and plugin manifests remain unchanged.
+- Mechanically generated denied-command variants, 76 permanent synthetic audit envelopes, and exact reviewed default-hook divergences with no pending-M2 categories. See the [tightening table](docs/design/hook-tightening.md) for deliberate differences and local evidence.
+
+- Bounded Go PreToolUse envelope and protected-path checks with `secret hook claude|codex`, synthetic decoding and alias tests, fuzz seed, and exact Bash-vs-Go hook case inventories. The active installed hook remains Bash; default Go shell analysis and search certification are now ready for review.
 - Alternate `SECRET_CLI` executable support for the CLI and provider shell suites, a tagged disposable Go backend stub, and per-case Go divergence checking in CI on the existing runners. The default Go build ignores stub environment variables.
 - Focused Go checks for stub isolation, failure injection, private secret directory permissions and unlabeled stash section reset.
 
@@ -28,11 +31,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### In progress
 
-- Expanded tagged Go hook trial budgets for long safe shell commands and ported sudo, direct stash, env split, jq/ps, and file option roles. The default build still defers Bash analysis and retains its prior envelope limit; unresolved tagged differences prevent activation.
+- M2 default-hook parity and hardening are ready for review, not a host cutover. Fixed config reassignment, wrapper clusters, previously unwalked AST expressions, printer-pipe redirects and assignments, combined printer flags, symlinked ancestors before parent traversal, Grep selectors, and tar mode parsing. Local Go, race, fuzz and retained Bash checks pass; real-host and cross-platform gates remain pending.
 
-- Added metadata-only search-scope checks and synthetic ripgrep config certification for the tagged Go hook trial; default-build Grep and Glob now use the shared search package. The installed Bash guard is unchanged and the default Go build still defers shell analysis.
-
-- Started an isolated Go Bash AST walker and command/printer role tables with synthetic role, path-property and fuzz tests. A timed grouped trial harness exposed security-critical false allows; targeted AST, role, option and argv analysis reduced them to four Claude Grep shim differences and zero Codex false allows in the unwired trial. The trial now builds with `hooktrial` without source edits; its four external-find shim differences are documented, while 150 Claude and one Codex false denies remain unclassified. Go walk failures deny under injected errors, loops, overflow and deadline. The default Go build still defers shell decisions to the installed Bash guard.
 - Go inventory and human-only CLI commands have synthetic Bash-generated parity cases and CI drift checks; usage exits 1 like Bash, Unix run and exec now have synthetic Bash goldens, and the Bash CLI is still active.
 - Go libsecret and Keychain transports now use stdin-only value writes, exact service/account lookups, and disposable provider integration tests in CI; provider validation is pending isolated runners.
 - Go store writes now use an anchored parent for private atomic replacement and the shared Bash secrets-directory lock for file and backend transactions, alongside validated v1 manifests, with Bash-generated stash byte goldens and process-concurrency checks. Backend dispatch has a test-only directory stub, readback-before-publish ordering, and unsupported real-provider placeholders; the Bash CLI remains active.

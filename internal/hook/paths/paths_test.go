@@ -108,3 +108,27 @@ func TestTreeProtected(t *testing.T) {
 		t.Fatal("protected descendant accepted")
 	}
 }
+
+// TestPhysicalDotDot prevents lexical cleanup from hiding a protected target.
+func TestPhysicalDotDot(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"proj", "home/.aws/cli", "safe/sub"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(root, "home/.aws/cli"), filepath.Join(root, "proj/awsx")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../safe/sub", filepath.Join(root, "proj/safe")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"awsx/../credentials", "./awsx/../../.aws/credentials"} {
+		if !Protected(name, filepath.Join(root, "proj"), "", filepath.Join(root, "home")) {
+			t.Errorf("allowed %s", name)
+		}
+	}
+	if Protected("safe/../readme", filepath.Join(root, "proj"), "", root) {
+		t.Fatal("safe physical path denied")
+	}
+}

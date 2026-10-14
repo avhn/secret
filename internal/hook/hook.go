@@ -1,4 +1,4 @@
-// Package hook connects validated host envelopes to file and patch path roles.
+// Package hook connects validated host envelopes to shell, file and patch roles.
 package hook
 
 import (
@@ -13,8 +13,8 @@ import (
 	"github.com/avhn/secret/internal/hook/search"
 )
 
-// Decide writes a supported denial or no decision. Bash remains unanalysed and
-// deferred to the retained guard until the M2 AST implementation is available.
+// Decide writes one supported denial or no decision after bounded analysis.
+// The installed Bash guard is unchanged; this entry point is the Go hook.
 func Decide(host string, in io.Reader, out io.Writer) error {
 	data, readErr := io.ReadAll(io.LimitReader(in, input.MaxBytes+1))
 	if readErr == nil && len(bytes.TrimSpace(data)) == 0 {

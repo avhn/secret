@@ -1,0 +1,215 @@
+package policy
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/avhn/secret/internal/hook/paths"
+	"mvdan.cc/sh/v3/syntax"
+)
+
+// corpusCase contains only synthetic command text and metadata fixture references.
+type corpusCase struct {
+	Name, Command, CWD, Config, Home string
+	Snapshot                         int
+	Extra                            map[string]json.RawMessage
+}
+
+// deniedVariants changes literal words without making active expansions inert.
+// Each replacement is independent, preserving the original shell operators.
+func deniedVariants(source string) []string {
+	variants := []string{source}
+	seen := map[string]bool{source: true}
+	add := func(start, end int, text string) {
+		v := source[:start] + text + source[end:]
+		if !seen[v] {
+			if _, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(v), ""); err != nil {
+				return
+			}
+			variants = append(variants, v)
+			seen[v] = true
+		}
+	}
+	if strings.ContainsRune(source, 0) {
+		return variants
+	}
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
+	if err != nil {
+		// Preserve malformed syntax rather than quote it into inert prose.
+		return append(variants, "command "+source)
+	}
+	skip := map[*syntax.Word]bool{}
+	syntax.Walk(file, func(node syntax.Node) bool {
+		// Declaration and time keywords are executable builtin/utility words
+		// too, even though the parser does not represent them as CallExpr.
+		keyword := ""
+		start := 0
+		switch n := node.(type) {
+		case *syntax.DeclClause:
+			keyword, start = n.Variant.Value, int(n.Variant.Pos().Offset())
+		case *syntax.TimeClause:
+			keyword, start = "time", int(n.Time.Offset())
+		case *syntax.LetClause:
+			keyword, start = "let", int(n.Let.Offset())
+		}
+		if keyword != "" {
+			for _, word := range []string{"'" + keyword + "'", "\"" + keyword + "\"", "$'" + keyword + "'", "command " + keyword} {
+				add(start, start+len(keyword), word)
+			}
+			if keyword != "time" {
+				add(start, start+len(keyword), "builtin "+keyword)
+			}
+		}
+		if r, ok := node.(*syntax.Redirect); ok && r.Hdoc != nil {
+			skip[r.Word] = true
+			skip[r.Hdoc] = true
+		}
+		if call, ok := node.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+			pos := int(call.Args[0].Pos().Offset())
+			add(pos, pos, "command ")
+			if strings.Contains(" echo printf source . export declare typeset set read eval exec ", " "+call.Args[0].Lit()+" ") {
+				add(pos, pos, "builtin ")
+			}
+		}
+		w, ok := node.(*syntax.Word)
+		if !ok {
+			return true
+		}
+		if skip[w] {
+			return true
+		}
+		literalWord := true
+		syntax.Walk(w, func(n syntax.Node) bool {
+			switch n.(type) {
+			case nil, *syntax.Word, *syntax.Lit, *syntax.SglQuoted, *syntax.DblQuoted:
+			default:
+				literalWord = false
+			}
+			return true
+		})
+		if !literalWord {
+			return true
+		}
+		for _, part := range w.Parts {
+			if lit, ok := part.(*syntax.Lit); ok && strings.ContainsAny(lit.Value, "*?[{}~") {
+				return true
+			}
+		}
+		value := literal(w)
+		if value == "" {
+			return false
+		}
+
+		start, end := int(w.Pos().Offset()), int(w.End().Offset())
+		// Quote only words without active pathname/brace/tilde expansion.
+		raw := source[start:end]
+		if strings.ContainsAny(raw, "*?[{}~") && w.Lit() != "" {
+			return false
+		}
+		add(start, end, "'"+strings.ReplaceAll(value, "'", "'\\''")+"'")
+		double := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`, "`", "\\`").Replace(value)
+		add(start, end, `"`+double+`"`)
+		ansi := strings.NewReplacer(`\`, `\\`, "'", `\'`, "\n", `\n`, "\t", `\t`, "\r", `\r`).Replace(value)
+		add(start, end, "$'"+ansi+"'")
+		if raw == value && !strings.ContainsAny(value, " \t\n'\"\\$`;|&()<>") && value != "" {
+			if witness(value) {
+				for i, c := range value {
+					if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+						add(start, end, value[:i]+`\`+value[i:])
+						// An additional alternative must not remove the protected operand.
+						add(start, end, "{"+value+",}")
+						break
+					}
+				}
+			}
+		}
+		return false
+	})
+	return variants
+}
+
+// TestGuardDeniedCorpus evaluates generated deny cases and semantics-preserving
+// literal variants against the AST policy using disposable fixture metadata.
+func TestGuardDeniedCorpus(t *testing.T) {
+	data, err := os.ReadFile("../../../testdata/hook/denied-commands.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corpus struct {
+		Cases     []corpusCase
+		Snapshots [][][3]string
+	}
+	if err := json.Unmarshal(data, &corpus); err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	count, failures := 0, 0
+	for _, tc := range corpus.Cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			// External dependency failures are not command-text properties. The
+			// Go scanner's own error/deadline tests cover that trust boundary.
+			switch tc.Name {
+			case "rg_find_exit", "rg_timeout", "git_grep_timeout", "rg_missing_perl_config", "rg_missing_perl", "rg_missing_find", "rg_missing_jq":
+				t.Skip("Bash-only injected external dependency failure")
+			}
+			tmp := t.TempDir()
+			replace := strings.NewReplacer("@TMP@", filepath.ToSlash(tmp), "@ROOT@", filepath.ToSlash(root))
+			for _, fixture := range corpus.Snapshots[tc.Snapshot] {
+				name := filepath.Join(tmp, filepath.FromSlash(fixture[0]))
+				if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+					t.Fatal(err)
+				}
+				switch fixture[1] {
+				case "dir":
+					err = os.MkdirAll(name, 0700)
+				case "unreadable-dir":
+					err = os.MkdirAll(name, 0000)
+				case "unreadable":
+					err = os.WriteFile(name, nil, 0000)
+				case "link":
+					err = os.Symlink(replace.Replace(fixture[2]), name)
+				case "file":
+					err = os.WriteFile(name, []byte(replace.Replace(fixture[2])), 0600)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
+			command := replace.Replace(tc.Command)
+			if raw, ok := tc.Extra["command"]; ok {
+				if err := json.Unmarshal(raw, &command); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cwd, home := replace.Replace(tc.CWD), replace.Replace(tc.Home)
+			check := func(name, dir string) bool {
+				if !strings.Contains(name, "/") {
+					if _, err := os.Lstat(paths.Resolve(name, dir, "", home)); os.IsNotExist(err) {
+						return false
+					}
+				}
+				return paths.Protected(name, dir, "", home)
+			}
+			for i, variant := range deniedVariants(command) {
+				count++
+				if got := Analyze(variant, cwd, home, check); got == "" {
+					failures++
+					if failures <= 80 {
+						t.Errorf("variant %d allowed: %s", i, strconv.Quote(variant))
+					} else {
+						t.Fail()
+					}
+				}
+			}
+		})
+	}
+	t.Logf("%d variants from %d Bash-deny cases, %d allows", count, len(corpus.Cases), failures)
+}

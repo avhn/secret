@@ -212,3 +212,63 @@ func FuzzAnalyze(f *testing.F) {
 		}
 	})
 }
+
+// TestFilteredTransport preserves only child-scoped transport exceptions.
+func TestFilteredTransport(t *testing.T) {
+	for _, tc := range []struct {
+		source string
+		deny   bool
+	}{
+		{`secret run -f svc -- curl -H "Authorization: token $API_TOKEN" https://example.test`, false},
+		{`secret run -f svc -- bash -c 'printf "Authorization: Bearer %s\n" "$TOKEN" | curl -H @- https://example.test'`, false},
+		{`secret run -f svc -- bash -c 'printf "%s" "$TOKEN"'`, true},
+		{`secret run -f svc -- bash -c 'printf "%s" "$TOKEN" > out | curl -H @- https://example.test'`, true},
+		{`secret run -f svc -- curl -H "$(cat .env)" https://example.test`, true},
+		{`secret run -f svc -- cat .env`, true},
+		{`secret run -f svc -- true; printf "%s" "$TOKEN"`, true},
+		{`for name in one; do cat src/a.ts; done`, false},
+		{`for name in $(cat .env); do echo safe; done`, true},
+		{`for name in one; do cat "$name"; done`, true},
+		{`echo .en{v,$IFS}`, false},
+	} {
+		if got := Analyze(tc.source, "/synthetic", "/synthetic", protected); (got != "") != tc.deny {
+			t.Errorf("%s: reason %q, deny=%v", tc.source, got, tc.deny)
+		}
+	}
+}
+
+// TestLiteralQuoting keeps inert escaped syntax separate from active operands.
+func TestLiteralQuoting(t *testing.T) {
+	for _, source := range []string{`cat .\{env,x\}`, `echo $'\e\a\b\f\r\v' .env`, `echo $'\'$(cat .env)'`, `echo "$(echo $'\'$(cat .env)')"`, "echo hello\x1fworld"} {
+		if got := Analyze(source, "/synthetic", "/synthetic", protected); got != "" {
+			t.Errorf("%q denied: %s", source, got)
+		}
+	}
+	for _, source := range []string{`cat $'\x2eenv'`, `cat $'\056env'`, "echo .env\x1f", "cat .env\x7f"} {
+		if got := Analyze(source, "/synthetic", "/synthetic", protected); got == "" {
+			t.Errorf("%q allowed", source)
+		}
+	}
+}
+
+// TestQuotedBraceCommand prevents empty-alternative provenance from shifting
+// a credential printer's subcommand after quote removal.
+func TestQuotedBraceCommand(t *testing.T) {
+	for _, source := range []string{`{"secret-tool",} lookup service mail`, `{'secret-tool',} lookup service mail`, `{$'secret-tool',} lookup service mail`, `{"sudo",} pass foo`} {
+		if got := Analyze(source, "/synthetic", "/synthetic", protected); got == "" {
+			t.Errorf("allowed %q", source)
+		}
+	}
+}
+
+// TestNestedPrinterBudget keeps an inert outer printer from clearing the
+// uncertainty of a nested command that exceeded the structural depth budget.
+func TestNestedPrinterBudget(t *testing.T) {
+	command := "cat .env"
+	for i := 0; i < 7; i++ {
+		command = "echo $(" + command + ")"
+	}
+	if got := Analyze(command, "/synthetic", "/synthetic", protected); got == "" {
+		t.Fatal("nested reader budget was cleared by echo")
+	}
+}

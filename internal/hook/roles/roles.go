@@ -15,6 +15,8 @@ const (
 	Indeterminate = "command too complex to analyse for secret access; split it or use secret run"
 )
 
+var jqEnvironment = regexp.MustCompile(`(^|[^A-Za-z0-9_."'])(env|\$ENV)([^A-Za-z0-9_]|$)`)
+
 var readers = map[string]bool{}
 var metadata = map[string]bool{}
 var credential = regexp.MustCompile(`(?i)\$\{?[a-z0-9_]*(token|secret|pass(word|wd)?|api_?key|private_key|credential|_key)[a-z0-9_]*\}?`)
@@ -152,7 +154,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 	case "declare", "typeset":
 		printValue = len(args) == 0
 		for _, a := range args {
-			if strings.HasPrefix(a, "-x") || strings.HasPrefix(a, "-p") {
+			if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.ContainsAny(a[1:], "xp") {
 				printValue = true
 			}
 		}
@@ -175,7 +177,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 				continue
 			}
 			a := args[i]
-			if a == "env" || a == "$ENV" || strings.Contains(a, "$ENV") || strings.Contains(a, "env |") {
+			if jqEnvironment.MatchString(a) {
 				printValue = true
 			}
 		}
@@ -190,6 +192,15 @@ func PrinterReason(name string, args []string, direct bool) string {
 // OperandReason returns the guard's fixed reason for a protected input operand.
 // The inputs callback checks only actual file operands, not prose or labels.
 func OperandReason(name string, args []string, protected func(string) bool) string {
+	if name == "grep" || name == "egrep" || name == "fgrep" {
+		return GrepReason(args, protected)
+	}
+	if name == "sed" {
+		return sedReason(args, protected)
+	}
+	if name == "split" {
+		return splitReason(args, protected)
+	}
 	if metadata[name] || name == "echo" || name == "printf" || name == "secret" || name == "tee" {
 		return ""
 	}
@@ -202,14 +213,14 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			a := args[i]
 			if a == "-c" || a == "--config-env" {
 				i++
-				if i < len(args) && protected(args[i]) {
+				if i < len(args) && protected("./"+args[i]) {
 					return "git config option names protected access"
 				}
 				i++
 				continue
 			}
 			if strings.HasPrefix(a, "-c") && len(a) > 2 || strings.HasPrefix(a, "--config-env=") {
-				if protected(a) {
+				if protected("./" + a) {
 					return "git config option names protected access"
 				}
 				i++
@@ -289,7 +300,6 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			}
 		}
 	}
-	splitInput := false
 	for i := 0; i < end; i++ {
 		a := args[i]
 		if name == "node" && a == "--env-file" {
@@ -361,12 +371,7 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			pattern = false
 			continue
 		}
-		if name == "split" {
-			if splitInput {
-				continue // remaining positional arguments name the output prefix
-			}
-			splitInput = true
-		}
+
 		if protected(a) {
 			if readers[name] {
 				return Reader

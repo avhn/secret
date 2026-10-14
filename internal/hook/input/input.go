@@ -66,11 +66,11 @@ func Decode(r io.Reader) (Envelope, error) {
 				return Envelope{}, ErrInvalid
 			}
 			for _, arg := range argv {
-				if bad(arg) {
+				if strings.ContainsRune(arg, 0) {
 					return Envelope{}, ErrInvalid
 				}
 			}
-		} else if bad(cmd) {
+		} else if strings.ContainsRune(cmd, 0) {
 			return Envelope{}, ErrInvalid
 		}
 	}
