@@ -58,3 +58,42 @@ func TestOperandTable(t *testing.T) {
 		})
 	}
 }
+
+// TestOptionBoundaries covers real option arity, clusters, abbreviations and --.
+func TestOptionBoundaries(t *testing.T) {
+	protected := func(s string) bool { return s == ".env" || s == "-r.env" }
+	for _, tc := range []struct {
+		name string
+		args []string
+		deny bool
+	}{
+		{"grep", []string{"-rl", "x", "src"}, true},
+		{"grep", []string{"-Rn", "x", "src"}, true},
+		{"grep", []string{"-rievalue", "src"}, true},
+		{"grep", []string{"-ier", "safe"}, false},
+		{"grep", []string{"-e", "-r", "safe"}, false},
+		{"grep", []string{"--", "-r", "safe"}, false},
+		{"grep", []string{"--rec", "x", "src"}, true},
+		{"grep", []string{"--dereference-r", "x", "src"}, true},
+		{"grep", []string{"--dir=recurse", "x", "src"}, true},
+		{"grep", []string{"-drecurse", "x", "src"}, true},
+		{"grep", []string{"-if.env", "safe"}, true},
+		{"grep", []string{"-ie", "x", ".env"}, true},
+		{"grep", []string{"--fi=.env", "safe"}, true},
+		{"grep", []string{"--exclude-f=.env", "x", "safe"}, true},
+		{"grep", []string{"--", "x", "-r.env"}, true},
+		{"split", []string{"--lines", "5", ".env"}, true},
+		{"split", []string{"--lin=5", ".env"}, true},
+		{"split", []string{"-dl5", ".env"}, true},
+		{"split", []string{"-t", ":", ".env"}, true},
+		{"split", []string{"--additional-suffix", "txt", ".env"}, true},
+		{"split", []string{"--", ".env", "out"}, true},
+		{"split", []string{"--filter=cat .env", "safe"}, true},
+		{"split", []string{"--lines=5", "safe", ".env"}, false},
+		{"split", []string{"--additional-suffix", ".env", "safe"}, false},
+	} {
+		if got := OperandReason(tc.name, tc.args, protected); (got != "") != tc.deny {
+			t.Errorf("%s %q: reason %q, deny=%v", tc.name, tc.args, got, tc.deny)
+		}
+	}
+}

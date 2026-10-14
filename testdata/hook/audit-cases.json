@@ -1,0 +1,735 @@
+{
+  "fixtures": [
+    [
+      "home/.aws/cli",
+      "dir",
+      ""
+    ],
+    [
+      "w/proj/sub",
+      "dir",
+      ""
+    ],
+    [
+      "w/proj/.secrets",
+      "dir",
+      ""
+    ],
+    [
+      "w/dirty",
+      "dir",
+      ""
+    ],
+    [
+      "w/g/node_modules/pkg",
+      "dir",
+      ""
+    ],
+    [
+      "w/g2",
+      "dir",
+      ""
+    ],
+    [
+      "w/r",
+      "dir",
+      ""
+    ],
+    [
+      "home/.aws/credentials",
+      "file",
+      ""
+    ],
+    [
+      "w/dirty/app.env",
+      "file",
+      ""
+    ],
+    [
+      "w/proj/.secrets/store",
+      "file",
+      ""
+    ],
+    [
+      "w/proj/.secrets/b.tar",
+      "file",
+      ""
+    ],
+    [
+      "w/g/node_modules/pkg/app.env",
+      "file",
+      ""
+    ],
+    [
+      "w/r/app.env",
+      "file",
+      ""
+    ],
+    [
+      "w/proj/sub/link",
+      "link",
+      "../../dirty/app.env"
+    ],
+    [
+      "w/proj/awsx",
+      "link",
+      "../../home/.aws/cli"
+    ],
+    [
+      "w/g2/.env",
+      "link",
+      "../dirty/app.env"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "audit-cases1-2",
+      "tool": "Read",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "file_path": "awsx/../credentials"
+      }
+    },
+    {
+      "name": "audit-cases1-3",
+      "tool": "Read",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "file_path": "sub/link"
+      }
+    },
+    {
+      "name": "audit-cases1-4",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "node_modules/**",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases1-5",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "node_modules/**/*.env",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases1-6",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "pkg/app.env",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases1-7",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "*.{env,ts}",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases1-8",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "path": "awsx/../credentials",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases1-9",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "prod.env",
+        "output_mode": "files_with_matches"
+      }
+    },
+    {
+      "name": "audit-cases2-1",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "node_modules/**",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases2-2",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "node_modules/**/*.env",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases2-3",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "pkg/app.env",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases2-4",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "*.{env,ts}",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases2-5",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "**/*.{env,ts}",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "audit-cases2-6",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g",
+      "fields": {
+        "pattern": "SYNTH",
+        "glob": "node_modules/pkg/*",
+        "output_mode": "count"
+      }
+    },
+    {
+      "name": "audit-cases3-2",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "export RIPGREP_CONFIG_PATH=/dev/null; rg SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases3-3",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "RIPGREP_CONFIG_PATH=/dev/null; rg SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases3-4",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "unset RIPGREP_CONFIG_PATH; rg SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases3-5",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "RIPGREP_CONFIG_PATH=/dev/null rg SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases3-6",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "declare -x RIPGREP_CONFIG_PATH=/dev/null; rg SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases4-2",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd sub && paste link"
+      }
+    },
+    {
+      "name": "audit-cases4-3",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd sub && true; paste link"
+      }
+    },
+    {
+      "name": "audit-cases4-4",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd .secrets && true; paste store"
+      }
+    },
+    {
+      "name": "audit-cases4-5",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd .secrets || exit; paste store"
+      }
+    },
+    {
+      "name": "audit-cases4-6",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "if cd .secrets; then :; fi; paste store"
+      }
+    },
+    {
+      "name": "audit-cases4-7",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd .secrets && ls; cat store"
+      }
+    },
+    {
+      "name": "audit-cases4-9",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time paste sub/link"
+      }
+    },
+    {
+      "name": "audit-cases4-10",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "time paste ./*.en?"
+      }
+    },
+    {
+      "name": "audit-cases4-11",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time pass show-me"
+      }
+    },
+    {
+      "name": "audit-cases4-12",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time pass foo"
+      }
+    },
+    {
+      "name": "audit-cases4-13",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time gcloud auth application-default print-access-token"
+      }
+    },
+    {
+      "name": "audit-cases4-14",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time xclip -o"
+      }
+    },
+    {
+      "name": "audit-cases4-15",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "time kwallet-query --read-password k w"
+      }
+    },
+    {
+      "name": "audit-cases4-16",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "sudo -nu root pass foo"
+      }
+    },
+    {
+      "name": "audit-cases4-18",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "tee /dev/stderr < app.env | secret stash s.env K"
+      }
+    },
+    {
+      "name": "audit-cases4-19",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "X=$(paste sub/link >&2) true | secret stash s.env K"
+      }
+    },
+    {
+      "name": "audit-cases4-20",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "cat < app.env | secret stash s.env K"
+      }
+    },
+    {
+      "name": "audit-cases4-22",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "xargs -0a app.env echo"
+      }
+    },
+    {
+      "name": "audit-cases4-23",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "xargs -n 1 printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-24",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "timeout -s KILL 5 printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-25",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "timeout -k 1 5 printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-26",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "nice --adjustment 5 printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-27",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "stdbuf -o L printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-28",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "exec -a x printenv"
+      }
+    },
+    {
+      "name": "audit-cases4-29",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "stdbuf -o L gh auth token"
+      }
+    },
+    {
+      "name": "audit-cases4-30",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "caffeinate -t 5 env"
+      }
+    },
+    {
+      "name": "audit-cases4-32",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "jq -n env.GITHUB_TOKEN"
+      }
+    },
+    {
+      "name": "audit-cases4-33",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "jq -rn 'env|keys'"
+      }
+    },
+    {
+      "name": "audit-cases4-34",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "declare -gp"
+      }
+    },
+    {
+      "name": "audit-cases4-35",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "typeset -gp"
+      }
+    },
+    {
+      "name": "audit-cases4-37",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "for x in $(paste sub/link); do echo $x; done"
+      }
+    },
+    {
+      "name": "audit-cases4-38",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "declare X=$(paste sub/link); echo $X"
+      }
+    },
+    {
+      "name": "audit-cases4-39",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "(( $(paste sub/link) ))"
+      }
+    },
+    {
+      "name": "audit-cases4-40",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "case x in $(paste sub/link >&2)) :;; esac"
+      }
+    },
+    {
+      "name": "audit-cases4-41",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "echo $((paste sub/link) )"
+      }
+    },
+    {
+      "name": "audit-cases4-43",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "grep -ieSYNTH app.env"
+      }
+    },
+    {
+      "name": "audit-cases4-44",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "sed -nep app.env"
+      }
+    },
+    {
+      "name": "audit-cases5-1",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/r",
+      "fields": {
+        "command": "git grep -l -Ocat SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases5-2",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/r",
+      "fields": {
+        "command": "git grep -l --open-files-in-pager=cat SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases5-3",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/r",
+      "fields": {
+        "command": "git grep -Ocat SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases5-4",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/r",
+      "fields": {
+        "command": "git grep SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases5-6",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/dirty",
+      "fields": {
+        "command": "rg -l --pre cat SYNTH"
+      }
+    },
+    {
+      "name": "audit-cases6-1",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "coproc { paste sub/link >&2; }"
+      }
+    },
+    {
+      "name": "audit-cases6-2",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "for ((i=$(paste sub/link >&2; echo 0); i<1; i++)); do :; done"
+      }
+    },
+    {
+      "name": "audit-cases6-3",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "let x=$(paste sub/link >&2; echo 1)"
+      }
+    },
+    {
+      "name": "audit-cases6-4",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "echo $[$(paste sub/link)]"
+      }
+    },
+    {
+      "name": "audit-cases6-5",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": [
+          "timeout",
+          "-s",
+          "KILL",
+          "5",
+          "printenv"
+        ]
+      }
+    },
+    {
+      "name": "audit-cases6-6",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": [
+          "bash",
+          "-lc",
+          "time paste sub/link"
+        ]
+      }
+    },
+    {
+      "name": "audit-cases6-7",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": [
+          "xargs",
+          "-0a",
+          "sub/link",
+          "echo"
+        ]
+      }
+    },
+    {
+      "name": "audit-cases6-8",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "cd -P .secrets && paste store"
+      }
+    },
+    {
+      "name": "audit-cases6-9",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "paste awsx/../credentials"
+      }
+    },
+    {
+      "name": "audit-cases6-10",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "tar --exclude=x -xOf .secrets/b.tar"
+      }
+    },
+    {
+      "name": "audit-cases6-11",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "tar -xOf .secrets/b.tar"
+      }
+    },
+    {
+      "name": "audit-cases7-1",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/g2",
+      "fields": {
+        "pattern": "SYNTH",
+        "path": ".env"
+      }
+    },
+    {
+      "name": "audit-cases7-2",
+      "tool": "Grep",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "pattern": "SYNTH",
+        "path": "awsx/../credentials"
+      }
+    },
+    {
+      "name": "audit-cases7-3",
+      "tool": "Read",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "file_path": "awsx/../credentials"
+      }
+    },
+    {
+      "name": "audit-arithmetic-unknown",
+      "tool": "Bash",
+      "cwd": "@TMP@/w/proj",
+      "fields": {
+        "command": "(( $(cat file) ))"
+      }
+    }
+  ]
+}

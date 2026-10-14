@@ -21,8 +21,8 @@ func Config(file, cwd, home string) (int, bool) {
 	if file == "" {
 		return 1, false
 	}
-	if !filepath.IsAbs(file) {
-		file = filepath.Join(cwd, file)
+	if !path.IsAbs(file) {
+		file = cwd + "/" + file
 	}
 	if paths.Protected(file, cwd, "", home) {
 		return 2, false
@@ -85,6 +85,24 @@ func neutral(s string) bool {
 
 // Selector tests synthetic candidate names, never contents.
 func Selector(glob string) bool {
+	if strings.Contains(glob, "{") {
+		alternatives, ok := selectorBraces(glob, 64)
+		if !ok {
+			return true
+		}
+		for _, alternative := range alternatives {
+			if Selector(alternative) {
+				return true
+			}
+		}
+		return false
+	}
+	if paths.LexicalProtected(glob, "/synthetic", "/synthetic") {
+		return true
+	}
+	if strings.Contains(glob, "/") && Selector(path.Base(glob)) {
+		return true
+	}
 	g := strings.ToLower(strings.TrimPrefix(glob, "!"))
 	for _, name := range []string{".env", ".env.production", "service.env", "service.secret", ".secrets.env", ".netrc", ".git-credentials", ".npmrc", ".pypirc", ".secrets/store", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".ssh/id_rsa", ".ssh/id_ed25519", "proc/self/environ", "proc/thread-self/environ", "proc/123/environ", "proc/123/task/456/environ", "proc/$$/environ", "proc/$ppid/environ"} {
 		if strings.Contains(name, "/") && !strings.Contains(g, "/") {
@@ -132,11 +150,11 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 	if paths.Protected(root, cwd, "", home) {
 		p := paths.Resolve(root, cwd, "", home)
 		info, err := os.Lstat(p)
-		if !names || err != nil || info.Mode()&os.ModeSymlink == 0 {
+		if !names || paths.LexicalProtected(root, cwd, home) || err != nil || info.Mode()&os.ModeSymlink == 0 {
 			return "Grep targets a protected store"
 		}
 	}
-	if !names && paths.TreeProtected(root, cwd, home) {
+	if !names && paths.TreeProtectedScope(root, cwd, home, glob != "") {
 		return "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"
 	}
 	return ""
@@ -183,6 +201,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 	for i := 0; i < len(args); i++ {
 		v := args[i]
 		if options {
+			if v == "--pre" || strings.HasPrefix(v, "--pre=") {
+				return UncertainReason
+			}
 			if v == "--" {
 				options = false
 				continue
@@ -255,6 +276,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			}
 			if strings.HasPrefix(v, "--type=") || strings.HasPrefix(v, "--type-not=") || strings.HasPrefix(v, "--type-add=") || strings.HasPrefix(v, "--max-depth=") || strings.HasPrefix(v, "--color=") || strings.HasPrefix(v, "--colors=") || strings.HasPrefix(v, "--encoding=") || strings.HasPrefix(v, "--max-count=") || strings.HasPrefix(v, "--threads=") || strings.HasPrefix(v, "--context=") {
 				continue
+			}
+			if kind == "git" && (v == "-O" || strings.HasPrefix(v, "-O") || strings.HasPrefix(v, "--open-files-in-pager")) {
+				return UncertainReason
 			}
 			if strings.HasPrefix(v, "-") {
 				if strings.HasPrefix(v, "--") {
@@ -354,4 +378,56 @@ func simple(v string) bool {
 		}
 	}
 	return false
+}
+
+// selectorBraces enumerates bounded selector lists without shell expansion.
+// Unknown or malformed brace forms cannot certify a content selector as safe.
+func selectorBraces(pattern string, budget int) ([]string, bool) {
+	start := strings.IndexByte(pattern, '{')
+	if start < 0 {
+		return []string{pattern}, true
+	}
+	depth, end := 0, -1
+	for i := start; i < len(pattern); i++ {
+		if pattern[i] == '{' {
+			depth++
+		}
+		if pattern[i] == '}' {
+			depth--
+			if depth == 0 {
+				end = i
+				break
+			}
+		}
+	}
+	if end < 0 {
+		return nil, false
+	}
+	var out []string
+	body := pattern[start+1 : end]
+	parts, last, depth := []string{}, 0, 0
+	for i, c := range body {
+		if c == '{' {
+			depth++
+		}
+		if c == '}' {
+			depth--
+		}
+		if c == ',' && depth == 0 {
+			parts = append(parts, body[last:i])
+			last = i + 1
+		}
+	}
+	parts = append(parts, body[last:])
+	if len(parts) < 2 || len(parts) > budget {
+		return nil, false
+	}
+	for _, part := range parts {
+		values, ok := selectorBraces(pattern[:start]+part+pattern[end+1:], budget-len(out))
+		if !ok || len(out)+len(values) > budget {
+			return nil, false
+		}
+		out = append(out, values...)
+	}
+	return out, true
 }

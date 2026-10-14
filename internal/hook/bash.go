@@ -1,20 +1,28 @@
-//go:build hooktrial
-
 package hook
 
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/avhn/secret/internal/hook/input"
 	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/policy"
 )
 
-// bashDecision applies the experimental policy only in tagged trial binaries.
+// bashDecision applies the bounded AST policy for supported host shell calls.
 func bashDecision(e input.Envelope, cwd string, _ func(string) bool) string {
 	home := os.Getenv("HOME")
-	check := func(name, dir string) bool { return paths.Protected(name, dir, "", home) }
+	check := func(name, dir string) bool {
+		// Bare shell operands match the legacy metadata existence check. Paths
+		// containing a slash and unresolved aliases retain lexical protection.
+		if !strings.Contains(name, "/") {
+			if _, err := os.Lstat(paths.Resolve(name, dir, "", home)); os.IsNotExist(err) {
+				return false
+			}
+		}
+		return paths.Protected(name, dir, "", home)
+	}
 	if raw := e.Fields["command"]; len(raw) != 0 && raw[0] == '[' {
 		var argv []string
 		if json.Unmarshal(raw, &argv) != nil {
