@@ -8,7 +8,6 @@ import (
 
 	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/roles"
-	"mvdan.cc/sh/v3/syntax"
 )
 
 func gitShellEnv(key string) bool {
@@ -62,7 +61,7 @@ func gitConfigInert(key, value string) bool {
 	return optionIn("core.quotepath core.autocrlf core.safecrlf core.abbrev user.name user.email init.defaultbranch format.pretty safe.directory http.sslverify", key)
 }
 
-func (a *analyzer) gitConfig(config string, aliases map[string]string, depth int, cwd string) {
+func (a *analyzer) gitConfig(config string, depth int, cwd string) {
 	key, value, ok := strings.Cut(config, "=")
 	key = strings.ToLower(key)
 	if !ok || key == "" {
@@ -91,10 +90,7 @@ func (a *analyzer) gitConfig(config string, aliases map[string]string, depth int
 		return
 	}
 	if strings.HasPrefix(key, "alias.") {
-		if strings.HasPrefix(value, "!") {
-			a.shellValue(value[1:], depth, cwd)
-		}
-		aliases[strings.TrimPrefix(key, "alias.")] = value
+		a.reason = roles.Indeterminate
 		return
 	}
 	if key == "credential.helper" && strings.HasPrefix(value, "!") {
@@ -109,7 +105,6 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		a.reason = roles.Indeterminate
 		return
 	}
-	aliases := make(map[string]string)
 	if a.env == nil {
 		a.env = make(map[string]string)
 	}
@@ -189,7 +184,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				a.reason = roles.Indeterminate
 				return
 			}
-			a.gitConfig(key+"="+val, aliases, depth, cwd)
+			a.gitConfig(key+"="+val, depth, cwd)
 		}
 	}
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
@@ -227,7 +222,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				}
 				workTree = value
 			case "-c":
-				a.gitConfig(value, aliases, depth, cwd)
+				a.gitConfig(value, depth, cwd)
 			case "--config-env":
 				// Git splits name=ENVVAR at the last equals sign; names may contain one.
 				cut := strings.LastIndex(value, "=")
@@ -244,7 +239,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 					a.reason = roles.Indeterminate
 					return
 				}
-				a.gitConfig(configKey+"="+val, aliases, depth, cwd)
+				a.gitConfig(configKey+"="+val, depth, cwd)
 			case "--exec-path":
 				a.reason = roles.Indeterminate
 				return
@@ -262,62 +257,11 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	if a.reason != "" || len(args) == 0 {
 		return
 	}
-	var configAliases map[string]string
-	var err error
-	if gitBuiltin(args[0]) {
-		// Git never lets an alias shadow a built-in, so no config is needed.
-		goto resolved
-	}
-	configAliases, err = gitAliases(resolveGitDirectory(cwd, gitDir), cwd, a.home, a.env)
-	if err != nil {
+	// Custom aliases and unknown commands cannot be certified without executing Git.
+	if !gitBuiltin(args[0]) {
 		a.reason = roles.Indeterminate
 		return
 	}
-	for key, value := range aliases {
-		configAliases[key] = value // Inline configuration takes precedence.
-	}
-	for n := 0; ; n++ {
-		value, ok := configAliases[args[0]]
-		if !ok {
-			break
-		}
-		if strings.HasPrefix(value, "!") {
-			a.reason = roles.Indeterminate
-			return
-		}
-		if n >= 4 {
-			a.reason = roles.Indeterminate
-			return
-		}
-		file, err := syntax.NewParser().Parse(strings.NewReader(value), "")
-		if err != nil || len(file.Stmts) != 1 || len(file.Stmts[0].Redirs) != 0 {
-			a.reason = roles.Indeterminate
-			return
-		}
-		call, ok := file.Stmts[0].Cmd.(*syntax.CallExpr)
-		if !ok || len(call.Assigns) != 0 || len(call.Args) == 0 {
-			a.reason = roles.Indeterminate
-			return
-		}
-		expanded := []string{}
-		for _, word := range call.Args {
-			values, ok := a.expandWord(word, cwd)
-			if !ok {
-				a.reason = roles.Indeterminate
-				return
-			}
-			expanded = append(expanded, values...)
-		}
-		if len(expanded) == 0 || strings.HasPrefix(expanded[0], "-") || strings.HasPrefix(expanded[0], "!") {
-			a.reason = roles.Indeterminate
-			return
-		}
-		args = append(expanded, args[1:]...)
-		if gitBuiltin(args[0]) {
-			break
-		}
-	}
-resolved:
 	sub, operands := args[0], args[1:]
 	for _, operand := range operands {
 		if strings.Contains(strings.ToLower(operand), "ext::") {

@@ -3,7 +3,6 @@ package policy
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/avhn/secret/internal/hook/paths"
@@ -109,32 +108,6 @@ func TestGitFourthAuditReproducers(t *testing.T) {
 	}
 }
 
-// TestGitConfigAliasSources checks precedence, quoting and bounded inclusion.
-func TestGitConfigAliasSources(t *testing.T) {
-	for _, tc := range []struct {
-		name, config string
-		deny         bool
-	}{
-		{"quoted shell", "[alias]\n a = \"!cat .env\"\n", true},
-		{"escaped shell", "[alias]\n a = \"!cat\\t.env\"\n", true},
-		{"continued shell", "[alias]\n a = \"!cat \\\n.env\"\n", true},
-		{"safe expansion", "[alias]\n a = log --oneline\n", false},
-		{"cyclic include", "[include]\n path = config\n", true},
-		{"large config", "[alias]\n a = " + strings.Repeat("x", maxGitConfigBytes) + "\n", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			repo, dir, root := isolatedGitFixture(t)
-			if err := os.WriteFile(filepath.Join(dir, "config"), []byte(tc.config), 0600); err != nil {
-				t.Fatal(err)
-			}
-			check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
-			if reason := Analyze("git a", repo, root, check); (reason != "") != tc.deny {
-				t.Fatalf("deny=%v want %v: %s", reason != "", tc.deny, reason)
-			}
-		})
-	}
-}
-
 // TestGitConfigInjectionAndInheritedEnvironment verifies the inline allowlist
 // and that inherited editors are never parsed as command text.
 func TestGitConfigInjectionAndInheritedEnvironment(t *testing.T) {
@@ -163,51 +136,6 @@ func TestGitConfigInjectionAndInheritedEnvironment(t *testing.T) {
 				t.Setenv("GIT_CONFIG_VALUE_0", tc.val)
 			} else if tc.key != "" {
 				t.Setenv(tc.key, tc.val)
-			}
-			check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
-			if reason := Analyze(tc.command, repo, filepath.Join(root, "home"), check); (reason != "") != tc.deny {
-				t.Fatalf("deny=%v want %v: %s", reason != "", tc.deny, reason)
-			}
-		})
-	}
-}
-
-// TestGitAliasPrecedenceAndCaps covers the remaining Git config locations and
-// fail-closed bounds, using only disposable config text.
-func TestGitAliasPrecedenceAndCaps(t *testing.T) {
-	for _, tc := range []struct {
-		name, source, text, command string
-		deny                        bool
-	}{
-		{"default global", "home/.gitconfig", "[alias]\n g = !cat .env\n", "git g", true},
-		{"system override", "system", "[alias]\n s = !cat .env\n", "git s", true},
-		{"global override", "global", "[alias]\n g = !cat .env\n", "git g", true},
-		{"worktree", "ca/.git/config.worktree", "[alias]\n w = !cat .env\n", "git w", true},
-		{"includeIf", "ca/.git/config", "[includeIf \"gitdir:*/ca/\"]\n path = ../../included.cfg\n", "git i", true},
-		{"local overrides global", "ca/.git/config", "[alias]\n g = log --oneline\n", "git g", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			repo, _, root := isolatedGitFixture(t)
-			file := filepath.Join(root, filepath.FromSlash(tc.source))
-			if err := os.WriteFile(file, []byte(tc.text), 0600); err != nil {
-				t.Fatal(err)
-			}
-			if tc.source == "system" {
-				t.Setenv("GIT_CONFIG_SYSTEM", file)
-				t.Setenv("GIT_CONFIG_NOSYSTEM", "0")
-			}
-			if tc.source == "global" {
-				t.Setenv("GIT_CONFIG_GLOBAL", file)
-			}
-			if tc.name == "local overrides global" {
-				if err := os.WriteFile(filepath.Join(root, "home", ".gitconfig"), []byte("[alias]\n g = !cat .env\n"), 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if tc.name == "includeIf" {
-				if err := os.WriteFile(filepath.Join(root, "included.cfg"), []byte("[alias]\n i = !cat .env\n"), 0600); err != nil {
-					t.Fatal(err)
-				}
 			}
 			check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
 			if reason := Analyze(tc.command, repo, filepath.Join(root, "home"), check); (reason != "") != tc.deny {

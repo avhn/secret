@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -90,11 +89,10 @@ func TestGitPolicyV2SafeForms(t *testing.T) {
 		"git restore safe.go", "git checkout main", "git switch main", "git stash list", "git fetch --all", "git pull --ff-only", "git push --dry-run",
 		"git clone https://example.invalid/repo destination", "git init", "git merge --no-edit main", "git rebase main", "git cherry-pick HEAD", "git revert --no-edit HEAD",
 		"git reset --hard HEAD", "git rm safe.go", "git mv safe.go next.go", "git worktree list", "git gc", "git prune", "git blame safe.go",
-		"git -c color.ui=always log --oneline", "git -ccolor.ui=always log --oneline", "git -c core.editor='echo .env' status", "git -c alias.summary='log --oneline' summary", "git -c core.editor='echo safe' status",
+		"git -c color.ui=always log --oneline", "git -ccolor.ui=always log --oneline", "git -c core.editor='echo .env' status", "git -c core.editor='echo safe' status",
 		"git --namespace demo --attr-source HEAD status", "git config --get user.name",
 	} {
 		t.Run(command, func(t *testing.T) {
-			skipUnresolvedAlias(t, command)
 			if reason := Analyze(command, root, root, func(name, dir string) bool { return paths.Protected(name, dir, "", root) }); reason != "" {
 				t.Fatalf("safe form denied: %s", reason)
 			}
@@ -107,9 +105,8 @@ func TestGitPolicyV2SafeForms(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, command := range []string{"git log -p", "git diff", "git show HEAD", "git unknown-option-surface"} {
+	for _, command := range []string{"git log -p", "git diff", "git show HEAD"} {
 		t.Run("ignored untracked/"+command, func(t *testing.T) {
-			skipUnresolvedAlias(t, command)
 			if reason := Analyze(command, ignored, ignored, func(name, dir string) bool { return paths.Protected(name, dir, "", ignored) }); reason != "" {
 				t.Fatalf("ignored untracked file influenced index gate: %s", reason)
 			}
@@ -215,14 +212,5 @@ func TestScriptAndProcessRoles(t *testing.T) {
 				t.Fatalf("safe role denied: %s", reason)
 			}
 		})
-	}
-}
-
-// skipUnresolvedAlias skips alias allow cases on Windows, where the system Git
-// config location is unknown and alias resolution deliberately fails closed.
-func skipUnresolvedAlias(t *testing.T, command string) {
-	t.Helper()
-	if runtime.GOOS == "windows" && (strings.Contains(command, "alias.") || strings.HasSuffix(command, "unknown-option-surface")) {
-		t.Skip("alias resolution fails closed on Windows until the Windows adapter lands")
 	}
 }
