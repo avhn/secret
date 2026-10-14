@@ -1537,7 +1537,7 @@ if sed --version 2>/dev/null | grep -q '^sed (GNU sed)'; then
     rm -f "$sed_marker"
 fi
 secrets audit6_sed_join deny Bash "sed -n -e 's/x/y/' -e 'e paste sub/link' src/a.ts"
-secrets audit6_sed_text allow Bash "sed -n 'a\\\nplain' src/a.ts"
+secrets audit6_sed_text deny Bash "sed -n 'a\\\nplain' src/a.ts"
 secrets audit6_sed_posix allow Bash "sed --posix -n '1p' src/a.ts"
 secrets audit6_sed_zero allow Bash "sed -z -n '1p' src/a.ts"
 secrets audit6_sed_flags allow Bash "sed --posix -E -s -z -n '1p' src/a.ts"
@@ -1630,16 +1630,59 @@ WATCH
     done
     secrets git_less_inert allow Bash "LESS=-FRX GIT_PAGER=less git -C '$TMP/alternate-index' status"
     secrets git_less_unsafe deny Bash "LESS=-k GIT_PAGER=less git -C '$TMP/alternate-index' log -p"
+    secrets audit8_git_log_safe allow Bash "git -C '$TMP/alternate-index' log --oneline"
+    secrets audit8_git_commit_editor allow Bash "EDITOR='code -w' git -C '$TMP/alternate-index' commit -m x"
+    secrets audit8_git_submodule_diff deny Bash "git -C '$TMP/alternate-index' diff --submodule=diff"
+    secrets audit8_git_submodule_foreach deny Bash "git -C '$TMP/alternate-index' submodule foreach 'cat .env'"
+    secrets audit8_git_recurse deny Bash "git -C '$TMP/alternate-index' grep --recurse-submodules x"
+
 else
     printf '%s\n' 'SKIP hostile git fixtures: git not installed'
 fi
 secrets stdin_shell_pipe deny Bash "echo 'cat app.env' | sh"
 secrets stdin_shell_printf deny Bash "printf 'cat app.env' | bash -s"
-secrets stdin_shell_herestring_safe allow Bash "sh <<<'echo ok'"
+secrets stdin_shell_herestring_safe deny Bash "sh <<<'echo ok'"
 secrets stdin_shell_herestring_deny deny Bash "sh <<<'cat app.env'"
-secrets stdin_shell_heredoc_safe allow Bash "$(printf "sh <<'DONE'\necho ok\nDONE")"
+secrets stdin_shell_heredoc_safe deny Bash "$(printf "sh <<'DONE'\necho ok\nDONE")"
 secrets stdin_shell_heredoc_deny deny Bash "$(printf "sh <<'DONE'\ncat app.env\nDONE")"
 secrets shell_inline_npm allow Bash "bash -c 'npm test'"
+# Stdin shells are denied regardless of outer operators or literal input.
+for cmd in "sh || echo x" "sh <<<'echo ok' < src/a.ts" "(sh) < src/a.ts" "exec < src/a.ts; sh" "setsid sh" "script -qc 'cat app.env' /dev/null" "busybox hush -c 'cat app.env'" "busybox msh -c 'cat app.env'" "toybox hush -c 'cat app.env'" "printf x | . /dev/stdin"; do
+    secrets audit8_stdin_shell deny Bash "$cmd"
+done
+for cmd in "sed -i 's/a/b/g' src/a.ts" "sed -n '1,5p' src/a.ts" "sed '/x/d' src/a.ts" "sed ':a;N;\$!ba;s/\\n/ /g' src/a.ts" "sed '\$a text' src/a.ts"; do
+    secrets audit8_sed_subset allow Bash "$cmd"
+done
+for cmd in "sed 'e' src/a.ts" "sed 's/a/b/e' src/a.ts" "sed 's/a/b/w app.env' src/a.ts" "sed 'F' src/a.ts" "sed 'v' src/a.ts" "sed ':a bad' src/a.ts"; do
+    secrets audit8_sed_unsafe deny Bash "$cmd"
+done
+secrets audit8_sed_unsafe allow Bash "sed -e 'p' 'd' src/a.ts"
+secrets audit8_sed_unsafe deny Bash 'POSIXLY_CORRECT=1 sed -e p src/a.ts'
+secrets audit8_sed_positional_before_expression deny Bash "sed 'd' -e 'p' src/a.ts"
+secrets audit8_sed_positional_before_file deny Bash "sed 'd' -f s.sed src/a.ts"
+for cmd in "printf x > .git/config" "printf x >> .git/hooks/pre-commit" "tee .git/config" "cp src/a.ts .git/config" "mv src/a.ts .git/config" "ln -s src/a.ts .git/config" "install src/a.ts .git/config" "rsync src/a.ts .git/config" "dd if=src/a.ts of=.git/config" "sed -i 's/a/b/' .git/config" "perl -i -pe 's/a/b/' .git/config" "truncate -s 0 .git/config" "touch .git/config" "printf x > .gitmodules" "printf x > '$HOME/.gitconfig'" "printf x > '$XDG_CONFIG_HOME/git/config'"; do
+    secrets audit8_git_write deny Bash "$cmd"
+done
+mkdir -p "$TMP/linked-worktree" "$TMP/worktree-gitdir"
+printf 'gitdir: %s\n' "$TMP/worktree-gitdir" >"$TMP/linked-worktree/.git"
+secrets audit8_gitfile_target deny Bash "cd '$TMP/linked-worktree'; touch '$TMP/worktree-gitdir/config'"
+secrets audit8_config_global_target deny Bash "GIT_CONFIG_GLOBAL='$TMP/global-config' touch '$TMP/global-config'"
+for cmd in 'cp -t .git src/a.ts' 'mv --target-directory .git src/a.ts' 'install --target-directory=.git src/a.ts' 'vi .git/config' 'nano .git/config' 'code .git/config'; do
+    secrets audit8_git_write_option deny Bash "$cmd"
+done
+secrets audit8_write_tool deny Write "$TMP/search/.git/config"
+secrets audit8_edit_tool deny Edit "$HOME/.gitconfig"
+secrets audit8_read_gitconfig allow Read "$TMP/search/.git/config"
+for cmd in 'printf x &> .git/config' 'printf x >| .git/config' 'printf x <> .git/config' 'printf x 2> .git/config'; do
+    secrets audit8_git_redirect deny Bash "$cmd"
+done
+secrets audit8_git_write_safe allow Bash 'printf x > ordinary.txt'
+secrets audit8_less_append deny Bash 'LESSKEY_CONTENT+=x git status'
+secrets audit8_git_append deny Bash 'GIT_INDEX_FILE+=x git log -p'
+secrets audit8_git_dashed_relative deny Bash './git-status .env'
+secrets audit8_case_sed deny Bash "SED 'e' src/a.ts"
+secrets audit8_case_git deny Bash 'GIT show HEAD:.env'
+
 secrets globstar_bashopts deny Bash "BASHOPTS=globstar bash -c 'cat x'"
 # GNU sed flag and option clusters, checked against a real marker in TMP.
 if sed --version 2>/dev/null | head -1 | grep -q GNU; then
