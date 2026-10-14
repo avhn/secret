@@ -1392,7 +1392,7 @@ if command -v git >/dev/null 2>&1; then
     GIT_EXTERNAL_DIFF='paste sub/link' secrets git_inherited_diff allow Bash "git -C '$TMP/ignored-index' log -p"
     GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=CORE.EDITOR GIT_CONFIG_VALUE_0='paste sub/link' \
         secrets git_inherited_config deny Bash "git -C '$TMP/ignored-index' log -p"
-    secrets git_inline_diff allow Bash "cd '$TMP/ignored-index'; GIT_EXTERNAL_DIFF='paste sub/link' git log -p"
+    secrets git_inline_diff deny Bash "cd '$TMP/ignored-index'; GIT_EXTERNAL_DIFF='paste sub/link' git log -p"
     secrets git_blame_contents_alias deny Bash "git -C '$TMP/ignored-index' blame --contents='$TMP/search/sub/link' src/code.txt"
     case_index=0
     for cmd in 'status' 'log --oneline' 'diff --stat' 'add src/code.txt' 'commit -m synthetic' 'push' 'pull' 'log -p'; do
@@ -1485,6 +1485,72 @@ done
 for cmd in "printf -v GIT_EDITOR 'paste sub/link'; git commit --amend --allow-empty" "declare -n ref=GIT_EDITOR; ref='paste sub/link'; git commit --amend --allow-empty" "typeset -n ref=GIT_EDITOR; git status" "local -n ref=GIT_EDITOR; git status" "read -r GIT_EDITOR < src/a.ts; git status" "mapfile -t GIT_PAGER < src/a.ts; git log" "eval 'GIT_EDITOR=foo'; git status" "printf -v \"\$name\" x; git status" "export \"\$name\"; git status"; do
     secrets audit5_indirect_env deny Bash "$cmd"
 done
+
+# Sixth audit: strict inert keys and assignments in all command-text forms.
+for cmd in 'git -c core.editor=sh status' 'git -c diff.external=sh status' \
+    'git -c http.proxy=localhost status' 'git -c core.worktree=src status' \
+    'git --config-env=core.editor=E status' "GIT_CONFIG_PARAMETERS='core.editor=sh' git status" \
+    'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.editor GIT_CONFIG_VALUE_0=sh git status'; do
+    secrets audit6_git_config deny Bash "$cmd"
+done
+secrets audit6_pager_boolean allow Bash 'git -c pager.log=false status'
+for cmd in 'GIT_EDITOR=sh git commit --amend --allow-empty' \
+    'env GIT_EDITOR=sh git commit --amend --allow-empty' \
+    'export EDITOR=sh; git commit --amend --allow-empty' \
+    'declare EDITOR=sh; git status' 'GIT_EXTERNAL_DIFF=vim git status' \
+    'env GIT_SSH=vim git status' 'GIT_SSH_COMMAND=vim git status' 'export GIT_ASKPASS=vim; git status' \
+    'SSH_ASKPASS=vim git status' 'GIT_PROXY_COMMAND=vim git status' \
+    'BASHOPTS=cdable_vars bash -c "s=sub; cd s; paste link"' \
+    'SHELLOPTS=autocd bash -c "paste sub/link"' \
+    'BASHOPTS=extglob bash -c "paste sub/link"' \
+    'BASH_ENV=src/a.ts bash -c "git status"'; do
+    secrets audit6_inline_environment deny Bash "$cmd"
+done
+secrets audit6_editor_code allow Bash "EDITOR='code -w' git status"
+secrets audit6_pager_less allow Bash "GIT_PAGER='less -FRX' git status"
+secrets audit6_editor_vim allow Bash 'GIT_EDITOR=vim git status'
+secrets audit6_export_editor allow Bash "export EDITOR='code -w'; git status"
+secrets audit6_declare_pager allow Bash "declare GIT_PAGER='less -FRX'; git status"
+
+# Validate the delimiter differential against GNU sed without reading a store.
+if sed --version 2>/dev/null | grep -q '^sed (GNU sed)'; then
+    sed_marker="$TMP/search/marker"
+    for script in ':label; e cat .env > marker' 's/x/y/;e cat .env > marker' \
+        'y/x/y/;e cat .env > marker' 's#[/]#x#;e cat .env > marker'; do
+        rm -f "$sed_marker"
+        (cd "$TMP/search" && sed -n "$script" src/a.ts >/dev/null 2>&1) || true
+        if [[ -f "$sed_marker" ]]; then
+            secrets audit6_sed_marker deny Bash "sed -n '$script' src/a.ts"
+        else
+            printf 'GNU sed did not create synthetic marker for %s\n' "$script" >&2
+            FAILED=$((FAILED + 1))
+        fi
+    done
+    rm -f "$sed_marker"
+    (cd "$TMP/search" && sed -n -e '1{' -e 'e cat .env > marker' -e '}' src/a.ts >/dev/null 2>&1) || true
+    if [[ -f "$sed_marker" ]]; then
+        secrets audit6_sed_join_marker deny Bash "sed -n -e '1{' -e 'e cat .env > marker' -e '}' src/a.ts"
+    else
+        printf 'GNU sed did not create joined-script marker\n' >&2
+        FAILED=$((FAILED + 1))
+    fi
+    rm -f "$sed_marker"
+fi
+secrets audit6_sed_join deny Bash "sed -n -e 's/x/y/' -e 'e paste sub/link' src/a.ts"
+secrets audit6_sed_text allow Bash "sed -n 'a\\\nplain' src/a.ts"
+secrets audit6_sed_posix allow Bash "sed --posix -n '1p' src/a.ts"
+secrets audit6_sed_zero allow Bash "sed -z -n '1p' src/a.ts"
+secrets audit6_sed_flags allow Bash "sed --posix -E -s -z -n '1p' src/a.ts"
+secrets audit6_sed_comment allow Bash "sed -n '#n; e paste sub/link' src/a.ts"
+secrets audit6_sed_bracket deny Bash "sed -n 's#[/]#x#;e cat .env > marker' src/a.ts"
+secrets audit6_sed_bracket_ambiguous deny Bash "sed -n 's/[/]/x/' src/a.ts"
+secrets audit6_sed_newline deny Bash "$(printf "sed -n 's/x/y/\ne cat .env > marker' src/a.ts")"
+secrets audit6_sed_escaped_delimiter deny Bash "sed -n 's/x\\/y/z/;e cat .env > marker' src/a.ts"
+secrets audit6_sed_join_block deny Bash "sed -n -e '1{' -e 'e cat .env > marker' -e '}' src/a.ts"
+secrets audit6_sed_text_line allow Bash "sed -n 'a; e paste sub/link' src/a.ts"
+secrets audit6_sed_insert_line allow Bash "sed -n 'i; e paste sub/link' src/a.ts"
+secrets audit6_sed_change_line allow Bash "sed -n 'c; e paste sub/link' src/a.ts"
+secrets audit6_sed_stray_brace deny Bash "sed -n '}p' src/a.ts"
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
