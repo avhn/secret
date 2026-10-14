@@ -200,10 +200,29 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		if a.reason != "" {
 			break
 		}
+		if call, ok := s.Cmd.(*syntax.CallExpr); ok && len(s.Redirs) > 0 {
+			for _, assign := range call.Assigns {
+				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME", assign.Name.Value) {
+					if a.env == nil {
+						a.env = make(map[string]string)
+					}
+					a.env[assign.Name.Value] = literal(assign.Value)
+				}
+			}
+		}
 		for _, r := range s.Redirs {
 			a.walkWord(r.Word, depth, cwd)
 			a.walkWord(r.Hdoc, depth, cwd)
 			op := r.Op.String()
+			if strings.HasPrefix(op, ">") || op == "<>" || op == "&>" || op == ">&" {
+				if r.Word == nil || len(r.Word.Parts) == 0 {
+					a.reason = roles.Indeterminate
+				} else if targets, ok := a.expandWord(r.Word, cwd); !ok || len(targets) != 1 {
+					a.reason = roles.Indeterminate
+				} else if a.writeProtected(targets[0], cwd) {
+					a.reason = roles.FileInput
+				}
+			}
 			if strings.HasPrefix(op, "<") || op == "<>" {
 				if a.protectedWord(r.Word, cwd) {
 					a.reason = "input redirect reads a protected store"
@@ -214,6 +233,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		case *syntax.CallExpr:
 			cmd = unwrapCall(cmd)
 			if a.shellStdinCall(cmd, cwd) {
+				a.reason = roles.Indeterminate
 				for _, r := range s.Redirs {
 					switch r.Op.String() {
 					case "<<<":
@@ -242,7 +262,11 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 						a.cdpath = true
 						cwd = ""
 					}
-					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+					if assign.Append {
+						a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
+					} else {
+						a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+					}
 				}
 			}
 			if len(cmd.Args) > 0 && path.Base(literal(cmd.Args[0])) == "apply_patch" {
@@ -320,7 +344,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.uncertain = true
 				break
 			}
-			name := path.Base(words[0])
+			name := strings.ToLower(path.Base(words[0]))
 			args := words[1:]
 			if shellPathOptions(name, args) {
 				cwd = ""
@@ -344,6 +368,10 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					cwd = ""
 					a.uncertain = true
 				}
+				continue
+			}
+			if (name == "source" || name == ".") && len(args) > 0 && (args[0] == "/dev/stdin" || strings.HasPrefix(args[0], "/dev/fd/") || strings.HasPrefix(args[0], "/proc/") && strings.Contains(args[0], "/fd/")) {
+				a.reason = roles.Indeterminate
 				continue
 			}
 			if name == "secret" {
@@ -412,7 +440,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
-			if cmd.Op.String() == "|" && a.shellStdinStatement(cmd.Y, cwd) {
+			if (cmd.Op.String() == "|" || cmd.Op.String() == "|&") && a.shellStdinStatement(cmd.Y, cwd) {
 				a.reason = roles.Indeterminate
 				break
 			}
@@ -496,10 +524,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 						a.cdpath = true
 						cwd = ""
 					}
-					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+					if assign.Append {
+						a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
+					} else {
+						a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+					}
 				}
 				if assign.Name != nil {
 					if assign.Value != nil {
+
 						args = append(args, assign.Name.Value+"="+literal(assign.Value))
 					} else {
 						args = append(args, assign.Name.Value)
@@ -666,7 +699,11 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 				a.cdpath = true
 				cwd = ""
 			}
-			a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+			if assign.Append {
+				a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
+			} else {
+				a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+			}
 		}
 		a.walkNode(assign, depth, cwd)
 	}
@@ -706,9 +743,51 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = roles.FileInput
 		return
 	}
-	name := path.Base(words[0])
+	name := strings.ToLower(path.Base(words[0]))
 	args := words[1:]
-	if strings.HasPrefix(name, "git-") {
+	if name == "setsid" {
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			args = args[1:]
+		}
+		a.command(args, depth+1, cwd, direct)
+		return
+	}
+	if name == "script" {
+		for i, v := range args {
+			if v == "-c" || v == "-qc" || v == "-cq" {
+				if i+1 >= len(args) {
+					a.reason = roles.Indeterminate
+					return
+				}
+				a.shellValue(args[i+1], depth, cwd)
+				return
+			}
+		}
+		a.reason = roles.Indeterminate
+		return
+	}
+	if name == "hush" || name == "msh" {
+		name = "sh"
+	}
+	if strings.HasPrefix(name, "git-") && strings.Contains(words[0], "/") && !strings.Contains(words[0], "/git-core/") {
+		for _, operand := range args {
+			if a.inputProtected(operand, cwd) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
+	}
+	if strings.HasPrefix(name, "git-") && (!strings.Contains(words[0], "/") || strings.Contains(words[0], "/git-core/")) {
+		if _, ok := a.env["PATH"]; ok {
+			a.reason = roles.Indeterminate
+			return
+		}
+		for _, v := range args {
+			if a.inputProtected(v, cwd) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
 		if name == "git-" {
 			a.reason = roles.Indeterminate
 			return
@@ -740,6 +819,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.parallelCommand(args, depth, cwd)
 		return
 	}
+	if a.writeCommand(name, args, cwd) {
+		return
+	}
 	if a.auditCommand(name, args, depth, cwd, direct) {
 		return
 	}
@@ -754,7 +836,15 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason != "" {
 			return
 		}
-		if shell && len(child) == 1 {
+		if shell && name == "sudo" {
+			if len(child) == 0 {
+				a.reason = roles.Indeterminate
+			} else if len(child) == 1 {
+				a.fragmentAt(child[0], depth+1, dir)
+			} else {
+				a.command(child, depth+1, dir, direct)
+			}
+		} else if shell && len(child) == 1 {
 			a.fragmentAt(child[0], depth+1, dir)
 		} else {
 			a.command(child, depth+1, dir, direct)
@@ -873,6 +963,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	case "bash", "sh", "zsh", "ksh", "ksh93", "mksh", "dash", "ash", "yash", "posh", "fish", "csh", "tcsh", "eval":
+		if shellStdinWords(append([]string{name}, args...)) {
+			a.reason = roles.Indeterminate
+			return
+		}
 		if a.cdpath && name != "eval" {
 			cwd = ""
 		}
@@ -883,7 +977,28 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 			return
 		}
-		for i, v := range args {
+		for i := 0; i < len(args); i++ {
+			v := args[i]
+			if v == "--rcfile" || v == "--init-file" {
+				if i+1 >= len(args) || !a.certifiableShellFile(args[i+1], cwd) {
+					a.reason = roles.FileInput
+					return
+				}
+				i++
+				continue
+			}
+			if name == "fish" && (v == "-C" || v == "--init-command") {
+				if i+1 >= len(args) {
+					a.reason = roles.Indeterminate
+					return
+				}
+				a.shellValue(args[i+1], depth, cwd)
+				if a.reason != "" {
+					return
+				}
+				i++
+				continue
+			}
 			if name == "bash" && (v == "-O" || v == "+O") {
 				if i+1 >= len(args) {
 					a.reason = roles.Indeterminate
@@ -892,6 +1007,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				if shellPathOption(args[i+1]) {
 					cwd = ""
 				}
+				i++
+				continue
+			}
+			if v == "-O" || v == "+O" || v == "-o" || v == "+o" {
+				i++
 				continue
 			}
 			if v == "-c" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v[1:], "c") {
@@ -900,6 +1020,19 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 					return
 				}
 				a.shellValue(args[i+1], depth, cwd)
+				return
+			}
+			if v == "--" {
+				i++
+				if i < len(args) && !a.certifiableShellFile(args[i], cwd) {
+					a.reason = roles.Indeterminate
+				}
+				return
+			}
+			if v != "-" && !strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "+") {
+				if !a.certifiableShellFile(v, cwd) {
+					a.reason = roles.Indeterminate
+				}
 				return
 			}
 		}
@@ -965,7 +1098,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		for i, v := range args {
 			if key, value, ok := strings.Cut(v, "="); ok {
-				a.hookAssignment(key, value, depth, cwd)
+				if strings.HasSuffix(key, "+") {
+					a.hookAppend(strings.TrimSuffix(key, "+"), value, depth, cwd)
+				} else {
+					a.hookAssignment(key, value, depth, cwd)
+				}
 				if key == "CDPATH" {
 					a.cdpath = true
 					cwd = ""

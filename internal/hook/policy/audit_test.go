@@ -43,7 +43,7 @@ func TestAuditBoundaries(t *testing.T) {
 		{"BASH_ENV=$UNKNOWN bash -c :", true},
 		{"BASH_ENV=app.env bash -xc : | secret stash service KEY", true},
 		{"PROMPT_COMMAND=$UNKNOWN bash -i", true},
-		{"PROMPT_COMMAND='echo safe' bash -i", false},
+		{"PROMPT_COMMAND='echo safe' bash -i", true},
 		{"dotenv -e app.env paste app.env", true},
 		{"dotenv -e app.env --unsupported npm start", true},
 		{"dotenv -e app.env -- npm start", false},

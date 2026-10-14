@@ -1,7 +1,9 @@
 package policy
 
 import (
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -71,13 +73,16 @@ func (a *analyzer) shellStdinCall(call *syntax.CallExpr, cwd string) bool {
 // shellStdinWords follows literal command wrappers before checking shell options.
 func (a *analyzer) shellStdinWords(words []string, cwd string) bool {
 	for len(words) > 0 {
-		name := path.Base(words[0])
+		name := strings.ToLower(path.Base(words[0]))
 		if _, ok := utilityTable[name]; !ok || name == "xargs" {
 			break
 		}
 		child, _, shell := a.utilityChild(name, words[1:], cwd)
-		if shell || a.reason != "" {
-			return true // A wrapper-created shell cannot certify its stdin.
+		if a.reason != "" || shell && len(child) == 0 {
+			return true // A wrapper-created shell without code reads stdin.
+		}
+		if shell {
+			return false // The sudo child is analyzed as shell text by dispatch.
 		}
 		words = child
 	}
@@ -89,13 +94,13 @@ func shellStdinWords(words []string) bool {
 	if len(words) == 0 {
 		return false
 	}
-	name := path.Base(words[0])
+	name := strings.ToLower(path.Base(words[0]))
 	args := words[1:]
 	if name == "env" || name == "command" || name == "builtin" || name == "exec" {
 		for len(args) > 0 {
 			arg := args[0]
 			if name == "env" && (arg == "-S" || arg == "--split-string" || strings.HasPrefix(arg, "-S") && len(arg) > 2 || strings.HasPrefix(arg, "--split-string=")) {
-				return true // Split-string may launch a shell that inherits stdin.
+				return false // The split-string child is classified by command dispatch.
 			}
 			if name == "env" && strings.Contains(arg, "=") && !strings.HasPrefix(arg, "-") || arg == "--" || arg == "-i" || name == "command" && arg == "-p" {
 				args = args[1:]
@@ -113,17 +118,34 @@ func shellStdinWords(words []string) bool {
 		if len(args) == 0 {
 			return false
 		}
-		name = path.Base(args[0])
+		name = strings.ToLower(path.Base(args[0]))
 		args = args[1:]
+	}
+	if name == "setsid" {
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			args = args[1:]
+		}
+		return shellStdinWords(args)
+	}
+	if name == "script" {
+		for i, arg := range args {
+			if arg == "-c" || arg == "-qc" || arg == "-cq" {
+				if i+1 < len(args) {
+					return shellStdinWords(strings.Fields(args[i+1]))
+				}
+				return true
+			}
+		}
+		return false
 	}
 	if name == "busybox" || name == "toybox" {
 		if len(args) == 0 {
 			return false
 		}
-		name = path.Base(args[0])
+		name = strings.ToLower(path.Base(args[0]))
 		args = args[1:]
 	}
-	if !optionIn("bash sh zsh ksh ksh93 mksh dash ash yash posh fish csh tcsh", name) {
+	if !optionIn("bash sh zsh ksh ksh93 mksh dash ash hush msh yash posh fish csh tcsh", name) {
 		return false
 	}
 	stdin := false
@@ -135,7 +157,7 @@ func shellStdinWords(words []string) bool {
 		if arg == "-c" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "c") {
 			return false
 		}
-		if arg == "-O" || arg == "+O" || arg == "-o" {
+		if arg == "-O" || arg == "+O" || arg == "-o" || arg == "+o" || arg == "--rcfile" || arg == "--init-file" || arg == "-C" || arg == "--init-command" {
 			i++
 			continue
 		}
@@ -148,6 +170,20 @@ func shellStdinWords(words []string) bool {
 		return stdin // After -s, remaining words are positional parameters.
 	}
 	return true
+}
+
+// certifiableShellFile excludes descriptor aliases, unreadable files and
+// symlinked or non-regular shell startup scripts.
+func (a *analyzer) certifiableShellFile(name, cwd string) bool {
+	if name == "" || a.inputProtected(name, cwd) {
+		return false
+	}
+	file := filepath.FromSlash(name)
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(cwd, file)
+	}
+	info, err := os.Lstat(file)
+	return err == nil && info.Mode().IsRegular()
 }
 
 // indirectConsumer identifies commands whose environment or shell path may be consulted.
