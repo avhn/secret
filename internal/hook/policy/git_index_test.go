@@ -149,8 +149,8 @@ func TestRepositoryMetadataFailures(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "index")); err != nil {
 		t.Fatal(err)
 	}
-	if indexProtected(dir, root) {
-		t.Fatal("initialized empty repository denied")
+	if !indexProtected(dir, root) {
+		t.Fatal("missing index with HEAD allowed")
 	}
 	if err := os.Mkdir(filepath.Join(dir, "index"), 0700); err != nil {
 		t.Fatal(err)
@@ -249,8 +249,8 @@ func TestGitRepositoryResolution(t *testing.T) {
 	for _, key := range []string{"GIT_EDITOR", "GIT_EXTERNAL_DIFF", "GIT_SSH_COMMAND"} {
 		t.Run(key, func(t *testing.T) {
 			t.Setenv(key, "cat '"+filepath.ToSlash(filepath.Join(tracked, ".env"))+"'")
-			if AnalyzeArgv([]string{"git", "status"}, clean, root, check) == "" {
-				t.Fatal("inherited executable override ignored")
+			if reason := AnalyzeArgv([]string{"git", "status"}, clean, root, check); reason != "" {
+				t.Fatalf("inherited user configuration denied: %s", reason)
 			}
 		})
 	}

@@ -25,8 +25,10 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   `security -w`, clipboard readers), and content searches over trees that hold
   protected files. The shipped guard also rejects control characters in shell
   commands, gates content-producing Git commands on bounded tracked index names
-  and protects covered archive reads,
-  and detects shell hook variables that can launch readers. Protected paths are matched after brace and `$IFS`
+  and protects covered archive reads, including BusyBox tar stdout extraction,
+  and detects shell hook variables that can launch readers. Inherited Git editor
+  and pager settings are user configuration, not shell text; values assigned in
+  the tool command are analysed. Protected paths are matched after brace and `$IFS`
   expansion and through symlink aliases, and unknown commands may not take a
   protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,

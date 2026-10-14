@@ -49,6 +49,19 @@ func gitCommandKey(key string) bool {
 	return false
 }
 
+// gitConfig checks inline configuration against the inert-key allowlist.
+func gitConfigInert(key, value string) bool {
+	if strings.HasPrefix(key, "pager.") {
+		return strings.EqualFold(value, "true") || strings.EqualFold(value, "false")
+	}
+	for _, prefix := range []string{"color.", "advice.", "log.", "column.", "i18n."} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return optionIn("core.quotepath core.autocrlf core.safecrlf core.abbrev user.name user.email init.defaultbranch format.pretty safe.directory http.sslverify", key)
+}
+
 func (a *analyzer) gitConfig(config string, aliases map[string]string, depth int, cwd string) {
 	key, value, ok := strings.Cut(config, "=")
 	key = strings.ToLower(key)
@@ -60,7 +73,16 @@ func (a *analyzer) gitConfig(config string, aliases map[string]string, depth int
 		a.reason = roles.FileInput
 		return
 	}
+	if gitConfigInert(key, value) {
+		return
+	}
+	if strings.HasPrefix(key, "url.") || strings.HasPrefix(key, "protocol.") || key == "core.gitproxy" || strings.HasPrefix(key, "remote.") && (strings.HasSuffix(key, ".url") && strings.HasPrefix(value, "ext::")) {
+		a.reason = roles.Indeterminate
+		return
+	}
 	if !gitCommandKey(key) {
+		// Unmodeled keys may name an executable or redirect a transport.
+		a.reason = roles.Indeterminate
 		return
 	}
 	if strings.HasPrefix(key, "include") || key == "core.hookspath" {
@@ -71,9 +93,8 @@ func (a *analyzer) gitConfig(config string, aliases map[string]string, depth int
 	if strings.HasPrefix(key, "alias.") {
 		if strings.HasPrefix(value, "!") {
 			a.shellValue(value[1:], depth, cwd)
-		} else {
-			aliases[strings.TrimPrefix(key, "alias.")] = value
 		}
+		aliases[strings.TrimPrefix(key, "alias.")] = value
 		return
 	}
 	if key == "credential.helper" && strings.HasPrefix(value, "!") {
@@ -99,28 +120,30 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			}
 		}
 	}
-	// Only named Git command surfaces are analyzed, never arbitrary inherited
-	// variables. Unknown inherited config injection remains fail closed.
-	for _, key := range strings.Fields("GIT_EXTERNAL_DIFF GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_PROXY_COMMAND GIT_EXEC_PATH EDITOR VISUAL PAGER") {
-		if _, known := a.env[key]; !known {
-			if value, present := os.LookupEnv(key); present && value != "" {
-				a.env[key] = value
-				if key == "GIT_EXEC_PATH" {
-					a.reason = roles.Indeterminate
-					return
-				}
-				a.shellValue(value, depth, cwd)
-			}
+	// Inherited editor/pager commands are user configuration, not command text.
+	// Only assignments recorded by hookAssignment are analyzed as shell text.
+	if _, known := a.env["GIT_EXEC_PATH"]; !known {
+		if _, present := os.LookupEnv("GIT_EXEC_PATH"); present {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
+	repoUncertain := false
+	for _, key := range strings.Fields("GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE") {
+		if _, present := a.env[key]; present {
+			repoUncertain = true
+		} else if _, present := os.LookupEnv(key); present {
+			repoUncertain = true
 		}
 	}
 	for _, key := range strings.Fields("GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG GIT_INDEX_FILE GIT_COMMON_DIR") {
-		if _, known := a.env[key]; !known {
-			if _, present := os.LookupEnv(key); present {
-				a.reason = roles.Indeterminate
-				return
-			}
-		}
 		if key != "GIT_CONFIG_COUNT" {
+			if _, known := a.env[key]; !known {
+				if _, present := os.LookupEnv(key); present {
+					a.reason = roles.Indeterminate
+					return
+				}
+			}
 			if _, present := a.env[key]; present {
 				a.reason = roles.Indeterminate
 				return
@@ -128,6 +151,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		}
 	}
 	gitDir, workTree := "", ""
+	bareGlobal := false
 	if value, ok := a.env["GIT_DIR"]; ok {
 		if !staticGitPath(value) {
 			a.reason = roles.Indeterminate
@@ -142,8 +166,12 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		}
 		workTree = value
 	}
-	if value, ok := a.env["GIT_CONFIG_COUNT"]; ok {
-		count, err := strconv.Atoi(value)
+	countValue, countPresent := a.env["GIT_CONFIG_COUNT"]
+	if !countPresent {
+		countValue, countPresent = os.LookupEnv("GIT_CONFIG_COUNT")
+	}
+	if countPresent {
+		count, err := strconv.Atoi(countValue)
 		if err != nil || count < 0 || count > 128 {
 			a.reason = roles.Indeterminate
 			return
@@ -151,6 +179,12 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		for n := 0; n < count; n++ {
 			key, hasKey := a.env["GIT_CONFIG_KEY_"+strconv.Itoa(n)]
 			val, hasValue := a.env["GIT_CONFIG_VALUE_"+strconv.Itoa(n)]
+			if !hasKey {
+				key, hasKey = os.LookupEnv("GIT_CONFIG_KEY_" + strconv.Itoa(n))
+			}
+			if !hasValue {
+				val, hasValue = os.LookupEnv("GIT_CONFIG_VALUE_" + strconv.Itoa(n))
+			}
 			if !hasKey || !hasValue {
 				a.reason = roles.Indeterminate
 				return
@@ -195,8 +229,17 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			case "-c":
 				a.gitConfig(value, aliases, depth, cwd)
 			case "--config-env":
-				configKey, envKey, ok := strings.Cut(value, "=")
+				// Git splits name=ENVVAR at the last equals sign; names may contain one.
+				cut := strings.LastIndex(value, "=")
+				ok := cut > 0
+				configKey, envKey := value, ""
+				if ok {
+					configKey, envKey = value[:cut], value[cut+1:]
+				}
 				val, known := a.env[envKey]
+				if !known {
+					val, known = os.LookupEnv(envKey)
+				}
 				if !ok || !known {
 					a.reason = roles.Indeterminate
 					return
@@ -209,26 +252,32 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		} else if !optionIn("--no-pager -p --paginate --bare --literal-pathspecs --glob-pathspecs --noglob-pathspecs --icase-pathspecs --no-optional-locks --no-replace-objects --no-lazy-fetch", key) || attached {
 			a.reason = roles.Indeterminate
 			return
-		} else if key == "--bare" && gitDir == "" {
-			gitDir = a.gitPath(".", cwd)
+		} else if key == "--bare" {
+			bareGlobal = true
+			if gitDir == "" {
+				gitDir = a.gitPath(".", cwd)
+			}
 		}
 	}
 	if a.reason != "" || len(args) == 0 {
 		return
 	}
-	if _, present := aliases[args[0]]; !present {
-		if value, ok := repositoryAlias(resolveGitDirectory(cwd, gitDir), args[0]); ok {
-			if strings.HasPrefix(value, "!") {
-				a.shellValue(strings.TrimPrefix(value, "!"), depth, cwd)
-				return
-			}
-			aliases[args[0]] = value
-		}
+	configAliases, err := gitAliases(resolveGitDirectory(cwd, gitDir), cwd, a.home, a.env)
+	if err != nil {
+		a.reason = roles.Indeterminate
+		return
+	}
+	for key, value := range aliases {
+		configAliases[key] = value // Inline configuration takes precedence.
 	}
 	for n := 0; ; n++ {
-		value, ok := aliases[args[0]]
+		value, ok := configAliases[args[0]]
 		if !ok {
 			break
+		}
+		if strings.HasPrefix(value, "!") {
+			a.reason = roles.Indeterminate
+			return
 		}
 		if n >= 4 {
 			a.reason = roles.Indeterminate
@@ -253,13 +302,19 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			}
 			expanded = append(expanded, values...)
 		}
-		if len(expanded) == 0 || strings.HasPrefix(expanded[0], "-") {
+		if len(expanded) == 0 || strings.HasPrefix(expanded[0], "-") || strings.HasPrefix(expanded[0], "!") {
 			a.reason = roles.Indeterminate
 			return
 		}
 		args = append(expanded, args[1:]...)
 	}
 	sub, operands := args[0], args[1:]
+	for _, operand := range operands {
+		if strings.Contains(strings.ToLower(operand), "ext::") {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
 	// Credential access remains prohibited even in an empty repository.
 	if sub == "credential" && len(operands) == 1 && operands[0] == "fill" && direct {
 		return
@@ -304,6 +359,10 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		return
 	}
 	if a.reason != "" {
+		return
+	}
+	if repoUncertain || bareGlobal {
+		a.reason = roles.Indeterminate
 		return
 	}
 	for _, arg := range operands {
