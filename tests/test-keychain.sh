@@ -137,6 +137,12 @@ SAMPLER=$!
 for iteration in 1 2 3 4 5 6 7 8; do
     check "argv_stash_$iteration" 0 "$SECRET" stash --env dev keychain:demo TOKEN <"$TMP/input"
 done
+# A fast CLI can finish between samples; keep stashing until the sampler sees security -i.
+retry=0
+while ! grep -Fq 'security -i' "$TMP/ps" && [ "$retry" -lt 40 ]; do
+    "$SECRET" stash --env dev keychain:demo TOKEN <"$TMP/input" >/dev/null 2>&1 || true
+    retry=$((retry + 1))
+done
 kill "$SAMPLER" 2>/dev/null || true
 wait "$SAMPLER" 2>/dev/null || true
 SAMPLER=""
