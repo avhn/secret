@@ -24,8 +24,8 @@ deliberately trying to read a secret.
 print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   `security -w`, clipboard readers), and content searches over trees that hold
   protected files. The shipped guard also rejects control characters in shell
-  commands, protects covered Git history dumps using bounded worktree scans
-  and archive reads,
+  commands, gates content-producing Git commands on bounded tracked index names
+  and protects covered archive reads,
   and detects shell hook variables that can launch readers. Protected paths are matched after brace and `$IFS`
   expansion and through symlink aliases, and unknown commands may not take a
   protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
@@ -47,14 +47,14 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   their input, and other dynamic constructs can name a protected file without
   spelling it. Same-command copy, symlink or archive laundering, including
   `cp -r`, `ln -s` and an archive read following an archive creation, is not
-  traced. Interpreter file reads through aliases whose names are not protected
-  are not reliably identified. The guard denies an unresolved operand only when
-  the command text itself names something protected.
-- **Deleted Git history.** Worktree name scans cannot identify stores removed
-  before the current checkout. Git history dumps of those deleted paths are
-  not reliably denied without reading Git objects. Other Git plumbing commands
-  outside the covered history operations, such as `git fast-export`, are not
-  currently classified as protected history dumps.
+  traced. Concatenated or computed script literals and `eval` are not reliably
+  resolved. The guard does not infer protected inputs from an unresolved
+  operand whose command text names no protected file.
+- **History no longer tracked.** Git content-producing commands are checked
+  against a bounded `git ls-files -z` index name list, not blob contents or a
+  worktree scan. An ignored, untracked `.env` does not block ordinary history
+  inspection. Paths deleted or renamed away from the current index can still
+  appear in old Git objects without being found by the index check.
 - **Inherited variable values in argv.** Tools such as `basename "$TOKEN"`
   and `ls "$TOKEN"` may print inherited secret values. Apart from existing
   `echo` and `printf` checks, arbitrary argv expansion is not tracked.
@@ -76,9 +76,9 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   exposes it to the local process list. Descendants a `run` child leaves
   running are not supervised. Any process running as the same user can read
   the stores and, while a child runs, its environment.
-- **Fail-open inputs.** The guard makes no decision when its input is not
-  valid JSON, or when analysis fails on text that names no protected file or
-  operation. Without `jq` it denies every request instead.
+- **Visibility limits.** A nonempty malformed request or failed static analysis
+  denies instead of allowing the tool call. This is a hook decision, not a
+  sandbox guarantee: a disabled or missing host hook cannot enforce it.
 - **Ignored dependency trees.** A content search over a tree skips `.git` and
   `node_modules` unless `--hidden`, a glob or an explicit path brings them
   into scope, so a protected file inside them is not detected.

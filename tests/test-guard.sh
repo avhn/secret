@@ -48,6 +48,10 @@ invoke_guard() {
         "${GUARD_ARGS[@]}"
     fi
 }
+# Inherited editor commands are intentionally not part of these synthetic fixtures.
+unset EDITOR VISUAL GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH_COMMAND
+# Failed parsing, option arity and analysis limits now deny even benign text.
+# Git grep outside a resolvable index also denies under the content gate.
 # Existing plain-rg cases model the installed defaults, independent of CI env.
 export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 mkdir -p "$TMP/descendant-only/sub" "$TMP/search/sub" "$TMP/search/web" "$TMP/empty-search" "$TMP/search/src"
@@ -446,7 +450,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets xargs_replace deny Bash 'echo .env | xargs -I {} cat {}'
         secrets xargs_options deny Bash 'ls .env | xargs -0 -n 1 -P 2 cat'
         secrets xargs_chain deny Bash "find . -name '.env' | sort | xargs cat"
-        secrets xargs_safe_reader allow Bash 'ls src/a.ts | xargs cat'
+        secrets xargs_safe_reader deny Bash 'ls src/a.ts | xargs cat'
         secrets xargs_safe_listing allow Bash 'ls .env | xargs ls'
         secrets python_code deny Bash "python -c 'open(\".env\").read()'"
         secrets perl_code deny Bash "perl -e 'open F, \"<\", \".env\"'"
@@ -535,9 +539,9 @@ if command -v jq >/dev/null 2>&1; then
         secrets xargs_optional_replace deny Bash 'ls .env | xargs --replace cat'
         secrets xargs_optional_lines deny Bash 'ls .env | xargs --max-lines cat'
         secrets xargs_optional_eof deny Bash 'ls .env | xargs --eof cat'
-        secrets xargs_optional_safe allow Bash 'ls src/a.ts | xargs --replace cat'
-        secrets xargs_R_safe allow Bash 'ls src/a.ts | xargs -R 1 cat'
-        secrets xargs_S_safe allow Bash 'ls src/a.ts | xargs -S 255 cat'
+        secrets xargs_optional_safe deny Bash 'ls src/a.ts | xargs --replace cat'
+        secrets xargs_R_safe deny Bash 'ls src/a.ts | xargs -R 1 cat'
+        secrets xargs_S_safe deny Bash 'ls src/a.ts | xargs -S 255 cat'
         secrets xargs_arg_file deny Bash 'xargs -a .env cat'
         secrets xargs_arg_file_attached deny Bash 'xargs -a.env cat'
         secrets xargs_arg_file_long deny Bash 'xargs --arg-file .env cat'
@@ -548,7 +552,7 @@ if command -v jq >/dev/null 2>&1; then
         for wrapper in timeout nice stdbuf caffeinate xargs exec; do
             secrets "unknown_${wrapper}_reader" deny Bash "$wrapper --unrecognised value cat .env"
             secrets "unknown_${wrapper}_printer" deny Bash "$wrapper --unrecognised value env"
-            secrets "unknown_${wrapper}_safe" allow Bash "$wrapper --unrecognised value echo environment settings"
+            secrets "unknown_${wrapper}_safe" deny Bash "$wrapper --unrecognised value echo environment settings"
         done
         secrets missing_wrapper_value deny Bash 'exec -a .env --unrecognised'
 
@@ -595,7 +599,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets sudo_login deny Bash "sudo -i 'cat .env'"
         secrets sudo_shell_safe allow Bash "sudo -s 'cat src/a.ts'"
         secrets sudo_unknown deny Bash 'sudo --unknown value cat .env'
-        secrets sudo_unknown_safe allow Bash 'sudo --unknown value echo hello'
+        secrets sudo_unknown_safe deny Bash 'sudo --unknown value echo hello'
         secrets continuation_operand deny Bash $'cat \\\n.env'
         secrets continuation_command deny Bash $'ca\\\nt .env'
         secrets continuation_double deny Bash $'cat ".en\\\nv"'
@@ -643,7 +647,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets unresolved_listing_safe allow Bash 'cat $(git ls-files | head -1)'
         secrets unresolved_wc_safe allow Bash 'wc -l $(ls src/*.ts)'
         secrets unresolved_redirect_safe allow Bash 'wc < "$FILE"'
-        secrets unresolved_xargs_safe allow Bash 'printf "%s" "$FILE" | xargs cat'
+        secrets unresolved_xargs_safe deny Bash 'printf "%s" "$FILE" | xargs cat'
         secrets unresolved_literal_safe allow Bash 'cat "$(printf src/; printf a.ts)"'
         secrets unresolved_no_eval allow Bash 'cat "$(touch should-not-exist; printf src/a.ts)"'
         secrets unresolved_quoted_parameter allow Bash "f=.env; cat '\$f'"
@@ -773,13 +777,13 @@ secrets rg_without_config_newline allow Bash "rg TOKEN '$TMP/newline-clean'"
 secrets rg_without_config_pruned deny Bash "rg TOKEN '$TMP/pruned-vendor'"
 for directory in node_modules .git; do
     secrets "rg_pruned_$directory" allow Bash "rg TOKEN '$TMP/pruned-$directory'"
-    secrets "git_grep_pruned_$directory" allow Bash "git -C '$TMP/pruned-$directory' grep TOKEN"
+    secrets "git_grep_pruned_$directory" deny Bash "git -C '$TMP/pruned-$directory' grep TOKEN"
     secrets "rg_pruned_deep_$directory" allow Bash "rg TOKEN '$TMP/pruned-deep-$directory'"
 done
 secrets git_grep deny Bash 'git grep TOKEN'
-secrets git_grep_clean allow Bash 'git grep TOKEN -- src'
-secrets git_grep_names allow Bash 'git grep -l TOKEN'
-secrets git_grep_names_long allow Bash 'git grep --files-with-matches TOKEN'
+secrets git_grep_clean deny Bash 'git grep TOKEN -- src'
+secrets git_grep_names deny Bash 'git grep -l TOKEN'
+secrets git_grep_names_long deny Bash 'git grep --files-with-matches TOKEN'
 secrets git_grep_pager_short deny Bash 'git grep -l -Ocat TOKEN'
 secrets git_grep_pager_short_bare deny Bash 'git grep -l -O TOKEN'
 secrets git_grep_pager_long deny Bash 'git grep -l --open-files-in-pager=cat TOKEN'
@@ -790,9 +794,9 @@ secrets git_grep_file deny Bash 'git grep TOKEN -- .env'
 secrets git_grep_regexp deny Bash 'git grep -e TOKEN'
 secrets git_grep_pattern_file deny Bash 'git grep -f .env -- src'
 secrets git_grep_global deny Bash 'git --no-pager grep TOKEN'
-secrets git_grep_chdir allow Bash 'git -C src grep TOKEN'
+secrets git_grep_chdir deny Bash 'git -C src grep TOKEN'
 secrets git_grep_chdir_protected deny Bash 'git -C sub grep TOKEN'
-secrets git_grep_multiple_chdir allow Bash 'git -C sub -C ../src grep TOKEN'
+secrets git_grep_multiple_chdir deny Bash 'git -C sub -C ../src grep TOKEN'
 secrets git_grep_config deny Bash 'git -c core.bare=false grep TOKEN'
 secrets git_grep_revision deny Bash 'git grep TOKEN HEAD -- src'
 secrets git_grep_over_cap deny Bash "git grep TOKEN # $LONG_TEXT"
@@ -849,7 +853,7 @@ export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 
 # Deterministic find failures cover root CI too, separately from permissions.
 mkdir "$TMP/find-error-bin"
-printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$TMP/find-error-bin/find"
+printf '#!%s\n%s\n' "$BASH" 'exit 1' >"$TMP/find-error-bin/find"
 chmod +x "$TMP/find-error-bin/find"
 PATH="$TMP/find-error-bin:$PATH" secrets grep_find_exit deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
 PATH="$TMP/find-error-bin:$PATH" secrets grep_find_exit_count deny Grep "$TMP/empty-search" '{"output_mode":"count"}'
@@ -861,10 +865,7 @@ export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 
 # A timeout in the names-only Grep fallback denies content but not filenames.
 mkdir "$TMP/find-bin"
-cat >"$TMP/find-bin/find" <<'EOF'
-#!/usr/bin/env bash
-exec sleep 1
-EOF
+printf '#!%s\n%s\n' "$BASH" 'exec sleep 1' >"$TMP/find-bin/find"
 chmod +x "$TMP/find-bin/find"
 PATH="$TMP/find-bin:$PATH" secrets grep_timeout deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
 PATH="$TMP/find-bin:$PATH" secrets grep_timeout_names allow Grep "$TMP/empty-search" '{"output_mode":"files_with_matches"}'
@@ -886,7 +887,7 @@ printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/.secrets/nested.ts"
 secrets rg_glob_private_child deny Bash 'rg -g "*.ts" TOKEN .'
 for flag in --no-index --untracked --cached; do
     secrets "git_scope_$flag" deny Bash "git grep $flag TOKEN -- src"
-    secrets "git_scope_names_$flag" allow Bash "git grep $flag -l TOKEN -- src"
+    secrets "git_scope_names_$flag" deny Bash "git grep $flag -l TOKEN -- src"
 done
 secrets git_revision_colon deny Bash 'git grep TOKEN HEAD:.env'
 
@@ -1060,12 +1061,12 @@ else
 fi
 record_direct no_command_substitution
 
-# Malformed JSON and empty stdin still produce no decision.
-[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_json >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(printf '%s' malformed | invoke_guard)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+# Malformed nonempty input denies; empty stdin still has no tool call.
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard malformed_json >>"$SECRET_TEST_INVENTORY"
+if printf '%s' malformed | invoke_guard | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 record_direct malformed_json
-[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_sensitive >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(printf '%s' 'malformed cat .env' | invoke_guard)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+[[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard malformed_sensitive >>"$SECRET_TEST_INVENTORY"
+if printf '%s' 'malformed cat .env' | invoke_guard | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 record_direct malformed_sensitive
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard empty_stdin >>"$SECRET_TEST_INVENTORY"
 if [[ -z "$(PATH="$TMP/empty-search" invoke_guard </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
@@ -1134,18 +1135,20 @@ ln -s absent "$TMP/search/operand-missing.txt"
     for cmd in 'dd if=.env' 'paste .env' 'fold .env' 'column -t .env' 'look x .env' 'openssl enc -in .env' 'openssl pkey -inkey .env' 'view .env' 'split -l1 .env /tmp/p' 'install .env /tmp/x' 'rsync .env host:' 'scp .env host:' 'tar -cf x.tar .env' 'zip x.zip .env' 'gpg -c .env' 'sops -d .env' 'jq --rawfile k .env -n "$k"' 'jq --slurpfile k .env -n 1' 'git add .env' 'git add -f .env' 'git diff .env' 'git show HEAD:.env' 'git log -p .env' 'git log --patch .env' 'git blame .env' 'git cat-file blob HEAD:.env' 'git grep x .env' 'git status -v .env' 'git status --verbose .env' 'git mv .env x' 'git rm .env' 'cp .env x' 'mv .env x' 'ln -s .env x' 'cp -t /tmp .env' 'mv --target-directory /tmp .env' 'ln --target-directory=/tmp .env' 'mv .env.tmp .env' 'unknown-tool .env'; do
         secrets operand_deny deny Bash "$cmd"
     done
-    for cmd in 'cp .env.example .env' 'tee .env < /dev/null' 'dd of=.env' 'split src/a.ts .env' 'openssl enc -in src/a.ts -out .env' 'tar -cf .env src' 'zip .env src/a.ts' 'rsync src/a.ts .env' 'scp src/a.ts .env' 'install src/a.ts .env' 'cp -t .env src/a.ts' 'mv --target-directory=.env src/a.ts' 'ls -l .env' 'stat .env' 'test -f .env' '[ -f .env ]' '[[ -f .env ]]' 'file .env' 'du .env' 'realpath .env' 'readlink .env' 'basename .env' 'dirname .env' 'chmod 600 .env' 'chown user .env' 'chgrp group .env' 'rm .env' 'touch .env' 'git check-ignore .env' 'git ls-files .env' 'git status' 'git status .env' 'git status -v' 'echo .env' 'printf "%s" .env' 'find . -name .env' 'git commit -m "add .env handling"' 'jq --rawfile .env src/a.ts -n 1' 'jq --slurpfile .env src/a.ts -n 1'; do
+    for cmd in 'cp .env.example .env' 'tee .env < /dev/null' 'dd of=.env' 'split src/a.ts .env' 'openssl enc -in src/a.ts -out .env' 'tar -cf .env src' 'zip .env src/a.ts' 'rsync src/a.ts .env' 'scp src/a.ts .env' 'install src/a.ts .env' 'cp -t .env src/a.ts' 'mv --target-directory=.env src/a.ts' 'ls -l .env' 'stat .env' 'test -f .env' '[ -f .env ]' '[[ -f .env ]]' 'file .env' 'du .env' 'realpath .env' 'readlink .env' 'basename .env' 'dirname .env' 'chmod 600 .env' 'chown user .env' 'chgrp group .env' 'rm .env' 'touch .env' 'git check-ignore .env' 'git ls-files .env' 'git status' 'git status .env' 'echo .env' 'printf "%s" .env' 'find . -name .env' 'git commit -m "add .env handling"' 'jq --rawfile .env src/a.ts -n 1' 'jq --slurpfile .env src/a.ts -n 1'; do
         secrets operand_allow allow Bash "$cmd"
     done
+    secrets operand_allow deny Bash 'git status -v'
     for cmd in 'dotenv -e .env -- printenv' 'dotenv -e .env -- env' 'docker run --env-file .env alpine env' 'docker run --env-file=.env alpine printenv' 'docker compose --env-file .env config' 'docker compose --env-file=.env config'; do
         secrets consumer_deny deny Bash "$cmd"
     done
     for cmd in 'docker run --env-file .env alpine node app.js' 'docker run --env-file=.env alpine node app.js' 'docker compose --env-file .env up' 'dotenv -e .env -- npm start' 'node --env-file=.env app.js' 'node --env-file .env app.js'; do
         secrets consumer_allow allow Bash "$cmd"
     done
-    for cmd in 'cat package.json' 'sed -n 1,20p src/x.ts' 'cp a b' 'mv a b' 'ln -s a b' 'tar -cf x.tar src' 'git add src' 'git diff' 'docker run alpine echo hi' 'node app.js' 'python3 script.py' 'make test' 'npm test'; do
+    for cmd in 'cat package.json' 'sed -n 1,20p src/x.ts' 'cp a b' 'mv a b' 'ln -s a b' 'tar -cf x.tar src' 'git add src' 'docker run alpine echo hi' 'node app.js' 'python3 script.py' 'make test' 'npm test'; do
         secrets ordinary_command allow Bash "$cmd"
     done
+    secrets ordinary_command deny Bash 'git diff'
     for tool in Read Edit Write; do
         secrets "alias_${tool}" deny "$tool" "$TMP/search/operand-alias.txt"
         secrets "ancestor_${tool}" deny "$tool" "$TMP/search/alias-parent/link/plain.txt"
@@ -1184,9 +1187,10 @@ ln -s absent "$TMP/search/operand-missing.txt"
     for cmd in 'find . -name .env -exec cat {} \;' 'find . -name .env -exec cat {} +' 'find . -iname .ENV -execdir cat {} \;' 'find . -path "*/.env" -ok cat {} \;' 'find . -regex ".*\\.env" -okdir cat {} +' 'find . -name "*.env" -exec cat {} +' 'find . -name ".env*" -exec cat {} \;' 'find . -exec cat {} \; -name .env' 'find . -name .env -exec env cat {} +' 'find . -name .env -exec sh -c "cat \"\$1\"" _ {} \;' 'find . -exec printenv \;' 'find . -name .env -exec cat .env \;' 'find -files0-from .env -print' 'find -files0-from=.env -print'; do
         secrets find_child_input deny Bash "$cmd"
     done
-    for cmd in 'find . -name .env' 'find . -name .env -delete' 'find . -name .env -print' 'find . -name .env -exec echo {} \;'; do
+    for cmd in 'find . -name .env' 'find . -name .env -delete' 'find . -name .env -print'; do
         secrets find_names_only allow Bash "$cmd"
     done
+    secrets find_names_only deny Bash 'find . -name .env -exec echo {} \;'
     secrets find_scope_reader deny Bash 'find . -type f -exec cat {} +'
     secrets find_scope_grep deny Bash 'find . -name "*.ts" -exec grep -l TODO {} +'
     for cmd in 'dotenv -e .env printenv' 'dotenv -e .env env' 'dotenv -e .env -v K=V -c dev --debug -o --no-expand printenv' 'dotenv -e .env -c printenv' 'dotenv -e .env -p TOKEN' 'dotenv --env=.env --print TOKEN' 'dotenv -e .env --mystery env'; do
@@ -1244,7 +1248,7 @@ if command -v zip >/dev/null 2>&1; then
     secrets audit_unzip_member deny Bash "unzip -p '$TMP/archive/a.zip' .env"
 fi
 secrets audit_tar_member deny Bash "tar -xOf '$TMP/archive/a.tar' .env"
-secrets audit_tar_list_member deny Bash "tar -tf '$TMP/archive/a.tar' .env"
+secrets audit_tar_list_member allow Bash "tar -tf '$TMP/archive/a.tar' .env"
 secrets audit_tar_follow_alias deny Bash 'tar -chf - sub | tar -xO'
 secrets audit_tar_tree deny Bash 'tar -cf - . | tar -xO'
 if command -v git >/dev/null 2>&1; then
@@ -1274,7 +1278,7 @@ if command -v git >/dev/null 2>&1; then
     secrets audit_history_diff_tags deny Bash "cd '$TMP/history'; git diff tag-one tag-two"
     secrets audit_history_grep_revision deny Bash "cd '$TMP/history'; git grep -l SYNTH tag-one"
     secrets audit_history_format deny Bash "cd '$TMP/history'; git format-patch --stdout HEAD~1"
-    secrets audit_history_safe allow Bash "cd '$TMP/history'; git log -p -- src/safe.txt"
+    secrets audit_history_safe deny Bash "cd '$TMP/history'; git log -p -- src/safe.txt"
     secrets audit_history_colon deny Bash "cd '$TMP/history/src'; git show HEAD:app.env"
 else
     printf '%s\n' 'SKIP audit git fixtures: git not installed'
@@ -1320,6 +1324,79 @@ secrets audit_control_byte deny Bash $'paste sub/link # \x01'
 for glob in '**/*.{env}' 'node_modules/pkg/app.e{n}v' '**/{app.env}' 'node_modules/pkg/*.{{env},x}' 'node_modules/**/*.{e}nv'; do
     secrets audit_brace_selector deny Grep "$TMP/search" "$(jq -cn --arg glob "$glob" '{glob:$glob,output_mode:"content"}')"
 done
+
+# Policy v2: bounded index checks, command surfaces and indeterminate readers.
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/ignored-index/src"
+    git -C "$TMP/ignored-index" init -q
+    printf '%s\n' '.env' >"$TMP/ignored-index/.gitignore"
+    printf '%s\n' 'synthetic-only' >"$TMP/ignored-index/.env"
+    printf '%s\n' 'safe' >"$TMP/ignored-index/src/code.txt"
+    git -C "$TMP/ignored-index" add .gitignore src/code.txt
+    git -C "$TMP/ignored-index" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm initial
+    secrets git_literal_alias allow Bash "git -C '$TMP/history' -c AliAS.x=log x"
+    secrets git_literal_alias_options allow Bash "git -C '$TMP/history' -c 'alias.x=log --oneline' x"
+    secrets git_include_config deny Bash "git -C '$TMP/ignored-index' -c InClUdE.path=safe.cfg status"
+    secrets git_hookspath_config deny Bash "git -C '$TMP/ignored-index' -c CORE.HOOKSPATH=hooks commit -m synthetic"
+    git -C "$TMP/ignored-index" config alias.unmodelled '!cat .env'
+    git -C "$TMP/history" config alias.short 'log --oneline'
+    secrets git_repo_alias_shell deny Bash "git -C '$TMP/ignored-index' unmodelled"
+    secrets git_repo_alias_safe allow Bash "git -C '$TMP/history' short"
+    secrets git_relocated_dir deny Bash "git -C '$TMP/ignored-index' --git-dir '$TMP/history/.git' --work-tree '$TMP/history' log -p"
+    secrets git_relocated_env deny Bash "cd '$TMP/ignored-index'; GIT_DIR='$TMP/history/.git' GIT_WORK_TREE='$TMP/history' git log -p"
+    GIT_EXTERNAL_DIFF='paste sub/link' secrets git_inherited_diff deny Bash "git -C '$TMP/ignored-index' log -p"
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=CORE.EDITOR GIT_CONFIG_VALUE_0='paste sub/link' \
+        secrets git_inherited_config deny Bash "git -C '$TMP/ignored-index' log -p"
+    secrets git_inline_diff allow Bash "cd '$TMP/ignored-index'; GIT_EXTERNAL_DIFF='paste sub/link' git log -p"
+    secrets git_blame_contents_alias deny Bash "git -C '$TMP/ignored-index' blame --contents='$TMP/search/sub/link' src/code.txt"
+    case_index=0
+    for cmd in 'status' 'log --oneline' 'diff --stat' 'add src/code.txt' 'commit -m synthetic' 'log -p'; do
+        secrets "git_ignored_safe_$case_index" allow Bash "git -C '$TMP/ignored-index' $cmd"
+        case_index=$((case_index + 1))
+    done
+    case_index=0
+    for cmd in 'log -U1' 'log --unified=1' 'log --patch-with-stat' 'log --patch-with-raw' 'log --cc' 'log --binary' 'log -L1,1:app.env' 'reflog -p' 'diff-tree -p HEAD' 'diff-index -p HEAD' 'diff HEAD HEAD' 'format-patch --output=/dev/stdout HEAD' 'cat-file blob HEAD' 'stash show -p' 'stash list -p' 'range-diff HEAD~1 HEAD' 'log -p --full-diff -- src/safe.txt' 'blame --contents=app.env src/safe.txt'; do
+        secrets "git_index_gate_$case_index" deny Bash "git -C '$TMP/history' $cmd"
+        case_index=$((case_index + 1))
+    done
+    case_index=0
+    for cmd in 'git --namespace x log -p' 'git --attr-source HEAD log -p' 'git --git-dir=.git log -p' 'GIT_DIR=.git git log -p' 'git -c Diff.External=paste log -p' 'git -c CORE.EDITOR=paste log -p' 'git --config-env=core.editor:EDITOR log -p' 'git log --upload-pack=paste' 'git rebase -x paste HEAD'; do
+        secrets "git_command_surface_$case_index" deny Bash "cd '$TMP/history'; $cmd"
+        case_index=$((case_index + 1))
+    done
+fi
+mkdir -p "$TMP/alias-only"
+ln -s "$TMP/search/app.env" "$TMP/alias-only/code-link"
+secrets policy_v2_find_symlink_scope deny Bash "find '$TMP/alias-only' -exec timeout 2 cat {} +"
+case_index=0
+for cmd in 'find . -exec env cat {} +' 'find . -exec timeout 2 cat {} +' 'find . -exec cp {} /tmp/out +' 'find . -exec dd if={} of=/dev/null +' 'find . -exec split {} +' 'find . -exec zcat {} +' 'find . -exec fold {} +' 'find . -exec iconv {} +' 'find . -exec pr {} +' 'printf x | xargs cat' 'printf x | parallel cat' 'cd ~-; cat app.env' 'cd ~1; cat app.env' 'pushd sub; cat link' 'popd; cat app.env' 'cat /proc/self/task/1/cwd/app.env' 'cat /proc/self/fd/9' 'cat /dev/stdin/x' 'jq -fn sub/link' 'jq -f -n sub/link' "sed '1r sub/link' src/a.ts" "sed -e '1R sub/link' src/a.ts" "sed -e '1e paste sub/link' src/a.ts" "awk 'BEGIN{getline x < \"sub/link\"}'" 'tar -O -xf safe.tar' 'tar --to-stdout -xf safe.tar' 'tar --to-s -xf safe.tar' 'bsdtar -O -xf safe.tar' 'unzip -pC safe.zip' '7z e -so safe.7z' '7z x -so safe.7z' 'cpio -i --to-stdout'; do
+    secrets "policy_v2_reader_$case_index" deny Bash "$cmd"
+    case_index=$((case_index + 1))
+done
+printf '%s\n' '1r sub/link' >"$TMP/search/reader.sed"
+ln -s reader.sed "$TMP/search/reader-script-link"
+secrets policy_v2_sed_script_file deny Bash 'sed -nf reader-script-link src/a.ts'
+secrets policy_v2_sed_script_file_attached deny Bash 'sed --file=reader-script-link src/a.ts'
+secrets policy_v2_sed_script_clean allow Bash 'sed -nf src/a.ts src/a.ts'
+printf '%s\n' 'BEGIN{getline x < "sub/link"}' >"$TMP/search/reader.awk"
+ln -s reader.awk "$TMP/search/awk-script-link"
+secrets policy_v2_awk_script_file deny Bash 'awk -f awk-script-link src/a.ts'
+secrets policy_v2_awk_script_system deny Bash 'awk '\''BEGIN{system("paste sub/link")}'\'' src/a.ts'
+# Concatenated interpreter path literals are out of scope, but must not crash.
+secrets policy_v2_no_crash allow Bash 'python3 -c '\''print(open("sub/"+"link").read())'\'''
+case_index=0
+for cmd in 'tar --to-command=cat -xf safe.tar' 'tar --checkpoint-action=exec=cat -cf safe.tar src' 'tar --use-compress-program=cat -cf safe.tar src' 'tar -I cat -cf safe.tar src' 'tar --cre -f safe.tar .' 'tar --cr -f safe.tar .' 'tar --deref -cf safe.tar sub' 'tar --der -cf safe.tar sub' 'tar -chf safe.tar sub'; do
+    if ((case_index >= 1 && case_index <= 3)); then
+        secrets "policy_v2_tar_$case_index" allow Bash "$cmd"
+    else
+        secrets "policy_v2_tar_$case_index" deny Bash "$cmd"
+    fi
+    case_index=$((case_index + 1))
+done
+
+secrets policy_v2_tar_checkpoint_reader deny Bash 'tar --checkpoint-action=exec="paste sub/link" -cf safe.tar src'
+secrets policy_v2_tar_compressor_reader deny Bash 'tar --use-compress-program="paste sub/link" -cf safe.tar src'
+secrets policy_v2_tar_short_reader deny Bash 'tar -I "paste sub/link" -cf safe.tar src'
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
