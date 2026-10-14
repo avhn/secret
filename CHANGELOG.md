@@ -28,6 +28,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### In progress
 
+- Expanded tagged Go hook trial budgets for long safe shell commands and ported sudo, direct stash, env split, jq/ps, and file option roles. The default build still defers Bash analysis and retains its prior envelope limit; unresolved tagged differences prevent activation.
+
+- Added metadata-only search-scope checks and synthetic ripgrep config certification for the tagged Go hook trial; default-build Grep and Glob now use the shared search package. The installed Bash guard is unchanged and the default Go build still defers shell analysis.
+
 - Started an isolated Go Bash AST walker and command/printer role tables with synthetic role, path-property and fuzz tests. A timed grouped trial harness exposed security-critical false allows; targeted AST, role, option and argv analysis reduced them to four Claude Grep shim differences and zero Codex false allows in the unwired trial. The trial now builds with `hooktrial` without source edits; its four external-find shim differences are documented, while 150 Claude and one Codex false denies remain unclassified. Go walk failures deny under injected errors, loops, overflow and deadline. The default Go build still defers shell decisions to the installed Bash guard.
 - Go inventory and human-only CLI commands have synthetic Bash-generated parity cases and CI drift checks; usage exits 1 like Bash, Unix run and exec now have synthetic Bash goldens, and the Bash CLI is still active.
 - Go libsecret and Keychain transports now use stdin-only value writes, exact service/account lookups, and disposable provider integration tests in CI; provider validation is pending isolated runners.

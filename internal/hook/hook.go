@@ -10,6 +10,7 @@ import (
 
 	"github.com/avhn/secret/internal/hook/input"
 	"github.com/avhn/secret/internal/hook/paths"
+	"github.com/avhn/secret/internal/hook/search"
 )
 
 // Decide writes a supported denial or no decision. Bash remains unanalysed and
@@ -45,9 +46,7 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 			reason = "file access targets a protected store"
 		}
 	case "Glob":
-		if name := e.String("path"); name != "" && protected(name) {
-			reason = "file access targets a protected store"
-		}
+		reason = search.ToolGlob(e.String("path"), cwd, os.Getenv("HOME"))
 	case "apply_patch":
 		if host != "codex" {
 			break
@@ -65,25 +64,7 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 		if host != "claude" {
 			break
 		}
-		p := e.String("path")
-		if p == "" {
-			p = cwd
-		}
-		mode := e.String("output_mode")
-		if mode == "" {
-			mode = "files_with_matches"
-		}
-		selector := e.String("glob")
-		fileType := strings.ToLower(e.String("type"))
-		if mode != "files_with_matches" && (fileType == "env" || fileType == "dotenv" || fileType == "secret" || fileType == "secrets" || fileType == "netrc" || fileType == "git-credentials") {
-			reason = "Grep type targets protected names"
-		} else if selector != "" && (protected(selector) || strings.Contains(strings.ToLower(selector), ".env") || strings.Contains(strings.ToLower(selector), ".secret") || strings.Contains(strings.ToLower(selector), ".config/gh/")) && (mode != "files_with_matches" || !strings.ContainsAny(selector, "*?[")) {
-			reason = "Grep selector targets protected names"
-		} else if protected(p) {
-			reason = "Grep targets a protected store"
-		} else if mode != "files_with_matches" && paths.TreeProtected(p, cwd, os.Getenv("HOME")) {
-			reason = "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"
-		}
+		reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), e.String("output_mode"), cwd, os.Getenv("HOME"))
 	case "Bash":
 		reason = bashDecision(e, cwd, protected)
 	}

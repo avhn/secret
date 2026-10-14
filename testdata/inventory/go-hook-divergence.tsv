@@ -552,7 +552,6 @@ guard	rg_explicit_.git	pending-M2-ast
 guard	rg_hidden_parent_.git	pending-M2-ast
 guard	rg_explicit_node_modules	pending-M2-ast
 guard	rg_hidden_parent_node_modules	pending-M2-ast
-guard	grep_alias_names	pending-M2-search
 guard	rg_alias_unconfigured	pending-M2-ast
 guard	git_pattern_alias	pending-M2-ast
 guard	git_pattern_alias_attached	pending-M2-ast
@@ -675,7 +674,6 @@ guard	tar_changed_directory	pending-M2-ast
 guard	tar_archive_input	pending-M2-ast
 guard	source_implicit_target	pending-M2-ast
 guard	scp_identity_input	pending-M2-ast
-guard	alias_grep_names	pending-M2-search
 guard	find_child_input	pending-M2-ast
 guard	find_child_input#2	pending-M2-ast
 guard	find_child_input#3	pending-M2-ast
@@ -740,4 +738,3 @@ codex	direct_inherited_cmd	pending-M2-ast
 codex	workdir	pending-M2-ast
 codex	workdir_relative	pending-M2-ast
 codex	argv_workdir	pending-M2-ast
-guard	grep_code_alias	pending-M2-search

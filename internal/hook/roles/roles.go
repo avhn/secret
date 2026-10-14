@@ -3,6 +3,7 @@
 package roles
 
 import (
+	"path"
 	"regexp"
 	"strings"
 )
@@ -129,8 +130,18 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 		}
 	case "ps":
+		skip := false
 		for _, a := range args {
-			if strings.Trim(a, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == "" && strings.Contains(a, "e") && a != "" || strings.HasPrefix(a, "-") && strings.Contains(a, "E") {
+			if skip {
+				skip = false
+				continue
+			}
+			switch a {
+			case "-o", "o", "-O", "O", "--format", "-p", "p", "--pid", "-C", "-t", "t", "-u", "U", "-U", "-g", "-G":
+				skip = true
+				continue
+			}
+			if a != "" && strings.Trim(a, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") == "" && strings.Contains(a, "e") || strings.HasPrefix(a, "-") && strings.Contains(a, "E") {
 				printValue = true
 			}
 		}
@@ -154,11 +165,21 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 		}
 	case "jq", "yq":
-		for _, a := range args {
+		for i := 0; i < len(args); i++ {
+			switch args[i] {
+			case "--arg", "--argjson":
+				i += 2
+				continue
+			case "--rawfile", "--slurpfile":
+				i += 2
+				continue
+			}
+			a := args[i]
 			if a == "env" || a == "$ENV" || strings.Contains(a, "$ENV") || strings.Contains(a, "env |") {
 				printValue = true
 			}
 		}
+
 	}
 	if printValue && !direct {
 		return Printer
@@ -169,7 +190,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 // OperandReason returns the guard's fixed reason for a protected input operand.
 // The inputs callback checks only actual file operands, not prose or labels.
 func OperandReason(name string, args []string, protected func(string) bool) string {
-	if metadata[name] || name == "echo" || name == "printf" || name == "secret" {
+	if metadata[name] || name == "echo" || name == "printf" || name == "secret" || name == "tee" {
 		return ""
 	}
 	if name == "docker" || name == "dotenv" {
@@ -235,6 +256,12 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		}
 		return ""
 	}
+	if name == "split" && len(args) > 1 {
+		args = args[:len(args)-1]
+	}
+	if name == "zip" && len(args) > 0 {
+		args = args[1:]
+	}
 	if name == "dd" {
 		for _, a := range args {
 			if strings.HasPrefix(a, "if=") && protected(strings.TrimPrefix(a, "if=")) {
@@ -267,8 +294,32 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 	}
 	for i := 0; i < end; i++ {
 		a := args[i]
-		if a == "--" {
+		if name == "node" && a == "--env-file" {
+			i++
 			continue
+		}
+		if name == "node" && strings.HasPrefix(a, "--env-file=") {
+			continue
+		}
+		if a == "--" {
+			pattern = false
+			continue
+		}
+		// Options carrying labels or output paths are not file inputs.
+		if takesLabel(name, a) {
+			i++
+			continue
+		}
+		if name == "jq" && (a == "--rawfile" || a == "--slurpfile") {
+			i++ // the binding name is a label, the following value is an input
+			if i+1 < end && protected(args[i+1]) {
+				return "jq file option targets a protected store"
+			}
+			i++
+			continue
+		}
+		if name == "git" && strings.Contains(a, ":") && !strings.HasPrefix(a, "-") {
+			a = path.Clean("./" + strings.SplitN(a, ":", 2)[1])
 		}
 		if pattern && (strings.HasPrefix(a, "--regexp=") || strings.HasPrefix(a, "-e") && len(a) > 2) {
 			pattern = false
@@ -277,6 +328,10 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		if pattern && (a == "-e" || a == "--regexp") {
 			i++
 			pattern = false
+			continue
+		}
+		if name == "jq" && (a == "--arg" || a == "--argjson") {
+			i += 2
 			continue
 		}
 		if a == "-f" || a == "--file" || a == "--files0-from" {
@@ -316,4 +371,27 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		}
 	}
 	return ""
+}
+
+// takesLabel identifies options whose next argument is metadata or an output path.
+func takesLabel(name, option string) bool {
+	switch name {
+	case "git":
+		return option == "-m" || option == "--message" || option == "--format" || option == "--pretty"
+	case "cp", "mv", "ln":
+		return option == "-S" || option == "--suffix" || option == "-t" || option == "--target-directory"
+	case "split":
+		return option == "-l" || option == "-b" || option == "-C" || option == "-n" || option == "-a"
+	case "install":
+		return option == "-m" || option == "-o" || option == "-g" || option == "-t"
+	case "rsync":
+		return option == "-e" || option == "--exclude" || option == "--include"
+	case "scp":
+		return option == "-P" || option == "-o"
+	case "openssl":
+		return option == "-out" || option == "-pass" || option == "-passin" || option == "-passout"
+	case "gpg", "sops":
+		return option == "-o" || option == "--output"
+	}
+	return false
 }
