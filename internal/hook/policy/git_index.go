@@ -99,12 +99,14 @@ func indexProtected(dir, home string) bool {
 	if dir == "" {
 		return true
 	}
-	data, err := boundedMetadata(filepath.Join(dir, "index"), maxIndexBytes)
-	if os.IsNotExist(err) {
-		// An initialized empty/bare repository may have no index yet.
-		info, headErr := os.Stat(filepath.Join(dir, "HEAD"))
-		return headErr != nil || !info.Mode().IsRegular()
+	if info, err := os.Stat(filepath.Join(dir, "objects")); err == nil && info.IsDir() {
+		if head, err := os.Stat(filepath.Join(dir, "HEAD")); err == nil && head.Mode().IsRegular() && filepath.Base(dir) != ".git" {
+			return true // Bare repository, including one with an index.
+		}
 	}
+	data, err := boundedMetadata(filepath.Join(dir, "index"), maxIndexBytes)
+	// History can read objects even when an index has never been written.
+	// Missing or unreadable indexes cannot certify content-producing Git.
 	return err != nil || indexNamesProtected(data, home)
 }
 
@@ -211,33 +213,4 @@ func indexNamesProtected(data []byte, home string) bool {
 		pos += int(size)
 	}
 	return protected
-}
-
-// repositoryAlias reads only bounded, regular Git config metadata. Git aliases
-// may execute shell code or expand to other subcommands; never run Git to look
-// them up, since even config lookup may load untrusted configuration.
-func repositoryAlias(dir, name string) (string, bool) {
-	if dir == "" || strings.ContainsAny(name, "\r\n\x00") {
-		return "", false
-	}
-	data, err := boundedMetadata(filepath.Join(dir, "config"), 64<<10)
-	if err != nil {
-		return "", false
-	}
-	section := ""
-	for _, raw := range strings.Split(string(data), "\n") {
-		line := strings.TrimSpace(raw)
-		if strings.HasPrefix(line, "[") {
-			section = strings.ToLower(line)
-			continue
-		}
-		if section != "[alias]" || line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if ok && strings.EqualFold(strings.TrimSpace(key), name) {
-			return strings.TrimSpace(value), true
-		}
-	}
-	return "", false
 }

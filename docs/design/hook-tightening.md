@@ -146,3 +146,25 @@ metadata without invoking Git. Go and Bash inspect bounded sed script files,
 including safe symlinks; unsafe and unreadable scripts deny.
 The generated divergence inventory now contains only reviewed find shims,
 indeterminate-input tightening and four audit envelopes.
+
+## Fourth audit: Git config and object reachability
+
+Go now reads bounded Git config metadata from system, XDG, global, local,
+worktree and included sources in precedence order. The parser decodes Git
+value quoting, escapes and continuations. It reclassifies alias chains up to
+four expansions, denies shell aliases and malformed or oversized config, and
+never executes Git or opens objects. Each config file is capped at 64 KiB,
+all config reads at 512 KiB and 64 files, and include depth at eight. All
+conditional include targets are inspected conservatively, including inactive
+ones; this can deny an alias overridden by an inactive include. Unknown
+subcommands still follow the content/index policy when no alias is present.
+
+Inline `-c`, `--config-env` and numbered Git config use the inert-key allowlist;
+other values enter shell analysis, while URL rewrites and ext transport
+configuration deny as indeterminate. Content-producing Git also denies for a
+bare repository, a missing or unreadable index, or object-directory and
+namespace environment overrides. This closes the audit's alias, quoted-alias,
+transport, bare-history and alternate-object examples. Inherited editor and
+pager values are no longer interpreted as agent-supplied shell text; command
+assignments are still checked. The synthetic Go tables exercise both hook
+analysis entry points without using repository object data.

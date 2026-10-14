@@ -15,6 +15,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+export HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/xdg" GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$HOME" "$XDG_CONFIG_HOME/git"
 PASSED=0 FAILED=0
 
 VERBOSE=0
@@ -1342,15 +1344,58 @@ if command -v git >/dev/null 2>&1; then
     git -C "$TMP/history" config alias.short 'log --oneline'
     secrets git_repo_alias_shell deny Bash "git -C '$TMP/ignored-index' unmodelled"
     secrets git_repo_alias_safe allow Bash "git -C '$TMP/history' short"
+    git -C "$TMP/ignored-index" config alias.chain unmodelled
+    git -C "$TMP/ignored-index" config alias.quoted '"!cat .env"'
+    secrets audit4_alias_chain deny Bash "git -C '$TMP/ignored-index' chain"
+    secrets audit4_alias_quoted deny Bash "git -C '$TMP/ignored-index' quoted"
+    printf '%s\n' '[alias]' 'global = !cat .env' >"$HOME/.gitconfig"
+    printf '%s\n' '[alias]' 'xdg = !cat .env' >"$XDG_CONFIG_HOME/git/config"
+    printf '%s\n' '[alias]' 'included = !cat .env' >"$TMP/included-gitconfig"
+    git -C "$TMP/ignored-index" config include.path "$TMP/included-gitconfig"
+    secrets audit4_alias_global deny Bash "git -C '$TMP/ignored-index' global"
+    secrets audit4_alias_xdg deny Bash "git -C '$TMP/ignored-index' xdg"
+    secrets audit4_alias_include deny Bash "git -C '$TMP/ignored-index' included"
+    printf '%s\n' 'safe = log --oneline' >>"$HOME/.gitconfig"
+    secrets audit4_alias_global_safe allow Bash "git -C '$TMP/ignored-index' safe"
+    printf '%s\n' '[alias]' 'system = !cat .env' >"$TMP/system-gitconfig"
+    GIT_CONFIG_NOSYSTEM='' GIT_CONFIG_SYSTEM="$TMP/system-gitconfig" secrets audit4_alias_system deny Bash "git -C '$TMP/ignored-index' system"
+    printf '%s\n' 'systemsafe = log --oneline' >>"$TMP/system-gitconfig"
+    GIT_CONFIG_NOSYSTEM='' GIT_CONFIG_SYSTEM="$TMP/system-gitconfig" secrets audit4_alias_system_safe allow Bash "git -C '$TMP/ignored-index' systemsafe"
+    secrets audit4_config_env_safe allow Bash "COLOR=auto git -C '$TMP/ignored-index' --config-env=color.ui=COLOR status"
+    for key in remote.x.uploadpack url.ext::sh.insteadof core.gitproxy protocol.ext.allow; do
+        secrets "audit4_config_${key%%.*}" deny Bash "git -C '$TMP/ignored-index' -c '$key=always' log -p"
+    done
+    for name in EDITOR PAGER GIT_PAGER; do
+        if [[ "$name" == EDITOR ]]; then value='code -w'; else value='less -FRX'; fi
+        export "$name=$value"
+        secrets "audit4_inherited_${name}" allow Bash "git -C '$TMP/ignored-index' log --oneline"
+        unset "$name"
+    done
+    secrets audit4_inline_pager allow Bash "GIT_PAGER='less -FRX' git -C '$TMP/ignored-index' log --oneline"
+    secrets audit4_inline_editor allow Bash "EDITOR='code -w' git -C '$TMP/ignored-index' status"
+    secrets audit4_injected_reader deny Bash "GIT_PAGER='cat .env' git -C '$TMP/ignored-index' log --oneline"
+    mkdir -p "$TMP/no-index"
+    git -C "$TMP/no-index" init -q
+    printf '%s\n' 'safe' >"$TMP/no-index/safe.txt"
+    git -C "$TMP/no-index" add safe.txt
+    git -C "$TMP/no-index" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm initial
+    mv "$TMP/no-index/.git/index" "$TMP/no-index/index-backup"
+    secrets audit4_no_index deny Bash "git -C '$TMP/no-index' log -p"
+    git -C "$TMP/no-index" clone -q --bare . "$TMP/bare.git"
+    secrets audit4_bare_repo deny Bash "git -C '$TMP/bare.git' log -p"
+    for name in GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_NAMESPACE; do
+        secrets "audit4_object_${name}" deny Bash "$name='$TMP/history/.git/objects' git -C '$TMP/ignored-index' log -p"
+    done
+    GIT_OBJECT_DIRECTORY="$TMP/history/.git/objects" secrets audit4_inherited_objects deny Bash "git -C '$TMP/ignored-index' log -p"
     secrets git_relocated_dir deny Bash "git -C '$TMP/ignored-index' --git-dir '$TMP/history/.git' --work-tree '$TMP/history' log -p"
     secrets git_relocated_env deny Bash "cd '$TMP/ignored-index'; GIT_DIR='$TMP/history/.git' GIT_WORK_TREE='$TMP/history' git log -p"
-    GIT_EXTERNAL_DIFF='paste sub/link' secrets git_inherited_diff deny Bash "git -C '$TMP/ignored-index' log -p"
+    GIT_EXTERNAL_DIFF='paste sub/link' secrets git_inherited_diff allow Bash "git -C '$TMP/ignored-index' log -p"
     GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=CORE.EDITOR GIT_CONFIG_VALUE_0='paste sub/link' \
         secrets git_inherited_config deny Bash "git -C '$TMP/ignored-index' log -p"
     secrets git_inline_diff allow Bash "cd '$TMP/ignored-index'; GIT_EXTERNAL_DIFF='paste sub/link' git log -p"
     secrets git_blame_contents_alias deny Bash "git -C '$TMP/ignored-index' blame --contents='$TMP/search/sub/link' src/code.txt"
     case_index=0
-    for cmd in 'status' 'log --oneline' 'diff --stat' 'add src/code.txt' 'commit -m synthetic' 'log -p'; do
+    for cmd in 'status' 'log --oneline' 'diff --stat' 'add src/code.txt' 'commit -m synthetic' 'push' 'pull' 'log -p'; do
         secrets "git_ignored_safe_$case_index" allow Bash "git -C '$TMP/ignored-index' $cmd"
         case_index=$((case_index + 1))
     done
@@ -1397,6 +1442,11 @@ done
 secrets policy_v2_tar_checkpoint_reader deny Bash 'tar --checkpoint-action=exec="paste sub/link" -cf safe.tar src'
 secrets policy_v2_tar_compressor_reader deny Bash 'tar --use-compress-program="paste sub/link" -cf safe.tar src'
 secrets policy_v2_tar_short_reader deny Bash 'tar -I "paste sub/link" -cf safe.tar src'
+secrets audit4_find_second_exec deny Bash "find . -type f -exec true ';' -exec paste '{}' '+'"
+secrets audit4_sed_attached deny Bash 'sed -n 1rsub/link src/a.ts'
+secrets audit4_sed_block deny Bash "$(printf 'sed -n '\''1{\n r sub/link\n}'\'' src/a.ts')"
+secrets audit4_cdable_variable deny Bash 'shopt -s cdable_vars; s=sub; cd s; paste link'
+secrets audit4_busybox_tar deny Bash 'busybox tar -xOf safe.tar src/a.ts'
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

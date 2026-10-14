@@ -26,6 +26,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Shipped Bash guard closes multi-exec find, attached and multiline sed reads, cdable-variable directory changes, and BusyBox tar stdout extraction. Git alias resolution follows Git configuration and bounded chains, inline transport configuration and indeterminate object sources deny content reads, while inherited editor and pager settings no longer block ordinary Git commands.
 - Shipped Bash guard now emits a denial for malformed nonempty requests and analysis errors, gates content-producing Git calls on bounded tracked index names, checks command-running options and inherited editor settings, and tightens find, xargs, archive, directory stack, proc/dev, jq, sed and awk inputs. Ignored untracked files do not block safe Git history forms.
 - Ripgrep configuration certification now resolves only its own config path instead of running a platform-dependent directory scan on a single file.
 - Shipped Bash guard now denies control bytes, bounded Git history and archive reads, unsafe shell hook variables, interpreter environment and literal script readers, indented Codex patch paths, and audited reader-option, cd, find and glob bypasses.
