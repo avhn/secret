@@ -33,6 +33,10 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   Inline Git configuration accepts only inert keys, and sed scripts use a
   conservative safe-command allowlist. Ordinary writes to `.git`, `.gitmodules`
   and user Git configuration deny to prevent planted repository commands.
+  The Bash hook also checks nested commands under unmodelled wrappers and
+  coprocesses, refuses unverified shell stdin, and resolves write targets
+  through ancestor worktree gitfiles and home configuration paths. The
+  Claude Code matcher includes MultiEdit and NotebookEdit file paths.
   Protected paths are matched after brace and `$IFS` expansion and through
   symlink aliases; unknown commands may not take a protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,
@@ -77,7 +81,8 @@ documentation or hardening suggestions, but they are not vulnerabilities:
 - **Executable substitution.** The guard trusts command names. A different
   program named `secret`, `cat` or `jq` earlier on PATH is not detected.
 - **Tools the guard does not see.** The hook covers Claude Code's Bash, Read,
-  Grep, Edit and Write tools, and Codex's Bash shell hook and `apply_patch`.
+  Grep, Edit, Write, MultiEdit and NotebookEdit tools, and Codex's Bash shell
+  hook and `apply_patch`.
   Hosted tools such as web search, MCP servers, other agents and other editors
   are not covered. Codex `write_stdin` input to an already running exec session
   is not re-checked by this hook. Codex's current `exec_command` hook input

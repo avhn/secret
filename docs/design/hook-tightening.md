@@ -80,6 +80,16 @@ failure tests, dialect evidence, and supported-platform CI remain separate gates
   non-protected regular files. The scanner peels `setsid` and `script -qc`,
   consumes shell option values, and rejects descriptor-based `source`. Inline `LESS*` settings
   other than inert `LESS`, and append assignments to sensitive names, deny.
+- P17 checks known-command suffixes and shell-like arguments of unmodelled wrappers,
+  recognizes versioned shell names and option clusters around `-c`, and analyzes
+  fish initialization and coprocess bodies. Scriptless shells and sudo login or
+  shell mode without a command deny. Git commit messages remain operands, not
+  shell text, because Git is explicitly modelled.
+- P15 rejects non-read-only commands that touch Git configuration paths,
+  including directory options and in-place sed or perl abbreviations. Write
+  targets with unknown variables or globs, and relative targets after ambiguous
+  directory changes, deny. Literal assignments and HOME or XDG home paths are
+  resolved before deciding. P1e denies `git submodule foreach` outright.
 - Git helper names classify only when dispatched by bare name or from a
   `git-core` directory; protected operands deny even for those helpers. Git
   content commands deny for `.gitmodules` or submodule expansion. Command names

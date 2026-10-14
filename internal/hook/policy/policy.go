@@ -214,12 +214,12 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			a.walkWord(r.Word, depth, cwd)
 			a.walkWord(r.Hdoc, depth, cwd)
 			op := r.Op.String()
-			if strings.HasPrefix(op, ">") || op == "<>" || op == "&>" || op == ">&" {
+			if strings.Contains(op, ">") || op == "<>" {
 				if r.Word == nil || len(r.Word.Parts) == 0 {
 					a.reason = roles.Indeterminate
 				} else if targets, ok := a.expandWord(r.Word, cwd); !ok || len(targets) != 1 {
 					a.reason = roles.Indeterminate
-				} else if a.writeProtected(targets[0], cwd) {
+				} else if a.writeProtected(targets[0], cwd) || a.uncertainWriteWord(r.Word, cwd) {
 					a.reason = roles.FileInput
 				}
 			}
@@ -346,6 +346,10 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			name := strings.ToLower(path.Base(words[0]))
 			args := words[1:]
+			if writePatternCommand(name, cmd.Args) {
+				a.reason = roles.Indeterminate
+				break
+			}
 			if shellPathOptions(name, args) {
 				cwd = ""
 				a.cdpath = true
@@ -564,7 +568,18 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 		case *syntax.CoprocClause:
 			a.walkWord(cmd.Name, depth, cwd)
-			a.stmts([]*syntax.Stmt{cmd.Stmt}, depth, cwd)
+			if cmd.Stmt == nil {
+				a.reason = roles.Indeterminate
+			} else {
+				// In `coproc sh < file`, the parser stores sh as Name and
+				// leaves the redirected statement without a command.
+				if cmd.Name != nil && cmd.Stmt.Cmd == nil && shellName(literal(cmd.Name)) {
+					a.command([]string{literal(cmd.Name)}, depth+1, cwd, false)
+				}
+				if a.reason == "" {
+					a.stmts([]*syntax.Stmt{cmd.Stmt}, depth, cwd)
+				}
+			}
 		case *syntax.LetClause, *syntax.ArithmCmd:
 			a.walkNode(cmd, depth, cwd)
 			a.uncertain = true
@@ -766,7 +781,8 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = roles.Indeterminate
 		return
 	}
-	if name == "hush" || name == "msh" {
+	dialect := name
+	if shellName(name) {
 		name = "sh"
 	}
 	if strings.HasPrefix(name, "git-") && strings.Contains(words[0], "/") && !strings.Contains(words[0], "/git-core/") {
@@ -803,6 +819,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.command(args, depth+1, cwd, direct)
 		return
 	}
+	if name == "su" && !strings.Contains(" "+strings.Join(args, " ")+" ", " -c ") && !strings.Contains(" "+strings.Join(args, " ")+" ", " --command ") {
+		a.reason = roles.Indeterminate
+		return
+	}
 	if a.indirect && indirectConsumer(name) {
 		a.reason = roles.Indeterminate
 		return
@@ -810,6 +830,21 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "git" {
 		a.gitCommand(args, depth, cwd, direct)
 		return
+	}
+	if a.configArgument(name, args, cwd) {
+		return
+	}
+	if name == "patch" {
+		output := false
+		for i, arg := range args {
+			if (arg == "-o" || arg == "--output") && i+1 < len(args) || strings.HasPrefix(arg, "-o") && len(arg) > 2 || strings.HasPrefix(arg, "--output=") && len(arg) > len("--output=") {
+				output = true
+			}
+		}
+		if !output {
+			a.reason = roles.Indeterminate
+			return
+		}
 	}
 	if optionIn("tar bsdtar unzip cpio 7z 7za", name) {
 		a.archiveCommand(name, args, depth, cwd)
@@ -827,7 +862,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		if a.reason == "" && name == "xargs" && !xargsHasArgFile(args) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
+		if a.reason == "" && name == "xargs" && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
 		if name == "sudo" && dir != cwd && !shell {
@@ -962,80 +997,14 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		return
-	case "bash", "sh", "zsh", "ksh", "ksh93", "mksh", "dash", "ash", "yash", "posh", "fish", "csh", "tcsh", "eval":
-		if shellStdinWords(append([]string{name}, args...)) {
-			a.reason = roles.Indeterminate
-			return
-		}
-		if a.cdpath && name != "eval" {
-			cwd = ""
-		}
+	case "sh", "eval":
 		if name == "eval" {
 			a.indirect = true
-			if len(args) > 0 {
-				a.fragmentAt(strings.Join(args, " "), depth+1, cwd)
-			}
+			a.shellValue(strings.Join(args, " "), depth, cwd)
 			return
 		}
-		for i := 0; i < len(args); i++ {
-			v := args[i]
-			if v == "--rcfile" || v == "--init-file" {
-				if i+1 >= len(args) || !a.certifiableShellFile(args[i+1], cwd) {
-					a.reason = roles.FileInput
-					return
-				}
-				i++
-				continue
-			}
-			if name == "fish" && (v == "-C" || v == "--init-command") {
-				if i+1 >= len(args) {
-					a.reason = roles.Indeterminate
-					return
-				}
-				a.shellValue(args[i+1], depth, cwd)
-				if a.reason != "" {
-					return
-				}
-				i++
-				continue
-			}
-			if name == "bash" && (v == "-O" || v == "+O") {
-				if i+1 >= len(args) {
-					a.reason = roles.Indeterminate
-					return
-				}
-				if shellPathOption(args[i+1]) {
-					cwd = ""
-				}
-				i++
-				continue
-			}
-			if v == "-O" || v == "+O" || v == "-o" || v == "+o" {
-				i++
-				continue
-			}
-			if v == "-c" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v[1:], "c") {
-				if i+1 >= len(args) {
-					a.reason = roles.Indeterminate
-					return
-				}
-				a.shellValue(args[i+1], depth, cwd)
-				return
-			}
-			if v == "--" {
-				i++
-				if i < len(args) && !a.certifiableShellFile(args[i], cwd) {
-					a.reason = roles.Indeterminate
-				}
-				return
-			}
-			if v != "-" && !strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "+") {
-				if !a.certifiableShellFile(v, cwd) {
-					a.reason = roles.Indeterminate
-				}
-				return
-			}
-		}
+		a.shellCommand(dialect, args, depth, cwd)
+		return
 	case "env", "command", "builtin":
 		if name == "env" {
 			// Split-string supplies child words, not an environment dump.
@@ -1150,6 +1119,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		return
+	}
+	if !modelledCommand(name) && roles.PrinterReason(name, args, false) == "" {
+		a.unknownExecution(args, depth, cwd)
+		if a.reason != "" {
+			return
+		}
 	}
 	if name == "rg" {
 		// Nested wrappers cannot inherit the hook's rg config certification.
@@ -1323,8 +1298,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 						a.uncertain = true
 						return nil, false
 					}
-					if x.Param.Value == "HOME" && a.home != "" {
-						piece += a.home
+					if value, ok := a.staticVariable(x.Param.Value); ok {
+						piece += value
 					} else {
 						a.uncertain = true
 						return nil, false
@@ -1339,8 +1314,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			if n.Param.Value == "HOME" && a.home != "" {
-				piece = a.home
+			if value, ok := a.staticVariable(n.Param.Value); ok {
+				piece = value
 			} else {
 				a.uncertain = true
 				return nil, false

@@ -145,31 +145,11 @@ func shellStdinWords(words []string) bool {
 		name = strings.ToLower(path.Base(args[0]))
 		args = args[1:]
 	}
-	if !optionIn("bash sh zsh ksh ksh93 mksh dash ash hush msh yash posh fish csh tcsh", name) {
+	if !shellName(name) {
 		return false
 	}
-	stdin := false
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "-s" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "s") {
-			stdin = true
-		}
-		if arg == "-c" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "c") {
-			return false
-		}
-		if arg == "-O" || arg == "+O" || arg == "-o" || arg == "+o" || arg == "--rcfile" || arg == "--init-file" || arg == "-C" || arg == "--init-command" {
-			i++
-			continue
-		}
-		if arg == "-s" || arg == "--" || arg == "-" {
-			continue
-		}
-		if strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "+") {
-			continue
-		}
-		return stdin // After -s, remaining words are positional parameters.
-	}
-	return true
+	return shellScriptIndex(name, args) == -1
+
 }
 
 // certifiableShellFile excludes descriptor aliases, unreadable files and
