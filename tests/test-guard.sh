@@ -1336,14 +1336,14 @@ if command -v git >/dev/null 2>&1; then
     printf '%s\n' 'safe' >"$TMP/ignored-index/src/code.txt"
     git -C "$TMP/ignored-index" add .gitignore src/code.txt
     git -C "$TMP/ignored-index" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm initial
-    secrets git_literal_alias allow Bash "git -C '$TMP/history' -c AliAS.x=log x"
-    secrets git_literal_alias_options allow Bash "git -C '$TMP/history' -c 'alias.x=log --oneline' x"
+    secrets git_literal_alias deny Bash "git -C '$TMP/history' -c AliAS.x=log x"
+    secrets git_literal_alias_options deny Bash "git -C '$TMP/history' -c 'alias.x=log --oneline' x"
     secrets git_include_config deny Bash "git -C '$TMP/ignored-index' -c InClUdE.path=safe.cfg status"
     secrets git_hookspath_config deny Bash "git -C '$TMP/ignored-index' -c CORE.HOOKSPATH=hooks commit -m synthetic"
     git -C "$TMP/ignored-index" config alias.unmodelled '!cat .env'
     git -C "$TMP/history" config alias.short 'log --oneline'
     secrets git_repo_alias_shell deny Bash "git -C '$TMP/ignored-index' unmodelled"
-    secrets git_repo_alias_safe allow Bash "git -C '$TMP/history' short"
+    secrets git_repo_alias_safe deny Bash "git -C '$TMP/history' short"
     git -C "$TMP/ignored-index" config alias.chain unmodelled
     git -C "$TMP/ignored-index" config alias.quoted '"!cat .env"'
     secrets audit4_alias_chain deny Bash "git -C '$TMP/ignored-index' chain"
@@ -1356,11 +1356,11 @@ if command -v git >/dev/null 2>&1; then
     secrets audit4_alias_xdg deny Bash "git -C '$TMP/ignored-index' xdg"
     secrets audit4_alias_include deny Bash "git -C '$TMP/ignored-index' included"
     printf '%s\n' 'safe = log --oneline' >>"$HOME/.gitconfig"
-    secrets audit4_alias_global_safe allow Bash "git -C '$TMP/ignored-index' safe"
+    secrets audit4_alias_global_safe deny Bash "git -C '$TMP/ignored-index' safe"
     printf '%s\n' '[alias]' 'system = !cat .env' >"$TMP/system-gitconfig"
     GIT_CONFIG_NOSYSTEM='' GIT_CONFIG_SYSTEM="$TMP/system-gitconfig" secrets audit4_alias_system deny Bash "git -C '$TMP/ignored-index' system"
     printf '%s\n' 'systemsafe = log --oneline' >>"$TMP/system-gitconfig"
-    GIT_CONFIG_NOSYSTEM='' GIT_CONFIG_SYSTEM="$TMP/system-gitconfig" secrets audit4_alias_system_safe allow Bash "git -C '$TMP/ignored-index' systemsafe"
+    GIT_CONFIG_NOSYSTEM='' GIT_CONFIG_SYSTEM="$TMP/system-gitconfig" secrets audit4_alias_system_safe deny Bash "git -C '$TMP/ignored-index' systemsafe"
     secrets audit4_config_env_safe allow Bash "COLOR=auto git -C '$TMP/ignored-index' --config-env=color.ui=COLOR status"
     for key in remote.x.uploadpack url.ext::sh.insteadof core.gitproxy protocol.ext.allow; do
         secrets "audit4_config_${key%%.*}" deny Bash "git -C '$TMP/ignored-index' -c '$key=always' log -p"
@@ -1447,6 +1447,44 @@ secrets audit4_sed_attached deny Bash 'sed -n 1rsub/link src/a.ts'
 secrets audit4_sed_block deny Bash "$(printf 'sed -n '\''1{\n r sub/link\n}'\'' src/a.ts')"
 secrets audit4_cdable_variable deny Bash 'shopt -s cdable_vars; s=sub; cd s; paste link'
 secrets audit4_busybox_tar deny Bash 'busybox tar -xOf safe.tar src/a.ts'
+# Fifth audit and policy addendum: built-ins only, shell applets, sed grammar,
+# quoted option names, and indirect environment assignments.
+secrets audit5_git_unknown deny Bash 'git ZZ'
+secrets audit5_git_alias_inline deny Bash 'git -c alias.xx=log status'
+secrets audit5_git_builtin_safe allow Bash 'git status'
+secrets audit5_git_case deny Bash 'git STATUS'
+mkdir -p "$TMP/audit5-alias-home"
+printf '%s\n' '[alias]' 'z = !paste sub/link' >"$TMP/audit5-alias-home/.gitconfig"
+printf '%s\n' '[alias]' 'z = !paste sub/link' >"$TMP/audit5-global-gitconfig"
+secrets audit5_home_alias deny Bash "HOME='$TMP/audit5-alias-home' git z"
+secrets audit5_global_alias deny Bash "GIT_CONFIG_GLOBAL='$TMP/audit5-global-gitconfig' git z"
+for cmd in "HOME='$TMP/home' git unknown" "GIT_CONFIG_GLOBAL='$TMP/system-gitconfig' git systemsafe"; do
+    secrets audit5_git_config_redirect deny Bash "$cmd"
+done
+for cmd in "busybox ash -c 'paste sub/link'" "busybox sh -c 'paste sub/link'" "toybox sh -c 'paste sub/link'" "env busybox ash -c 'paste sub/link'" "dash -c 'paste sub/link'" "ash -c 'paste sub/link'" "yash -c 'paste sub/link'" "posh -c 'paste sub/link'" "mksh -c 'paste sub/link'"; do
+    secrets audit5_shell_reader deny Bash "$cmd"
+done
+secrets audit5_busybox_applet deny Bash 'busybox paste sub/link'
+secrets audit5_toybox_applet deny Bash 'toybox paste sub/link'
+secrets audit5_shell_missing_code deny Bash 'dash -c'
+secrets audit5_multicall_missing_code deny Bash 'busybox ash -c'
+for cmd in "sed -n '/x/Irsub/link' src/a.ts" "sed -n '/x/Mrsub/link' src/a.ts" "sed -n '\\%x%Irsub/link' src/a.ts" "sed -n 's%x%x%w sub/link' src/a.ts" "sed -n 's%x%paste sub/link%e' src/a.ts" "sed -n '1,2!{r sub/link; p}' src/a.ts" "sed -n '1e paste sub/link' src/a.ts" "sed -n 's/unterminated' src/a.ts"; do
+    secrets audit5_sed_grammar deny Bash "$cmd"
+done
+secrets audit5_sed_safe allow Bash "sed -n '1,2{s/x/y/g; p}' src/a.ts"
+secrets audit5_sed_custom_safe allow Bash "sed -n '\\%x%Ip' src/a.ts"
+secrets audit5_sed_unclosed_block deny Bash "sed -n '1{p' src/a.ts"
+secrets audit5_sed_stray_block deny Bash "sed -n '1p}' src/a.ts"
+secrets audit5_indirect_nonsensitive allow Bash 'printf -v ORDINARY x; git status'
+secrets audit5_nameref_nonsensitive allow Bash 'declare -n ref=ORDINARY; git status'
+# shellcheck disable=SC2016  # dynamic name is literal command text for the guard
+secrets audit5_indirect_dynamic deny Bash 'read -r "$name" < src/a.ts; git status'
+for cmd in "bash -O cdable_vars -c 's=sub; cd s; paste link'" "bash -O cdable_\"\"vars -c 's=sub; cd s; paste link'" "bash +O extglob -c 'paste sub/link'" "shopt -s cdable_\"\"vars; s=sub; cd s; paste link" "shopt -s cdable_'vars'; s=sub; cd s; paste link" "set -o autocd; s=sub; cd s; paste link"; do
+    secrets audit5_shell_options deny Bash "$cmd"
+done
+for cmd in "printf -v GIT_EDITOR 'paste sub/link'; git commit --amend --allow-empty" "declare -n ref=GIT_EDITOR; ref='paste sub/link'; git commit --amend --allow-empty" "typeset -n ref=GIT_EDITOR; git status" "local -n ref=GIT_EDITOR; git status" "read -r GIT_EDITOR < src/a.ts; git status" "mapfile -t GIT_PAGER < src/a.ts; git log" "eval 'GIT_EDITOR=foo'; git status" "printf -v \"\$name\" x; git status" "export \"\$name\"; git status"; do
+    secrets audit5_indirect_env deny Bash "$cmd"
+done
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
