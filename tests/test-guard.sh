@@ -1552,5 +1552,119 @@ secrets audit6_sed_insert_line allow Bash "sed -n 'i; e paste sub/link' src/a.ts
 secrets audit6_sed_change_line allow Bash "sed -n 'c; e paste sub/link' src/a.ts"
 secrets audit6_sed_stray_brace deny Bash "sed -n '}p' src/a.ts"
 
+if command -v git >/dev/null 2>&1; then
+    # Repository configuration must never execute inside the hook.
+    mkdir -p "$TMP/hostile-git"
+    git -C "$TMP/hostile-git" init -q
+    printf 'plain\n' >"$TMP/hostile-git/ordinary.txt"
+    git -C "$TMP/hostile-git" add ordinary.txt
+    cat >"$TMP/hostile-git/watch-basic" <<'WATCH'
+#!/bin/sh
+printf 'ran\n' >"$(dirname "$0")/marker"
+WATCH
+    cat >"$TMP/hostile-git/watch-kill" <<'WATCH'
+#!/bin/sh
+printf 'ran\n' >"$(dirname "$0")/marker"
+group=$(ps -o pgid= -p "$PPID" | tr -d ' ')
+kill -KILL -- "-$group"
+WATCH
+    chmod +x "$TMP/hostile-git/watch-basic" "$TMP/hostile-git/watch-kill"
+    git -C "$TMP/hostile-git" config core.fsmonitor "$TMP/hostile-git/watch-basic"
+    secrets git_fsmonitor_no_exec allow Bash "git -C '$TMP/hostile-git' diff --cached"
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\tgit_fsmonitor_no_marker\tassert\t0\n' >>"$SECRET_TEST_INVENTORY"
+    if [[ ! -e "$TMP/hostile-git/marker" ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_fsmonitor_no_marker\tpass\n' >>"$SECRET_TEST_RESULTS"
+    else
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_fsmonitor_no_marker\tfail\n' >>"$SECRET_TEST_RESULTS"
+        printf 'FAIL git_fsmonitor_no_marker: Git executed fsmonitor\n'
+        FAILED=$((FAILED + 1))
+    fi
+    # Kill-on-execution variant: even a hostile helper must not suppress a decision.
+    # The same forbidden callback must remain uninvoked.
+    git -C "$TMP/hostile-git" config core.fsmonitor "$TMP/hostile-git/watch-kill"
+    secrets git_fsmonitor_signal allow Bash "git -C '$TMP/hostile-git' log -p"
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\tgit_fsmonitor_signal_marker\tassert\t0\n' >>"$SECRET_TEST_INVENTORY"
+    if [[ ! -e "$TMP/hostile-git/marker" ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_fsmonitor_signal_marker\tpass\n' >>"$SECRET_TEST_RESULTS"
+    else
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_fsmonitor_signal_marker\tfail\n' >>"$SECRET_TEST_RESULTS"
+        printf 'FAIL git_fsmonitor_signal_marker: Git executed fsmonitor\n'
+        FAILED=$((FAILED + 1))
+    fi
+    mkdir -p "$TMP/alternate-index"
+    git -C "$TMP/alternate-index" init -q
+    printf 'app.env\n' >"$TMP/alternate-index/.gitignore"
+    printf 'TOKEN=synthetic\n' >"$TMP/alternate-index/app.env"
+    printf 'plain\n' >"$TMP/alternate-index/plain.txt"
+    git -C "$TMP/alternate-index" add .gitignore plain.txt
+    git -C "$TMP/alternate-index" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm initial
+    GIT_INDEX_FILE="$TMP/alternate-index/alt.idx" git -C "$TMP/alternate-index" add -f app.env
+    secrets git_alternate_index_add deny Bash "GIT_INDEX_FILE='$TMP/alternate-index/alt.idx' git -C '$TMP/alternate-index' add -f ."
+    secrets git_alternate_index_diff deny Bash "GIT_INDEX_FILE='$TMP/alternate-index/alt.idx' git -C '$TMP/alternate-index' diff --cached"
+    for assignment in "GIT_DIR=.git" "GIT_WORK_TREE=." "GIT_COMMON_DIR=.git" \
+        "GIT_OBJECT_DIRECTORY=.git/objects" "GIT_ALTERNATE_OBJECT_DIRECTORIES=elsewhere" "GIT_NAMESPACE=synthetic"; do
+        secrets git_command_repo_override deny Bash "$assignment git -C '$TMP/alternate-index' log -p"
+    done
+    secrets git_index_env deny Bash "env GIT_INDEX_FILE='$TMP/alternate-index/alt.idx' git -C '$TMP/alternate-index' diff --cached"
+    secrets git_index_export deny Bash "export GIT_INDEX_FILE='$TMP/alternate-index/alt.idx'; git -C '$TMP/alternate-index' log -p"
+    secrets git_index_declare deny Bash "declare GIT_INDEX_FILE='$TMP/alternate-index/alt.idx'; git -C '$TMP/alternate-index' log -p"
+    secrets git_index_indirect deny Bash "printf -v GIT_INDEX_FILE %s x; git -C '$TMP/alternate-index' log -p"
+    secrets git_config_fsmonitor_write deny Bash "git -C '$TMP/alternate-index' config core.fsmonitor '$TMP/hostile-git/watch-kill'"
+    secrets git_config_editor_write deny Bash "git -C '$TMP/alternate-index' config core.editor sh"
+    secrets git_config_inert_write deny Bash "git -C '$TMP/alternate-index' config user.name synthetic"
+    secrets git_config_get_allow allow Bash "git -C '$TMP/alternate-index' config --get user.name"
+    secrets git_config_get_credential deny Bash "git -C '$TMP/alternate-index' config --get credential.helper"
+    secrets git_dashed_log deny Bash "git-log -p"
+    secrets git_dashed_show deny Bash "/usr/lib/git-core/git-show"
+    secrets git_dashed_unknown deny Bash "git-not-a-builtin"
+    for value in 'vim -c q' 'vim -S script' 'emacs --eval nil' 'code --extensionDevelopmentPath ext' 'hx --config x' 'less -k keys' 'less -R -X' 'more +1' 'delta --config x'; do
+        secrets git_editor_option_deny deny Bash "EDITOR='$value' git -C '$TMP/alternate-index' log -p"
+    done
+    secrets git_editor_option_allow allow Bash "EDITOR='code -w' git -C '$TMP/alternate-index' status"
+    secrets git_pager_option_allow allow Bash "GIT_PAGER='less -FRX' git -C '$TMP/alternate-index' status"
+    secrets git_editor_vim_allow allow Bash "GIT_EDITOR=vim git -C '$TMP/alternate-index' status"
+    for name in LESSOPEN LESSCLOSE LESSKEY LESSKEYIN; do
+        secrets git_less_hook deny Bash "$name=x GIT_PAGER=less git -C '$TMP/alternate-index' log -p"
+    done
+    secrets git_less_inert allow Bash "LESS=-FRX GIT_PAGER=less git -C '$TMP/alternate-index' status"
+    secrets git_less_unsafe deny Bash "LESS=-k GIT_PAGER=less git -C '$TMP/alternate-index' log -p"
+else
+    printf '%s\n' 'SKIP hostile git fixtures: git not installed'
+fi
+secrets stdin_shell_pipe deny Bash "echo 'cat app.env' | sh"
+secrets stdin_shell_printf deny Bash "printf 'cat app.env' | bash -s"
+secrets stdin_shell_herestring_safe allow Bash "sh <<<'echo ok'"
+secrets stdin_shell_herestring_deny deny Bash "sh <<<'cat app.env'"
+secrets stdin_shell_heredoc_safe allow Bash "$(printf "sh <<'DONE'\necho ok\nDONE")"
+secrets stdin_shell_heredoc_deny deny Bash "$(printf "sh <<'DONE'\ncat app.env\nDONE")"
+secrets shell_inline_npm allow Bash "bash -c 'npm test'"
+secrets globstar_bashopts deny Bash "BASHOPTS=globstar bash -c 'cat x'"
+# GNU sed flag and option clusters, checked against a real marker in TMP.
+if sed --version 2>/dev/null | head -1 | grep -q GNU; then
+    printf 'x\n' >"$TMP/sed-input"
+    for script in 's/x/y/gw marker' 's/x/y/w marker' 's/x/y/3w marker' 's/x/y/pw marker'; do
+        rm -f "$TMP/marker"
+        (cd "$TMP" && sed "$script" sed-input >/dev/null 2>&1) || true
+        if [[ ! -f "$TMP/marker" ]]; then
+            printf 'FAIL GNU sed did not write synthetic marker for %s\n' "$script"
+            FAILED=$((FAILED + 1))
+        fi
+        secrets sed_write_flag_variants deny Bash "sed '${script/marker/app.env}' ordinary.txt"
+    done
+    rm -f "$TMP/marker"
+    secrets sed_cluster_nef deny Bash "sed -nef 's/x/y/w app.env' ordinary.txt"
+    secrets sed_cluster_nfe deny Bash "sed -nfe '$TMP/hostile-git/watch' ordinary.txt"
+    secrets sed_cluster_ef deny Bash "sed -ef 's/x/y/w app.env' ordinary.txt"
+    secrets sed_cluster_fe deny Bash "sed -fe '$TMP/hostile-git/watch' ordinary.txt"
+    secrets sed_mixed_expression deny Bash "sed --expression='s/x/y/w app.env' ordinary.txt"
+    secrets sed_write_flag_semicolon deny Bash "sed 's/x/y/w app.env; p' ordinary.txt"
+    secrets sed_write_flag_newline deny Bash "sed 's/x/y/w app.env
+p' ordinary.txt"
+    secrets sed_write_block_ambiguous deny Bash "sed '1{s/x/y/w app.env}' ordinary.txt"
+    secrets sed_execute_flag deny Bash "sed 's/x/cat app.env/e' ordinary.txt"
+fi
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

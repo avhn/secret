@@ -55,6 +55,8 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   traced. Concatenated or computed script literals and `eval` are not reliably
   resolved. The guard does not infer protected inputs from an unresolved
   operand whose command text names no protected file.
+- **Shell scripts read from stdin.** The guard denies a shell given a piped or file-redirected script whose body it cannot inspect. Literal here-strings and quoted here-docs are analysed as shell text; execute a named script only when its contents are trusted.
+- **Git probe isolation.** The Bash guard runs index probes with a scrubbed Git environment, disabled fsmonitor, untracked cache and hooks, and a separate session. The guard does not execute repository Git configuration as part of its own index inspection. Git config writes and unmodelled getters are denied; custom editor and pager settings assigned inside command text accept only inert program-specific options.
 - **Custom Git aliases are denied.** The hook does not read Git configuration: aliases can execute arbitrary shell commands and configuration resolution can differ from the command environment. Only case-sensitive built-in Git subcommands are classified. Run the expanded built-in command instead of an alias.
 - **History no longer tracked.** Git content-producing commands are checked
   against a bounded `git ls-files -z` index name list, not blob contents or a
