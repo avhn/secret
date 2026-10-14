@@ -26,8 +26,8 @@ func TestInventory(t *testing.T) {
 	validStatus := regexp.MustCompile(`^[0-9]+$`)
 	seen := make(map[string]string)
 	for _, path := range files {
-		if filepath.Base(path) == "go-expected-divergence.tsv" {
-			continue // Three-column expected failures are checked by tests/check-go-divergence.py.
+		if filepath.Base(path) == "go-expected-divergence.tsv" || filepath.Base(path) == "go-hook-divergence.tsv" {
+			continue // Three-column expected failures have dedicated exact differential checkers.
 		}
 		// SUITE.darwin.tsv overrides carry the same suite name as SUITE.tsv.
 		suite := strings.TrimSuffix(strings.TrimSuffix(filepath.Base(path), ".tsv"), ".darwin")

@@ -39,6 +39,15 @@ command -v jq >/dev/null 2>&1 || {
 # secrets NAME DECISION TOOL VALUE: run guard-secrets on a TOOL call whose
 # command (Bash), file_path (Read/Edit/Write), or path (Grep) is VALUE.
 SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
+# Alternate commands are split as arguments, never evaluated as shell source.
+read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$SECRETS_GUARD}"
+invoke_guard() {
+    if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
+        "$BASH" "$SECRETS_GUARD"
+    else
+        "${GUARD_ARGS[@]}"
+    fi
+}
 # Existing plain-rg cases model the installed defaults, independent of CI env.
 export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 mkdir -p "$TMP/descendant-only/sub" "$TMP/search/sub" "$TMP/search/web" "$TMP/empty-search" "$TMP/search/src"
@@ -59,13 +68,30 @@ printf '%s\n' 'KEY=synthetic-private' >"$TMP/upper-private/.Secrets/file.txt"
 printf '%s\n' 'TOKEN=template-only' >"$TMP/template-search/.ENV.EXAMPLE"
 secrets() {
     local name="$1" want="$2" tool="$3" value="$4" extra="${5:-}" got
+    local guard_cmd=("${GUARD_ARGS[@]}")
+    if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
+        guard_cmd=("$BASH" "$SECRETS_GUARD")
+    fi
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\t%s\n' guard "$name" "$want" >>"$SECRET_TEST_INVENTORY"
+    if [[ -n "${SECRET_TEST_CATEGORIES:-}" ]]; then
+        local category=pending-M2-paths
+        [[ "$tool" != Bash ]] || category=pending-M2-ast
+        [[ "$tool" != Grep ]] || category=pending-M2-search
+        printf 'guard\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
+    fi
     [[ -n "$extra" ]] || extra='{}'
     got="$(jq -cn --arg t "$tool" --arg v "$value" --arg w "$TMP/search" --argjson extra "$extra" \
         '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
-        perl -e 'alarm 5; exec @ARGV' "$BASH" "$SECRETS_GUARD" 2>"$TMP/$name.err" |
+        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" 2>"$TMP/$name.err" |
         jq -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null)" || got="crash"
     got="${got:-allow}"
+    if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
+        if [[ "$got" == "$want" ]]; then
+            printf 'guard\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
+        else
+            printf 'guard\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
+        fi
+    fi
     if [[ "$got" == "$want" ]]; then
         PASSED=$((PASSED + 1))
         ((VERBOSE)) && printf 'ok    %-22s %s\n' "$name" "$got"
@@ -964,7 +990,19 @@ SECRETS_GUARD="$TMP/missing-jq-guard"
 secrets grep_missing_jq deny Grep "$TMP/empty-search" '{"output_mode":"content"}'
 secrets rg_missing_jq deny Bash 'rg TOKEN src'
 SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
-FAILURE_OUTPUT="$(printf '%s' '{"tool_name":"Grep","cwd":"src\u0000/../.env","tool_input":{"output_mode":"content"}}' | "$BASH" "$SECRETS_GUARD")"
+# Direct assertions also participate in the exact per-case differential record.
+DIRECT_FAILED=$FAILED
+record_direct() {
+    if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
+        if [[ "$FAILED" == "$DIRECT_FAILED" ]]; then
+            printf 'guard\t%s\tpass\n' "$1" >>"$SECRET_TEST_RESULTS"
+        else
+            printf 'guard\t%s\tfail\n' "$1" >>"$SECRET_TEST_RESULTS"
+        fi
+    fi
+    DIRECT_FAILED=$FAILED
+}
+FAILURE_OUTPUT="$(printf '%s' '{"tool_name":"Grep","cwd":"src\u0000/../.env","tool_input":{"output_mode":"content"}}' | invoke_guard)"
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard nul_cwd >>"$SECRET_TEST_INVENTORY"
 if printf '%s' "$FAILURE_OUTPUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then
     PASSED=$((PASSED + 1))
@@ -972,10 +1010,11 @@ else
     FAILED=$((FAILED + 1))
     printf 'FAIL NUL in cwd must be denied before extraction\n'
 fi
+record_direct nul_cwd
 
 # Narrow analysis failures use an exact fixed reason, never command text.
 FIXED_REASON='command too complex to analyse for secret access; split it or use secret run'
-FAILURE_OUTPUT="$(jq -cn --arg c "cat .env '" --arg w "$TMP/search" '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
+FAILURE_OUTPUT="$(jq -cn --arg c "cat .env '" --arg w "$TMP/search" '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}' | invoke_guard)"
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard fixed_complexity_reason >>"$SECRET_TEST_INVENTORY"
 if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpecificOutput.permissionDecision == "deny" and .hookSpecificOutput.permissionDecisionReason == $reason' >/dev/null; then
     PASSED=$((PASSED + 1))
@@ -983,10 +1022,11 @@ else
     FAILED=$((FAILED + 1))
     printf 'FAIL fixed complexity reason\n'
 fi
+record_direct fixed_complexity_reason
 
 # Invalid control bytes must reach raw recovery, not change token boundaries.
 for json_command in '"echo .env\u0000"' '"echo .env\u001f"' '"echo .env\u000b"' '"echo .env\u007f"'; do
-    FAILURE_OUTPUT="$(jq -cn --argjson c "$json_command" '{tool_name:"Bash",tool_input:{command:$c}}' | "$BASH" "$SECRETS_GUARD")"
+    FAILURE_OUTPUT="$(jq -cn --argjson c "$json_command" '{tool_name:"Bash",tool_input:{command:$c}}' | invoke_guard)"
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tdeny\n' guard "control_byte_${json_command}" >>"$SECRET_TEST_INVENTORY"
     if printf '%s' "$FAILURE_OUTPUT" | jq -e --arg reason "$FIXED_REASON" '.hookSpecificOutput.permissionDecision == "deny" and .hookSpecificOutput.permissionDecisionReason == $reason' >/dev/null; then
         PASSED=$((PASSED + 1))
@@ -994,6 +1034,7 @@ for json_command in '"echo .env\u0000"' '"echo .env\u001f"' '"echo .env\u000b"' 
         FAILED=$((FAILED + 1))
         printf 'FAIL control byte must use raw recovery: %s\n' "$json_command"
     fi
+    record_direct "control_byte_${json_command}"
 done
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard no_command_substitution >>"$SECRET_TEST_INVENTORY"
 if [[ ! -e "$TMP/search/should-not-exist" ]]; then
@@ -1002,14 +1043,18 @@ else
     FAILED=$((FAILED + 1))
     printf 'FAIL command substitution was executed\n'
 fi
+record_direct no_command_substitution
 
 # Malformed JSON and empty stdin still produce no decision.
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_json >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(printf '%s' malformed | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+if [[ -z "$(printf '%s' malformed | invoke_guard)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+record_direct malformed_json
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard malformed_sensitive >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(printf '%s' 'malformed cat .env' | "$BASH" "$SECRETS_GUARD")" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+if [[ -z "$(printf '%s' 'malformed cat .env' | invoke_guard)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+record_direct malformed_sensitive
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard empty_stdin >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(PATH="$TMP/empty-search" "$BASH" "$SECRETS_GUARD" </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+if [[ -z "$(PATH="$TMP/empty-search" invoke_guard </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+record_direct empty_stdin
 
 # Operand redesign: fixtures are synthetic and command strings are never run.
 printf '%s\n' synthetic-only >"$TMP/search/.env.tmp"
