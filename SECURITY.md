@@ -52,6 +52,7 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   traced. Concatenated or computed script literals and `eval` are not reliably
   resolved. The guard does not infer protected inputs from an unresolved
   operand whose command text names no protected file.
+- **Custom Git aliases are denied.** The hook does not read Git configuration: aliases can execute arbitrary shell commands and configuration resolution can differ from the command environment. Only case-sensitive built-in Git subcommands are classified. Run the expanded built-in command instead of an alias.
 - **History no longer tracked.** Git content-producing commands are checked
   against a bounded `git ls-files -z` index name list, not blob contents or a
   worktree scan. An ignored, untracked `.env` does not block ordinary history
