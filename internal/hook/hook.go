@@ -4,7 +4,6 @@ package hook
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"strings"
@@ -12,13 +11,6 @@ import (
 	"github.com/avhn/secret/internal/hook/input"
 	"github.com/avhn/secret/internal/hook/paths"
 )
-
-// ErrNotYetAnalyzed marks the deferred Bash AST implementation. It does not
-// certify a command safe, so the Go hook must not replace the installed guard.
-var ErrNotYetAnalyzed = errors.New("not yet analysed")
-
-// bashDecision reserves the analysis boundary for the later M2 AST implementation.
-func bashDecision(input.Envelope) error { return ErrNotYetAnalyzed }
 
 // Decide writes a supported denial or no decision. Bash remains unanalysed and
 // deferred to the retained guard until the M2 AST implementation is available.
@@ -85,7 +77,7 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 		fileType := strings.ToLower(e.String("type"))
 		if mode != "files_with_matches" && (fileType == "env" || fileType == "dotenv" || fileType == "secret" || fileType == "secrets" || fileType == "netrc" || fileType == "git-credentials") {
 			reason = "Grep type targets protected names"
-		} else if selector != "" && (protected(selector) || strings.Contains(strings.ToLower(selector), ".env") || strings.Contains(strings.ToLower(selector), ".secret")) && (mode != "files_with_matches" || !strings.ContainsAny(selector, "*?[")) {
+		} else if selector != "" && (protected(selector) || strings.Contains(strings.ToLower(selector), ".env") || strings.Contains(strings.ToLower(selector), ".secret") || strings.Contains(strings.ToLower(selector), ".config/gh/")) && (mode != "files_with_matches" || !strings.ContainsAny(selector, "*?[")) {
 			reason = "Grep selector targets protected names"
 		} else if protected(p) {
 			reason = "Grep targets a protected store"
@@ -93,15 +85,10 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 			reason = "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"
 		}
 	case "Bash":
-		if analysisErr := bashDecision(e); errors.Is(analysisErr, ErrNotYetAnalyzed) {
-			// A deferred tool gets no Go decision; the installed Bash guard stays active.
-			return nil
-		} else {
-			return analysisErr
-		}
+		reason = bashDecision(e, cwd, protected)
 	}
 	if reason != "" {
-		_, err = out.Write(input.Deny(reason, true))
+		_, err = out.Write(input.Deny(reason, reason != "command too complex to analyse for secret access; split it or use secret run"))
 		return err
 	}
 	return nil

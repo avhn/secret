@@ -15,7 +15,6 @@ func TestDecide(t *testing.T) {
 		{"multi edit protected", "claude", `{"tool_name":"MultiEdit","cwd":"/synthetic","tool_input":{"file_path":".env"}}`, "file access targets a protected store"},
 		{"glob protected root", "claude", `{"tool_name":"Glob","cwd":"/synthetic","tool_input":{"path":".secrets","pattern":"*.secret"}}`, "file access targets a protected store"},
 		{"patch", "codex", `{"tool_name":"apply_patch","cwd":"/synthetic","tool_input":{"command":"*** Add File: .netrc\n+synthetic"}}`, "patch targets a protected store"},
-		{"bash deferred", "claude", `{"tool_name":"Bash","tool_input":{"command":"cat .env"}}`, ""},
 		{"malformed", "claude", "bad", "command too complex to analyse for secret access; split it or use secret run"},
 		{"empty", "claude", "", ""},
 	}

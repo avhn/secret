@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,7 +9,8 @@ import (
 )
 
 func protected(name, cwd string) bool {
-	return filepath.Base(filepath.Join(cwd, name)) == ".env" || strings.Contains(filepath.Join(cwd, name), "/.secrets/")
+	joined := filepath.ToSlash(filepath.Join(cwd, name))
+	return path.Base(joined) == ".env" || strings.Contains(joined, "/.secrets/")
 }
 
 func TestASTPaths(t *testing.T) {
@@ -79,6 +81,27 @@ func TestArgv(t *testing.T) {
 	}
 	if got := AnalyzeArgv([]string{"printf", "%s", "cat .env"}, "/synthetic", "/synthetic", protected); got != "" {
 		t.Fatalf("literal argv prose denied: %q", got)
+	}
+}
+
+// TestDeniedVariants checks that equivalent shell spelling never turns a protected read into an allow.
+func TestDeniedVariants(t *testing.T) {
+	for _, cmd := range []string{"cat", "head", "tail", "wc", "sort"} {
+		for _, path := range []string{".env", ".secrets/item"} {
+			variants := []string{path, "'" + path + "'", "\"" + path + "\"", "\\" + path,
+				"$'" + strings.Replace(path, ".", "\\x2e", 1) + "'", "{" + path + ",safe.txt}"}
+			for _, variant := range variants {
+				src := cmd + " " + variant
+				if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
+					t.Errorf("allowed variant %q", src)
+				}
+			}
+		}
+	}
+	for _, src := range []string{"env -u A -u B cat .env", "env --unset A --chdir /synthetic cat .env", "env -C /synthetic cat .env", "sudo -s bash -c 'cat .env'", "sudo -i cat .env"} {
+		if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
+			t.Errorf("wrapper allowed protected read %q", src)
+		}
 	}
 }
 

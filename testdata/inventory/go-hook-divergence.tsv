@@ -41,7 +41,6 @@ guard	cat_proc_environ	pending-M2-ast
 guard	redirect_proc_environ	pending-M2-ast
 guard	cat_ssh_space	pending-M2-ast
 guard	credential_glob	pending-M2-ast
-guard	credential_selector_glob	pending-M2-search
 guard	ssh_private_glob	pending-M2-ast
 guard	cat_secret	pending-M2-ast
 guard	cat_home_var	pending-M2-ast
@@ -528,11 +527,11 @@ guard	rg_large_config	pending-M2-ast
 guard	git_grep_existing_revision	pending-M2-ast
 guard	rg_root_symlink	pending-M2-ast
 guard	rg_missing_path	pending-M2-ast
-guard	grep_find_exit	pending-M2-search
-guard	grep_find_exit_count	pending-M2-search
+guard	grep_find_exit	deliberate-tightening
+guard	grep_find_exit_count	deliberate-tightening
 guard	rg_find_exit	pending-M2-ast
-guard	grep_timeout	pending-M2-search
-guard	grep_timeout_count	pending-M2-search
+guard	grep_timeout	deliberate-tightening
+guard	grep_timeout_count	deliberate-tightening
 guard	rg_timeout	pending-M2-ast
 guard	git_grep_timeout	pending-M2-ast
 guard	rg_config_scope_--follow	pending-M2-ast

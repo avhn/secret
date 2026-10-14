@@ -1,9 +1,12 @@
 package paths
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // TestProtected checks names, aliases and cwd/workdir anchoring using synthetic files.
@@ -35,6 +38,49 @@ func TestProtected(t *testing.T) {
 		t.Run(tc.path, func(t *testing.T) {
 			if got := Protected(tc.path, root, tc.workdir, home); got != tc.protected {
 				t.Fatalf("protected=%v, want %v", got, tc.protected)
+			}
+		})
+	}
+}
+
+// TestTreeProtectedFailures injects incomplete walks, loops and exhausted budgets.
+func TestTreeProtectedFailures(t *testing.T) {
+	root := t.TempDir()
+	now := time.Now()
+	entry, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "safe.go"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	entry, err = os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name  string
+		walk  func(string, fs.WalkDirFunc) error
+		clock func() time.Time
+	}{
+		{"walk error", func(string, fs.WalkDirFunc) error { return errors.New("synthetic I/O") }, time.Now},
+		{"permission", func(p string, visit fs.WalkDirFunc) error { return visit(p, nil, fs.ErrPermission) }, time.Now},
+		{"symlink loop", func(p string, visit fs.WalkDirFunc) error { return visit(p, nil, fs.ErrInvalid) }, time.Now},
+		{"budget", func(p string, visit fs.WalkDirFunc) error {
+			for i := 0; i < 4097; i++ {
+				if err := visit(filepath.Join(p, "safe.go"), entry[0], nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		}, time.Now},
+		{"deadline", func(p string, visit fs.WalkDirFunc) error { return visit(filepath.Join(p, "safe.go"), entry[0], nil) }, func() time.Time { now = now.Add(time.Second); return now }},
+		{"ignored callback failure", func(p string, visit fs.WalkDirFunc) error { _ = visit(p, nil, fs.ErrPermission); return nil }, time.Now},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !treeProtected(root, root, root, tc.walk, tc.clock) {
+				t.Fatal("incomplete tree allowed")
 			}
 		})
 	}
