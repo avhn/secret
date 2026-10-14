@@ -2,13 +2,13 @@
 package hook
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/avhn/secret/internal/hook/input"
+	"github.com/avhn/secret/internal/hook/patch"
 	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/search"
 )
@@ -29,6 +29,11 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 	cwd := e.CWD
 	if cwd == "" {
 		cwd, _ = os.Getwd()
+	}
+	// A relative host cwd cannot anchor a relative workdir or file operand.
+	if !filepath.IsAbs(cwd) {
+		_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
+		return err
 	}
 	reason := ""
 	workdir := ""
@@ -51,15 +56,7 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 		if host != "codex" {
 			break
 		}
-		scanner := bufio.NewScanner(strings.NewReader(e.String("command")))
-		for scanner.Scan() {
-			line := scanner.Text()
-			for _, prefix := range []string{"*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "} {
-				if strings.HasPrefix(line, prefix) && protected(strings.TrimPrefix(line, prefix)) {
-					reason = "patch targets a protected store"
-				}
-			}
-		}
+		reason = patch.Decision(e.String("command"), cwd, workdir, os.Getenv("HOME"))
 	case "Grep":
 		if host != "claude" {
 			break
