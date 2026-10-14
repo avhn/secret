@@ -39,6 +39,7 @@ func TestOperandTable(t *testing.T) {
 		reason string
 	}{
 		{"cat", []string{".env"}, Reader},
+		{"[", []string{"-f", ".env", "]"}, ""},
 		{"ls", []string{".env"}, ""},
 		{"git", []string{"check-ignore", ".env"}, ""},
 		{"git", []string{"-c", "core.excludesfile=.env", "status"}, ""},

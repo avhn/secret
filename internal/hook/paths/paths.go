@@ -124,16 +124,55 @@ func lexical(p string) bool {
 // TreeProtected scans names only within a bounded search scope. An incomplete
 // scan conservatively reports protected so content searches cannot proceed.
 func TreeProtected(root, cwd, home string) bool {
-	return treeProtected(root, cwd, home, filepath.WalkDir, time.Now)
+	return TreeProtectedScope(root, cwd, home, false)
+}
+
+// TreeProtectedScope optionally includes normally ignored directories. Explicit
+// roots inside ignored directories are always scanned.
+func TreeProtectedScope(root, cwd, home string, includeIgnored bool) bool {
+	return scanTree(root, cwd, home, includeIgnored, filepath.WalkDir, time.Now)
+}
+
+// RootProtected checks an explicit search root without reading descendants.
+// A root-only proof cannot certify the filesystem root or proc trees.
+func RootProtected(root, cwd, home string) bool {
+	root = Resolve(root, cwd, "", home)
+	if Protected(root, cwd, "", home) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return true
+	}
+	if resolved == string(os.PathSeparator) || resolved == "/proc" || strings.HasPrefix(resolved, "/proc/") {
+		return true
+	}
+	info, err := os.Stat(resolved)
+	return err != nil || !info.Mode().IsRegular() && !info.IsDir()
 }
 
 // treeProtected accepts a walk and clock to verify fail-closed scans under injected failures.
 func treeProtected(root, cwd, home string, walk func(string, fs.WalkDirFunc) error, now func() time.Time) bool {
+	return scanTree(root, cwd, home, false, walk, now)
+}
+
+func scanTree(root, cwd, home string, includeIgnored bool, walk func(string, fs.WalkDirFunc) error, now func() time.Time) bool {
 	root = Resolve(root, cwd, "", home)
+	if Protected(root, cwd, "", home) {
+		return true
+	}
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return true
+	}
+	root = resolved
+	if root == "/" || root == "/proc" || strings.HasPrefix(root, "/proc/") {
+		return true
+	}
 	deadline := now().Add(200 * time.Millisecond)
 	count := 0
 	incomplete := false
-	err := walk(root, func(name string, entry fs.DirEntry, walkErr error) error {
+	err = walk(root, func(name string, entry fs.DirEntry, walkErr error) error {
 		count++
 		if walkErr != nil || entry == nil || count > 4096 || now().After(deadline) {
 			incomplete = true
@@ -148,7 +187,7 @@ func treeProtected(root, cwd, home string, walk func(string, fs.WalkDirFunc) err
 			incomplete = true
 			return os.ErrPermission
 		}
-		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == "node_modules") && name != root {
+		if !includeIgnored && entry.IsDir() && (entry.Name() == ".git" || entry.Name() == "node_modules") && name != root {
 			return filepath.SkipDir
 		}
 		if Protected(name, cwd, "", home) {

@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const MaxBytes = 32 << 10
-
 var ErrInvalid = errors.New("invalid hook envelope")
 
 // Envelope contains only fields required to classify a supported tool call.

@@ -13,6 +13,7 @@ func TestDecode(t *testing.T) {
 	}{
 		{"simple", `{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":".env"}}`, true},
 		{"array", `{"tool_name":"Bash","tool_input":{"command":["cat",".env"]}}`, true},
+		{"long safe shell envelope", `{"tool_name":"Bash","tool_input":{"command":"echo ` + strings.Repeat("a", 33000) + `"}}`, MaxBytes >= 64<<10},
 		{"empty", "", false},
 		{"missing tool", `{"tool_input":{}}`, false},
 		{"trailing", `{"tool_name":"Read"}{}`, false},

@@ -35,7 +35,7 @@ func TestASTPaths(t *testing.T) {
 		{"ls .env | xargs cat", "xargs reader consumes a protected-name listing"},
 		{"xargs -a.env cat", "xargs arg-file reads a protected store"},
 		{"timeout 5 cat .env", "reader targets a protected store"},
-		{"env -S 'cat .env'", "command too complex to analyse for secret access; split it or use secret run"},
+		{"env -S 'cat .env'", "reader targets a protected store"},
 		{"docker compose --env-file .env config", "compose config prints env-file values"},
 		{"dotenv -e .env -- printenv", "credential printer requires a direct pipe to secret stash FILE KEY"},
 		{"grep -R TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
@@ -98,9 +98,48 @@ func TestDeniedVariants(t *testing.T) {
 			}
 		}
 	}
+	// Exercise the same protected spelling through different reader roles.
+	for _, form := range []string{
+		"dd if=%s", "openssl enc -in %s", "git add %s",
+		"sudo -u user cat %s", "env -u NAME cat %s",
+		"grep -e TOKEN %s", "jq --rawfile key %s -n 1",
+		"wc < %s", "cp %s output", "tar -cf archive.tar %s",
+	} {
+		for _, file := range []string{".env", `".env"`, `\.env`, `$'\x2eenv'`, `{.env,safe.txt}`} {
+			src := strings.Replace(form, "%s", file, 1)
+			if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
+				t.Errorf("allowed reader spelling %q", src)
+			}
+		}
+	}
 	for _, src := range []string{"env -u A -u B cat .env", "env --unset A --chdir /synthetic cat .env", "env -C /synthetic cat .env", "sudo -s bash -c 'cat .env'", "sudo -i cat .env"} {
 		if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
 			t.Errorf("wrapper allowed protected read %q", src)
+		}
+	}
+}
+
+// TestSafeRoleParity checks that option values and direct stash sinks remain safe.
+func TestSafeRoleParity(t *testing.T) {
+	for _, source := range []string{
+		"sudo -u cat echo .env", "sudo -g cat echo .env", "sudo -C cat echo .env",
+		"gh auth token | secret stash a K > out",
+		"gh auth token 2>&1 | secret stash a K",
+		"gh auth token | secret stash --env dev --label region=eu a K",
+		"git commit -m 'add .env handling'", "git status .env", "[ -f .env ]", "tar -cf .env src",
+		"jq --arg label .env -n '$label'", "cp -S .env src/a.ts out",
+	} {
+		if got := Analyze(source, "/synthetic", "/synthetic", protected); got != "" {
+			t.Errorf("safe role %q denied: %q", source, got)
+		}
+	}
+	for _, source := range []string{
+		"sudo -u value cat .env", "gh auth token >out | secret stash a K",
+		"gh auth token | secret stash --env= a K", "git add .env",
+		"jq --rawfile k .env -n '$k'",
+	} {
+		if got := Analyze(source, "/synthetic", "/synthetic", protected); got == "" {
+			t.Errorf("protected role %q allowed", source)
 		}
 	}
 }
@@ -130,10 +169,20 @@ func TestReadingProtectedLiteral(t *testing.T) {
 }
 
 func TestBudgets(t *testing.T) {
-	if got := Analyze("cat .env "+strings.Repeat("x", 8192), "/synthetic", "/synthetic", protected); got != "command too complex to analyse for secret access; split it or use secret run" {
+	if got := Analyze(" # "+strings.Repeat("a", 33000), "/synthetic", "/synthetic", protected); got != "" {
+		t.Errorf("long inert comment denied: %q", got)
+	}
+	safe := "echo " + strings.Repeat("a", 33000)
+	if got := Analyze(safe, "/synthetic", "/synthetic", protected); got != "" {
+		t.Errorf("safe long command denied: %q", got)
+	}
+	if got := Analyze(safe+" .env", "/synthetic", "/synthetic", protected); got == "" {
+		t.Error("long protected witness allowed")
+	}
+	if got := Analyze("cat .env "+strings.Repeat("x", 40<<10), "/synthetic", "/synthetic", protected); got != "command too complex to analyse for secret access; split it or use secret run" {
 		t.Fatalf("source budget: %q", got)
 	}
-	if got := Analyze(strings.Repeat("echo x; ", 130)+"cat .env", "/synthetic", "/synthetic", protected); got == "" {
+	if got := Analyze(strings.Repeat("echo x; ", 260)+"cat .env", "/synthetic", "/synthetic", protected); got == "" {
 		t.Fatal("word budget allowed protected read")
 	}
 	if got := Analyze("cat {"+strings.Repeat("a,", 65)+".env}", "/synthetic", "/synthetic", protected); got == "" {
@@ -142,11 +191,11 @@ func TestBudgets(t *testing.T) {
 }
 
 func FuzzAnalyze(f *testing.F) {
-	for _, seed := range []string{"cat .env", "cat {a,b}", "$(cat .env)", "echo 'x'", strings.Repeat("x", 8193), "bash -c 'bash -c \"cat .env\"'"} {
+	for _, seed := range []string{"cat .env", "cat {a,b}", "$(cat .env)", "echo 'x'", strings.Repeat("x", 40<<10+1), "bash -c 'bash -c \"cat .env\"'"} {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, src string) {
-		if len(src) > 10000 {
+		if len(src) > 42<<10 {
 			t.Skip()
 		}
 		start := time.Now()
@@ -154,7 +203,7 @@ func FuzzAnalyze(f *testing.F) {
 		if time.Since(start) > 5*time.Second {
 			t.Fatal("analysis exceeded hook deadline")
 		}
-		if len(src) > 8192 && CheckBudget(src) != ErrIndeterminate {
+		if len(src) > 40<<10 && CheckBudget(src) != ErrIndeterminate {
 			t.Fatal("missing source budget")
 		}
 	})

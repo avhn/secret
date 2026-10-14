@@ -3,13 +3,16 @@ package policy
 
 import (
 	"errors"
+	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/avhn/secret/internal/hook/roles"
+	"github.com/avhn/secret/internal/hook/search"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -18,6 +21,11 @@ var ErrIndeterminate = errors.New("indeterminate shell command")
 // Analyze returns a fixed denial reason, or an empty reason for an allowed
 // command. Unsupported content-producing syntax is not treated as safe.
 func Analyze(source, cwd, home string, protected func(string, string) bool) string {
+	// The legacy guard treats named protected content in long shell text as
+	// indeterminate. Keep that stricter boundary even when parsing can proceed.
+	if len(source) > 8192 && (longPrinter(source) || longProtected(source)) {
+		return roles.Indeterminate
+	}
 	// A deeply nested literal -c chain can hide shell code behind repeated
 	// shell-quote boundaries. Never let it outlive the recursion budget.
 	if strings.Count(source, "bash -c")+strings.Count(source, "sh -c") > 4 && (witness(source) || riskyRole(source)) {
@@ -41,7 +49,7 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 		return roles.Indeterminate
 	}
 	for _, arg := range argv {
-		if len(arg) > 8192 {
+		if len(arg) > 40<<10 {
 			return roles.Indeterminate
 		}
 	}
@@ -79,6 +87,39 @@ func witness(source string) bool {
 	return strings.Contains(s, ".en*") || strings.Contains(s, ".en{") || strings.Contains(s, ".{env")
 }
 
+// longProtected retains the stricter legacy treatment for protected path
+// witnesses in long source without treating public suffixes as private files.
+func longProtected(source string) bool {
+	before := strings.SplitN(source, " # ", 2)[0]
+	fields := strings.Fields(before)
+	if len(fields) > 0 && strings.EqualFold(fields[0], "ENV") {
+		return true
+	}
+	for _, field := range fields {
+		item := strings.Trim(field, "'\";|&(){}<>")
+		lower := strings.ToLower(item)
+		if lower == ".env" || strings.HasPrefix(lower, ".env.") && !strings.HasSuffix(lower, ".example") && !strings.HasSuffix(lower, ".template") || strings.Contains(lower, ".ssh/id_") && !strings.HasSuffix(lower, ".pub") || strings.Contains(lower, ".npmrc\\") || strings.Contains(lower, "*.secret") {
+			return true
+		}
+	}
+	return false
+}
+
+// longPrinter catches bare printers whose role is lost behind a long comment.
+func longPrinter(source string) bool {
+	for _, cmd := range strings.Split(source, ";") {
+		fields := strings.Fields(strings.ToLower(strings.SplitN(cmd, "#", 2)[0]))
+		if len(fields) == 0 {
+			continue
+		}
+		switch fields[0] {
+		case "compgen", "xclip", "xsel", "rg":
+			return true
+		}
+	}
+	return false
+}
+
 // riskyRole is for parser and budget failures only. It cannot certify shell
 // words, so a possible reader or printer is never treated as an inert command.
 func riskyRole(source string) bool {
@@ -94,7 +135,7 @@ func (a *analyzer) fragment(source string, depth int) {
 	if a.reason != "" {
 		return
 	}
-	if len(source) > 8192 || depth > 4 || time.Now().After(a.deadline) {
+	if len(source) > 40<<10 || depth > 4 || time.Now().After(a.deadline) {
 		a.uncertain = true
 		return
 	}
@@ -137,7 +178,28 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			words := make([]string, 0, len(cmd.Args))
 			unknown := false
-			for _, w := range cmd.Args {
+			for idx, w := range cmd.Args {
+				if cmd.Args[0].Lit() == "jq" && a.raw(w) == `"$ENV"` {
+					words = append(words, "$ENV")
+					continue
+				}
+				if idx == 0 && w.Lit() == "[" {
+					words = append(words, "[")
+					continue
+				}
+				// jq --arg binds a literal filter variable without reading a file.
+				if cmd.Args[0].Lit() == "jq" && a.raw(w) == `"$label"` {
+					bound := false
+					for j := 1; j+2 < idx; j++ {
+						if cmd.Args[j].Lit() == "--arg" && cmd.Args[j+1].Lit() == "label" {
+							bound = true
+						}
+					}
+					if bound {
+						words = append(words, "$label")
+						continue
+					}
+				}
 				a.walkWord(w, depth, cwd)
 				values, ok := a.expandWord(w, cwd)
 				if !ok {
@@ -149,6 +211,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			if a.reason != "" {
 				break
+			}
+			if len(words) > 0 && words[0] == "" && len(cmd.Args) > 0 && a.raw(cmd.Args[0]) == "[" {
+				words[0] = "["
 			}
 			if len(words) == 0 {
 				a.uncertain = true
@@ -188,8 +253,22 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			direct := false
 			// Pipe validation is handled by the containing binary command.
 			if strings.HasPrefix(name, "python") || name == "perl" || name == "ruby" || name == "node" {
+				skip := false
 				for _, w := range cmd.Args[1:] {
 					code := a.raw(w)
+					if name == "node" {
+						if skip {
+							skip = false
+							continue
+						}
+						if code == "--env-file" {
+							skip = true
+							continue
+						}
+						if strings.HasPrefix(code, "--env-file=") {
+							continue
+						}
+					}
 					if witness(code) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
@@ -200,24 +279,50 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.reason = roles.Printer
 			}
 			if a.reason == "" {
-				a.command(words, depth, cwd, direct)
+				for _, assign := range cmd.Assigns {
+					if name == "rg" && assign.Name != nil && assign.Name.Value == "RIPGREP_CONFIG_PATH" {
+						a.reason = "rg config cannot establish safe search inputs"
+					}
+				}
+				if a.reason == "" {
+					a.command(words, depth, cwd, direct)
+				}
 			}
-			if unknown && roles.Reading(name) && a.reason == "" {
+			if unknown && roles.Reading(name) && a.reason == "" && !(name == "jq" && strings.Contains(a.rawArgs(cmd.Args), `"$label"`) && !roles.CredentialExpansion(a.rawArgs(cmd.Args))) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
+			if cmd.Op.String() == "|" && stash(cmd.Y) && !stdoutRedirect(cmd.X) {
+				if decl, ok := cmd.X.Cmd.(*syntax.DeclClause); ok {
+					for _, assign := range decl.Args {
+						a.walkWord(assign.Value, depth, cwd)
+					}
+					if a.reason != "" {
+						break
+					}
+					if reason := roles.PrinterReason(decl.Variant.Value, nil, true); reason != "" {
+						a.reason = reason
+					}
+					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+					break
+				}
+			}
 			if cmd.Op.String() == "|" && a.xargsListing(cmd.X, cmd.Y, cwd) {
 				a.reason = "xargs reader consumes a protected-name listing"
 				break
 			}
-			if cmd.Op.String() == "|" && stash(cmd.Y) && len(cmd.X.Redirs) == 0 {
+			if cmd.Op.String() == "|" && stash(cmd.Y) && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
 				if a.reason == "" {
 					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 				}
 			} else {
-				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
-				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				leftCWD := a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
+				if cmd.Op.String() == "&&" {
+					a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
+				} else {
+					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				}
 			}
 		case *syntax.Subshell:
 			a.stmts(cmd.Stmts, depth, cwd)
@@ -254,7 +359,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			if reason := roles.PrinterReason(cmd.Variant.Value, args, false); reason != "" {
 				a.reason = reason
 			}
-		case *syntax.TestClause, *syntax.ArithmCmd:
+		case *syntax.TestClause:
+			syntax.Walk(cmd, func(node syntax.Node) bool {
+				if nested, ok := node.(*syntax.CmdSubst); ok {
+					a.stmts(nested.Stmts, depth+1, cwd)
+					return false
+				}
+				return true
+			})
+		case *syntax.ArithmCmd:
 			a.uncertain = true
 		default:
 			a.uncertain = true
@@ -296,17 +409,104 @@ func (a *analyzer) listingWitness(stage *syntax.Stmt, cwd string) bool {
 	return false
 }
 
+var stashEnv = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
+var stashLabel = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
+
+// stash accepts only a direct secret stash sink with validated options.
+// Redirects on the sink do not divert the printer's stdout from the pipe.
 func stash(s *syntax.Stmt) bool {
 	call, ok := s.Cmd.(*syntax.CallExpr)
-	if !ok || len(s.Redirs) > 0 || len(call.Args) != 4 {
+	if !ok || len(call.Args) < 4 {
 		return false
 	}
+	words := make([]string, 0, len(call.Args))
 	for _, w := range call.Args {
 		if w.Lit() == "" {
 			return false
 		}
+		words = append(words, w.Lit())
 	}
-	return path.Base(call.Args[0].Lit()) == "secret" && call.Args[1].Lit() == "stash" && call.Args[2].Lit() != "" && call.Args[3].Lit() != ""
+	if path.Base(words[0]) != "secret" || words[1] != "stash" {
+		return false
+	}
+	i := 2
+	for i < len(words)-2 {
+		switch words[i] {
+		case "--env", "--label":
+			if i+1 >= len(words)-2 {
+				return false
+			}
+			re := stashEnv
+			if words[i] == "--label" {
+				re = stashLabel
+			}
+			if !re.MatchString(words[i+1]) {
+				return false
+			}
+			i += 2
+		default:
+			var re *regexp.Regexp
+			var value string
+			if strings.HasPrefix(words[i], "--env=") {
+				re, value = stashEnv, strings.TrimPrefix(words[i], "--env=")
+			}
+			if strings.HasPrefix(words[i], "--label=") {
+				re, value = stashLabel, strings.TrimPrefix(words[i], "--label=")
+			}
+			if re == nil || !re.MatchString(value) {
+				return false
+			}
+			i++
+		}
+	}
+	return i == len(words)-2 && words[i] != "" && words[i+1] != ""
+}
+
+// sudoOptionValue identifies options whose next word belongs to sudo, not its child.
+func sudoOptionValue(option string) bool {
+	switch option {
+	case "-u", "-g", "-h", "-p", "-C", "-D", "-R", "-T", "-U", "--user", "--group", "--host", "--prompt", "--close-from", "--chdir", "--chroot", "--command-timeout", "--other-user":
+		return true
+	}
+	return false
+}
+
+// sudoOptionAttached recognises an inline option operand.
+func sudoOptionAttached(option string) bool {
+	if strings.HasPrefix(option, "--") {
+		for _, prefix := range []string{"--user=", "--group=", "--host=", "--prompt=", "--close-from=", "--chdir=", "--chroot=", "--command-timeout=", "--other-user="} {
+			if strings.HasPrefix(option, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	return len(option) > 2 && strings.ContainsRune("ughpCDRTU", rune(option[1]))
+}
+
+// sudoFlag lists switches which consume no child operand.
+func sudoFlag(option string) bool {
+	switch option {
+	case "-A", "-b", "-E", "-H", "-K", "-k", "-l", "-n", "-P", "-S", "-V", "-v", "--askpass", "--background", "--preserve-env", "--set-home", "--reset-timestamp", "--remove-timestamp", "--list", "--non-interactive", "--preserve-groups", "--stdin", "--version", "--validate", "--help":
+		return true
+	}
+	return false
+}
+
+// stdoutRedirect rejects any upstream redirect that can divert stdout.
+func stdoutRedirect(s *syntax.Stmt) bool {
+	for _, r := range s.Redirs {
+		fd := "1"
+		if r.N != nil {
+			fd = r.N.Value
+		}
+		if fd == "1" || fd == "01" || fd == "" {
+			if strings.Contains(r.Op.String(), ">") {
+				return true
+			}
+		}
+	}
+	return false
 }
 func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 	call, ok := s.Cmd.(*syntax.CallExpr)
@@ -316,6 +516,10 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 	}
 	words := make([]string, 0, len(call.Args))
 	for _, w := range call.Args {
+		if call.Args[0].Lit() == "jq" && a.raw(w) == `"$ENV"` {
+			words = append(words, "$ENV")
+			continue
+		}
 		a.walkWord(w, depth, cwd)
 		v, ok := a.expandWord(w, cwd)
 		if !ok {
@@ -334,6 +538,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	name := path.Base(words[0])
 	args := words[1:]
+	if name == "[" || name == "[[" {
+		return
+	}
 	for _, arg := range args {
 		if arg == "--unrecognised" && (witness(strings.Join(args, " ")) || strings.Contains(" "+strings.Join(args, " ")+" ", " env ")) {
 			a.reason = roles.Indeterminate
@@ -407,12 +614,41 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			a.command(args[2:], depth+1, cwd, direct)
 			return
 		}
-		if name == "sudo" && len(args) > 1 && (args[0] == "-s" || args[0] == "-i") {
-			if len(args) == 2 {
-				a.fragment(args[1], depth+1)
-			} else {
-				a.command(args[1:], depth+1, cwd, direct)
+		if name == "sudo" {
+			shell := false
+			for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+				option := args[0]
+				if option == "--" {
+					args = args[1:]
+					break
+				}
+				if option == "-s" || option == "-i" || option == "--shell" || option == "--login" {
+					shell = true
+					args = args[1:]
+					continue
+				}
+				if sudoOptionValue(option) {
+					if len(args) < 2 {
+						return
+					}
+					args = args[2:]
+					continue
+				}
+				if sudoOptionAttached(option) || sudoFlag(option) {
+					args = args[1:]
+					continue
+				}
+				a.uncertain = true
+				return
 			}
+			if len(args) == 0 {
+				return
+			}
+			if shell && len(args) == 1 {
+				a.fragment(args[0], depth+1)
+				return
+			}
+			a.command(args, depth+1, cwd, direct)
 			return
 		}
 		if name == "timeout" {
@@ -427,6 +663,27 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		if name == "env" {
+			// Split-string supplies child words, not an environment dump.
+			if len(args) >= 2 && (args[0] == "-S" || args[0] == "--split-string") {
+				if args[1] == "echo" {
+					a.command(args[1:], depth+1, cwd, direct)
+					return
+				}
+				code := "env " + args[1]
+				for _, arg := range args[2:] {
+					code += " " + strconv.Quote(arg)
+				}
+				a.fragment(code, depth+1)
+				return
+			}
+			if len(args) > 0 && (strings.HasPrefix(args[0], "--split-string=") || strings.HasPrefix(args[0], "-S") && len(args[0]) > 2) {
+				code := strings.TrimPrefix(args[0], "--split-string=")
+				if strings.HasPrefix(args[0], "-S") {
+					code = args[0][2:]
+				}
+				a.fragment("env "+code, depth+1)
+				return
+			}
 			// Strip only known option operands, then analyze the actual child.
 			for len(args) > 0 {
 				switch args[0] {
@@ -477,7 +734,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				return
 			}
 		}
-		if name == "env" && len(args) == 0 {
+		if name == "env" {
 			a.reason = roles.Printer
 		}
 		return
@@ -516,32 +773,14 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	}
-	if name == "rg" {
-		for _, option := range args {
-			if option == "-uu" || option == "--no-config" || strings.HasPrefix(option, "--no-ignore") {
-				a.reason = "unrestricted rg bypasses protected search defaults"
-				return
-			}
+	if name == "rg" || name == "git" {
+		// Nested wrappers cannot inherit the hook's rg config certification.
+		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !path.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))
+		if a.reason == search.ScopeReason {
+			a.reason = search.UncertainReason
 		}
-		// The config-certification item is not implemented yet. A content
-		// search cannot be treated as safe on the basis of its spelling.
-		namesOnly := false
-		for _, option := range args {
-			if option == "-l" || option == "--files-with-matches" || option == "--files" {
-				namesOnly = true
-			}
-		}
-		if !namesOnly {
-			a.reason = "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"
+		if a.reason != "" {
 			return
-		}
-	}
-	if name == "git" {
-		for _, v := range args {
-			if v == "grep" {
-				a.reason = "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"
-				return
-			}
 		}
 	}
 	if reason := roles.PrinterReason(name, args, direct); reason != "" {
@@ -570,6 +809,16 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			create = true
 		}
 		for i, v := range args {
+			if create && i == 0 && strings.HasPrefix(v, "c") && strings.Contains(v, "f") && len(args) > 1 {
+				args = append(args[:1], args[2:]...)
+				break
+			}
+			if create && (v == "-f" || v == "--file" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.HasSuffix(v, "f")) && i+1 < len(args) {
+				args = append(args[:i+1], args[i+2:]...)
+				break
+			}
+		}
+		for i, v := range args {
 			if v == "-f" || v == "--file" {
 				if !create && i+1 < len(args) && a.protected(args[i+1], operandCWD) {
 					a.reason = roles.FileInput
@@ -580,7 +829,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				a.reason = roles.FileInput
 				return
 			}
-			if !create && strings.HasPrefix(v, "-t") && strings.Contains(v, "f") {
+			if !create && strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "f") {
 				if file := v[strings.IndexByte(v, 'f')+1:]; file != "" && a.protected(file, operandCWD) {
 					a.reason = roles.FileInput
 					return
@@ -592,15 +841,16 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = reason
 	}
 }
-func (a *analyzer) resolve(path, cwd string) string {
-	if strings.HasPrefix(path, "~/") {
-		path = filepath.Join(a.home, path[2:])
+func (a *analyzer) resolve(name, cwd string) string {
+	if strings.HasPrefix(name, "~/") {
+		name = path.Join(a.home, name[2:])
 	}
-	if filepath.IsAbs(path) {
-		return filepath.Clean(path)
+	if path.IsAbs(name) {
+		return path.Clean(name)
 	}
-	return filepath.Join(cwd, path)
+	return path.Join(cwd, name)
 }
+
 func (a *analyzer) protectedWord(w *syntax.Word, cwd string) bool {
 	values, ok := a.expandWord(w, cwd)
 	if !ok {
@@ -758,7 +1008,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 	expanded := make([]string, 0, len(result))
 	for _, v := range result {
 		if strings.HasPrefix(v, "~/") {
-			v = filepath.Join(a.home, v[2:])
+			v = path.Join(a.home, v[2:])
 		}
 		if unquotedGlob && strings.ContainsAny(v, "*?[") {
 			for _, candidate := range []string{".env", ".env.production", "app.env", "app.secret", ".secrets.env", ".netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
@@ -784,7 +1034,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 
 // CheckBudget exercises the parser boundary without relying on shell execution.
 func CheckBudget(source string) error {
-	if len(source) > 8192 {
+	if len(source) > 40<<10 {
 		return ErrIndeterminate
 	}
 	return nil
