@@ -1137,7 +1137,6 @@ guard	rg_config_clean_pre	decision	deny
 guard	rg_config_clean_reinclude	decision	deny
 guard	rg_config_filesystem_root	decision	deny
 guard	rg_config_follow_names	decision	allow
-guard	rg_config_proc_root	decision	deny
 guard	rg_config_protected_alias	decision	deny
 guard	rg_config_scope_--follow	decision	deny
 guard	rg_config_scope_--ignore-file-case-insensitive	decision	deny
