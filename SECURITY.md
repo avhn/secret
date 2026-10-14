@@ -37,6 +37,14 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   coprocesses, refuses unverified shell stdin, and resolves write targets
   through ancestor worktree gitfiles and home configuration paths. The
   Claude Code matcher includes MultiEdit and NotebookEdit file paths.
+  Protected Git write targets include independent directories identified by a
+  HEAD file, objects directory and refs directory, and declared Git directory
+  roots. Non-reader argument words containing Git configuration tokens deny,
+  including attached option values and interpreter code. The shell scanner
+  denies over-limit token streams rather than falling back to a raw regex.
+  Generic shell-looking arguments are inspected for positive findings; known
+  command slots such as flock -c, make --eval and rsync -e are inspected
+  strictly. This is syntax-only accident prevention, not execution isolation.
   Protected paths are matched after brace and `$IFS` expansion and through
   symlink aliases; unknown commands may not take a protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,

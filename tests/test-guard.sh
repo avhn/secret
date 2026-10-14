@@ -411,7 +411,10 @@ if command -v jq >/dev/null 2>&1; then
         secrets bounded_length_risk deny Bash "echo $MEDIUM_TEXT .ENV"
         MANY_TOKENS="$(printf 'word %.0s' $(seq 1 130))"
         secrets bounded_tokens_safe allow Bash "echo $MANY_TOKENS"
+        secrets bounded_tokens_under_limit allow Bash "echo $MANY_TOKENS .ENV"
+        MANY_TOKENS="$(printf 'word %.0s' $(seq 1 260))"
         secrets bounded_tokens_risk deny Bash "echo $MANY_TOKENS .ENV"
+        secrets bounded_tokens_plain deny Bash "true $MANY_TOKENS; echo hi > .git/hooks/pre-commit"
         # Path/selector/tree matching is case-insensitive on every platform.
         secrets uppercase_reader deny Bash 'cat .ENV'
         secrets uppercase_secret deny Bash 'head X.SECRET'
@@ -1272,6 +1275,20 @@ if command -v git >/dev/null 2>&1; then
     secrets audit_history_deleted_path deny Bash "cd '$TMP/deleted'; git log -p -- .env"
     secrets audit_history_deleted_colon deny Bash "cd '$TMP/deleted'; git show HEAD~1:.env"
     secrets audit_history_log deny Bash "cd '$TMP/history'; git log -p"
+    # The guard's process cwd differs from the envelope cwd; scan the full index.
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\tgit_index_process_subdir\tdecision\tdeny\n' >>"$SECRET_TEST_INVENTORY"
+    got="$(jq -cn --arg w "$TMP/history" '{tool_name:"Bash",cwd:$w,tool_input:{command:"git log -p"}}' |
+        (cd "$TMP/history/src" && invoke_guard) |
+        jq -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null)" || got=crash
+    got="${got:-allow}"
+    if [[ "$got" == deny ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_index_process_subdir\tpass\n' >>"$SECRET_TEST_RESULTS"
+    else
+        FAILED=$((FAILED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\tgit_index_process_subdir\tfail\n' >>"$SECRET_TEST_RESULTS"
+        printf 'FAIL git_index_process_subdir: got %s, expected deny\n' "$got"
+    fi
     secrets audit_history_stat deny Bash "cd '$TMP/history'; git log -p --stat"
     secrets audit_history_show deny Bash "cd '$TMP/history/src'; git show HEAD~1"
     secrets audit_history_archive deny Bash "cd '$TMP/history'; git archive HEAD | tar -xO"
@@ -1656,6 +1673,10 @@ done
 for cmd in "sed 'e' src/a.ts" "sed 's/a/b/e' src/a.ts" "sed 's/a/b/w app.env' src/a.ts" "sed 'F' src/a.ts" "sed 'v' src/a.ts" "sed ':a bad' src/a.ts"; do
     secrets audit8_sed_unsafe deny Bash "$cmd"
 done
+secrets sed_read_dev_stdin deny Bash "sed '1r /dev/stdin' src/a.ts"
+secrets sed_write_dev_stdout deny Bash "sed -n 'w /dev/stdout' src/a.ts"
+secrets sed_read_proc deny Bash "sed '1R /proc/self/fd/0' src/a.ts"
+secrets sed_write_proc deny Bash "sed -n 'W /proc/self/fd/1' src/a.ts"
 secrets audit8_sed_unsafe allow Bash "sed -e 'p' 'd' src/a.ts"
 secrets audit8_sed_unsafe deny Bash 'POSIXLY_CORRECT=1 sed -e p src/a.ts'
 secrets audit8_sed_positional_before_expression deny Bash "sed 'd' -e 'p' src/a.ts"
@@ -1757,6 +1778,79 @@ secrets audit9_static_write allow Bash 'OUT=out.txt; echo x > "$OUT"'
 # shellcheck disable=SC2016  # the guard receives a literal shell variable
 secrets audit9_static_git deny Bash 'OUT=.git/config; echo x > "$OUT"'
 secrets audit9_write_safe allow Write "$TMP/search/src/new.ts"
+
+# Audit 10: shell-text slots, Git tokens and independent gitdir roots.
+mkdir -p "$TMP/separate-git/objects" "$TMP/separate-git/refs" "$TMP/sibling" "$TMP/unrelated"
+printf 'ref: refs/heads/main\n' >"$TMP/separate-git/HEAD"
+audit10=0
+# shellcheck disable=SC2016,SC2088  # every command below is synthetic shell text
+for cmd in \
+    "bash -c - 'cat app.env'" "bash -c - 'echo x >> .git/config'" \
+    'cp -ft.git X' 'cp -rt.git' 'mv -ft.git' 'install -Dt.git' 'ln -sft.git' 'ln -sfnt.git' \
+    'doas -s <<< x' 'run0 <<< x' 'pkexec <<< x' 'expect <<< x' 'expect - <<< x' 'expect -f /dev/stdin' \
+    'sudo -Es' 'sudo -si' 'sudo -bs' 'sudo -is' 'sudo -sE' 'sudo -nks' 'script' 'script /dev/null' \
+    "git --git-dir=$TMP/separate-git status; echo x > $TMP/separate-git/config" \
+    "GIT_COMMON_DIR=$TMP/separate-git; echo x > $TMP/separate-git/config" \
+    "GIT_DIR=$TMP/separate-git/; echo x > $TMP/separate-git//config" \
+    'python3 -c '\''open(".git/config","a")'\''' \
+    'node -e '\''require("fs").appendFileSync(".git/config","x")'\''' \
+    'ruby -e '\''File.write(".git/hooks/pre-commit","x")'\''' \
+    'perl -e '\''open F,">>.git/config"'\''' \
+    "coproc command bash -c 'cat app.env'" "coproc exec bash -c -- 'cat app.env'" \
+    'coproc exec -c bash' 'coproc exec sh' 'coproc command -p sh' 'coproc builtin command sh' 'coproc rbash' \
+    "flock --command='cat app.env' /tmp/l" "flock --comm='cat app.env' /tmp/l" \
+    "flock /tmp/l -c 'cat app.env'" "nice flock --command='cat app.env' /tmp/l" \
+    "flock /tmp/l -c '{cat,app.*}'" "watch '{cat,app.*}'" "su -c '{cat,app.*}' root" \
+    "flock /tmp/l -c \$'cat\tapp.*'" 'flock /tmp/l -c export' 'flock /tmp/l -c set' \
+    'flock /tmp/l -c declare' 'watch export' \
+    'tar xf a.tar -C.git' 'tar --directory=.git -xf a.tar' 'tar --one-top-level=.git -xf a.tar' \
+    'unzip -d.git a.zip' '7z x a.7z -o.git' 'cp --target=.git a' 'cp --t=.git a' \
+    'git submodule --quiet foreach ls' 'git submodule -q foreach ls' 'git apply p.diff' \
+    'echo x >> ~user/.gitconfig' \
+    "npm exec -c 'cat app.*'" "make -f /dev/null --eval=\$'x:\n\tcat app.*' x" \
+    "rsync -e 'sh -c \"cat app.*\"' a h:b" "op run -- sh -c 'cat app.*'" \
+    "gh alias set x '!cat app.*'" "printf 'cat app.*' | ./bash-static" \
+    'X=.git; Y=1 X=safe true; echo hi > $X/config' \
+    'X=; X+=.git; echo hi > $X/config' \
+    'X=safe; printf -v X .git; echo hi > $X/config' \
+    'X=safe; read X; echo hi > $X/config' \
+    'X=safe; for X in ok; do :; done; echo hi > $X/config' \
+    'X=safe; mapfile X; echo hi > $X/config' \
+    'find . -maxdepth 0 -fprintf .git/hooks/pre-commit x' \
+    'find . -maxdepth 0 -fprint0 .git/config' \
+    'find . -maxdepth 0 -fls .git/config'; do
+    audit10=$((audit10 + 1))
+    secrets "audit10_denied_$audit10" deny Bash "$cmd"
+done
+for printer_model in npm make rsync op gh curl kubectl aws gcloud docker; do
+    secrets "audit10_generic_$printer_model" deny Bash "$printer_model --command='cat app.*'"
+done
+secrets audit10_generic_equals deny Bash "custom --command='cat app.*'"
+many_args=''
+for ((j = 0; j < 130; j++)); do many_args+=" a$j"; done
+secrets audit10_token_limit_tail deny Bash "true$many_args; echo hi > .git/hooks/pre-commit"
+for dir in "$TMP/sibling" "$TMP/unrelated" "$TMP/search"; do
+    secrets audit10_separate_gitdir deny Bash "cd '$dir'; echo x > '$TMP/separate-git/config'"
+done
+for tool in Write MultiEdit NotebookEdit; do
+    secrets "audit10_separate_$tool" deny "$tool" "$TMP/separate-git/hooks/pre-commit"
+done
+# shellcheck disable=SC2016  # these are literal guard inputs
+for cmd in 'cat .gitignore' 'echo x >> .gitignore' 'cp a .github/workflows/b.yml' \
+    "sed -i 's/a/b/' .gitattributes" 'git status' 'git add .' \
+    "git commit -m 'update .git docs'" 'git push' "python3 -c 'print(1)'" \
+    "node -e 'console.log(1)'" "bash -c 'npm test'" 'sudo apt-get install -y jq' \
+    'tar -xf a.tar -C build' 'cp -t dist a b' 'ls .git' 'rg foo .git' \
+    "gh pr create --title 'fix(api): handle null'" \
+    'gh issue comment 1 --body "don'\''t do that"' \
+    "curl -d '{\"a\": 1}' https://x/y" "psql -c 'select 1'" \
+    "kubectl get pods -l 'app in (a,b)'" "gh api r --jq '.[] | .title'" \
+    'kill -9 $(pgrep node)' "sqlite3 db 'select * from t'" \
+    "npx eslint 'src/**/*.ts'" "prettier --write 'src/**/*.ts'" \
+    'kubectl set image d x=y' 'git apply --check p.diff'; do
+    audit10=$((audit10 + 1))
+    secrets "audit10_allowed_$audit10" allow Bash "$cmd"
+done
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

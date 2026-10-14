@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,7 +54,7 @@ func TestNinthAuditAndCommonForms(t *testing.T) {
 	check := func(name, dir string) bool { return paths.Protected(name, dir, "", root) }
 	deny := []string{
 		"sed -Ei 's/a/b/' .git/config", "sed -ni 's/a/b/' .git/config", "sed --in 's/a/b/' .git/config", "perl -pi -e 's/a/b/' .git/config", "perl -pi -e 's/a/b/' ~/.gitconfig",
-		"patch .git/config", "patch -o .git/config src/f", "tar -C .git -xf archive.tar", "tar --directory .git -xf archive.tar", "mkdir -p .git/hooks", "cp -t.git src/f", "echo x &>> .git/config", "GIT_DIR=/tmp/gd; touch /tmp/gd/config", "sudo VAR=1 sh < src/f",
+		"patch .git/config", "patch -o .git/config src/f", "tar -C .git -xf archive.tar", "tar --directory .git -xf archive.tar", "mkdir -p .git/hooks", "cp -t.git src/f", "echo x &>> .git/config", fmt.Sprintf("GIT_DIR='%s'; touch '%s/config'", filepath.Join(root, "gd"), filepath.Join(root, "gd")), "sudo VAR=1 sh < src/f",
 		"git submodule foreach echo", "git submodule foreach 'npm test'", "echo x > *.txt", "echo x > $UNSET", "pushd elsewhere; echo x > output.txt", "cd -; touch output.txt", "touch *.txt", "touch *.ts", "tee $UNSET", "cp src/f $UNSET", "patch .git/config", "sed -n '1,5p' .git/config", "ssh host 'cat .env'", "sudo -i", "sudo -s", "su", "su -c 'cat .env'", "coproc { cat .env; }",
 		"bash5 -c 'cat .env'", "sh5 -c 'cat .env'", "bash-5.2 -c 'cat .env'", "bash -c -- 'cat .env'", "bash -c -x 'cat .env'", "bash -oc posix 'cat .env'", "bash -co posix 'cat .env'", "bash -Oc extglob -c 'cat .env'", "bash -c -o posix 'cat .env'", "bash -c --norc 'cat .env'", "fish -c true -C 'cat .env'", "fish --init-command='cat .env' -c true", "coproc sh", "coproc cat .env",
 	}

@@ -224,12 +224,14 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 					return
 				}
 				gitDir = value
+				a.gitRoots = append(a.gitRoots, filepath.Clean(paths.Resolve(value, cwd, "", a.home)))
 			case "--work-tree":
 				if !staticGitPath(value) {
 					a.reason = roles.Indeterminate
 					return
 				}
 				workTree = value
+				a.gitRoots = append(a.gitRoots, filepath.Join(filepath.Clean(paths.Resolve(value, cwd, "", a.home)), ".git"))
 			case "-c":
 				a.gitConfig(value, depth, cwd)
 			case "--config-env":
@@ -272,6 +274,31 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		return
 	}
 	sub, operands := args[0], args[1:]
+	for i, operand := range operands {
+		if operand == "--separate-git-dir" && i+1 < len(operands) || strings.HasPrefix(operand, "--separate-git-dir=") {
+			value := strings.TrimPrefix(operand, "--separate-git-dir=")
+			if operand == "--separate-git-dir" {
+				value = operands[i+1]
+			}
+			if !staticGitPath(value) {
+				a.reason = roles.Indeterminate
+				return
+			}
+			a.gitRoots = append(a.gitRoots, filepath.Clean(paths.Resolve(value, cwd, "", a.home)))
+		}
+	}
+	applyReadOnly := false
+	if sub == "apply" {
+		for _, operand := range operands {
+			if optionIn("--check --stat --numstat", operand) {
+				applyReadOnly = true
+			}
+		}
+		if !applyReadOnly {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
 	for _, arg := range operands {
 		if strings.HasPrefix(arg, "--submodule=diff") || strings.HasPrefix(arg, "--submodule=log") || arg == "--recurse-submodules" || sub == "grep" && arg == "--recurse-submodules" {
 			repoUncertain = true
@@ -308,7 +335,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			a.shellValue(value, depth, cwd)
 		}
 	}
-	if sub == "filter-branch" || sub == "bisect" && len(operands) > 0 && operands[0] == "run" || sub == "submodule" && len(operands) > 0 && operands[0] == "foreach" {
+	if sub == "filter-branch" || sub == "bisect" && len(operands) > 0 && operands[0] == "run" || sub == "submodule" && optionIn(strings.Join(operands, " "), "foreach") {
 		// These interpret argument lists in multiple execution contexts.
 		a.reason = roles.Indeterminate
 		return
@@ -357,7 +384,8 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			return
 		}
 	}
-	if indexProtected(resolveGitDirectory(cwd, gitDir), a.home) {
+	// Summary and check modes inspect the supplied patch, not indexed files.
+	if !applyReadOnly && indexProtected(resolveGitDirectory(cwd, gitDir), a.home) {
 		a.reason = roles.FileInput
 	}
 }

@@ -242,3 +242,20 @@ func (a *analyzer) recordIndirect(name string, args []string, unknown bool) {
 		a.indirect = true
 	}
 }
+
+// launcherStdin rejects uncategorized scripts supplied through stdin.
+func launcherStdin(call *syntax.CallExpr, redirs []*syntax.Redirect) bool {
+	if len(call.Args) == 0 {
+		return false
+	}
+	name := strings.ToLower(path.Base(literal(call.Args[0])))
+	if !optionIn("doas run0 pkexec expect runuser su machinectl sudo", name) {
+		return false
+	}
+	for _, r := range redirs {
+		if strings.HasPrefix(r.Op.String(), "<") {
+			return true
+		}
+	}
+	return false
+}
