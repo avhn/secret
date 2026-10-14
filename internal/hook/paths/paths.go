@@ -2,6 +2,7 @@
 package paths
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,30 +124,40 @@ func lexical(p string) bool {
 // TreeProtected scans names only within a bounded search scope. An incomplete
 // scan conservatively reports protected so content searches cannot proceed.
 func TreeProtected(root, cwd, home string) bool {
+	return treeProtected(root, cwd, home, filepath.WalkDir, time.Now)
+}
+
+// treeProtected accepts a walk and clock to verify fail-closed scans under injected failures.
+func treeProtected(root, cwd, home string, walk func(string, fs.WalkDirFunc) error, now func() time.Time) bool {
 	root = Resolve(root, cwd, "", home)
-	deadline := time.Now().Add(200 * time.Millisecond)
+	deadline := now().Add(200 * time.Millisecond)
 	count := 0
-	err := filepath.WalkDir(root, func(name string, entry os.DirEntry, walkErr error) error {
+	incomplete := false
+	err := walk(root, func(name string, entry fs.DirEntry, walkErr error) error {
 		count++
-		if walkErr != nil || count > 4096 || time.Now().After(deadline) {
+		if walkErr != nil || entry == nil || count > 4096 || now().After(deadline) {
+			incomplete = true
 			return os.ErrPermission
 		}
 		if depth := strings.Count(strings.TrimPrefix(name, root), string(os.PathSeparator)); depth > 12 {
+			incomplete = true
 			return os.ErrPermission
 		}
 		if entry.Type()&os.ModeSymlink != 0 {
 			// A directory link could hide protected descendants outside this walk.
+			incomplete = true
 			return os.ErrPermission
 		}
 		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == "node_modules") && name != root {
 			return filepath.SkipDir
 		}
 		if Protected(name, cwd, "", home) {
+			incomplete = true
 			return os.ErrPermission
 		}
 		return nil
 	})
-	return err != nil
+	return incomplete || err != nil
 }
 
 // pid accepts proc's concrete and shell symbolic process selectors.

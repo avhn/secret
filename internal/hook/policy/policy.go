@@ -3,6 +3,7 @@ package policy
 
 import (
 	"errors"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -153,7 +154,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.uncertain = true
 				break
 			}
-			name := filepath.Base(words[0])
+			name := path.Base(words[0])
 			args := words[1:]
 			if name == "cd" {
 				if len(args) > 0 && !unknown {
@@ -271,7 +272,7 @@ func (a *analyzer) xargsListing(upstream, downstream *syntax.Stmt, cwd string) b
 	}
 	reader := false
 	for _, w := range call.Args[1:] {
-		if roles.Reading(filepath.Base(w.Lit())) && w.Lit() != "" {
+		if roles.Reading(path.Base(w.Lit())) && w.Lit() != "" {
 			reader = true
 		}
 	}
@@ -305,7 +306,7 @@ func stash(s *syntax.Stmt) bool {
 			return false
 		}
 	}
-	return filepath.Base(call.Args[0].Lit()) == "secret" && call.Args[1].Lit() == "stash" && call.Args[2].Lit() != "" && call.Args[3].Lit() != ""
+	return path.Base(call.Args[0].Lit()) == "secret" && call.Args[1].Lit() == "stash" && call.Args[2].Lit() != "" && call.Args[3].Lit() != ""
 }
 func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 	call, ok := s.Cmd.(*syntax.CallExpr)
@@ -331,7 +332,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if len(words) == 0 || a.reason != "" {
 		return
 	}
-	name := filepath.Base(words[0])
+	name := path.Base(words[0])
 	args := words[1:]
 	for _, arg := range args {
 		if arg == "--unrecognised" && (witness(strings.Join(args, " ")) || strings.Contains(" "+strings.Join(args, " ")+" ", " env ")) {
@@ -407,7 +408,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			return
 		}
 		if name == "sudo" && len(args) > 1 && (args[0] == "-s" || args[0] == "-i") {
-			a.fragment(args[1], depth+1)
+			if len(args) == 2 {
+				a.fragment(args[1], depth+1)
+			} else {
+				a.command(args[1:], depth+1, cwd, direct)
+			}
 			return
 		}
 		if name == "timeout" {
@@ -422,21 +427,41 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		if name == "env" {
-			for i, v := range args {
-				if (v == "-u" || v == "--unset" || v == "-C" || v == "--chdir") && i+1 < len(args) {
-					a.command(args[i+2:], depth+1, cwd, direct)
-					return
+			// Strip only known option operands, then analyze the actual child.
+			for len(args) > 0 {
+				switch args[0] {
+				case "-u", "--unset", "-C", "--chdir":
+					if len(args) < 2 {
+						a.reason = roles.Indeterminate
+						return
+					}
+					if args[0] == "-C" || args[0] == "--chdir" {
+						cwd = a.resolve(args[1], cwd)
+					}
+					args = args[2:]
+				case "-i", "--ignore-environment", "-0", "--null":
+					args = args[1:]
+				default:
+					if strings.HasPrefix(args[0], "-") && args[0] != "--" && !strings.HasPrefix(args[0], "--unset=") && !strings.HasPrefix(args[0], "--chdir=") {
+						a.reason = roles.Indeterminate
+						return
+					}
+					if strings.HasPrefix(args[0], "--chdir=") {
+						cwd = a.resolve(strings.TrimPrefix(args[0], "--chdir="), cwd)
+						args = args[1:]
+						continue
+					}
+					if strings.HasPrefix(args[0], "--unset=") {
+						args = args[1:]
+						continue
+					}
+					goto envChild
 				}
 			}
-			for i, v := range args {
-				if (v == "-u" || v == "--unset" || v == "-C" || v == "--chdir") && i+1 >= len(args) {
-					a.reason = roles.Indeterminate
-					return
-				}
-				if v == "-S" || v == "--split-string" || strings.HasPrefix(v, "-S") || strings.HasPrefix(v, "--split-string=") {
-					a.reason = roles.Indeterminate
-					return
-				}
+		envChild:
+			if len(args) == 0 {
+				a.reason = roles.Printer
+				return
 			}
 		}
 		for i, v := range args {
@@ -651,7 +676,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		var piece string
 		switch n := part.(type) {
 		case *syntax.Lit:
-			piece = n.Value
+			piece = strings.ReplaceAll(n.Value, `\`, ``)
 			if strings.Contains(piece, "{") && (strings.Contains(piece, ",") || strings.Contains(piece, "..")) {
 				a.uncertain = true
 				return nil, false
@@ -737,8 +762,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		}
 		if unquotedGlob && strings.ContainsAny(v, "*?[") {
 			for _, candidate := range []string{".env", ".env.production", "app.env", "app.secret", ".secrets.env", ".netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
-				if matched, _ := filepath.Match(filepath.Base(v), candidate); matched && a.protected(filepath.Join(filepath.Dir(v), candidate), cwd) {
-					expanded = append(expanded, filepath.Join(filepath.Dir(v), candidate))
+				if matched, _ := path.Match(path.Base(v), candidate); matched && a.protected(path.Join(path.Dir(v), candidate), cwd) {
+					expanded = append(expanded, path.Join(path.Dir(v), candidate))
 				}
 			}
 			matches, err := filepath.Glob(a.resolve(v, cwd))
