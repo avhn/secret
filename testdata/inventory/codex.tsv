@@ -28,6 +28,8 @@ codex	ordinary	decision	allow
 codex	ordinary_patch	decision	allow
 codex	oversized_named	decision	deny
 codex	oversized_safe	decision	allow
+codex	parent_env	decision	deny
+codex	patch_heredoc_prose	decision	allow
 codex	plugin_guard	decision	deny
 codex	plugin_hooks	assert	0
 codex	references	assert	0
@@ -36,6 +38,7 @@ codex	skill_definition	assert	0
 codex	skills	assert	0
 codex	string	decision	deny
 codex	template	decision	allow
+codex	unicode_secret	decision	deny
 codex	versions	assert	0
 codex	workdir	decision	deny
 codex	workdir_relative	decision	deny

@@ -134,6 +134,13 @@ patch_case move_from deny '*** Begin Patch
 *** Update File: .env
 *** Move to: src/safe.ts
 *** End Patch'
+patch_case parent_env deny '*** Begin Patch
+*** Add File: nested/../.env
+*** End Patch'
+patch_case unicode_secret deny '*** Begin Patch
+*** Update File: 配置.secret
+*** End Patch'
+shell_case patch_heredoc_prose allow "\"apply_patch <<'EOF'\\n*** Begin Patch\\n*** Add File: .env\\n+synthetic-only\\n*** End Patch\\nEOF\""
 patch_case template allow '*** Begin Patch
 *** Add File: .env.example
 +TOKEN=sample
