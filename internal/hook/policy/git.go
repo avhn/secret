@@ -11,7 +11,30 @@ import (
 )
 
 func gitShellEnv(key string) bool {
-	return optionIn("GIT_EXTERNAL_DIFF GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_PROXY_COMMAND GIT_EXEC_PATH EDITOR VISUAL PAGER", key)
+	return optionIn("GIT_EXTERNAL_DIFF GIT_EDITOR GIT_SEQUENCE_EDITOR GIT_PAGER GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND GIT_EXEC_PATH EDITOR VISUAL PAGER", key)
+}
+
+// editorPagerValue accepts only literal editor or pager commands, never arbitrary shell text.
+func (a *analyzer) editorPagerValue(key, value, cwd string) {
+	if !optionIn("GIT_EDITOR GIT_SEQUENCE_EDITOR EDITOR VISUAL GIT_PAGER PAGER", key) {
+		a.reason = roles.Indeterminate
+		return
+	}
+	if strings.ContainsAny(value, "\r\n") {
+		a.reason = roles.Indeterminate
+		return
+	}
+	words := strings.Fields(value)
+	if len(words) == 0 || !optionIn("vi vim nvim nano emacs emacsclient code codium subl mate hx kak micro less more most true :", words[0]) && !(optionIn("GIT_PAGER PAGER", key) && optionIn("cat delta", words[0])) {
+		a.reason = roles.Indeterminate
+		return
+	}
+	for _, word := range words {
+		if strings.ContainsAny(word, "\\'\"$`;&|(){}<>*?[]!\r\n") || a.inputProtected(word, cwd) {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
 }
 
 // shellValue checks literal command text without expanding or executing it.
@@ -24,28 +47,6 @@ func (a *analyzer) shellValue(value string, depth int, cwd string) {
 	if a.uncertain {
 		a.reason = roles.Indeterminate
 	}
-}
-
-func gitCommandKey(key string) bool {
-	key = strings.ToLower(key)
-	if strings.HasPrefix(key, "alias.") || strings.HasPrefix(key, "pager.") || strings.HasPrefix(key, "includeif.") || key == "include.path" {
-		return true
-	}
-	if optionIn("core.pager core.editor core.sshcommand core.fsmonitor core.hookspath core.askpass diff.external sequence.editor credential.helper gpg.program uploadpack.packobjectshook", key) {
-		return true
-	}
-	for _, group := range []struct{ prefix, suffixes string }{
-		{"diff.", "command textconv"}, {"filter.", "clean smudge process"}, {"merge.", "driver"}, {"gpg.", "program"},
-	} {
-		if strings.HasPrefix(key, group.prefix) {
-			for _, suffix := range strings.Fields(group.suffixes) {
-				if strings.HasSuffix(key, "."+suffix) {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 // gitConfig checks inline configuration against the inert-key allowlist.
@@ -68,35 +69,14 @@ func (a *analyzer) gitConfig(config string, depth int, cwd string) {
 		a.reason = roles.Indeterminate
 		return
 	}
+	if !gitConfigInert(key, value) {
+		// Every other key may execute code, name a file or redirect a transport.
+		a.reason = roles.Indeterminate
+		return
+	}
 	if !strings.ContainsAny(value, " \t\n") && a.inputProtected(value, cwd) {
 		a.reason = roles.FileInput
-		return
 	}
-	if gitConfigInert(key, value) {
-		return
-	}
-	if strings.HasPrefix(key, "url.") || strings.HasPrefix(key, "protocol.") || key == "core.gitproxy" || strings.HasPrefix(key, "remote.") && (strings.HasSuffix(key, ".url") && strings.HasPrefix(value, "ext::")) {
-		a.reason = roles.Indeterminate
-		return
-	}
-	if !gitCommandKey(key) {
-		// Unmodeled keys may name an executable or redirect a transport.
-		a.reason = roles.Indeterminate
-		return
-	}
-	if strings.HasPrefix(key, "include") || key == "core.hookspath" {
-		// A config or hooks directory cannot be certified without reading code.
-		a.reason = roles.Indeterminate
-		return
-	}
-	if strings.HasPrefix(key, "alias.") {
-		a.reason = roles.Indeterminate
-		return
-	}
-	if key == "credential.helper" && strings.HasPrefix(value, "!") {
-		value = value[1:]
-	}
-	a.shellValue(value, depth, cwd)
 }
 
 // gitCommand owns all Git dispatch: no legacy reader shortcut runs afterwards.

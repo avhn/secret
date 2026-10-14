@@ -45,14 +45,27 @@ func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 		return
 	}
 	if gitShellEnv(key) {
-		a.shellValue(value, depth, cwd)
+		a.editorPagerValue(key, value, cwd)
 	}
 	switch key {
 	case "BASH_ENV", "ENV":
 		if value == "" || a.inputProtected(value, cwd) {
 			a.reason = roles.FileInput
+		} else if key == "BASH_ENV" {
+			// A child shell sources this file; its code and path options are unknown.
+			a.reason = roles.Indeterminate
 		}
-	case "PS4", "PROMPT_COMMAND", "SHELLOPTS", "BASHOPTS":
+	case "SHELLOPTS", "BASHOPTS":
+		if value == "" {
+			a.reason = roles.Indeterminate
+			return
+		}
+		for _, option := range strings.Split(value, ":") {
+			if shellPathOption(option) {
+				a.cdpath = true
+			}
+		}
+	case "PS4", "PROMPT_COMMAND":
 		if value == "" {
 			a.reason = roles.Indeterminate
 			return
