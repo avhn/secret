@@ -49,12 +49,15 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 	protected := func(name string) bool { return paths.Protected(name, cwd, workdir, os.Getenv("HOME")) }
 	switch e.Tool {
 	case "Read", "Edit", "Write", "MultiEdit", "NotebookEdit":
-		name := e.String("file_path")
+		names := []string{e.String("file_path")}
 		if e.Tool == "NotebookEdit" {
-			name = e.String("notebook_path")
+			names = append(names, e.String("notebook_path"))
 		}
-		if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", os.Getenv("HOME"), os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
-			reason = "file access targets a protected store"
+		for _, name := range names {
+			if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", os.Getenv("HOME"), os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
+				reason = "file access targets a protected store"
+				break
+			}
 		}
 	case "Glob":
 		reason = search.ToolGlob(e.String("path"), cwd, os.Getenv("HOME"))

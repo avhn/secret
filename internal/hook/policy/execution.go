@@ -6,9 +6,10 @@ import (
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
+	"mvdan.cc/sh/v3/syntax"
 )
 
-var shellVersion = regexp.MustCompile(`^(?:bash|rbash|sh|zsh|ksh|mksh|dash|ash|yash|posh|fish|csh|tcsh|hush|msh)(?:[-.]?[0-9][0-9.-]*)?$`)
+var shellVersion = regexp.MustCompile(`^(?:bash|rbash|sh|zsh|ksh|mksh|dash|ash|yash|posh|fish|csh|tcsh|hush|msh)(?:[0-9._-][a-z0-9._-]*)?$`)
 
 func shellName(name string) bool { return shellVersion.MatchString(strings.ToLower(path.Base(name))) }
 
@@ -26,7 +27,7 @@ func shellArguments(name string, args []string) (bool, int, []string, bool) {
 	end := false
 	for i := 0; i < len(args); i++ {
 		word := args[i]
-		if !end && word == "--" {
+		if !end && (word == "--" || word == "-") {
 			end = true
 			continue
 		}
@@ -95,9 +96,7 @@ func shellArguments(name string, args []string) (bool, int, []string, bool) {
 		if !end && strings.HasPrefix(word, "-") && word != "-" {
 			continue
 		}
-		if word == "-" && !command {
-			continue
-		}
+
 		return command, i, init, false
 	}
 	return command, -1, init, false
@@ -158,16 +157,14 @@ func (a *analyzer) shellCommand(name string, args []string, depth int, cwd strin
 // modelledCommand keeps opaque strings out of Git messages and other commands
 // whose operand grammar is already explicitly classified.
 func modelledCommand(name string) bool {
-	if optionIn("git sed awk gawk jq yq tar bsdtar unzip cpio 7z 7za find rg docker dotenv secret xargs parallel sudo env command builtin exec timeout gtimeout nice time setsid script busybox toybox sh", name) {
+	if optionIn("git sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
 		return true
 	}
 	if _, ok := utilityTable[name]; ok {
 		return true
 	}
-	if roles.KnownReader(name) || roles.PrinterReason(name, nil, false) != "" {
-		return true
-	}
-	if optionIn("npm go make echo printf ls stat file wc cp mv ln install rsync dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for", name) {
+
+	if optionIn("echo printf ls stat file wc cp mv ln install dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for", name) {
 		return true
 	}
 	return false
@@ -178,14 +175,44 @@ func knownNested(name string) bool {
 	return shellName(name) || modelledCommand(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
 }
 
+// genericShellText is best-effort: prose or invalid shell syntax in an
+// ordinary argument cannot become an accidental fail-closed command slot.
+func (a *analyzer) genericShellText(value string, depth int, cwd string) {
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(value), "")
+	if err != nil || len(file.Stmts) == 0 {
+		return
+	}
+	probe := *a
+	probe.reason, probe.uncertain, probe.structuralUncertain = "", false, false
+	probe.env = make(map[string]string)
+	for key, val := range a.env {
+		probe.env[key] = val
+	}
+	probe.fragmentAt(value, depth+1, cwd)
+	if probe.reason != "" && probe.reason != roles.Indeterminate {
+		a.reason = probe.reason
+	} else if probe.reason == roles.Indeterminate && knownNested(commandName(file.Stmts[0])) {
+		a.reason = probe.reason
+	}
+}
+
 // Unknown launchers can pass commands in any argv suffix or opaque code word.
 func (a *analyzer) unknownExecution(args []string, depth int, cwd string) {
 	for i, value := range args {
-		if strings.ContainsAny(value, " \t\n;|&$`><()") {
-			a.shellValue(value, depth, cwd)
-			if a.reason != "" {
-				return
+		if strings.HasPrefix(value, "--") {
+			if _, suffix, ok := strings.Cut(value, "="); ok && strings.ContainsAny(suffix, " \t\n;|&$`><(){}") {
+				a.genericShellText(suffix, depth, cwd)
 			}
+		}
+		if strings.ContainsAny(value, " \t\n;|&$`><(){}") {
+			a.genericShellText(value, depth, cwd)
+		}
+		if a.reason != "" {
+			return
+		}
+		if optionIn("env printenv", strings.ToLower(path.Base(value))) {
+			a.reason = roles.Printer
+			return
 		}
 		if knownNested(value) {
 			a.command(args[i:], depth+1, cwd, false)

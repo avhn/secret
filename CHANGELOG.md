@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Bash guard protects independent Git directories and Git configuration tokens
+  in attached options and inline code, rejects interactive launchers and
+  unverified command slots, and handles nested coprocesses, shell option
+  terminators, static-variable reassignment, and bounded token streams. Its
+  synthetic regression inventories cover the audit 10 additions on Linux and
+  macOS. Ordinary non-executing argument prose remains allowed.
+
+- Bash guard scans tracked names across the full work tree even when launched from a subdirectory, and denies sed device and process file operands.
+
 ### Added
 
 - Bounded Go Codex patch-header checks for add/update/delete/move paths, physical aliases and explicit workdirs, with malformed patch denial and synthetic fuzz coverage; installed hooks remain unchanged.

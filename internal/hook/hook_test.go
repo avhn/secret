@@ -2,6 +2,9 @@ package hook
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -39,6 +42,45 @@ func TestDecide(t *testing.T) {
 			expected := `"permissionDecisionReason":"` + tc.reason
 			if !strings.Contains(out.String(), expected) || !strings.Contains(out.String(), `"permissionDecision":"deny"`) {
 				t.Fatalf("unexpected denial: %s", out.String())
+			}
+		})
+	}
+}
+
+// TestNotebookEditPaths checks both fields against a separate Git directory.
+func TestNotebookEditPaths(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("cases use Unix host cwds; the Windows hook adapter is M5e")
+	}
+	root := t.TempDir()
+	gitdir := filepath.Join(root, "metadata")
+	for _, dir := range []string{filepath.Join(gitdir, "objects"), filepath.Join(gitdir, "refs")} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(gitdir, "HEAD"), []byte("ref: refs/heads/main\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, notebook, file string
+		deny                 bool
+	}{
+		{"file path protected", "safe.ipynb", filepath.Join(gitdir, "hooks/pre-commit"), true},
+		{"notebook path protected", filepath.Join(gitdir, "hooks/pre-commit"), "safe.ipynb", true},
+		{"both paths safe", "safe.ipynb", "safe.go", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{"tool_name": "NotebookEdit", "cwd": root, "tool_input": map[string]string{"notebook_path": tc.notebook, "file_path": tc.file}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			if err := Decide("claude", bytes.NewReader(body), &out); err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(out.String(), `"permissionDecision":"deny"`); got != tc.deny {
+				t.Errorf("denial=%s, want denial=%v", out.String(), tc.deny)
 			}
 		})
 	}

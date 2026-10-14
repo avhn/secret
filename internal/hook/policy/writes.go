@@ -3,6 +3,7 @@ package policy
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/paths"
@@ -11,6 +12,9 @@ import (
 
 // staticWriteTarget rejects patterns and computed names before path resolution.
 func (a *analyzer) staticWriteTarget(value, cwd string) bool {
+	if strings.HasPrefix(value, "~") && !strings.HasPrefix(value, "~/") {
+		return false
+	}
 	if cwd == "" && !filepath.IsAbs(value) && !strings.HasPrefix(value, "~/") {
 		return false
 	}
@@ -66,12 +70,18 @@ func (a *analyzer) configPath(name, cwd string) bool {
 	if inline, ok := a.env["GIT_CONFIG_GLOBAL"]; ok {
 		global = inline
 	}
-	gitDir := a.env["GIT_DIR"]
-	if gitDir != "" {
-		resolved := paths.Resolve(gitDir, cwd, "", a.home)
-		target := paths.Resolve(name, cwd, "", a.home)
-		if target == resolved || strings.HasPrefix(target, resolved+string(os.PathSeparator)) {
+	target := filepath.Clean(paths.Resolve(name, cwd, "", a.home))
+	for _, root := range a.gitRoots {
+		if target == root || strings.HasPrefix(target, root+string(os.PathSeparator)) {
 			return true
+		}
+	}
+	for _, key := range []string{"GIT_DIR", "GIT_COMMON_DIR"} {
+		if dir := a.env[key]; dir != "" {
+			root := filepath.Clean(paths.Resolve(dir, cwd, "", a.home))
+			if target == root || strings.HasPrefix(target, root+string(os.PathSeparator)) {
+				return true
+			}
 		}
 	}
 	return paths.ConfigWriteProtected(name, cwd, "", a.home, xdg, global)
@@ -91,7 +101,7 @@ func readOnlyConfigCommand(name string, args []string) bool {
 	}
 	if name == "find" {
 		for _, v := range args {
-			if v == "-delete" || v == "-exec" || v == "-execdir" || v == "-ok" || v == "-okdir" || v == "-fprint" {
+			if strings.HasPrefix(v, "-") && !optionIn("-name -iname -path -ipath -regex -iregex -type -maxdepth -mindepth -newer -mtime -mmin -atime -amin -ctime -cmin -size -empty -perm -user -group -uid -gid -links -inum -samefile -readable -writable -executable -print -print0 -printf -prune -quit -not -o -a -or -and -true -false -depth -xdev -mount -follow -L -P -H", v) {
 				return false
 			}
 		}
@@ -100,31 +110,29 @@ func readOnlyConfigCommand(name string, args []string) bool {
 	return strings.Contains(" cat head tail less more ls stat file wc grep rg diff cmp ", " "+name+" ")
 }
 
+// Protected Git tokens occur in attached options and interpreter code as well
+// as standalone paths. The suffix excludes ordinary .gitignore-style names.
+var gitToken = regexp.MustCompile(`(?i)\.git(?:modules|config|[^a-z0-9_-]|$)|git/config`)
+
 // Non-read-only commands cannot even name a Git configuration file.
 func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
 	if readOnlyConfigCommand(name, args) {
 		return false
 	}
-	for _, v := range args {
-		if v == "" || v == "-" {
+	for _, word := range args {
+		if gitToken.MatchString(word) {
+			a.reason = "git configuration write target"
+			return true
+		}
+		if word == "" || word == "-" || strings.ContainsAny(word, "; \n\t*?[]$`<>|(){}\"'") {
 			continue
 		}
-		values := []string{v}
-		if strings.HasPrefix(v, "-") && strings.Contains(v, "=") {
-			_, val, _ := strings.Cut(v, "=")
-			values = append(values, val)
-		}
-		if strings.HasPrefix(v, "-t") && len(v) > 2 {
-			values = append(values, v[2:])
-		}
-		if strings.HasPrefix(v, "-C") && len(v) > 2 {
-			values = append(values, v[2:])
+		values := []string{word}
+		if _, value, ok := strings.Cut(word, "="); ok {
+			values = append(values, value)
 		}
 		for _, value := range values {
-			if value == "" || strings.ContainsAny(value, "; \n\t") {
-				continue
-			}
-			if strings.ContainsAny(value, "*?[]$`") || strings.HasPrefix(value, "-") {
+			if strings.HasPrefix(value, "-") || strings.HasPrefix(value, "~") && !strings.HasPrefix(value, "~/") || strings.ContainsAny(value, "; \n\t") {
 				continue
 			}
 			if a.configPath(value, cwd) {
@@ -194,6 +202,23 @@ func (a *analyzer) writeCommand(name string, args []string, cwd string) bool {
 // staticVariable resolves only literal assignments made in this command and
 // the two explicitly permitted home locations from the hook environment.
 func (a *analyzer) staticVariable(name string) (string, bool) {
+	if a.source != "" {
+		// Bare names include targets of read, for, mapfile, printf -v and similar
+		// mutations. Neither a prefix assignment nor a second assignment proves
+		// that the value remains the one originally seen by the scanner.
+		bare := regexp.MustCompile(`(^|[\s;])` + regexp.QuoteMeta(name) + `([\s;]|$)`)
+		if bare.MatchString(a.source) {
+			return "", false
+		}
+		assigned := regexp.MustCompile(`(^|[;\n])\s*` + regexp.QuoteMeta(name) + `=`)
+		count := len(assigned.FindAllStringIndex(a.source, -1))
+		if count > 1 || count == 1 && a.assignments[name] != 1 {
+			return "", false
+		}
+		if name != "HOME" && name != "XDG_CONFIG_HOME" && count != 1 {
+			return "", false
+		}
+	}
 	if name == "HOME" {
 		return a.home, a.home != ""
 	}

@@ -16,6 +16,9 @@ codex	cwd_safe	decision	allow
 codex	direct	decision	deny
 codex	direct_inherited_cmd	decision	deny
 codex	direct_literal	decision	allow
+codex	gitdir_nongit_allow	decision	allow
+codex	gitdir_write_elsewhere	decision	deny
+codex	gitdir_write_work	decision	deny
 codex	guard	assert	0
 codex	guard_path	assert	0
 codex	hook_config	assert	0

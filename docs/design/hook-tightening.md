@@ -151,3 +151,23 @@ counts and p99. Regenerate denied-command metadata fixtures with
 `python3 -I tests/gen-hook-variants.py`; it keeps Bash-only injected dependency
 faults out of command-text variants and tests their Go scanner boundary through
 fault injection.
+
+## Audit 10 addenda: Go hook
+
+The Go policy now treats attached Git tokens in non-reader operands and inline
+interpreter text as protected, and normalizes command-text Git directories and
+separate gitdirs for write checks. Shell `-c` option parsing stops at `-` or
+`--`, nested wrappers inspect command slots and option values, and interactive
+launchers without certifiable command text deny. `git submodule foreach` and
+unchecked `git apply` deny; a cwd listing piped to `xargs echo` denies only
+when its scope contains a protected file.
+
+Audit 10b distinguishes strict execution slots from best-effort ordinary
+arguments. Invalid shell syntax in titles, prose, JSON, SQL, and label filters
+is not a reason to deny; command slots such as `npm exec -c`, `make --eval`,
+`rsync -e`, and `gh alias set !...` must be certifiable. The `find` read-only
+allowlist excludes output-to-file primaries, and names modified after a static
+assignment no longer certify a write target. Synthetic fixtures under
+`internal/hook/policy/` and `internal/hook/paths/` pair the denials with
+ordinary Git metadata, safe file names, and public command forms. These are
+policy checks, not evidence that the installed Bash hook was replaced.

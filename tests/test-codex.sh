@@ -118,6 +118,13 @@ shell_case workdir deny '"cat .env"' "$TMP/work"
 shell_case workdir_relative deny '"cat .env"' .
 shell_case argv_workdir deny '["cat",".env"]' "$TMP/work"
 shell_case ordinary allow '"cat src/app.ts"'
+# A separate Git directory is protected irrespective of the tool workdir.
+mkdir -p "$TMP/git-objects/objects" "$TMP/git-objects/refs"
+printf 'ref: refs/heads/main\n' >"$TMP/git-objects/HEAD"
+for workdir in "$TMP/work" "$TMP/elsewhere"; do
+    shell_case "gitdir_write_${workdir##*/}" deny "$(jq -cn --arg p "$TMP/git-objects/config" '"echo x > " + $p')" "$workdir"
+done
+shell_case gitdir_nongit_allow allow "$(jq -cn --arg p "$TMP/elsewhere/config" '"echo x > " + $p')"
 for op in 'Add File' 'Update File' 'Delete File' 'Move to'; do
     patch_case "${op// /_}_env" deny "*** Begin Patch
 *** $op: .env

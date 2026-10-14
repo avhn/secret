@@ -39,7 +39,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	if strings.Count(source, "bash -c")+strings.Count(source, "sh -c") > 4 && (witness(source) || riskyRole(source)) {
 		return roles.Indeterminate
 	}
-	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(source, "RIPGREP_CONFIG_PATH")}
+	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(source, "RIPGREP_CONFIG_PATH"), source: source}
 	a.fragment(source, 0)
 	if a.reason != "" {
 		return a.reason
@@ -53,7 +53,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 // AnalyzeArgv checks already-tokenized host arguments without joining them
 // into shell source. Only explicit bash/sh -c source is parsed as shell code.
 func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string) bool) string {
-	if !filepath.IsAbs(cwd) || len(argv) == 0 || len(argv) > 128 {
+	if !filepath.IsAbs(cwd) || len(argv) == 0 || len(argv) > 256 {
 		return roles.Indeterminate
 	}
 	for _, arg := range argv {
@@ -81,6 +81,9 @@ type analyzer struct {
 	configUntrusted     bool
 	structuralUncertain bool
 	env                 map[string]string
+	gitRoots            []string
+	source              string
+	assignments         map[string]int
 	cdpath              bool
 	indirect            bool
 	deadline            time.Time
@@ -202,7 +205,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		}
 		if call, ok := s.Cmd.(*syntax.CallExpr); ok && len(s.Redirs) > 0 {
 			for _, assign := range call.Assigns {
-				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME", assign.Name.Value) {
+				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME GIT_DIR GIT_COMMON_DIR", assign.Name.Value) {
 					if a.env == nil {
 						a.env = make(map[string]string)
 					}
@@ -219,7 +222,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					a.reason = roles.Indeterminate
 				} else if targets, ok := a.expandWord(r.Word, cwd); !ok || len(targets) != 1 {
 					a.reason = roles.Indeterminate
-				} else if a.writeProtected(targets[0], cwd) || a.uncertainWriteWord(r.Word, cwd) {
+				} else if gitToken.MatchString(targets[0]) || a.writeProtected(targets[0], cwd) || a.uncertainWriteWord(r.Word, cwd) {
 					a.reason = roles.FileInput
 				}
 			}
@@ -232,7 +235,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		switch cmd := s.Cmd.(type) {
 		case *syntax.CallExpr:
 			cmd = unwrapCall(cmd)
-			if a.shellStdinCall(cmd, cwd) {
+			if a.shellStdinCall(cmd, cwd) || launcherStdin(cmd, s.Redirs) {
 				a.reason = roles.Indeterminate
 				for _, r := range s.Redirs {
 					switch r.Op.String() {
@@ -284,6 +287,14 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				}
 			}
 			if len(cmd.Args) == 0 {
+				for _, assign := range cmd.Assigns {
+					if assign.Name != nil && !assign.Append && literal(assign.Value) != "" {
+						if a.assignments == nil {
+							a.assignments = make(map[string]int)
+						}
+						a.assignments[assign.Name.Value]++
+					}
+				}
 				for _, assign := range cmd.Assigns {
 					a.walkWord(assign.Value, depth, cwd)
 				}
@@ -437,10 +448,13 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					a.command(words, depth, cwd, direct)
 				}
 			}
-			if (name == "echo" || name == "printf") && a.words <= 128 && time.Now().Before(a.deadline) {
+			if (name == "echo" || name == "printf") && a.words <= 256 && time.Now().Before(a.deadline) {
 				a.uncertain = priorUncertain || nestedUncertain || a.structuralUncertain
 			}
-			if unknown && roles.Reading(name) && a.reason == "" {
+			if name == "kill" && unknown && safePIDLookup(cmd.Args) && a.reason == "" {
+				a.uncertain = priorUncertain
+			}
+			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
@@ -591,6 +605,31 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 	return cwd
 }
 
+var pidLookup = regexp.MustCompile(`^\$\(pgrep [a-zA-Z0-9_.-]+\)$`)
+
+// PID selection is not a content-producing file lookup or a write target.
+func safePIDLookup(words []*syntax.Word) bool {
+	found := false
+	for _, w := range words {
+		raw := literal(w)
+		if raw != "" {
+			continue
+		}
+		var b strings.Builder
+		syntax.NewPrinter().Print(&b, w)
+		if !pidLookup.MatchString(b.String()) {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+func implicitListing(stmt *syntax.Stmt) bool {
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	return ok && len(call.Args) == 1
+}
+
 // xargsListing checks only an AST-connected stdout pipe into a reader.
 // It never relies on the printed output of an upstream command.
 func (a *analyzer) xargsListing(upstream, downstream *syntax.Stmt, cwd string) bool {
@@ -600,6 +639,10 @@ func (a *analyzer) xargsListing(upstream, downstream *syntax.Stmt, cwd string) b
 	}
 	if !ok || len(call.Args) < 2 || literal(call.Args[0]) != "xargs" {
 		return false
+	}
+	// An implicit cwd listing supplies names to xargs even for echo.
+	if commandName(upstream) == "ls" && implicitListing(upstream) && literal(call.Args[len(call.Args)-1]) != "ls" && a.treeProtected(".", cwd) {
+		return true
 	}
 	reader := false
 	for _, w := range call.Args[1:] {
@@ -819,6 +862,24 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.command(args, depth+1, cwd, direct)
 		return
 	}
+	if optionIn("doas run0 pkexec runuser expect machinectl", name) {
+		if len(args) == 0 || name == "expect" && (args[0] == "-" || len(args) > 1 && args[0] == "-f" && (args[1] == "-" || args[1] == "/dev/stdin")) || name == "machinectl" && len(args) == 1 && args[0] == "shell" {
+			a.reason = roles.Indeterminate
+			return
+		}
+		if (name == "doas" || name == "run0") && len(args) > 0 && strings.HasPrefix(args[0], "-") && !strings.HasPrefix(args[0], "--") && strings.ContainsAny(args[0][1:], "si") {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
+	if name == "sudo" && len(args) == 0 {
+		a.reason = roles.Indeterminate
+		return
+	}
+	if name == "sudo" && len(args) > 0 && strings.HasPrefix(args[0], "-") && !strings.HasPrefix(args[0], "--") && strings.ContainsAny(args[0][1:], "si") && len(args) == 1 {
+		a.reason = roles.Indeterminate
+		return
+	}
 	if name == "su" && !strings.Contains(" "+strings.Join(args, " ")+" ", " -c ") && !strings.Contains(" "+strings.Join(args, " ")+" ", " --command ") {
 		a.reason = roles.Indeterminate
 		return
@@ -829,6 +890,17 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if name == "git" {
 		a.gitCommand(args, depth, cwd, direct)
+		return
+	}
+	if name == "find" {
+		for _, arg := range args {
+			if optionIn("-fprintf -fprint0 -fls", arg) {
+				a.reason = roles.Indeterminate
+				return
+			}
+		}
+	}
+	if a.commandSlot(name, args, depth, cwd) {
 		return
 	}
 	if a.configArgument(name, args, cwd) {
@@ -1118,9 +1190,18 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				return
 			}
 		}
+		// Docker's printer rules do not certify arbitrary command options.
+		// Its exec subcommand is not the shell builtin of the same name.
+		dockerArgs := args
+		if len(args) > 0 && args[0] == "exec" {
+			dockerArgs = args[1:]
+		} else if len(args) > 1 && args[0] == "compose" && args[1] == "exec" {
+			dockerArgs = append([]string{"compose"}, args[2:]...)
+		}
+		a.unknownExecution(dockerArgs, depth, cwd)
 		return
 	}
-	if !modelledCommand(name) && roles.PrinterReason(name, args, false) == "" {
+	if !modelledCommand(name) && !shellName(name) {
 		a.unknownExecution(args, depth, cwd)
 		if a.reason != "" {
 			return
@@ -1216,7 +1297,7 @@ func (a *analyzer) walkNode(node syntax.Node, depth int, cwd string) {
 // ambient variables, execute substitutions, and enumerate the filesystem.
 func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 	a.words++
-	if a.words > 128 || time.Now().After(a.deadline) {
+	if a.words > 256 || time.Now().After(a.deadline) {
 		a.uncertain = true
 		return nil, false
 	}
