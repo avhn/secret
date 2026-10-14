@@ -40,32 +40,24 @@ Gate: parser, label, stash and manifest goldens; race/concurrency tests; unchang
 
 ## M1: CLI parity
 
-Status: in progress. Estimate: 5-7 days. Goal: port CLI, provider transports and redacted child execution.
+Status: done (PR #4). Estimate: 5-7 days. Goal: port CLI, provider transports and redacted child execution.
 
-- [ ] feat(cli): add inventory and human-only commands
-
-The Go CLI now has inventory, masked show, stdin/hidden-prompt stash, terminal-only get and clipboard copy; 15 Bash-generated synthetic CLI cases cover a subset of the inventory. Usage failures exit 1 like Bash on all platforms before the Windows launch rejection; run and exec are wired on Unix. Child PATH lookup uses the selected environment. Keep this item open until the full CLI corpus and runner checks pass.
-- [ ] feat(backend): port libsecret transport
-- [ ] feat(backend): port keychain transport
-
-Provider transports and disposable Go integration tests are implemented; keep both boxes open until isolated Linux/macOS CI and review pass. The Bash CLI remains active.
-
-- [ ] feat(run): construct selected child environment
-
-Unix run and exec now load selected file and registered keystore records, remove unselected ambient keys, and preserve required and optional selection. Exec replaces the process on Unix; Windows rejects both commands with a value-free error pending the M5a Job Object gate. Go environment strings and GC copies remain visible to the same user. Keep open until CI runner checks pass.
-
-- [ ] feat(run): filter both output streams and supervise child
-
-Go run filters independent stdout and stderr byte streams with a bounded streaming matcher, subscribes to INT/TERM/HUP before starting the Unix process group, and stops on filter failure, a stalled output writer or a two-second descendant drain timeout. Provider calls now limit captured output, bound inherited pipes and terminate Unix process groups on timeout. Unlike Bash, Go run does not allocate a PTY or invoke script(1); Bash run currently also uses separate FIFO filters, not script(1). Direct terminal buffering and merged stream ordering can differ from an interactive PTY. Keep open until Linux/macOS runner checks pass.
-- [ ] test(cli): port CLI and backend assertions
+- [x] feat(cli): add inventory and human-only commands (`b21e050`)
+- [x] feat(backend): port libsecret transport (`5047953`, with keychain)
+- [x] feat(backend): port keychain transport (`5047953`, size message `8bdef90`)
+- [x] feat(run): construct selected child environment (`141082e`, with filtering)
+- [x] feat(run): filter both output streams and supervise child (`141082e`, review fixes `d0baff2`)
+- [x] test(cli): port CLI and backend assertions (`d273fc0`)
 
 Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on appropriate runners; inject failures/signals; no values in argv or diagnostics; Bash 3.2 jobs green.
 
-M1 test progress (box stays open): the four existing shell suites accept `SECRET_CLI` with the Bash CLI still the default. CI builds regular and `secretstub` test-only Go binaries and runs the same cases on their existing runner jobs. `tests/go-cli.sh` checks every case against `testdata/inventory/go-expected-divergence.tsv`, failing for new failures or a listed case that now passes. Local Linux results: 183 passed and 18 deliberate Bash-only Perl fault-injection divergences for CLI, 63 passed and 0 divergences for stub. Go filter failure and signal tests inject directly in `internal/cli/supervise_test.go`. The isolated 85 libsecret and 129 keychain Go cases, plus macOS Bash 3.2, require CI runner confirmation; do not tick this item until those jobs pass.
+Result: the four shell suites run against the Go binary through `SECRET_CLI` on the same runners as Bash. CLI 183 passed with 18 deliberate divergences (Bash-only Perl fault injection, covered by Go supervision tests), stub 63/63, libsecret 85/85, keychain 129/129. `tests/go-cli.sh` fails on any unlisted divergence or a listed case that passes, against `testdata/inventory/go-expected-divergence.tsv`. The directory stub exists only under the `secretstub` build tag.
+
+Known differences, kept deliberately: Go run uses separate stdout and stderr pipes with no PTY, so terminal buffering and merged ordering can differ from an interactive session; Unix exec is unfiltered, as in Bash; Windows rejects run and exec until M5a. A sol review found a hanging stalled writer, unbounded provider calls, quadratic redaction, ambient PATH lookup, a pre-start signal gap and usage exit codes, all fixed in `d0baff2`. The Bash CLI remains the shipped CLI until the M4 cutover.
 
 ## M2: Go hook parity and tightening
 
-Status: planned. Estimate: 7-10 days. Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax.
+Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax.
 
 - [ ] feat(hook): decode host envelopes and path roles
 - [ ] feat(hook): analyse bash AST and bounded expansions
