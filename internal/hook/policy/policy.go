@@ -838,6 +838,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	case "bash", "sh", "zsh", "ksh", "ksh93", "mksh", "dash", "ash", "yash", "posh", "fish", "csh", "tcsh", "eval":
+		if a.cdpath && name != "eval" {
+			cwd = ""
+		}
 		if name == "eval" {
 			a.indirect = true
 			if len(args) > 0 {

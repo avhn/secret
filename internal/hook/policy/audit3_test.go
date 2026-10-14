@@ -89,7 +89,7 @@ func TestGitPolicyV2SafeForms(t *testing.T) {
 		"git restore safe.go", "git checkout main", "git switch main", "git stash list", "git fetch --all", "git pull --ff-only", "git push --dry-run",
 		"git clone https://example.invalid/repo destination", "git init", "git merge --no-edit main", "git rebase main", "git cherry-pick HEAD", "git revert --no-edit HEAD",
 		"git reset --hard HEAD", "git rm safe.go", "git mv safe.go next.go", "git worktree list", "git gc", "git prune", "git blame safe.go",
-		"git -c color.ui=always log --oneline", "git -ccolor.ui=always log --oneline", "git -c core.editor='echo .env' status", "git -c core.editor='echo safe' status",
+		"git -c color.ui=always log --oneline", "git -ccolor.ui=always log --oneline",
 		"git --namespace demo --attr-source HEAD status", "git config --get user.name",
 	} {
 		t.Run(command, func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestPolicyV2FailurePaths(t *testing.T) {
 	for _, command := range []string{
 		"git --unknown status", "git --namespace", "git -c", "git --config-env=core.editor=MISSING status",
 		"git -c alias.a=a a", "git -c alias.a='-c core.editor=printenv commit' a", "git -c alias.a='$UNKNOWN' a",
-		"git -c core.editor='$UNKNOWN' status", "git -c include.path=safe status", "git -c core.hooksPath=safe status",
+		"git -c core.editor='$UNKNOWN' status", "git -c core.editor='echo .env' status", "git -c core.editor='echo safe' status", "git -c include.path=safe status", "git -c core.hooksPath=safe status",
 		"GIT_CONFIG_COUNT=129 git status", "GIT_CONFIG_COUNT=1 git status", "GIT_CONFIG_COUNT=no git status",
 		"GIT_DIR=$UNKNOWN git log -p", "GIT_INDEX_FILE=other git log -p",
 		"git log --unknown-output", "git status -v", "git rev-list --objects HEAD", "git log -p -- safe.go",

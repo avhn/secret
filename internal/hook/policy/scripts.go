@@ -22,6 +22,10 @@ func (a *analyzer) scriptInputs(name string, args []string, depth int, cwd strin
 	if a.reason != "" {
 		return
 	}
+	if name == "sed" {
+		// GNU sed separates successive -e/-f sources with a newline.
+		args = []string{strings.Join(args, "\n")}
+	}
 	for _, arg := range args {
 		if name != "sed" && (strings.HasPrefix(arg, "--file") || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg, "f")) {
 			a.reason = roles.Indeterminate

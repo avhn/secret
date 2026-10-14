@@ -73,8 +73,6 @@ func (a *analyzer) recordIndirect(name string, args []string, unknown bool) {
 				}
 			} else if unknown {
 				mark("")
-			} else {
-				mark(key)
 			}
 		}
 	case "read":
@@ -102,13 +100,7 @@ func (a *analyzer) recordIndirect(name string, args []string, unknown bool) {
 		if unknown {
 			mark("")
 		}
-		for _, arg := range args {
-			if strings.HasPrefix(arg, "-") {
-				continue
-			}
-			key, _, _ := strings.Cut(arg, "=")
-			mark(key)
-		}
+		// Literal export names are direct assignments, not indirect writes.
 	case "eval":
 		a.indirect = true
 	}

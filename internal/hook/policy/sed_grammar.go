@@ -15,7 +15,7 @@ type sedParser struct {
 }
 
 // sedDelimited consumes an escaped-delimiter expression, including bracket classes.
-func (p *sedParser) sedDelimited(delim byte) bool {
+func (p *sedParser) sedDelimited(delim byte, regex bool) bool {
 	inClass := false
 	for p.pos < len(p.code) {
 		c := p.code[p.pos]
@@ -27,13 +27,15 @@ func (p *sedParser) sedDelimited(delim byte) bool {
 			p.pos++
 			continue
 		}
-		if c == '[' {
+		if regex && c == '[' {
 			inClass = true
-		} else if c == ']' {
+		} else if regex && c == ']' {
 			inClass = false
 		}
-		if c == delim && !inClass {
-			return true
+		if c == delim {
+			// GNU sed does not let a bracket class hide the delimiter; treating it
+			// as hidden would misparse what follows, so the form is ambiguous.
+			return !inClass
 		}
 	}
 	return false
@@ -60,7 +62,7 @@ func (p *sedParser) sedAddress() bool {
 		p.pos++
 	case c == '/':
 		p.pos++
-		if !p.sedDelimited('/') {
+		if !p.sedDelimited('/', true) {
 			return false
 		}
 		p.sedRegexFlags()
@@ -71,7 +73,7 @@ func (p *sedParser) sedAddress() bool {
 		}
 		delim := p.code[p.pos]
 		p.pos++
-		if !p.sedDelimited(delim) {
+		if !p.sedDelimited(delim, true) {
 			return false
 		}
 		p.sedRegexFlags()
@@ -137,10 +139,8 @@ func (a *analyzer) parseSedScript(code string, depth int, cwd string) {
 			continue
 		}
 		if code[p.pos] == '#' {
-			p.sedArgument()
-			if p.pos < len(code) && code[p.pos] == '}' {
-				p.pos++
-			}
+			// GNU sed comments consume semicolons and braces through the newline.
+			p.sedLineArgument()
 			continue
 		}
 		if code[p.pos] == '}' {
@@ -185,13 +185,13 @@ func (a *analyzer) parseSedScript(code string, depth int, cwd string) {
 			p.blocks++
 			continue
 		case 's', 'y':
-			if p.pos >= len(code) || strings.ContainsRune(" \t\n;", rune(code[p.pos])) {
+			if p.pos >= len(code) || strings.ContainsRune(" \t\n;\\", rune(code[p.pos])) {
 				invalid()
 				break
 			}
 			delim := code[p.pos]
 			p.pos++
-			if !p.sedDelimited(delim) || !p.sedDelimited(delim) {
+			if !p.sedDelimited(delim, cmd == 's') || !p.sedDelimited(delim, false) {
 				invalid()
 				break
 			}
@@ -239,7 +239,26 @@ func (a *analyzer) parseSedScript(code string, depth int, cwd string) {
 			} else {
 				a.shellValue(value, depth, cwd)
 			}
-		case ':', 'b', 't', 'T', 'a', 'i', 'c', 'v':
+		case 'a', 'i', 'c':
+			// Text includes semicolons and braces; backslash continues the next line.
+			for p.pos < len(code) {
+				if code[p.pos] == '\n' {
+					backslashes := 0
+					for i := p.pos - 1; i >= 0 && code[i] == '\\'; i-- {
+						backslashes++
+					}
+					if backslashes%2 == 1 {
+						p.pos++
+						continue
+					}
+					break
+				}
+				p.pos++
+			}
+			if strings.TrimSpace(code[p.pos:]) != "" {
+				invalid() // Later commands after text cannot be certified.
+			}
+		case ':', 'b', 't', 'T', 'v':
 			p.sedArgument()
 		case 'q', 'Q', 'l', 'L':
 			p.sedSpaces()

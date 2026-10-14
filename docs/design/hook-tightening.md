@@ -57,10 +57,22 @@ failure tests, dialect evidence, and supported-platform CI remain separate gates
 - P13 expands single-element glob braces under explicit nesting and alternative
   limits. P14 treats `apply_patch` heredocs as patches, rather than inert prose;
   protected or malformed patches deny and safe framed patches remain allowed.
-- Shell hook code in `BASH_ENV` and `ENV` is treated as a file input. Other hook
-  variables and Git execution configuration are bounded shell fragments.
-  Interpreter environment access is denied for recognized environment reads in
-  interpreter arguments. No interpreter runs during analysis.
+- Inline Git configuration outside the inert `gitConfigInert` key allowlist
+  always denies, including `-c`, `--config-env`, `GIT_CONFIG_COUNT`, and
+  `GIT_CONFIG_PARAMETERS`. Inline editor and pager assignments accept only named
+  editor or pager programs and literal arguments; inline SSH, askpass, proxy,
+  and external-diff assignments deny. Inherited editor and pager settings are
+  not analyzed.
+- Shell hook code in `BASH_ENV` and `ENV` is treated as a file input. An
+  inline `BASH_ENV` pointing to an unprotected script also denies because its
+  sourced code is not certified. Inline `BASHOPTS` and `SHELLOPTS` with
+  path-changing options invalidate child shell directories. Other hook variables remain bounded shell fragments. Interpreter
+  environment access is denied for recognized environment reads in interpreter
+  arguments. No interpreter runs during analysis.
+- GNU sed text commands consume the complete line and odd-backslash newline
+  continuations; even-backslash newlines end the text. Scripts containing later
+  commands after text deny. Multiple `-e` sources are
+  joined with newlines, and comments consume the rest of their line.
 
 The policy intentionally excludes simulated copy, link, and extraction state;
 computed script literals and `eval`; object-content reads; and claims about host
@@ -83,6 +95,7 @@ indeterminate-input or audited input/output policy tightening.
 | `malformed_safe`, `oversized_safe`                                                                                                                                                 | deliberate-tightening | An absent framing pair, ambiguous header, or patch above the 40 KiB limit cannot certify safe target paths. Recognized protected headers deny even without framing.                          |
 | `active_safe_command`                                                                                                                                                              | deliberate-tightening | `$c package.json` does not establish the executable or its input and output roles.                                                                                                           |
 | `deep_safe`                                                                                                                                                                        | deliberate-tightening | Six nested `shell -c` layers exceed the Go analysis depth and deny.                                                                                                                          |
+| `audit6_sed_comment`, `audit6_sed_text_line`, `audit6_sed_insert_line`, `audit6_sed_change_line`                                                                                   | deliberate-tightening | GNU sed reads these as a comment or as a/i/c text, so Bash allows them; Go denies any script whose later commands follow a comment or text command on one line.                              |
 | `grep_find_exit`, `grep_find_exit_count`, `grep_timeout`, `grep_timeout_count`, `rg_find_exit`, `rg_timeout`                                                                       | deliberate-find-shim  | Bash denies when the injected `find` exits or times out. Go does not execute `find`; its walk errors, permissions, loops, budgets, and deadlines deny under dedicated fault-injection tests. |
 | `unresolved_file_safe`, `unresolved_listing_safe`, `unresolved_literal_safe`, `unresolved_no_eval`, `unresolved_positional_safe`, `unresolved_redirect_safe`, `unresolved_wc_safe` | deliberate-tightening | Unknown parameter or substitution output cannot certify a non-protected content-producing input. The analyzer never executes a substitution to decide.                                       |
 
