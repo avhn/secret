@@ -39,6 +39,17 @@ func TestASTPaths(t *testing.T) {
 		{"grep -R TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
 		{"rg TOKEN src", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
 		{"git grep TOKEN", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
+		{"cat .{env,x", "command too complex to analyse for secret access; split it or use secret run"},
+		{"find . -name .env -exec cat {} \\;", "reader targets a protected store"},
+		{"find -files0-from=.env -print", "find reads a protected name list"},
+		{"find . -name .env -exec sh -c \"cat \\\"\\$1\\\"\" _ {} \\;", "command too complex to analyse for secret access; split it or use secret run"},
+		{"ln -s .env", "file input targets a protected store"},
+		{"cat \"$(printf .en; printf v)\"", "command too complex to analyse for secret access; split it or use secret run"},
+		{"wc < \"$(printf .en; printf v)\"", "input redirect reads a protected store"},
+		{"cat $'\\x2eenv'", "reader targets a protected store"},
+		{"cat .en{u..w}", "command too complex to analyse for secret access; split it or use secret run"},
+		{"cat .env '", "command too complex to analyse for secret access; split it or use secret run"},
+		{"if false; then echo safe; elif false; then echo safe; else cat .env; fi", "reader targets a protected store"},
 	}
 	for _, c := range cases {
 		t.Run(c.src, func(t *testing.T) {
@@ -46,6 +57,38 @@ func TestASTPaths(t *testing.T) {
 				t.Fatalf("got %q want %q", got, c.reason)
 			}
 		})
+	}
+}
+
+func TestIndeterminateRisk(t *testing.T) {
+	for _, src := range []string{"security find-generic-password '", "git credential fill '", "secret get svc TOKEN '", "aws configure get aws_secret_access_key '", "gcloud auth print-access-token '", "op read '", "pass show mail '", "ps e '", "jq -n env '", "cat $(printf .en; printf v)", "wc < $(printf .en; printf v)", "cat .{env,x", strings.Repeat("cat ", 130) + ".env"} {
+		if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
+			t.Fatalf("allowed uncertain protected operation %q", src)
+		}
+	}
+	if got := Analyze("echo harmless '", "/synthetic", "/synthetic", protected); got != "" {
+		t.Fatalf("inert parse failure denied: %q", got)
+	}
+}
+
+func TestArgv(t *testing.T) {
+	for _, argv := range [][]string{{"cat", ".env"}, {"bash", "-lc", "cat .env"}, {"sh", "-c", "cat .env"}} {
+		if got := AnalyzeArgv(argv, "/synthetic", "/synthetic", protected); got == "" {
+			t.Fatalf("argv protected read allowed: %q", argv)
+		}
+	}
+	if got := AnalyzeArgv([]string{"printf", "%s", "cat .env"}, "/synthetic", "/synthetic", protected); got != "" {
+		t.Fatalf("literal argv prose denied: %q", got)
+	}
+}
+
+func TestNestedDepth(t *testing.T) {
+	command := "cat .env"
+	for i := 0; i < 6; i++ {
+		command = "bash -c '" + strings.ReplaceAll(command, "'", "'\\\\''") + "'"
+	}
+	if got := Analyze(command, "/synthetic", "/synthetic", protected); got == "" {
+		t.Fatal("nested reader exceeded depth but was allowed")
 	}
 }
 

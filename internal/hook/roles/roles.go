@@ -30,6 +30,9 @@ func init() {
 // CredentialExpansion recognises an active credential-variable reference.
 func CredentialExpansion(text string) bool { return credential.MatchString(text) }
 
+// KnownReader checks a named reader without guessing an unknown command's role.
+func KnownReader(name string) bool { return readers[name] }
+
 // Reading reports whether a command consumes positional file inputs.
 func Reading(name string) bool {
 	return readers[name] || !metadata[name] && name != "echo" && name != "printf"
@@ -203,11 +206,34 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		}
 		if i < len(args) {
 			switch args[i] {
-			case "check-ignore", "ls-files", "grep", "status":
+			case "check-ignore", "ls-files", "grep":
 				return ""
+			case "status":
+				verbose := false
+				for _, v := range args[i+1:] {
+					if v == "--verbose" || v == "-v" {
+						verbose = true
+					}
+				}
+				if !verbose {
+					return ""
+				}
 			}
 			args = args[i+1:]
 		}
+	}
+	if name == "du" || name == "file" {
+		for i, v := range args {
+			for _, opt := range []string{"--files0-from", "--exclude-from", "--files-from", "--magic-file"} {
+				if v == opt && i+1 < len(args) && protected(args[i+1]) || strings.HasPrefix(v, opt+"=") && protected(strings.TrimPrefix(v, opt+"=")) {
+					return name + " option reads a protected file"
+				}
+			}
+			if (v == "-X" || v == "-f" || v == "-m") && i+1 < len(args) && protected(args[i+1]) || len(v) > 2 && (strings.HasPrefix(v, "-X") || strings.HasPrefix(v, "-f") || strings.HasPrefix(v, "-m")) && protected(v[2:]) {
+				return name + " option reads a protected file"
+			}
+		}
+		return ""
 	}
 	if name == "dd" {
 		for _, a := range args {
@@ -222,7 +248,21 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 	if end > 1 {
 		switch name {
 		case "cp", "mv", "ln", "install", "rsync", "scp":
-			end--
+			targetOption := false
+			for _, v := range args {
+				if v == "-t" || v == "--target-directory" || strings.HasPrefix(v, "--target-directory=") || strings.HasPrefix(v, "-t") && len(v) > 2 {
+					targetOption = true
+				}
+			}
+			positional := 0
+			for _, v := range args {
+				if !strings.HasPrefix(v, "-") {
+					positional++
+				}
+			}
+			if !targetOption && positional >= 2 {
+				end--
+			}
 		}
 	}
 	for i := 0; i < end; i++ {
@@ -230,7 +270,17 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		if a == "--" {
 			continue
 		}
+		if pattern && (strings.HasPrefix(a, "--regexp=") || strings.HasPrefix(a, "-e") && len(a) > 2) {
+			pattern = false
+			continue
+		}
+		if pattern && (a == "-e" || a == "--regexp") {
+			i++
+			pattern = false
+			continue
+		}
 		if a == "-f" || a == "--file" || a == "--files0-from" {
+			pattern = false
 			i++
 			if i < end && protected(args[i]) {
 				return "pattern file targets a protected store"
@@ -238,6 +288,7 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			continue
 		}
 		if strings.HasPrefix(a, "--file=") || strings.HasPrefix(a, "--files0-from=") {
+			pattern = false
 			if protected(a[strings.IndexByte(a, '=')+1:]) {
 				return "pattern file targets a protected store"
 			}
