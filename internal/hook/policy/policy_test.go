@@ -16,6 +16,8 @@ func protected(name, cwd string) bool {
 func TestASTPaths(t *testing.T) {
 	cases := []struct{ src, reason string }{
 		{"cat .env", "reader targets a protected store"},
+		{"split -l 5 .env", "file input targets a protected store"},
+		{"split -l 5 src/app.ts .env", ""},
 		{"cat .env.example", ""},
 		{"ls .env", ""},
 		{"(cat .env)", "reader targets a protected store"},
@@ -39,6 +41,8 @@ func TestASTPaths(t *testing.T) {
 		{"docker compose --env-file .env config", "compose config prints env-file values"},
 		{"dotenv -e .env -- printenv", "credential printer requires a direct pipe to secret stash FILE KEY"},
 		{"grep -R TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
+		{"grep -nR TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
+		{"grep -ri TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
 		{"rg TOKEN src", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
 		{"git grep TOKEN", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
 		{"cat .{env,x", "command too complex to analyse for secret access; split it or use secret run"},

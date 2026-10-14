@@ -549,7 +549,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if name == "grep" || name == "egrep" || name == "fgrep" {
 		for _, arg := range args {
-			if arg == "-R" || arg == "-r" || arg == "--recursive" || arg == "--dereference-recursive" {
+			if arg == "--recursive" || arg == "--dereference-recursive" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsAny(arg[1:], "rR") {
 				a.reason = "recursive grep bypasses protected search defaults; use plain rg"
 				return
 			}

@@ -88,6 +88,9 @@ func TestScope(t *testing.T) {
 		{"hidden", []string{"rg", "--hidden", "TOKEN", "src"}, config, false},
 		{"positive", []string{"rg", "-g.env", "TOKEN", "src"}, config, true},
 		{"pattern file", []string{"rg", "-f", "src/.env", "TOKEN", "src"}, config, true},
+		{"missing pattern file names", []string{"rg", "-l", "-f", "missing-pattern", "src"}, config, true},
+		{"missing attached pattern file names", []string{"rg", "-l", "--file=missing-pattern", "src"}, config, true},
+		{"pattern file directory names", []string{"rg", "-l", "-f", "src", "TOKEN"}, config, false},
 		{"follow", []string{"rg", "--follow", "TOKEN", "src"}, config, true},
 		{"unrestricted", []string{"rg", "-uu", "TOKEN", "src"}, config, true},
 		{"zip", []string{"rg", "--search-zip", "TOKEN", "src"}, config, true},
@@ -132,7 +135,7 @@ func TestToolSelectors(t *testing.T) {
 		selector  string
 		protected bool
 	}{
-		{"**/.config/gh/*.yml", true}, {".ENV*", true}, {"proc/$PPID/environ", true},
+		{"**/.config/gh/*.yml", true}, {"**/.env*", true}, {"src/.env*", true}, {".ENV*", true}, {"proc/$PPID/environ", true},
 		{"**/environment*.ts", false}, {"~/.ssh/id_ed25519.pub", false},
 	} {
 		t.Run(tc.selector, func(t *testing.T) {
