@@ -1,0 +1,2318 @@
+[
+  {
+    "name": "git1-1",
+    "cwd": "r",
+    "command": "git log -U1",
+    "deny": true
+  },
+  {
+    "name": "git1-2",
+    "cwd": "r",
+    "command": "git log --unified=1",
+    "deny": true
+  },
+  {
+    "name": "git1-3",
+    "cwd": "r",
+    "command": "git log --patch-with-stat",
+    "deny": true
+  },
+  {
+    "name": "git1-4",
+    "cwd": "r",
+    "command": "git log --patch-with-raw",
+    "deny": true
+  },
+  {
+    "name": "git1-5",
+    "cwd": "r",
+    "command": "git log --word-diff",
+    "deny": true
+  },
+  {
+    "name": "git1-6",
+    "cwd": "r",
+    "command": "git log --color-words",
+    "deny": true
+  },
+  {
+    "name": "git1-7",
+    "cwd": "r",
+    "command": "git log --cc",
+    "deny": true
+  },
+  {
+    "name": "git1-8",
+    "cwd": "r",
+    "command": "git log -L1,1:.secrets/store",
+    "deny": true
+  },
+  {
+    "name": "git1-9",
+    "cwd": "r",
+    "command": "git log -L 1,1:.secrets/store",
+    "deny": true
+  },
+  {
+    "name": "git1-10",
+    "cwd": "r3",
+    "command": "git log -L1,1:app.env",
+    "deny": true
+  },
+  {
+    "name": "git1-11",
+    "cwd": "r",
+    "command": "git log --binary",
+    "deny": true
+  },
+  {
+    "name": "git1-12",
+    "cwd": "r",
+    "command": "git log -W",
+    "deny": true
+  },
+  {
+    "name": "git1-13",
+    "cwd": "r",
+    "command": "git whatchanged -p",
+    "deny": true
+  },
+  {
+    "name": "git1-14",
+    "cwd": "r",
+    "command": "git reflog -p",
+    "deny": true
+  },
+  {
+    "name": "git1-15",
+    "cwd": "r",
+    "command": "git reflog show --patch",
+    "deny": true
+  },
+  {
+    "name": "git1-16",
+    "cwd": "r",
+    "command": "git log -p --full-diff -- a.ts",
+    "deny": true
+  },
+  {
+    "name": "git1-17",
+    "cwd": "r",
+    "command": "git show HEAD~1 --full-diff -- a.ts",
+    "deny": true
+  },
+  {
+    "name": "git1-18",
+    "cwd": "r",
+    "command": "git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "deny": true
+  },
+  {
+    "name": "git1-19",
+    "cwd": "r",
+    "command": "git diff --cached 4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "deny": true
+  },
+  {
+    "name": "git1-20",
+    "cwd": "r",
+    "command": "git diff @~1",
+    "deny": true
+  },
+  {
+    "name": "git1-21",
+    "cwd": "r",
+    "command": "git diff-tree -p --root HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git1-22",
+    "cwd": "r",
+    "command": "git diff-tree -r -p 4b825dc642cb6eb9a060e54bf8d69288fbee4904 HEAD",
+    "deny": true
+  },
+  {
+    "name": "git1-23",
+    "cwd": "r",
+    "command": "git diff-index -p 4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "deny": true
+  },
+  {
+    "name": "git1-24",
+    "cwd": "r",
+    "command": "git format-patch --root --output=/dev/stdout",
+    "deny": true
+  },
+  {
+    "name": "git1-25",
+    "cwd": "r",
+    "command": "git format-patch --root --stdou",
+    "deny": true
+  },
+  {
+    "name": "git1-26",
+    "cwd": "r",
+    "command": "git fast-export --all",
+    "deny": true
+  },
+  {
+    "name": "git1-27",
+    "cwd": "r",
+    "command": "git bundle create - --all",
+    "deny": true
+  },
+  {
+    "name": "git2-1",
+    "cwd": "r",
+    "command": "git cat-file blob 1d6d3ba2c4a3b4fd6c8b3b8b0e4f0a4b8f0e2d1c",
+    "deny": true
+  },
+  {
+    "name": "git2-2",
+    "cwd": "r",
+    "command": "git cat-file --textconv HEAD:app.env",
+    "deny": true
+  },
+  {
+    "name": "git2-3",
+    "cwd": "r",
+    "command": "git cat-file -p HEAD~1:.secrets/store",
+    "deny": true
+  },
+  {
+    "name": "git2-4",
+    "cwd": "r",
+    "command": "git grep -e SYNTH HEAD",
+    "deny": true
+  },
+  {
+    "name": "git2-5",
+    "cwd": "r",
+    "command": "git grep -e SYNTH HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-6",
+    "cwd": "r",
+    "command": "git grep SYNTH HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-7",
+    "cwd": "r",
+    "command": "git grep -e SYNTH ca906e3",
+    "deny": true
+  },
+  {
+    "name": "git2-8",
+    "cwd": "r",
+    "command": "git grep --cached SYNTH",
+    "deny": true
+  },
+  {
+    "name": "git2-9",
+    "cwd": "r",
+    "command": "git blame app.env",
+    "deny": true
+  },
+  {
+    "name": "git2-10",
+    "cwd": "r",
+    "command": "git blame -- app.env",
+    "deny": true
+  },
+  {
+    "name": "git2-11",
+    "cwd": "r",
+    "command": "git blame --contents=@ROOT@/proj/sub/link a.ts",
+    "deny": true
+  },
+  {
+    "name": "git2-12",
+    "cwd": "r",
+    "command": "git blame --contents @ROOT@/proj/sub/link a.ts",
+    "deny": true
+  },
+  {
+    "name": "git2-13",
+    "cwd": "r",
+    "command": "git --namespace x show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-14",
+    "cwd": "r",
+    "command": "git --namespace=x show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-15",
+    "cwd": "r",
+    "command": "git --attr-source HEAD show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-16",
+    "cwd": "r",
+    "command": "git -c alias.x=show x HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git2-17",
+    "cwd": "r",
+    "command": "git -c alias.x=log x -p",
+    "deny": true
+  },
+  {
+    "name": "git2-18",
+    "cwd": "r",
+    "command": "git stash show -p",
+    "deny": true
+  },
+  {
+    "name": "git2-19",
+    "cwd": "r3",
+    "command": "git stash show -p",
+    "deny": true
+  },
+  {
+    "name": "git2-20",
+    "cwd": "r3",
+    "command": "git stash show -p stash@{0}",
+    "deny": true
+  },
+  {
+    "name": "git2-21",
+    "cwd": "r3",
+    "command": "git stash list -p",
+    "deny": true
+  },
+  {
+    "name": "git2-22",
+    "cwd": "r3",
+    "command": "git range-diff HEAD~2..HEAD~1 HEAD~1..HEAD",
+    "deny": true
+  },
+  {
+    "name": "git2-23",
+    "cwd": "r3",
+    "command": "git log -p HEAD~1..HEAD",
+    "deny": true
+  },
+  {
+    "name": "git2-24",
+    "cwd": "r3",
+    "command": "git notes show",
+    "deny": true
+  },
+  {
+    "name": "git2-25",
+    "cwd": "r",
+    "command": "git log --format=%B",
+    "deny": false
+  },
+  {
+    "name": "git2-26",
+    "cwd": "r",
+    "command": "git log -p -- a.ts",
+    "deny": true
+  },
+  {
+    "name": "git2-27",
+    "cwd": "r",
+    "command": "git diff --no-index /dev/null @ROOT@/proj/sub/link",
+    "deny": true
+  },
+  {
+    "name": "git2-28",
+    "cwd": "r",
+    "command": "git diff --no-index -- /dev/null @ROOT@/proj/sub/link",
+    "deny": true
+  },
+  {
+    "name": "git3-1",
+    "cwd": "r3",
+    "command": "git range-diff --creation-factor=999 HEAD~2..HEAD~1 alt~1..alt",
+    "deny": true
+  },
+  {
+    "name": "git3-2",
+    "cwd": "cr",
+    "command": "git --git-dir=@ROOT@/r/.git show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git3-3",
+    "cwd": "cr",
+    "command": "git --git-dir @ROOT@/r/.git show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git3-4",
+    "cwd": "cr",
+    "command": "GIT_DIR=@ROOT@/r/.git git show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git3-5",
+    "cwd": "cr",
+    "command": "git --git-dir=@ROOT@/r/.git log -p",
+    "deny": true
+  },
+  {
+    "name": "git3-6",
+    "cwd": "cr",
+    "command": "git -C @ROOT@/r show HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git3-7",
+    "cwd": "cr",
+    "command": "git diff",
+    "deny": false
+  },
+  {
+    "name": "git3-8",
+    "cwd": "cr",
+    "command": "git -c diff.external='paste @ROOT@/proj/sub/link #' diff",
+    "deny": true
+  },
+  {
+    "name": "git3-9",
+    "cwd": "cr",
+    "command": "git -c core.editor='paste @ROOT@/proj/sub/link #' commit --allow-empty",
+    "deny": true
+  },
+  {
+    "name": "git3-10",
+    "cwd": "cr",
+    "command": "git -c credential.helper='!paste @ROOT@/proj/sub/link >&2 #' credential fill",
+    "deny": true
+  },
+  {
+    "name": "git3-11",
+    "cwd": "cr",
+    "command": "git -c gpg.program='paste @ROOT@/proj/sub/link' commit -S --allow-empty -m x",
+    "deny": true
+  },
+  {
+    "name": "git3-12",
+    "cwd": "cr",
+    "command": "git rebase -x 'paste @ROOT@/proj/sub/link' HEAD",
+    "deny": true
+  },
+  {
+    "name": "git3-13",
+    "cwd": "cr",
+    "command": "git rebase --exec='paste @ROOT@/proj/sub/link' HEAD",
+    "deny": true
+  },
+  {
+    "name": "git3-14",
+    "cwd": "cr",
+    "command": "git ls-remote --upload-pack='paste @ROOT@/proj/sub/link >&2 #' .",
+    "deny": true
+  },
+  {
+    "name": "git3-15",
+    "cwd": "cr",
+    "command": "GIT_EXTERNAL_DIFF='paste @ROOT@/proj/sub/link #' git diff",
+    "deny": true
+  },
+  {
+    "name": "git3-16",
+    "cwd": "cr",
+    "command": "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.external GIT_CONFIG_VALUE_0='paste @ROOT@/proj/sub/link #' git diff",
+    "deny": true
+  },
+  {
+    "name": "git3-17",
+    "cwd": "cr",
+    "command": "P='paste @ROOT@/proj/sub/link #' git --config-env=diff.external=P diff",
+    "deny": true
+  },
+  {
+    "name": "git3-18",
+    "cwd": "cr",
+    "command": "git -c CORE.SSHCOMMAND='paste @ROOT@/proj/sub/link >&2 #' ls-remote ssh://x/y",
+    "deny": true
+  },
+  {
+    "name": "git3-19",
+    "cwd": "cr",
+    "command": "git -c core.sshCommand='paste @ROOT@/proj/sub/link >&2 #' ls-remote ssh://x/y",
+    "deny": true
+  },
+  {
+    "name": "git3-20",
+    "cwd": "cr",
+    "command": "git -c alias.x='!paste @ROOT@/proj/sub/link' x",
+    "deny": true
+  },
+  {
+    "name": "git3-21",
+    "cwd": "cr",
+    "command": "git -c Alias.x='!paste @ROOT@/proj/sub/link' x",
+    "deny": true
+  },
+  {
+    "name": "git3-22",
+    "cwd": "cr",
+    "command": "git -cAlias.x='!paste @ROOT@/proj/sub/link' x",
+    "deny": true
+  },
+  {
+    "name": "git3-23",
+    "cwd": "cr",
+    "command": "P='!paste @ROOT@/proj/sub/link' git --config-env=alias.x=P x",
+    "deny": true
+  },
+  {
+    "name": "git3-24",
+    "cwd": "cr",
+    "command": "P='!paste @ROOT@/proj/sub/link' git --config-env alias.x=P x",
+    "deny": true
+  },
+  {
+    "name": "git3-25",
+    "cwd": "cr",
+    "command": "git -c core.fsmonitor='paste @ROOT@/proj/sub/link >&2 #' status",
+    "deny": true
+  },
+  {
+    "name": "git3-26",
+    "cwd": "cr",
+    "command": "GIT_SSH_COMMAND='paste @ROOT@/proj/sub/link >&2 #' git ls-remote ssh://x/y",
+    "deny": true
+  },
+  {
+    "name": "git3-27",
+    "cwd": "cr",
+    "command": "GIT_SEQUENCE_EDITOR='paste @ROOT@/proj/sub/link' git rebase -i HEAD",
+    "deny": true
+  },
+  {
+    "name": "git3-28",
+    "cwd": "cr",
+    "command": "GIT_EDITOR='paste @ROOT@/proj/sub/link #' git commit --allow-empty",
+    "deny": true
+  },
+  {
+    "name": "git4-1",
+    "cwd": "cr",
+    "command": "git rebase -x 'paste @ROOT@/dirty/app.env' HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git4-2",
+    "cwd": "cr",
+    "command": "git rebase -x 'paste @ROOT@/proj/.secrets/store' HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git4-3",
+    "cwd": "cr",
+    "command": "git -c diff.external='paste @ROOT@/dirty/app.env #' diff",
+    "deny": true
+  },
+  {
+    "name": "git4-4",
+    "cwd": "cr",
+    "command": "git -c core.editor='paste @ROOT@/dirty/app.env #' commit --allow-empty",
+    "deny": true
+  },
+  {
+    "name": "git4-5",
+    "cwd": "cr",
+    "command": "GIT_EXTERNAL_DIFF='paste @ROOT@/dirty/app.env #' git diff",
+    "deny": true
+  },
+  {
+    "name": "git4-6",
+    "cwd": "cr",
+    "command": "GIT_EDITOR='paste @ROOT@/dirty/app.env #' git commit --allow-empty",
+    "deny": true
+  },
+  {
+    "name": "git4-7",
+    "cwd": "cr",
+    "command": "git ls-remote --upload-pack='paste @ROOT@/dirty/app.env >&2 #' .",
+    "deny": true
+  },
+  {
+    "name": "git4-8",
+    "cwd": "cr",
+    "command": "GIT_SSH_COMMAND='paste @ROOT@/dirty/app.env >&2 #' git ls-remote ssh://x/y",
+    "deny": true
+  },
+  {
+    "name": "git4-9",
+    "cwd": "cr",
+    "command": "P='!paste @ROOT@/dirty/app.env' git --config-env=alias.x=P x",
+    "deny": true
+  },
+  {
+    "name": "git4-10",
+    "cwd": "cr",
+    "command": "git -c core.editor='printenv #' commit --allow-empty",
+    "deny": true
+  },
+  {
+    "name": "git4-11",
+    "cwd": "cr",
+    "command": "git rebase -x printenv HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "git4-12",
+    "cwd": "cr",
+    "command": "git -c diff.external='env #' diff",
+    "deny": true
+  },
+  {
+    "name": "git4-13",
+    "cwd": "cr",
+    "command": "GIT_EXTERNAL_DIFF=printenv git diff",
+    "deny": true
+  },
+  {
+    "name": "git4-14",
+    "cwd": "cr",
+    "command": "git -c CORE.PAGER='paste @ROOT@/proj/sub/link' -p diff",
+    "deny": true
+  },
+  {
+    "name": "ar-1",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar",
+    "deny": true
+  },
+  {
+    "name": "ar-2",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-3",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar ./app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-4",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --wildcards '*env'",
+    "deny": true
+  },
+  {
+    "name": "ar-5",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --wildcards 'app.e*'",
+    "deny": true
+  },
+  {
+    "name": "ar-6",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --wildcards 'app.en?'",
+    "deny": true
+  },
+  {
+    "name": "ar-7",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --wildcards '[a]pp.env'",
+    "deny": true
+  },
+  {
+    "name": "ar-8",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --wild '*env'",
+    "deny": true
+  },
+  {
+    "name": "ar-9",
+    "cwd": "ar",
+    "command": "tar --wildcards -xOf x.tar '*env'",
+    "deny": true
+  },
+  {
+    "name": "ar-10",
+    "cwd": "ar",
+    "command": "tar -x --to-stdout -f x.tar '*nv' --wildcards",
+    "deny": true
+  },
+  {
+    "name": "ar-11",
+    "cwd": "ar",
+    "command": "tar xOf x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-12",
+    "cwd": "ar",
+    "command": "tar -xf x.tar -O app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-13",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-stdout app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-14",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-std app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-15",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-command=cat",
+    "deny": true
+  },
+  {
+    "name": "ar-16",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-command=cat app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-17",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-com=cat",
+    "deny": true
+  },
+  {
+    "name": "ar-18",
+    "cwd": "ar",
+    "command": "tar -tvf x.tar",
+    "deny": false
+  },
+  {
+    "name": "ar-19",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar -T /dev/null --add-file=app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-20",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --add-file=app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-21",
+    "cwd": "ar",
+    "command": "tar --extract --to-stdout --file=x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-22",
+    "cwd": "ar",
+    "command": "tar --get -Of x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-23",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar APP.ENV",
+    "deny": true
+  },
+  {
+    "name": "ar-24",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar --ignore-case APP.ENV",
+    "deny": true
+  },
+  {
+    "name": "ar-25",
+    "cwd": "ar",
+    "command": "unzip -p x.zip",
+    "deny": true
+  },
+  {
+    "name": "ar-26",
+    "cwd": "ar",
+    "command": "unzip -p x.zip app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-27",
+    "cwd": "ar",
+    "command": "unzip -p x.zip '*env'",
+    "deny": true
+  },
+  {
+    "name": "ar-28",
+    "cwd": "ar",
+    "command": "unzip -p x.zip 'app.e*'",
+    "deny": true
+  },
+  {
+    "name": "ar-29",
+    "cwd": "ar",
+    "command": "unzip -c x.zip",
+    "deny": true
+  },
+  {
+    "name": "ar-30",
+    "cwd": "ar",
+    "command": "unzip -pC x.zip APP.ENV",
+    "deny": true
+  },
+  {
+    "name": "ar-31",
+    "cwd": "ar",
+    "command": "unzip -p -C x.zip APP.ENV",
+    "deny": true
+  },
+  {
+    "name": "ar-32",
+    "cwd": "ar",
+    "command": "unzip -qc x.zip",
+    "deny": true
+  },
+  {
+    "name": "ar-33",
+    "cwd": "ar",
+    "command": "unzip -Z x.zip",
+    "deny": false
+  },
+  {
+    "name": "ar-34",
+    "cwd": "ar",
+    "command": "bsdtar -xOf x.tar",
+    "deny": true
+  },
+  {
+    "name": "ar-35",
+    "cwd": "ar",
+    "command": "bsdtar -xOf x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-36",
+    "cwd": "ar",
+    "command": "busybox tar -xOf x.tar app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-37",
+    "cwd": "ar",
+    "command": "7z x -so x.zip app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-42",
+    "cwd": "ar",
+    "command": "cpio -i --to-stdout < x.tar",
+    "deny": true
+  },
+  {
+    "name": "ar-45",
+    "cwd": "ar",
+    "command": "unzip -l x.zip",
+    "deny": false
+  },
+  {
+    "name": "ar-47",
+    "cwd": "ar",
+    "command": "tar -cf - @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-48",
+    "cwd": "ar",
+    "command": "tar -cf - -C /tmp/audit2/w dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-49",
+    "cwd": "ar",
+    "command": "tar -C /tmp/audit2/w -cf - dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-50",
+    "cwd": "ar",
+    "command": "tar -cf - --directory=/tmp/audit2/w dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-51",
+    "cwd": "ar",
+    "command": "tar -cf - --dir /tmp/audit2/w dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-52",
+    "cwd": "ar",
+    "command": "tar -cf - --direc=/tmp/audit2/w dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-53",
+    "cwd": "ar",
+    "command": "tar cf - -C /tmp/audit2/w dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-54",
+    "cwd": "ar",
+    "command": "tar -cO @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-55",
+    "cwd": "ar",
+    "command": "tar -c @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-56",
+    "cwd": "ar",
+    "command": "tar --create @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-57",
+    "cwd": "ar",
+    "command": "tar --cre @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "ar-58",
+    "cwd": "ar",
+    "command": "tar -r -f /dev/stdout @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-59",
+    "cwd": "ar",
+    "command": "tar -rf /dev/stdout @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-60",
+    "cwd": "ar",
+    "command": "tar -cf - @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-61",
+    "cwd": "ar",
+    "command": "tar -chf - @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-62",
+    "cwd": "ar",
+    "command": "tar -cf - --dereference @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-63",
+    "cwd": "ar",
+    "command": "tar -cf - --deref @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-64",
+    "cwd": "ar",
+    "command": "tar -cf - -h @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-65",
+    "cwd": "ar",
+    "command": "tar -c --dereference -f - @ROOT@/proj/sub",
+    "deny": true
+  },
+  {
+    "name": "ar-66",
+    "cwd": "ar",
+    "command": "tar -cf - -T <(echo @ROOT@/dirty/app.env)",
+    "deny": true
+  },
+  {
+    "name": "ar-67",
+    "cwd": "ar",
+    "command": "tar -cf - --files-from=/dev/stdin <<< @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-68",
+    "cwd": "ar",
+    "command": "tar -cf - -I cat @ROOT@/clean",
+    "deny": false
+  },
+  {
+    "name": "ar-69",
+    "cwd": "ar",
+    "command": "tar -cf /dev/null --checkpoint=1 --checkpoint-action=exec='paste @ROOT@/proj/sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "ar-70",
+    "cwd": "ar",
+    "command": "tar -cf /dev/null --checkpoint=1 --checkpoint-action=exec='paste @ROOT@/dirty/app.env' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "ar-71",
+    "cwd": "ar",
+    "command": "tar -cf - --use-compress-program='paste @ROOT@/proj/sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "ar-72",
+    "cwd": "ar",
+    "command": "tar -cf - -I 'paste @ROOT@/dirty/app.env' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "ar-73",
+    "cwd": "ar",
+    "command": "tar -xf x.tar --to-command='paste @ROOT@/dirty/app.env'",
+    "deny": true
+  },
+  {
+    "name": "ar-74",
+    "cwd": "ar",
+    "command": "tar -cf - -F 'paste @ROOT@/dirty/app.env' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "ar-75",
+    "cwd": "ar",
+    "command": "tar -cf - --newer=@ROOT@/dirty/app.env @ROOT@/cr",
+    "deny": true
+  },
+  {
+    "name": "ar-76",
+    "cwd": "ar",
+    "command": "tar -cvvf /dev/null -g @ROOT@/dirty/app.env @ROOT@/cr",
+    "deny": true
+  },
+  {
+    "name": "ar-77",
+    "cwd": "ar",
+    "command": "tar -cf - --exclude-from=@ROOT@/proj/sub/link @ROOT@/cr",
+    "deny": true
+  },
+  {
+    "name": "ar-78",
+    "cwd": "ar",
+    "command": "tar -cf - -X @ROOT@/proj/sub/link @ROOT@/cr",
+    "deny": true
+  },
+  {
+    "name": "ar-79",
+    "cwd": "ar",
+    "command": "tar -xOf x.tar -X @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "ar-80",
+    "cwd": "ar",
+    "command": "tar -cf - --transform='s,x,y,' @ROOT@/dirty",
+    "deny": true
+  },
+  {
+    "name": "cd-1",
+    "cwd": "proj",
+    "command": "pushd .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-2",
+    "cwd": "proj",
+    "command": "pushd .secrets >/dev/null && paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-3",
+    "cwd": "proj",
+    "command": "pushd -n .secrets; pushd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-4",
+    "cwd": "proj",
+    "command": "pushd sub; paste link",
+    "deny": true
+  },
+  {
+    "name": "cd-5",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; popd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-6",
+    "cwd": "proj",
+    "command": "cd .secrets; pushd /tmp; popd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-7",
+    "cwd": "proj",
+    "command": "pushd +0 .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-8",
+    "cwd": "proj",
+    "command": "(cd .secrets; paste store)",
+    "deny": true
+  },
+  {
+    "name": "cd-9",
+    "cwd": "proj",
+    "command": "(cd .secrets && paste store)",
+    "deny": true
+  },
+  {
+    "name": "cd-10",
+    "cwd": "proj",
+    "command": "{ cd .secrets; }; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-11",
+    "cwd": "proj",
+    "command": "echo $(cd .secrets; paste store)",
+    "deny": true
+  },
+  {
+    "name": "cd-12",
+    "cwd": "proj",
+    "command": "x=$(cd .secrets && paste store)",
+    "deny": true
+  },
+  {
+    "name": "cd-13",
+    "cwd": "proj",
+    "command": "echo \"$(cd .secrets && paste store)\"",
+    "deny": true
+  },
+  {
+    "name": "cd-14",
+    "cwd": "proj",
+    "command": "echo `cd .secrets && paste store`",
+    "deny": true
+  },
+  {
+    "name": "cd-15",
+    "cwd": "proj",
+    "command": "cat <(cd .secrets && paste store)",
+    "deny": true
+  },
+  {
+    "name": "cd-16",
+    "cwd": "proj",
+    "command": "cd .secrets | paste store",
+    "deny": false
+  },
+  {
+    "name": "cd-17",
+    "cwd": "proj",
+    "command": "cd ./.secrets/ ; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-18",
+    "cwd": "proj",
+    "command": "cd .secrets/../.secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-19",
+    "cwd": "proj",
+    "command": "cd sub/..; cd .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-20",
+    "cwd": "proj",
+    "command": "cd -P -- .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-21",
+    "cwd": "proj",
+    "command": "cd -- .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-22",
+    "cwd": "proj",
+    "command": "builtin cd .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-23",
+    "cwd": "proj",
+    "command": "command cd .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-24",
+    "cwd": "proj",
+    "command": "\\cd .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-25",
+    "cwd": "proj",
+    "command": "'cd' .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-26",
+    "cwd": "proj",
+    "command": "c\\d .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-27",
+    "cwd": "proj",
+    "command": "eval cd .secrets; paste store",
+    "deny": false
+  },
+  {
+    "name": "cd-28",
+    "cwd": "proj",
+    "command": "cd .secret?; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-29",
+    "cwd": "proj",
+    "command": "cd .secre*; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-30",
+    "cwd": "proj",
+    "command": "cd .sec[r]ets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-31",
+    "cwd": "proj",
+    "command": "cd .{secrets,x}; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-32",
+    "cwd": "proj",
+    "command": "cd ~-; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-33",
+    "cwd": "proj",
+    "command": "cd \"$OLDPWD\"; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-34",
+    "cwd": "proj",
+    "command": "OLDPWD=.secrets; cd -; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-35",
+    "cwd": "proj",
+    "command": "cd .secrets; cd ..; cd ~-; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-36",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd ..; pushd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-37",
+    "cwd": "proj",
+    "command": "cd .secrets; pushd ..; popd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-38",
+    "cwd": "proj",
+    "command": "pushd .secrets; cd ..; popd; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-39",
+    "cwd": "proj",
+    "command": "dirs; pushd .secrets ; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-40",
+    "cwd": "proj",
+    "command": "set -- .secrets; cd \"$1\"; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-41",
+    "cwd": "proj",
+    "command": "cd .secrets & paste store",
+    "deny": true
+  },
+  {
+    "name": "cd-42",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/self/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-43",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/thread-self/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-44",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/self/task/*/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-45",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/self/fd/3/store 3<.",
+    "deny": true
+  },
+  {
+    "name": "cd-46",
+    "cwd": "proj",
+    "command": "paste /proc/self/fd/3/link 3<sub",
+    "deny": true
+  },
+  {
+    "name": "cd-47",
+    "cwd": "proj",
+    "command": "paste /proc/self/fd/3/store 3<.secrets",
+    "deny": true
+  },
+  {
+    "name": "cd-48",
+    "cwd": "proj",
+    "command": "paste /dev/stdin/link < sub",
+    "deny": true
+  },
+  {
+    "name": "cd-49",
+    "cwd": "proj",
+    "command": "paste /dev/fd/3/link 3<sub",
+    "deny": true
+  },
+  {
+    "name": "cd-50",
+    "cwd": "proj",
+    "command": "paste /proc/self/root@ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "cd-51",
+    "cwd": "proj",
+    "command": "paste /proc/self/cwd/sub/link",
+    "deny": true
+  },
+  {
+    "name": "cd-52",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/$$/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-53",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc/self/../self/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-54",
+    "cwd": "proj",
+    "command": "cd .secrets; paste /proc//self/cwd/store",
+    "deny": true
+  },
+  {
+    "name": "cd-55",
+    "cwd": "proj",
+    "command": "paste /proc/self/fd/3/sub/link 3<.",
+    "deny": true
+  },
+  {
+    "name": "cd2-1",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; cd ~1; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-2",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; cd ~-1; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-3",
+    "cwd": "proj",
+    "command": "pushd .secrets; cd ..; cd ~+1; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-4",
+    "cwd": "proj",
+    "command": "pushd .secrets >/dev/null; pushd /tmp >/dev/null; popd +1; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-5",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; pushd +1; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-6",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; pushd -0; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-7",
+    "cwd": "proj",
+    "command": "pushd .secrets; pushd /tmp; popd -0; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-8",
+    "cwd": "proj",
+    "command": "pushd -- .secrets; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-9",
+    "cwd": "proj",
+    "command": "pushd sub >/dev/null; paste link",
+    "deny": true
+  },
+  {
+    "name": "cd2-10",
+    "cwd": "proj",
+    "command": "pushd sub && paste link",
+    "deny": true
+  },
+  {
+    "name": "cd2-11",
+    "cwd": "proj",
+    "command": "cd sub; paste link",
+    "deny": true
+  },
+  {
+    "name": "cd2-12",
+    "cwd": "proj",
+    "command": "cd .secrets; cd ..; cd ~-/; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-13",
+    "cwd": "proj",
+    "command": "cd .secrets; cd ..; cd ~-/.; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-14",
+    "cwd": "proj",
+    "command": "shopt -s cdable_vars; s=.secrets; cd s; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-15",
+    "cwd": "proj",
+    "command": "cd .secrets; cd ..; cd \"$OLDPWD\"; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-16",
+    "cwd": "proj",
+    "command": "cd .secrets; cd /tmp; cd ${OLDPWD}; paste store",
+    "deny": true
+  },
+  {
+    "name": "cd2-17",
+    "cwd": "proj",
+    "command": "cd .secrets; bash -c 'paste store'",
+    "deny": true
+  },
+  {
+    "name": "cd2-18",
+    "cwd": "proj",
+    "command": "cd .secrets; sh -c \"paste store\"",
+    "deny": true
+  },
+  {
+    "name": "cd2-19",
+    "cwd": "proj",
+    "command": "cd .secrets; xargs paste <<< store",
+    "deny": true
+  },
+  {
+    "name": "cd2-20",
+    "cwd": "proj",
+    "command": "cd sub; xargs paste <<< link",
+    "deny": true
+  },
+  {
+    "name": "cd2-21",
+    "cwd": "proj",
+    "command": "cd .secrets; find . -type f -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "cd2-22",
+    "cwd": "proj",
+    "command": "cd sub; find . -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f0-1",
+    "cwd": "proj",
+    "command": "cd sub; find . -type l -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f0-2",
+    "cwd": "proj",
+    "command": "find sub -type l -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f0-3",
+    "cwd": "proj",
+    "command": "find sub -type l -execdir paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f0-4",
+    "cwd": "proj",
+    "command": "find sub -type l | xargs paste",
+    "deny": true
+  },
+  {
+    "name": "f0-5",
+    "cwd": "proj",
+    "command": "find sub -name link -print0 | xargs -0 paste",
+    "deny": true
+  },
+  {
+    "name": "f0-6",
+    "cwd": "proj",
+    "command": "find sub -type l -okdir paste {} ;",
+    "deny": true
+  },
+  {
+    "name": "f1-1",
+    "cwd": "dirty",
+    "command": "find . -name '*.env' | xargs cat",
+    "deny": true
+  },
+  {
+    "name": "f1-2",
+    "cwd": "dirty",
+    "command": "find . -type f | xargs paste",
+    "deny": true
+  },
+  {
+    "name": "f1-3",
+    "cwd": "dirty",
+    "command": "find . -type f -print0 | xargs -0 paste",
+    "deny": true
+  },
+  {
+    "name": "f1-4",
+    "cwd": "dirty",
+    "command": "ls | xargs paste",
+    "deny": true
+  },
+  {
+    "name": "f1-5",
+    "cwd": "dirty",
+    "command": "ls | xargs -I{} paste {}",
+    "deny": true
+  },
+  {
+    "name": "f1-6",
+    "cwd": "dirty",
+    "command": "printf '%s\\n' * | xargs paste",
+    "deny": true
+  },
+  {
+    "name": "f1-7",
+    "cwd": "dirty",
+    "command": "find . -type f | parallel paste",
+    "deny": true
+  },
+  {
+    "name": "f1-8",
+    "cwd": "dirty",
+    "command": "parallel paste ::: *",
+    "deny": true
+  },
+  {
+    "name": "f1-9",
+    "cwd": "dirty",
+    "command": "parallel paste ::: app.env",
+    "deny": true
+  },
+  {
+    "name": "f1-10",
+    "cwd": "dirty",
+    "command": "parallel -j1 paste {} ::: app.env",
+    "deny": true
+  },
+  {
+    "name": "f1-11",
+    "cwd": "dirty",
+    "command": "parallel paste ::: ap*",
+    "deny": true
+  },
+  {
+    "name": "f1-12",
+    "cwd": "dirty",
+    "command": "parallel --xapply paste ::: app.env",
+    "deny": true
+  },
+  {
+    "name": "f1-13",
+    "cwd": "dirty",
+    "command": "echo app.env | parallel paste",
+    "deny": true
+  },
+  {
+    "name": "f1-14",
+    "cwd": "proj",
+    "command": "parallel paste ::: sub/link",
+    "deny": true
+  },
+  {
+    "name": "f1-15",
+    "cwd": "proj",
+    "command": "find .secrets -type f | xargs paste",
+    "deny": true
+  },
+  {
+    "name": "f1-16",
+    "cwd": "dirty",
+    "command": "find . -type f -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-17",
+    "cwd": "dirty",
+    "command": "find . -type f -execdir paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-18",
+    "cwd": "dirty",
+    "command": "find . -type f -exec sh -c 'paste \"$@\"' _ {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-19",
+    "cwd": "dirty",
+    "command": "find . -type f -exec bash -c 'paste $0' {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-20",
+    "cwd": "dirty",
+    "command": "find . -type f -exec xargs paste \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-21",
+    "cwd": "dirty",
+    "command": "find . -type f -exec env paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-22",
+    "cwd": "dirty",
+    "command": "find . -type f -exec timeout 5 paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-23",
+    "cwd": "dirty",
+    "command": "find . -type f -exec nice paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-24",
+    "cwd": "dirty",
+    "command": "find . -type f -exec command paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-25",
+    "cwd": "dirty",
+    "command": "find . -type f -exec busybox paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-26",
+    "cwd": "dirty",
+    "command": "find . -type f -exec perl -pe1 {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-27",
+    "cwd": "dirty",
+    "command": "find . -type f -exec python3 -c 'import sys;print(open(sys.argv[1]).read())' {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-28",
+    "cwd": "dirty",
+    "command": "find . -type f -exec git diff --no-index /dev/null {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-29",
+    "cwd": "dirty",
+    "command": "find . -type f -exec dd if={} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-30",
+    "cwd": "dirty",
+    "command": "find . -type f -exec cp {} /dev/stdout \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-31",
+    "cwd": "dirty",
+    "command": "find . -type f -exec install {} /dev/stdout \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-32",
+    "cwd": "dirty",
+    "command": "find . -type f -exec tee < {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-33",
+    "cwd": "dirty",
+    "command": "find . -type f -exec rg -N . {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-34",
+    "cwd": "dirty",
+    "command": "find . -type f -exec rg --no-config SYNTH {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-35",
+    "cwd": "dirty",
+    "command": "find . -type f -exec grep -h . {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-36",
+    "cwd": "dirty",
+    "command": "find . -type f -exec diff /dev/null {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-37",
+    "cwd": "dirty",
+    "command": "find . -type f -exec cmp -l /dev/null {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-38",
+    "cwd": "dirty",
+    "command": "find . -type f -exec od -c {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-39",
+    "cwd": "dirty",
+    "command": "find . -type f -exec base64 -d {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-40",
+    "cwd": "dirty",
+    "command": "find . -type f -exec strings {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-41",
+    "cwd": "dirty",
+    "command": "find . -type f -exec sort {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-42",
+    "cwd": "dirty",
+    "command": "find . -type f -exec uniq {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-43",
+    "cwd": "dirty",
+    "command": "find . -type f -exec column {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-44",
+    "cwd": "dirty",
+    "command": "find . -type f -exec fold {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-45",
+    "cwd": "dirty",
+    "command": "find . -type f -exec nl {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-46",
+    "cwd": "dirty",
+    "command": "find . -type f -exec pr {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-47",
+    "cwd": "dirty",
+    "command": "find . -type f -exec tac {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-48",
+    "cwd": "dirty",
+    "command": "find . -type f -exec rev {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-49",
+    "cwd": "dirty",
+    "command": "find . -type f -exec expand {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-50",
+    "cwd": "dirty",
+    "command": "find . -type f -exec fmt {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-51",
+    "cwd": "dirty",
+    "command": "find . -type f -exec join {} /dev/null \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-52",
+    "cwd": "dirty",
+    "command": "find . -type f -exec comm {} /dev/null \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-53",
+    "cwd": "dirty",
+    "command": "find . -type f -exec cut -c1- {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-54",
+    "cwd": "dirty",
+    "command": "find . -type f -exec tr -d x < {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-55",
+    "cwd": "dirty",
+    "command": "find . -type f -exec xxd {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-56",
+    "cwd": "dirty",
+    "command": "find . -type f -exec hexdump -C {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-57",
+    "cwd": "dirty",
+    "command": "find . -type f -exec less {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-58",
+    "cwd": "dirty",
+    "command": "find . -type f -exec more {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-59",
+    "cwd": "dirty",
+    "command": "find . -type f -exec vim -es '+%p' '+q!' {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-60",
+    "cwd": "dirty",
+    "command": "find . -type f -exec jq -R . {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-61",
+    "cwd": "dirty",
+    "command": "find . -type f -exec yq . {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-62",
+    "cwd": "dirty",
+    "command": "find . -type f -exec iconv {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-63",
+    "cwd": "dirty",
+    "command": "find . -type f -exec gzip -c {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-64",
+    "cwd": "dirty",
+    "command": "find . -type f -exec zcat -f {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-65",
+    "cwd": "dirty",
+    "command": "find . -type f -exec split -l1 --filter=cat {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-66",
+    "cwd": "dirty",
+    "command": "find . -type f -exec csplit {} 1 \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-67",
+    "cwd": "dirty",
+    "command": "find . -type f -exec look x {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-68",
+    "cwd": "dirty",
+    "command": "find . -type f -exec sum {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-69",
+    "cwd": "dirty",
+    "command": "find . -type f -exec file {} +",
+    "deny": false
+  },
+  {
+    "name": "f1-70",
+    "cwd": "dirty",
+    "command": "find . -type f -exec wc {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-71",
+    "cwd": "dirty",
+    "command": "find . -type f -exec ls -l {} +",
+    "deny": false
+  },
+  {
+    "name": "f1-72",
+    "cwd": "dirty",
+    "command": "find . -type f -fprint /dev/stdout",
+    "deny": false
+  },
+  {
+    "name": "f1-73",
+    "cwd": "dirty",
+    "command": "find . -type f -printf '%p\\n'",
+    "deny": false
+  },
+  {
+    "name": "f1-74",
+    "cwd": "dirty",
+    "command": "find . -newer app.env",
+    "deny": false
+  },
+  {
+    "name": "f1-75",
+    "cwd": "dirty",
+    "command": "find . -type f -exec {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-76",
+    "cwd": "dirty",
+    "command": "find . -files0-from - -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-77",
+    "cwd": "dirty",
+    "command": "find -L . -type f -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-78",
+    "cwd": "dirty",
+    "command": "find . -exec /usr/bin/paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-79",
+    "cwd": "dirty",
+    "command": "find . -type f -ok paste {} \\;",
+    "deny": true
+  },
+  {
+    "name": "f1-80",
+    "cwd": "dirty",
+    "command": "find . -type f -exec \"paste\" {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-81",
+    "cwd": "dirty",
+    "command": "find . -type f -exec p\\aste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-82",
+    "cwd": "dirty",
+    "command": "find . -type f -exec 'paste' '{}' ';'",
+    "deny": true
+  },
+  {
+    "name": "f1-83",
+    "cwd": "dirty",
+    "command": "find . -type f -exec paste '{}' \\+",
+    "deny": true
+  },
+  {
+    "name": "f1-84",
+    "cwd": "dirty",
+    "command": "find . -exec paste {} \\; -o -print",
+    "deny": true
+  },
+  {
+    "name": "f1-85",
+    "cwd": "dirty",
+    "command": "find . -type f -exec true \\; -exec paste {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-86",
+    "cwd": "dirty",
+    "command": "find . \\( -type f -exec paste {} + \\)",
+    "deny": true
+  },
+  {
+    "name": "f1-87",
+    "cwd": "dirty",
+    "command": "find . -type f -exec sed -n p {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-88",
+    "cwd": "dirty",
+    "command": "find . -type f -exec awk 1 {} +",
+    "deny": true
+  },
+  {
+    "name": "f1-89",
+    "cwd": "dirty",
+    "command": "find . -type f -exec head {} +",
+    "deny": true
+  },
+  {
+    "name": "jq-1",
+    "cwd": "proj",
+    "command": "jq -f -n @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "jq-2",
+    "cwd": "proj",
+    "command": "jq -n -f @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "s-1",
+    "cwd": "dirty",
+    "command": "cat app.env",
+    "deny": true
+  },
+  {
+    "name": "s-2",
+    "cwd": "dirty",
+    "command": "ls",
+    "deny": false
+  },
+  {
+    "name": "s-3",
+    "cwd": "proj",
+    "command": "paste sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-1",
+    "cwd": "proj",
+    "command": "python3 -c 'print(open(\"sub/\"+\"link\").read())'",
+    "deny": false
+  },
+  {
+    "name": "sl-2",
+    "cwd": "proj",
+    "command": "python3 -c 'print(open(\"sub/link\").read())'",
+    "deny": true
+  },
+  {
+    "name": "sl-3",
+    "cwd": "proj",
+    "command": "awk 'BEGIN{f=\"sub/\" \"link\"; while((getline l<f)>0)print l}'",
+    "deny": false
+  },
+  {
+    "name": "sl-4",
+    "cwd": "proj",
+    "command": "awk 'BEGIN{while((getline l<\"sub/link\")>0)print l}'",
+    "deny": true
+  },
+  {
+    "name": "sl-5",
+    "cwd": "proj",
+    "command": "sed -n '1r sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-6",
+    "cwd": "proj",
+    "command": "sed -n --expression='1r sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-7",
+    "cwd": "proj",
+    "command": "sed -n --expr='1r sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-8",
+    "cwd": "proj",
+    "command": "sed -n -e '1R sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-9",
+    "cwd": "proj",
+    "command": "sed -n '1{r sub/link\n}' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-10",
+    "cwd": "proj",
+    "command": "sed -n '1r'\"sub/link\" @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-11",
+    "cwd": "proj",
+    "command": "sed -n 1rsub/link @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-12",
+    "cwd": "proj",
+    "command": "sed -n '/x/r sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-13",
+    "cwd": "proj",
+    "command": "sed -n '$r sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-14",
+    "cwd": "proj",
+    "command": "sed -n 'e paste sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-15",
+    "cwd": "proj",
+    "command": "sed -n '1e paste sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-16",
+    "cwd": "proj",
+    "command": "sed -n '/x/e paste sub/link' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-17",
+    "cwd": "proj",
+    "command": "sed -n 's/x/paste sub\\/link/e' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-18",
+    "cwd": "proj",
+    "command": "jq -fn sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-19",
+    "cwd": "proj",
+    "command": "jq -f -n sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-20",
+    "cwd": "proj",
+    "command": "jq -n -f sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-21",
+    "cwd": "proj",
+    "command": "jq -n --from-file sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-22",
+    "cwd": "proj",
+    "command": "jq -n --from-f sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-23",
+    "cwd": "proj",
+    "command": "jq -n --rawfile a sub/link '$a'",
+    "deny": true
+  },
+  {
+    "name": "sl-24",
+    "cwd": "proj",
+    "command": "grep --regexp=SYNTH sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-25",
+    "cwd": "proj",
+    "command": "grep --file=sub/link @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-26",
+    "cwd": "proj",
+    "command": "grep --fil=sub/link @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl-27",
+    "cwd": "proj",
+    "command": "grep --fi sub/link -r .",
+    "deny": true
+  },
+  {
+    "name": "sl-28",
+    "cwd": "proj",
+    "command": "sed --file=/dev/null sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-29",
+    "cwd": "proj",
+    "command": "rg --no-conf -N SYNTH sub/link",
+    "deny": true
+  },
+  {
+    "name": "sl-30",
+    "cwd": "proj",
+    "command": "rg --pre=cat -l SYNTH sub",
+    "deny": true
+  },
+  {
+    "name": "sl-31",
+    "cwd": "proj",
+    "command": "git grep --open-files-in=cat -l SYNTH",
+    "deny": true
+  },
+  {
+    "name": "sl2-1",
+    "cwd": "proj",
+    "command": "sed -n '1r @ROOT@/dirty/app.env' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl2-2",
+    "cwd": "proj",
+    "command": "sed -n '1e paste @ROOT@/dirty/app.env' @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl2-3",
+    "cwd": "proj",
+    "command": "sed -n 1r@ROOT@/dirty/app.env @ROOT@/cr/a.ts",
+    "deny": true
+  },
+  {
+    "name": "sl2-4",
+    "cwd": "proj",
+    "command": "jq -fn @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "sl2-5",
+    "cwd": "proj",
+    "command": "jq -n --from-f @ROOT@/dirty/app.env",
+    "deny": true
+  },
+  {
+    "name": "rb-1",
+    "cwd": "cr",
+    "command": "git rebase -x 'paste @ROOT@/proj/sub/link' HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "rb-2",
+    "cwd": "cr",
+    "command": "git rebase -x 'paste sub/link' HEAD~1",
+    "deny": true
+  },
+  {
+    "name": "rd-1",
+    "cwd": "r3",
+    "command": "git range-diff HEAD~2..HEAD~1 alt~1..alt",
+    "deny": true
+  }
+]

@@ -304,7 +304,7 @@
       "name": "S7-10",
       "cwd": "r",
       "tool": "Bash",
-      "deny": false,
+      "deny": true,
       "fields": {
         "command": "git log -p -- safe.txt"
       }

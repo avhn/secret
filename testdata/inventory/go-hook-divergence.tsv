@@ -5,22 +5,12 @@ audit	audit-cases7-2	deliberate-tightening
 codex	malformed_safe	deliberate-tightening
 codex	oversized_safe	deliberate-tightening
 guard	active_safe_command	deliberate-tightening
-guard	git_grep_timeout	deliberate-find-shim
 guard	grep_find_exit	deliberate-find-shim
 guard	grep_find_exit_count	deliberate-find-shim
 guard	grep_timeout	deliberate-find-shim
 guard	grep_timeout_count	deliberate-find-shim
-guard	malformed_json	deliberate-tightening
-guard	malformed_sensitive	deliberate-tightening
 guard	rg_find_exit	deliberate-find-shim
 guard	rg_timeout	deliberate-find-shim
-guard	sudo_unknown_safe	deliberate-tightening
-guard	unknown_caffeinate_safe	deliberate-tightening
-guard	unknown_exec_safe	deliberate-tightening
-guard	unknown_nice_safe	deliberate-tightening
-guard	unknown_stdbuf_safe	deliberate-tightening
-guard	unknown_timeout_safe	deliberate-tightening
-guard	unknown_xargs_safe	deliberate-tightening
 guard	unresolved_file_safe	deliberate-tightening
 guard	unresolved_listing_safe	deliberate-tightening
 guard	unresolved_literal_safe	deliberate-tightening
@@ -28,4 +18,3 @@ guard	unresolved_no_eval	deliberate-tightening
 guard	unresolved_positional_safe	deliberate-tightening
 guard	unresolved_redirect_safe	deliberate-tightening
 guard	unresolved_wc_safe	deliberate-tightening
-guard	unresolved_xargs_safe	deliberate-tightening
