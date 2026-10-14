@@ -23,7 +23,10 @@ deliberately trying to read a secret.
   the environment, credential printers (`gh auth token`, `gcloud auth
 print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   `security -w`, clipboard readers), and content searches over trees that hold
-  protected files. Protected paths are matched after brace and `$IFS`
+  protected files. The shipped guard also rejects control characters in shell
+  commands, protects covered Git history dumps using bounded worktree scans
+  and archive reads,
+  and detects shell hook variables that can launch readers. Protected paths are matched after brace and `$IFS`
   expansion and through symlink aliases, and unknown commands may not take a
   protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,
@@ -42,8 +45,19 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   tokenizes commands and never evaluates them. Variables set elsewhere, files
   of commands, `eval`, aliases, functions, interpreters reading paths from
   their input, and other dynamic constructs can name a protected file without
-  spelling it. The guard denies an unresolved operand only when the command
-  text itself names something protected.
+  spelling it. Same-command copy, symlink or archive laundering, including
+  `cp -r`, `ln -s` and an archive read following an archive creation, is not
+  traced. Interpreter file reads through aliases whose names are not protected
+  are not reliably identified. The guard denies an unresolved operand only when
+  the command text itself names something protected.
+- **Deleted Git history.** Worktree name scans cannot identify stores removed
+  before the current checkout. Git history dumps of those deleted paths are
+  not reliably denied without reading Git objects. Other Git plumbing commands
+  outside the covered history operations, such as `git fast-export`, are not
+  currently classified as protected history dumps.
+- **Inherited variable values in argv.** Tools such as `basename "$TOKEN"`
+  and `ls "$TOKEN"` may print inherited secret values. Apart from existing
+  `echo` and `printf` checks, arbitrary argv expansion is not tracked.
 - **What env-file consumers do with values.** `docker run --env-file .env`,
   `node --env-file=.env` and `dotenv -e .env -- CMD` are allowed. Obvious
   printing children (`env`, `printenv`, `docker compose config`) are denied,

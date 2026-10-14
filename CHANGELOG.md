@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Shipped Bash guard now denies control bytes, bounded Git history and archive reads, unsafe shell hook variables, interpreter environment and literal script readers, indented Codex patch paths, and audited reader-option, cd, find and glob bypasses.
+
 - Installed Bash guard now denies protected Git grep pager searches, clustered grep/sed file inputs, cd option traversal and brace-expanded Grep selectors.
 
 ### Changed

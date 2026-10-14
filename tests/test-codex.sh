@@ -130,6 +130,16 @@ for op in 'Add File' 'Update File' 'Delete File' 'Move to'; do
 *** $op: alias.txt
 *** End Patch"
 done
+patch_case indented_update deny '*** Begin Patch
+*** Add File: src/ordinary.ts
+ *** Update File: .env
+*** End Patch'
+patch_case nbsp_update deny $'*** Begin Patch\n*** Add File: src/ordinary.ts\n\xc2\xa0*** Update File: .env\n*** End Patch'
+patch_case indented_delete deny '*** Begin Patch
+*** Delete File: src/ordinary.ts
+  *** Update File: alias.txt
+*** End Patch'
+shell_case patch_shell_heredoc deny "$(jq -cn --arg p $'apply_patch <<\'EOF\'\n*** Begin Patch\n*** Update File: .env\n+synthetic-only\n*** End Patch\nEOF' '$p')"
 patch_case move_from deny '*** Begin Patch
 *** Update File: .env
 *** Move to: src/safe.ts
@@ -140,7 +150,7 @@ patch_case parent_env deny '*** Begin Patch
 patch_case unicode_secret deny '*** Begin Patch
 *** Update File: 配置.secret
 *** End Patch'
-shell_case patch_heredoc_prose allow "\"apply_patch <<'EOF'\\n*** Begin Patch\\n*** Add File: .env\\n+synthetic-only\\n*** End Patch\\nEOF\""
+shell_case patch_heredoc_prose deny "\"apply_patch <<'EOF'\\n*** Begin Patch\\n*** Add File: .env\\n+synthetic-only\\n*** End Patch\\nEOF\""
 patch_case template allow '*** Begin Patch
 *** Add File: .env.example
 +TOKEN=sample
