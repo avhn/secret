@@ -52,6 +52,7 @@ invoke_guard() {
 export RIPGREP_CONFIG_PATH="$REPO_ROOT/examples/ripgreprc"
 mkdir -p "$TMP/descendant-only/sub" "$TMP/search/sub" "$TMP/search/web" "$TMP/empty-search" "$TMP/search/src"
 printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/.env"
+printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/app.env"
 printf '%s\n' 'KEY=synthetic-only' >"$TMP/search/one.secret"
 printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/sub/.env"
 printf '%s\n' 'TOKEN=synthetic-descendant' >"$TMP/descendant-only/sub/.env"
@@ -164,7 +165,16 @@ if command -v jq >/dev/null 2>&1; then
         secrets cat_secret deny Bash 'cat ~/.secrets/svc.secret'
         secrets cat_home_var deny Bash 'cat "$HOME/.secrets/x.secret"'
         secrets grep_env deny Bash 'grep TOKEN web/.env.development'
+        secrets grep_cluster_pattern deny Bash 'grep -ieTOKEN app.env'
+        secrets grep_cluster_file deny Bash 'grep -ifapp.env src/a.ts'
+        secrets sed_cluster_script deny Bash 'sed -nep app.env'
+        secrets sed_cluster_file deny Bash 'sed -nfapp.env src/a.ts'
+        secrets grep_cluster_clean allow Bash 'grep -ieTOKEN src/a.ts'
         secrets sed_chain deny Bash 'cd web && sed -n 1p .env'
+        secrets cd_physical deny Bash 'cd -P web && cat .env'
+        secrets cd_logical deny Bash 'cd -L web && cat .env'
+        secrets cd_end_options deny Bash 'cd -- web && cat .env'
+        secrets cd_options_clean allow Bash 'cd -P web && cat ../package.json'
         secrets source_env deny Bash 'source ~/.secrets.env'
         secrets redirect deny Bash 'while read l; do :; done < .env'
         secrets redirect_tight deny Bash 'wc -l <.env'
@@ -770,6 +780,11 @@ secrets git_grep deny Bash 'git grep TOKEN'
 secrets git_grep_clean allow Bash 'git grep TOKEN -- src'
 secrets git_grep_names allow Bash 'git grep -l TOKEN'
 secrets git_grep_names_long allow Bash 'git grep --files-with-matches TOKEN'
+secrets git_grep_pager_short deny Bash 'git grep -l -Ocat TOKEN'
+secrets git_grep_pager_short_bare deny Bash 'git grep -l -O TOKEN'
+secrets git_grep_pager_long deny Bash 'git grep -l --open-files-in-pager=cat TOKEN'
+secrets git_grep_pager_long_bare deny Bash 'git grep -l --open-files-in-pager TOKEN'
+secrets git_grep_pager_after deny Bash 'git grep --files-with-matches TOKEN -Ocat'
 secrets git_grep_count deny Bash 'git grep -c TOKEN'
 secrets git_grep_file deny Bash 'git grep TOKEN -- .env'
 secrets git_grep_regexp deny Bash 'git grep -e TOKEN'
@@ -1068,6 +1083,10 @@ ln -s absent "$TMP/search/operand-missing.txt"
 # shellcheck disable=SC2016  # literal commands under analysis, never executed
 {
     secrets brace_list deny Bash 'cat .{env,x}'
+    secrets grep_brace_selector deny Grep "$TMP/search" '{"glob":"*.{env,ts}","output_mode":"content"}'
+    secrets grep_nested_brace_selector deny Grep "$TMP/search" '{"glob":"**/*.{env,ts}","output_mode":"count"}'
+    secrets grep_brace_selector_names allow Grep "$TMP/search" '{"glob":"*.{env,ts}","output_mode":"files_with_matches"}'
+    secrets grep_brace_selector_safe allow Grep "$TMP/empty-search" '{"glob":"*.{ts,js}","output_mode":"content"}'
     secrets brace_empty deny Bash 'cat .en{v,}'
     secrets brace_nested deny Bash 'cat .{x,{en,zz}v}'
     secrets brace_letters deny Bash 'cat .en{u..w}'

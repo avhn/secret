@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
+- Bounded Go Codex patch-header checks for add/update/delete/move paths, physical aliases and explicit workdirs, with malformed patch denial and synthetic fuzz coverage; installed hooks remain unchanged.
+
 - Default Go hook Bash AST analysis with 64 KiB envelopes, 40 KiB fragments, explicit wrapper and grep/sed/split option arity, scoped directory checks and value-free denials. The installed Bash hook and plugin manifests remain unchanged.
 - Mechanically generated denied-command variants, 76 permanent synthetic audit envelopes, and exact reviewed default-hook divergences with no pending-M2 categories. See the [tightening table](docs/design/hook-tightening.md) for deliberate differences and local evidence.
 
@@ -21,6 +23,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Explicit label sections and label-aware selection for file and keystore records.
 - Manifest-backed keystore dispatch, Linux libsecret and macOS Keychain backends, with isolated provider tests.
 - Codex shell and patch guard support and a Codex plugin bundling the guard and skill.
+
+### Fixed
+
+- Installed Bash guard now denies protected Git grep pager searches, clustered grep/sed file inputs, cd option traversal and brace-expanded Grep selectors.
 
 ### Changed
 
