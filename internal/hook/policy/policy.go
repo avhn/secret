@@ -213,6 +213,29 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		switch cmd := s.Cmd.(type) {
 		case *syntax.CallExpr:
 			cmd = unwrapCall(cmd)
+			if a.shellStdinCall(cmd, cwd) {
+				for _, r := range s.Redirs {
+					switch r.Op.String() {
+					case "<<<":
+						if body := literal(r.Word); body != "" {
+							a.shellValue(body, depth, cwd)
+						} else {
+							a.reason = roles.Indeterminate
+						}
+					case "<<", "<<-":
+						if delim := a.raw(r.Word); (strings.HasPrefix(delim, "'") || strings.HasPrefix(delim, "\"")) && r.Hdoc != nil {
+							a.shellValue(literal(r.Hdoc), depth, cwd)
+						} else {
+							a.reason = roles.Indeterminate
+						}
+					case "<", "<>", "<&":
+						a.reason = roles.Indeterminate
+					}
+				}
+			}
+			if a.reason != "" {
+				break
+			}
 			for _, assign := range cmd.Assigns {
 				if assign.Name != nil {
 					if assign.Name.Value == "CDPATH" {
@@ -389,6 +412,10 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
+			if cmd.Op.String() == "|" && a.shellStdinStatement(cmd.Y, cwd) {
+				a.reason = roles.Indeterminate
+				break
+			}
 			if a.inRun && cmd.Op.String() == "|" && commandName(cmd.X) == "printf" && commandName(cmd.Y) == "curl" && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
 				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
@@ -681,6 +708,14 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	name := path.Base(words[0])
 	args := words[1:]
+	if strings.HasPrefix(name, "git-") {
+		if name == "git-" {
+			a.reason = roles.Indeterminate
+			return
+		}
+		args = append([]string{name[4:]}, args...)
+		name = "git"
+	}
 	if name == "busybox" || name == "toybox" {
 		if len(args) == 0 || strings.HasPrefix(args[0], "-") {
 			a.reason = roles.Indeterminate
