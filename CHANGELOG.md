@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Bash guard denies stdin shell scripts, applies a conservative sed allowlist, prevents ordinary writes to Git configuration, and hardens Git subprocess lookup and submodule classification.
+
 - Bash guard isolates bounded Git probes from repository config and process-group signals, rejects alternate-index and config-write ambiguity, and tightens dashed Git, pager/editor, shell stdin, globstar and ambiguous sed write-flag analysis.
 
 - Bash hook rejects every non-inert inline Git configuration key, disallows command-text editor and pager interpreters and Git SSH/diff/askpass overrides, and conservatively rejects ambiguous sed grammar. Literal allowlisted editors and pagers remain available.

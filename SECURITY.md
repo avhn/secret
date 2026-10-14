@@ -30,10 +30,11 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   and pager settings are user configuration, not shell text; values assigned in
   the tool command permit only literal allowlisted editor/pager programs with
   non-protected arguments; Git diff, SSH, proxy and askpass overrides deny.
-  Inline Git configuration accepts only inert keys, and ambiguous sed scripts
-  deny rather than guessing their input or execution semantics. Protected
-  paths are matched after brace and `$IFS` expansion and through symlink aliases, and unknown commands may not take a
-  protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
+  Inline Git configuration accepts only inert keys, and sed scripts use a
+  conservative safe-command allowlist. Ordinary writes to `.git`, `.gitmodules`
+  and user Git configuration deny to prevent planted repository commands.
+  Protected paths are matched after brace and `$IFS` expansion and through
+  symlink aliases; unknown commands may not take a protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,
   `node --env-file`, `dotenv -e`) stay allowed. A printer piped straight into
   `secret stash FILE KEY` is allowed, since the value goes into a store instead
@@ -55,14 +56,17 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   traced. Concatenated or computed script literals and `eval` are not reliably
   resolved. The guard does not infer protected inputs from an unresolved
   operand whose command text names no protected file.
-- **Shell scripts read from stdin.** The guard denies a shell given a piped or file-redirected script whose body it cannot inspect. Literal here-strings and quoted here-docs are analysed as shell text; execute a named script only when its contents are trusted.
+- **Shell scripts read from stdin.** A shell without `-c` or a certifiable script file is denied, including static here-strings and quoted here-docs. Use `sh -c` for literal code.
 - **Git probe isolation.** The Bash guard runs index probes with a scrubbed Git environment, disabled fsmonitor, untracked cache and hooks, and a separate session. The guard does not execute repository Git configuration as part of its own index inspection. Git config writes and unmodelled getters are denied; custom editor and pager settings assigned inside command text accept only inert program-specific options.
 - **Custom Git aliases are denied.** The hook does not read Git configuration: aliases can execute arbitrary shell commands and configuration resolution can differ from the command environment. Only case-sensitive built-in Git subcommands are classified. Run the expanded built-in command instead of an alias.
 - **History no longer tracked.** Git content-producing commands are checked
   against a bounded `git ls-files -z` index name list, not blob contents or a
   worktree scan. An ignored, untracked `.env` does not block ordinary history
   inspection. Paths deleted or renamed away from the current index can still
-  appear in old Git objects without being found by the index check.
+  appear in old Git objects without being found by the index check. The Bash
+  guard's index probe runs under a short timeout with repository config hooks
+  disabled; a probe that times out (for example in a very large repository)
+  is treated as protected, so content-producing Git commands deny there.
 - **Inherited variable values in argv.** Tools such as `basename "$TOKEN"`
   and `ls "$TOKEN"` may print inherited secret values. Apart from existing
   `echo` and `printf` checks, arbitrary argv expansion is not tracked.
