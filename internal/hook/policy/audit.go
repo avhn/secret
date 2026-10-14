@@ -29,6 +29,16 @@ func (a *analyzer) treeProtected(root, cwd string) bool {
 	return paths.TreeProtected(root, cwd, a.home)
 }
 
+// Append requires a known prior value for environment-sensitive names.
+func (a *analyzer) hookAppend(key, value string, depth int, cwd string) {
+	previous, known := a.env[key]
+	if !known && (sensitiveIndirect(key) || gitShellEnv(key) || strings.HasPrefix(key, "LESS") || key == "POSIXLY_CORRECT") {
+		a.reason = roles.Indeterminate
+		return
+	}
+	a.hookAssignment(key, previous+value, depth, cwd)
+}
+
 // hookAssignment checks only variables interpreted by a shell, never ordinary
 // assignment data. No assignment value is evaluated to determine its contents.
 func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
@@ -40,6 +50,9 @@ func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 	} else {
 		a.env[key] = value
 	}
+	if key == "POSIXLY_CORRECT" {
+		a.env[key] = value
+	}
 	if key == "GIT_EXEC_PATH" {
 		a.reason = roles.Indeterminate
 		return
@@ -47,7 +60,7 @@ func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 	if gitShellEnv(key) {
 		a.editorPagerValue(key, value, cwd)
 	}
-	if optionIn("LESSOPEN LESSCLOSE LESSKEY LESSKEYIN", key) || key == "LESS" && !inertLessOption("-"+value) {
+	if strings.HasPrefix(key, "LESS") && key != "LESS" || key == "LESS" && !inertLessOption("-"+value) {
 		a.reason = roles.Indeterminate
 		return
 	}

@@ -14,6 +14,7 @@ guard	grep_find_exit	deliberate-find-shim
 guard	grep_find_exit_count	deliberate-find-shim
 guard	grep_timeout	deliberate-find-shim
 guard	grep_timeout_count	deliberate-find-shim
+guard	policy_v2_sed_script_clean	deliberate-tightening
 guard	rg_find_exit	deliberate-find-shim
 guard	rg_timeout	deliberate-find-shim
 guard	unresolved_file_safe	deliberate-tightening

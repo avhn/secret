@@ -53,7 +53,7 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 		if e.Tool == "NotebookEdit" {
 			name = e.String("notebook_path")
 		}
-		if name != "" && protected(name) {
+		if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", os.Getenv("HOME"), os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 			reason = "file access targets a protected store"
 		}
 	case "Glob":

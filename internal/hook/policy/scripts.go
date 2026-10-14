@@ -49,8 +49,13 @@ func (a *analyzer) scriptInputs(name string, args []string, depth int, cwd strin
 
 // sedScripts shares sed's option arities, including -neSCRIPT clusters.
 func (a *analyzer) sedScripts(args []string, cwd string) []string {
+	if _, set := a.env["POSIXLY_CORRECT"]; set {
+		a.reason = roles.Indeterminate
+		return nil
+	}
 	var scripts, positional []string
 	options := true
+	positionalBeforeSource := false
 	consume := func(i *int, value string, attached bool) string {
 		if attached {
 			return value
@@ -69,6 +74,9 @@ func (a *analyzer) sedScripts(args []string, cwd string) []string {
 			continue
 		}
 		if !options || !strings.HasPrefix(arg, "-") || arg == "-" {
+			if len(scripts) == 0 {
+				positionalBeforeSource = true
+			}
 			positional = append(positional, arg)
 			continue
 		}
@@ -114,6 +122,11 @@ func (a *analyzer) sedScripts(args []string, cwd string) []string {
 			}
 		}
 	}
+	if len(scripts) > 0 && positionalBeforeSource {
+		// The first operand may become a script when getopt permutation changes.
+		a.reason = roles.Indeterminate
+		return nil
+	}
 	if len(scripts) == 0 && len(positional) > 0 {
 		scripts = append(scripts, positional[0])
 	}
@@ -132,7 +145,10 @@ func (a *analyzer) sedFile(name, cwd string) string {
 		a.reason = roles.FileInput
 		return ""
 	}
-	file := filepath.FromSlash(a.resolve(name, cwd))
+	file := filepath.FromSlash(name)
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(cwd, file)
+	}
 	// A symlink can lead to /dev/stdin in the child even when the hook's
 	// own stdin resolves to an innocuous regular file.
 	info, statErr := os.Lstat(file)

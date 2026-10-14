@@ -272,6 +272,11 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		return
 	}
 	sub, operands := args[0], args[1:]
+	for _, arg := range operands {
+		if strings.HasPrefix(arg, "--submodule=diff") || strings.HasPrefix(arg, "--submodule=log") || arg == "--recurse-submodules" || sub == "grep" && arg == "--recurse-submodules" {
+			repoUncertain = true
+		}
+	}
 	for _, operand := range operands {
 		if strings.Contains(strings.ToLower(operand), "ext::") {
 			a.reason = roles.Indeterminate
@@ -324,7 +329,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	if a.reason != "" {
 		return
 	}
-	if repoUncertain || bareGlobal {
+	if repoUncertain || bareGlobal || gitModulesPresent(cwd) {
 		a.reason = roles.Indeterminate
 		return
 	}
@@ -510,4 +515,19 @@ func (a *analyzer) gitPath(value, cwd string) string {
 		return ""
 	}
 	return paths.Resolve(value, cwd, "", a.home)
+}
+
+func gitModulesPresent(cwd string) bool {
+	for dir, count := cwd, 0; dir != "" && count < 128; dir, count = filepath.Dir(dir), count+1 {
+		if _, err := os.Lstat(filepath.Join(dir, ".gitmodules")); err == nil || !os.IsNotExist(err) {
+			return true
+		}
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return false
+		}
+		if dir == filepath.Dir(dir) {
+			break
+		}
+	}
+	return false
 }

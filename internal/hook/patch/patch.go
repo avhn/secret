@@ -2,6 +2,7 @@
 package patch
 
 import (
+	"os"
 	"strings"
 	"unicode"
 
@@ -50,7 +51,7 @@ func Decision(text, cwd, workdir, home string) string {
 		case strings.HasPrefix(line, "*** Add File: "), strings.HasPrefix(line, "*** Update File: "), strings.HasPrefix(line, "*** Delete File: "), strings.HasPrefix(line, "*** Move to: "):
 			prefix := line[:strings.Index(line, ": ")+2]
 			name := strings.TrimPrefix(line, prefix)
-			if name != "" && paths.Protected(name, cwd, workdir, home) {
+			if name != "" && (paths.Protected(name, cwd, workdir, home) || paths.ConfigWriteProtected(name, cwd, workdir, home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 				return protectedReason
 			}
 			if !started || ended || name == "" || strings.TrimSpace(name) != name || strings.ContainsAny(name, "\t\r\x00") {

@@ -48,7 +48,8 @@ failure tests, dialect evidence, and supported-platform CI remain separate gates
   literal file or system operands. Sed script files are inspected only through a
   non-protected alias as bounded regular files of at most 8 KiB. Missing,
   non-regular, unreadable, oversized, computed, or otherwise indeterminate
-  scripts deny.
+  scripts deny. Sed script-file lookup uses native absolute paths on Windows,
+  preserving the regular-file and symlink checks.
 - P9 analyzes `-c` text for additional shell dialects and BusyBox or ToyBox shell
   applets. P10 validates complete sed scripts before classifying file and
   execution surfaces. P11 normalizes Bash option words before invalidating
@@ -69,10 +70,22 @@ failure tests, dialect evidence, and supported-platform CI remain separate gates
   path-changing options invalidate child shell directories. Other hook variables remain bounded shell fragments. Interpreter
   environment access is denied for recognized environment reads in interpreter
   arguments. No interpreter runs during analysis.
-- GNU sed text commands consume the complete line and odd-backslash newline
-  continuations; even-backslash newlines end the text. Scripts containing later
-  commands after text deny. Multiple `-e` sources are
-  joined with newlines, and comments consume the rest of their line.
+- Sed uses a safe-subset allowlist: simple addresses, inert commands, bounded
+  labels, final one-line text commands, and final-line literal read/write
+  filenames. Execution commands and substitution execution/write flags always
+  deny. A positional script before `-e` or `-f`, or an inline assignment to
+  `POSIXLY_CORRECT`, denies. Multiple explicit scripts join with newlines.
+- Shell invocations without `-c` or a script file deny, including here-doc and
+  here-string input. Script-file operands and shell startup files must be
+  non-protected regular files. The scanner peels `setsid` and `script -qc`,
+  consumes shell option values, and rejects descriptor-based `source`. Inline `LESS*` settings
+  other than inert `LESS`, and append assignments to sensitive names, deny.
+- Git helper names classify only when dispatched by bare name or from a
+  `git-core` directory; protected operands deny even for those helpers. Git
+  content commands deny for `.gitmodules` or submodule expansion. Command names
+  classify case-insensitively. Writes to Git configuration, `.gitmodules`,
+  worktree gitdirs, and global configuration deny, including redirected output,
+  command destinations, and in-place edits.
 
 The policy intentionally excludes simulated copy, link, and extraction state;
 computed script literals and `eval`; object-content reads; and claims about host
@@ -96,6 +109,7 @@ indeterminate-input or audited input/output policy tightening.
 | `active_safe_command`                                                                                                                                                              | deliberate-tightening | `$c package.json` does not establish the executable or its input and output roles.                                                                                                           |
 | `deep_safe`                                                                                                                                                                        | deliberate-tightening | Six nested `shell -c` layers exceed the Go analysis depth and deny.                                                                                                                          |
 | `audit6_sed_comment`, `audit6_sed_text_line`, `audit6_sed_insert_line`, `audit6_sed_change_line`                                                                                   | deliberate-tightening | GNU sed reads these as a comment or as a/i/c text, so Bash allows them; Go denies any script whose later commands follow a comment or text command on one line.                              |
+| `policy_v2_sed_script_clean`                                                                                                                                                       | deliberate-tightening | A `-f` script file holding `code` is a final one-line `c` command to GNU sed; Go certifies only scripts whose file text matches the safe subset exactly, so it denies.                       |
 | `grep_find_exit`, `grep_find_exit_count`, `grep_timeout`, `grep_timeout_count`, `rg_find_exit`, `rg_timeout`                                                                       | deliberate-find-shim  | Bash denies when the injected `find` exits or times out. Go does not execute `find`; its walk errors, permissions, loops, budgets, and deadlines deny under dedicated fault-injection tests. |
 | `unresolved_file_safe`, `unresolved_listing_safe`, `unresolved_literal_safe`, `unresolved_no_eval`, `unresolved_positional_safe`, `unresolved_redirect_safe`, `unresolved_wc_safe` | deliberate-tightening | Unknown parameter or substitution output cannot certify a non-protected content-producing input. The analyzer never executes a substitution to decide.                                       |
 
