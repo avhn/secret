@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
+- Bounded Go PreToolUse envelope and protected-path checks with `secret hook claude|codex`, synthetic decoding and alias tests, fuzz seed, and exact Bash-vs-Go hook case inventories. The active installed hook remains Bash; shell analysis and certified search scope are later M2 work.
 - Alternate `SECRET_CLI` executable support for the CLI and provider shell suites, a tagged disposable Go backend stub, and per-case Go divergence checking in CI on the existing runners. The default Go build ignores stub environment variables.
 - Focused Go checks for stub isolation, failure injection, private secret directory permissions and unlabeled stash section reset.
 

@@ -12,6 +12,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 PASSED=0 FAILED=0
+read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$ROOT/hooks/guard-secrets}"
 mkdir -p "$TMP/work" "$TMP/elsewhere"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.env"
 ln -s .env "$TMP/work/alias.txt"
@@ -23,8 +24,10 @@ manifest_case() {
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tassert\t0\n' codex "$name" >>"$SECRET_TEST_INVENTORY"
     if "$@" >/dev/null; then
         PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
     else
         FAILED=$((FAILED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
         printf 'FAIL %s\n' "$name"
     fi
 }
@@ -37,8 +40,10 @@ file_case() {
         [[ "$kind" == exec && -x "$path" ]] ||
         [[ "$kind" == dir && -d "$path" ]]; then
         PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
     else
         FAILED=$((FAILED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
         printf 'FAIL %s: missing %s %s\n' "$name" "$kind" "$path"
     fi
 }
@@ -71,14 +76,25 @@ file_case manual_fallback file "$ROOT/codex/hooks.json"
 # check NAME EXPECTED TOOL COMMAND [WORKDIR] [GUARD]: feed recorded-shaped hook JSON.
 check() {
     local name="$1" expected="$2" tool="$3" command="$4" workdir="${5:-}" guard="${6:-$ROOT/hooks/guard-secrets}" got
+    local guard_cmd=("${GUARD_ARGS[@]}")
+    if [[ "$guard" != "$ROOT/hooks/guard-secrets" ]]; then
+        guard_cmd=("$BASH" "$guard")
+    fi
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
+    if [[ -n "${SECRET_TEST_CATEGORIES:-}" ]]; then
+        local category=pending-M2-paths
+        [[ "$tool" != Bash ]] || category=pending-M2-ast
+        printf 'codex\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
+    fi
     got="$(jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
         '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:$t,tool_input:({command:$c} + (if $d == "" then {} else {workdir:$d} end))}' |
-        perl -e 'alarm 5; exec @ARGV' "$BASH" "$guard" | jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end')" || got=crash
+        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" | jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end')" || got=crash
     if [[ "$got" == "$expected" ]]; then
         PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
     else
         FAILED=$((FAILED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
         printf 'FAIL %s: got %s, expected %s\n' "$name" "$got" "$expected"
     fi
 }

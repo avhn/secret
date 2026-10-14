@@ -118,6 +118,12 @@ jobs:
         run: '"$BASH_BIN" tests/test-guard.sh'
       - name: Codex guard matrix
         run: '"$BASH_BIN" tests/test-codex.sh'
+      - name: Go Claude hook divergence matrix
+        if: runner.os == 'Linux'
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh guard "$RUNNER_TEMP/secret-go" claude
+      - name: Go Codex hook divergence matrix
+        if: runner.os == 'Linux'
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh codex "$RUNNER_TEMP/secret-go" codex
       - name: Check synthetic inventory
         run: BASH_BIN="$BASH_BIN" bash tests/inventory.sh --check
       - name: Stock bash 3.2 (macOS)

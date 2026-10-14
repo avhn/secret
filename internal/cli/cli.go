@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/avhn/secret/internal/backend"
+	"github.com/avhn/secret/internal/hook"
 	"github.com/avhn/secret/internal/store"
 	"golang.org/x/term"
 )
@@ -72,6 +73,15 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 			_ = copyClipboard(nil)
 		}
 		clear(current)
+		return 0
+	}
+	if sub == "hook" {
+		if len(args) != 1 || (args[0] != "claude" && args[0] != "codex") {
+			return c.fail("hook requires claude or codex", 1)
+		}
+		if err := hook.Decide(args[0], in, out); err != nil {
+			return c.fail("hook output failed", 2)
+		}
 		return 0
 	}
 	switch sub {

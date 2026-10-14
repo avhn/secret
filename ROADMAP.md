@@ -66,6 +66,8 @@ Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded B
 - [ ] feat(hook): guard Codex patches and workdir
 - [ ] test(hook): classify every bash differential and fuzz seeds
 
+Initial M2 envelope and path-role work now has a bounded Go decoder, protected-path checks, CLI hook entry points, synthetic unit tests and an exact case divergence harness. The first Linux measurement is 654 pass / 735 divergent Claude assertions and 32 pass / 9 divergent Codex assertions. Bash command analysis, certified Grep searches and real-host failure validation remain pending. The nonempty malformed JSON cases intentionally deny in Go instead of silently allowing. See `docs/design/hook-tightening.md` and `testdata/inventory/go-hook-divergence.tsv`.
+
 Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s host timeout; cross-platform Go and race tests green. Bash guard stays active.
 
 ## M3: Operator workflow
