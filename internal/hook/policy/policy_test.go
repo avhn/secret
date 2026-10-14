@@ -3,6 +3,7 @@ package policy
 import (
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ func protected(name, cwd string) bool {
 }
 
 func TestASTPaths(t *testing.T) {
+	skipUnixCWD(t)
 	cases := []struct{ src, reason string }{
 		{"cat .env", "reader targets a protected store"},
 		{"split -l 5 .env", "file input targets a protected store"},
@@ -67,6 +69,7 @@ func TestASTPaths(t *testing.T) {
 }
 
 func TestIndeterminateRisk(t *testing.T) {
+	skipUnixCWD(t)
 	for _, src := range []string{"security find-generic-password '", "git credential fill '", "secret get svc TOKEN '", "aws configure get aws_secret_access_key '", "gcloud auth print-access-token '", "op read '", "pass show mail '", "ps e '", "jq -n env '", "cat $(printf .en; printf v)", "wc < $(printf .en; printf v)", "cat .{env,x", strings.Repeat("cat ", 130) + ".env"} {
 		if got := Analyze(src, "/synthetic", "/synthetic", protected); got == "" {
 			t.Fatalf("allowed uncertain protected operation %q", src)
@@ -78,6 +81,7 @@ func TestIndeterminateRisk(t *testing.T) {
 }
 
 func TestArgv(t *testing.T) {
+	skipUnixCWD(t)
 	for _, argv := range [][]string{{"cat", ".env"}, {"bash", "-lc", "cat .env"}, {"sh", "-c", "cat .env"}} {
 		if got := AnalyzeArgv(argv, "/synthetic", "/synthetic", protected); got == "" {
 			t.Fatalf("argv protected read allowed: %q", argv)
@@ -90,6 +94,7 @@ func TestArgv(t *testing.T) {
 
 // TestDeniedVariants checks that equivalent shell spelling never turns a protected read into an allow.
 func TestDeniedVariants(t *testing.T) {
+	skipUnixCWD(t)
 	for _, cmd := range []string{"cat", "head", "tail", "wc", "sort"} {
 		for _, path := range []string{".env", ".secrets/item"} {
 			variants := []string{path, "'" + path + "'", "\"" + path + "\"", "\\" + path,
@@ -125,6 +130,7 @@ func TestDeniedVariants(t *testing.T) {
 
 // TestSafeRoleParity checks that option values and direct stash sinks remain safe.
 func TestSafeRoleParity(t *testing.T) {
+	skipUnixCWD(t)
 	for _, source := range []string{
 		"sudo -u cat echo .env", "sudo -g cat echo .env", "sudo -C cat echo .env",
 		"gh auth token | secret stash a K > out",
@@ -149,6 +155,7 @@ func TestSafeRoleParity(t *testing.T) {
 }
 
 func TestNestedDepth(t *testing.T) {
+	skipUnixCWD(t)
 	command := "cat .env"
 	for i := 0; i < 6; i++ {
 		command = "bash -c '" + strings.ReplaceAll(command, "'", "'\\\\''") + "'"
@@ -159,6 +166,7 @@ func TestNestedDepth(t *testing.T) {
 }
 
 func TestReadingProtectedLiteral(t *testing.T) {
+	skipUnixCWD(t)
 	for _, path := range []string{".env", ".secrets/item"} {
 		for _, command := range []string{"cat", "head", "tail", "wc", "sort", "cp", "openssl -in"} {
 			src := command + " " + path
@@ -173,6 +181,7 @@ func TestReadingProtectedLiteral(t *testing.T) {
 }
 
 func TestBudgets(t *testing.T) {
+	skipUnixCWD(t)
 	if got := Analyze(" # "+strings.Repeat("a", 33000), "/synthetic", "/synthetic", protected); got != "" {
 		t.Errorf("long inert comment denied: %q", got)
 	}
@@ -215,6 +224,7 @@ func FuzzAnalyze(f *testing.F) {
 
 // TestFilteredTransport preserves only child-scoped transport exceptions.
 func TestFilteredTransport(t *testing.T) {
+	skipUnixCWD(t)
 	for _, tc := range []struct {
 		source string
 		deny   bool
@@ -239,6 +249,7 @@ func TestFilteredTransport(t *testing.T) {
 
 // TestLiteralQuoting keeps inert escaped syntax separate from active operands.
 func TestLiteralQuoting(t *testing.T) {
+	skipUnixCWD(t)
 	for _, source := range []string{`cat .\{env,x\}`, `echo $'\e\a\b\f\r\v' .env`, `echo $'\'$(cat .env)'`, `echo "$(echo $'\'$(cat .env)')"`} {
 		if got := Analyze(source, "/synthetic", "/synthetic", protected); got != "" {
 			t.Errorf("%q denied: %s", source, got)
@@ -254,6 +265,7 @@ func TestLiteralQuoting(t *testing.T) {
 // TestQuotedBraceCommand prevents empty-alternative provenance from shifting
 // a credential printer's subcommand after quote removal.
 func TestQuotedBraceCommand(t *testing.T) {
+	skipUnixCWD(t)
 	for _, source := range []string{`{"secret-tool",} lookup service mail`, `{'secret-tool',} lookup service mail`, `{$'secret-tool',} lookup service mail`, `{"sudo",} pass foo`} {
 		if got := Analyze(source, "/synthetic", "/synthetic", protected); got == "" {
 			t.Errorf("allowed %q", source)
@@ -264,11 +276,19 @@ func TestQuotedBraceCommand(t *testing.T) {
 // TestNestedPrinterBudget keeps an inert outer printer from clearing the
 // uncertainty of a nested command that exceeded the structural depth budget.
 func TestNestedPrinterBudget(t *testing.T) {
+	skipUnixCWD(t)
 	command := "cat .env"
 	for i := 0; i < 7; i++ {
 		command = "echo $(" + command + ")"
 	}
 	if got := Analyze(command, "/synthetic", "/synthetic", protected); got == "" {
 		t.Fatal("nested reader budget was cleared by echo")
+	}
+}
+
+// The Bash policy tables use Unix cwds; Windows denies them as non-native until M5e.
+func skipUnixCWD(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix cwd table; the Windows shell adapter is M5e")
 	}
 }
