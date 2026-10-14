@@ -1,14 +1,9 @@
 audit	audit-arithmetic-unknown	deliberate-tightening
-audit	audit-cases2-4	deliberate-tightening
-audit	audit-cases2-5	deliberate-tightening
-audit	audit-cases4-43	deliberate-tightening
-audit	audit-cases4-44	deliberate-tightening
-audit	audit-cases5-1	deliberate-tightening
-audit	audit-cases5-2	deliberate-tightening
 audit	audit-cases5-6	deliberate-tightening
 audit	audit-cases6-7	deliberate-tightening
-audit	audit-cases6-8	deliberate-tightening
 audit	audit-cases7-2	deliberate-tightening
+codex	malformed_safe	deliberate-tightening
+codex	oversized_safe	deliberate-tightening
 guard	active_safe_command	deliberate-tightening
 guard	git_grep_timeout	deliberate-find-shim
 guard	grep_find_exit	deliberate-find-shim

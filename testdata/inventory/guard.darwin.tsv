@@ -208,7 +208,11 @@ guard	cat_ssh_ed25519	decision	deny
 guard	cat_ssh_rsa	decision	deny
 guard	cat_ssh_space	decision	deny
 guard	cat_star	decision	deny
+guard	cd_end_options	decision	deny
 guard	cd_file	decision	deny
+guard	cd_logical	decision	deny
+guard	cd_options_clean	decision	allow
+guard	cd_physical	decision	deny
 guard	chained_wrappers	decision	deny
 guard	chmod_secret	decision	allow
 guard	clipboard_stash_xclip -o	decision	allow
@@ -429,6 +433,11 @@ guard	git_grep_multiple_chdir	decision	allow
 guard	git_grep_names	decision	allow
 guard	git_grep_names_long	decision	allow
 guard	git_grep_over_cap	decision	deny
+guard	git_grep_pager_after	decision	deny
+guard	git_grep_pager_long	decision	deny
+guard	git_grep_pager_long_bare	decision	deny
+guard	git_grep_pager_short	decision	deny
+guard	git_grep_pager_short_bare	decision	deny
 guard	git_grep_pattern_file	decision	deny
 guard	git_grep_pruned_.git	decision	allow
 guard	git_grep_pruned_node_modules	decision	allow
@@ -460,6 +469,12 @@ guard	glob_safe_9	decision	allow
 guard	grep_alias	decision	deny
 guard	grep_alias_count	decision	deny
 guard	grep_alias_names	decision	allow
+guard	grep_brace_selector	decision	deny
+guard	grep_brace_selector_names	decision	allow
+guard	grep_brace_selector_safe	decision	allow
+guard	grep_cluster_clean	decision	allow
+guard	grep_cluster_file	decision	deny
+guard	grep_cluster_pattern	decision	deny
 guard	grep_code_alias	decision	allow
 guard	grep_content	decision	deny
 guard	grep_control_glob	decision	deny
@@ -500,6 +515,7 @@ guard	grep_missing_find	decision	deny
 guard	grep_missing_jq	decision	deny
 guard	grep_missing_perl	decision	deny
 guard	grep_missing_perl_names	decision	allow
+guard	grep_nested_brace_selector	decision	deny
 guard	grep_nopath	decision	deny
 guard	grep_nul_glob	decision	deny
 guard	grep_nul_output_mode	decision	deny
@@ -1174,6 +1190,8 @@ guard	secret_tool_search_nested	decision	deny
 guard	secret_tool_search_to_stash	decision	deny
 guard	secret_tool_search_wrapped	decision	deny
 guard	sed_chain	decision	deny
+guard	sed_cluster_file	decision	deny
+guard	sed_cluster_script	decision	deny
 guard	set_opts	decision	allow
 guard	shell_c_export_path	decision	allow
 guard	shell_c_printer_still_denied	decision	deny
