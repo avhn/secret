@@ -21,8 +21,9 @@ func Config(file, cwd, home string) (int, bool) {
 	if file == "" {
 		return 1, false
 	}
-	if !path.IsAbs(file) {
-		file = cwd + "/" + file
+	// RIPGREP_CONFIG_PATH is a native filesystem path, not shell text.
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(cwd, file)
 	}
 	if paths.Protected(file, cwd, "", home) {
 		return 2, false
