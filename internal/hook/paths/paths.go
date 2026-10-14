@@ -102,6 +102,15 @@ func physical(raw string) (string, error) {
 func lexical(p string) bool {
 	p = strings.ToLower(filepath.ToSlash(p))
 	base := filepath.Base(p)
+	if p == "/dev/fd" || strings.HasPrefix(p, "/dev/fd/") {
+		return true
+	}
+	if strings.HasPrefix(p, "/proc/") {
+		parts := strings.Split(strings.TrimPrefix(p, "/proc/"), "/")
+		if len(parts) >= 2 && (parts[1] == "cwd" || parts[1] == "root") {
+			return true
+		}
+	}
 	if strings.Contains(p, "/.secrets/") || strings.HasSuffix(p, "/.secrets") {
 		return true
 	}

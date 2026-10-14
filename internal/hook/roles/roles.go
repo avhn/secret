@@ -3,7 +3,6 @@
 package roles
 
 import (
-	"path"
 	"regexp"
 	"strings"
 )
@@ -52,7 +51,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 	}
 	printValue := false
 	switch name {
-	case "env", "printenv", "pbpaste", "wl-paste":
+	case "env", "printenv", "pbpaste", "wl-paste", "envsubst":
 		printValue = true
 	case "xclip", "xsel":
 		for _, a := range args {
@@ -62,6 +61,33 @@ func PrinterReason(name string, args []string, direct bool) string {
 		}
 	case "gh":
 		printValue = arg(0) == "auth" && arg(1) == "token"
+		if arg(0) == "auth" && arg(1) == "status" {
+			for _, v := range args[2:] {
+				if v == "--show-token" || v == "-t" {
+					printValue = true
+				}
+			}
+		}
+	case "make":
+		for _, v := range args {
+			if v == "--print-data-base" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "p") {
+				printValue = true
+			}
+		}
+	case "npm":
+		if arg(0) == "config" {
+			lower := strings.ToLower(strings.Join(args[2:], " "))
+			key := strings.Contains(lower, "token") || strings.Contains(lower, "auth") || strings.Contains(lower, "password")
+			printValue = arg(1) == "get" && key || arg(1) == "list" && (key || strings.Contains(lower, "--json") || strings.Contains(" "+lower+" ", " -l "))
+		}
+	case "kubectl":
+		if arg(0) == "config" && arg(1) == "view" {
+			for _, v := range args[2:] {
+				if v == "--raw" || v == "--raw=true" {
+					printValue = true
+				}
+			}
+		}
 	case "gcloud":
 		j := 0
 		if arg(j) == "auth" {
@@ -327,7 +353,7 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			continue
 		}
 		if name == "git" && strings.Contains(a, ":") && !strings.HasPrefix(a, "-") {
-			a = path.Clean("./" + strings.SplitN(a, ":", 2)[1])
+			a = "./" + strings.SplitN(a, ":", 2)[1]
 		}
 		if pattern && (strings.HasPrefix(a, "--regexp=") || strings.HasPrefix(a, "-e") && len(a) > 2) {
 			pattern = false

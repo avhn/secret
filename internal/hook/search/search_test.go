@@ -169,3 +169,33 @@ func TestToolGrepAlias(t *testing.T) {
 		t.Fatal("count allowed")
 	}
 }
+
+func TestAuditSearchOptions(t *testing.T) {
+	root := t.TempDir()
+	for _, tc := range []struct {
+		words []string
+		deny  bool
+	}{
+		{[]string{"git", "grep", "-l", "--open=cat", "SYNTH"}, true},
+		{[]string{"git", "grep", "-l", "--open-files=cat", "SYNTH"}, true},
+		{[]string{"git", "grep", "-l", "--unknown-option", "SYNTH"}, true},
+		{[]string{"rg", "-l", "--unknown-option", "SYNTH"}, true},
+		{[]string{"rg", "--files-with-mat", "SYNTH"}, false},
+		{[]string{"git", "grep", "--files-with-mat", "SYNTH"}, false},
+	} {
+		if got := Scope(tc.words, root, root, "", false); (got != "") != tc.deny {
+			t.Errorf("%v: %q, deny=%v", tc.words, got, tc.deny)
+		}
+	}
+	for _, glob := range []string{"**/*.{env}", "node_modules/pkg/app.e{n}v", "**/{app.env}", "node_modules/pkg/*.{{env},x}", "node_modules/**/*.{e}nv"} {
+		if !Selector(glob) {
+			t.Errorf("protected selector allowed: %s", glob)
+		}
+	}
+	if !Selector(strings.Repeat("{", 65) + "go" + strings.Repeat("}", 65)) {
+		t.Error("unbounded nested braces allowed")
+	}
+	if Selector("**/*.{go}") {
+		t.Error("safe single-element selector denied")
+	}
+}
