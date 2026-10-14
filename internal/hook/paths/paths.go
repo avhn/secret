@@ -41,6 +41,9 @@ func Resolve(name, cwd, workdir, home string) string {
 // reads only metadata and denies link loops and non-ENOENT resolution errors.
 func Protected(name, cwd, workdir, home string) bool {
 	raw := unresolved(name, cwd, workdir, home)
+	if raw == "/proc/self/status" {
+		return false
+	}
 	if lexical(filepath.Clean(raw)) {
 		return true
 	}
@@ -102,14 +105,8 @@ func physical(raw string) (string, error) {
 func lexical(p string) bool {
 	p = strings.ToLower(filepath.ToSlash(p))
 	base := filepath.Base(p)
-	if p == "/dev/fd" || strings.HasPrefix(p, "/dev/fd/") {
+	if ProcessAlias(p) {
 		return true
-	}
-	if strings.HasPrefix(p, "/proc/") {
-		parts := strings.Split(strings.TrimPrefix(p, "/proc/"), "/")
-		if len(parts) >= 2 && (parts[1] == "cwd" || parts[1] == "root") {
-			return true
-		}
 	}
 	if strings.Contains(p, "/.secrets/") || strings.HasSuffix(p, "/.secrets") {
 		return true
@@ -242,4 +239,24 @@ func digits(s string) bool {
 // ordinary alias, for names-only tools which may return alias names.
 func LexicalProtected(name, cwd, home string) bool {
 	return lexical(filepath.Clean(unresolved(name, cwd, "", home)))
+}
+
+// ProcessAlias rejects dynamic process files and directory-style descriptor aliases.
+func ProcessAlias(p string) bool {
+	if p == "/dev/fd" || strings.HasPrefix(p, "/dev/fd/") {
+		return true
+	}
+	for _, prefix := range []string{"/dev/stdin/", "/dev/stdout/", "/dev/stderr/"} {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	if p == "/proc" || strings.HasPrefix(p, "/proc/") {
+		switch p {
+		case "/proc/cpuinfo", "/proc/meminfo", "/proc/loadavg", "/proc/uptime", "/proc/version", "/proc/stat", "/proc/self/status":
+			return false
+		}
+		return true
+	}
+	return false
 }

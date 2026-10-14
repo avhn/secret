@@ -80,6 +80,7 @@ type analyzer struct {
 	inRun               bool
 	configUntrusted     bool
 	structuralUncertain bool
+	env                 map[string]string
 	cdpath              bool
 	deadline            time.Time
 }
@@ -297,7 +298,11 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			name := path.Base(words[0])
 			args := words[1:]
-			if name == "cd" || name == "pushd" || name == "popd" {
+			if name == "shopt" && (optionIn(strings.Join(args, " "), "cdable_vars") || optionIn(strings.Join(args, " "), "autocd")) {
+				cwd = ""
+				a.cdpath = true
+			}
+			if name == "cd" || name == "pushd" || name == "popd" || name == "dirs" {
 				for len(args) > 0 && len(args[0]) > 1 && strings.HasPrefix(args[0], "-") {
 					option := args[0]
 					args = args[1:]
@@ -308,7 +313,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 						unknown = true
 					}
 				}
-				if len(args) > 0 && args[0] != "-" && !unknown && !a.cdpath && cwd != "" && name != "popd" {
+				if len(args) == 1 && args[0] != "-" && !unknown && !a.cdpath && cwd != "" && name == "cd" && !strings.HasPrefix(args[0], "~") {
 					cwd = a.resolve(args[0], cwd)
 				} else {
 					cwd = ""
@@ -658,13 +663,40 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if len(words) == 0 || a.reason != "" {
 		return
 	}
+	if strings.Contains(words[0], "/") && a.inputProtected(words[0], cwd) {
+		a.reason = roles.FileInput
+		return
+	}
 	name := path.Base(words[0])
 	args := words[1:]
+	if name == "busybox" {
+		if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+			a.reason = roles.Indeterminate
+			return
+		}
+		a.command(args, depth+1, cwd, direct)
+		return
+	}
+	if name == "git" {
+		a.gitCommand(args, depth, cwd, direct)
+		return
+	}
+	if optionIn("tar bsdtar unzip cpio 7z 7za", name) {
+		a.archiveCommand(name, args, depth, cwd)
+		return
+	}
+	if name == "parallel" {
+		a.parallelCommand(args, depth, cwd)
+		return
+	}
 	if a.auditCommand(name, args, depth, cwd, direct) {
 		return
 	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
+		if a.reason == "" && name == "xargs" && !xargsHasArgFile(args) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
+			a.reason = roles.FileInput
+		}
 		if name == "sudo" && dir != cwd && !shell {
 			a.command(child, depth+1, cwd, direct)
 		}
@@ -763,7 +795,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				if len(roots) == 0 {
 					roots = []string{"."}
 				}
-				if roles.Reading(path.Base(child[0])) {
+				if !a.metadataChild(child, depth+1, cwd) {
 					for _, root := range roots {
 						if a.treeProtectedAll(root, cwd) {
 							a.reason = roles.FileInput
@@ -913,7 +945,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	}
-	if name == "rg" || name == "git" {
+	if name == "rg" {
 		// Nested wrappers cannot inherit the hook's rg config certification.
 		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), a.configUntrusted || depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !path.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))
 		if a.reason == search.ScopeReason {
@@ -927,57 +959,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = reason
 		return
 	}
-	operandCWD := cwd
-	if name == "git" || name == "tar" {
-		for i, v := range args {
-			if (v == "-C" || v == "--directory") && i+1 < len(args) {
-				operandCWD = a.resolve(args[i+1], operandCWD)
-			}
-			if strings.HasPrefix(v, "--directory=") {
-				operandCWD = a.resolve(strings.TrimPrefix(v, "--directory="), operandCWD)
-			}
-		}
-	}
-	if name == "tar" {
-		create := false
-		for _, v := range args {
-			if v == "-c" || v == "--create" || len(v) > 1 && v[0] == '-' && !strings.HasPrefix(v, "--") && strings.Contains(v[1:], "c") {
-				create = true
-			}
-		}
-		if len(args) > 0 && strings.HasPrefix(args[0], "c") {
-			create = true
-		}
-		for i, v := range args {
-			if create && i == 0 && strings.HasPrefix(v, "c") && strings.Contains(v, "f") && len(args) > 1 {
-				args = append(args[:1], args[2:]...)
-				break
-			}
-			if create && (v == "-f" || v == "--file" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.HasSuffix(v, "f")) && i+1 < len(args) {
-				args = append(args[:i+1], args[i+2:]...)
-				break
-			}
-		}
-		for i, v := range args {
-			if v == "-f" || v == "--file" {
-				if !create && i+1 < len(args) && a.inputProtected(args[i+1], operandCWD) {
-					a.reason = roles.FileInput
-					return
-				}
-			}
-			if !create && strings.HasPrefix(v, "--file=") && a.inputProtected(strings.TrimPrefix(v, "--file="), operandCWD) {
-				a.reason = roles.FileInput
-				return
-			}
-			if !create && strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "f") {
-				if file := v[strings.IndexByte(v, 'f')+1:]; file != "" && a.inputProtected(file, operandCWD) {
-					a.reason = roles.FileInput
-					return
-				}
-			}
-		}
-	}
-	if reason := roles.OperandReason(name, args, func(path string) bool { return a.inputProtected(path, operandCWD) }); reason != "" {
+	if reason := roles.OperandReason(name, args, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
 	}
 }

@@ -46,7 +46,7 @@ func TestASTPaths(t *testing.T) {
 		{"grep -nR TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
 		{"grep -ri TOKEN src", "recursive grep bypasses protected search defaults; use plain rg"},
 		{"rg TOKEN src", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
-		{"git grep TOKEN", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
+		{"git grep TOKEN", "file input targets a protected store"},
 		{"cat .{env,x", "command too complex to analyse for secret access; split it or use secret run"},
 		{"find . -name .env -exec cat {} \\;", "file input targets a protected store"},
 		{"find -files0-from=.env -print", "find reads a protected name list"},
@@ -134,6 +134,7 @@ func TestSafeRoleParity(t *testing.T) {
 	for _, source := range []string{
 		"sudo -u cat echo .env", "sudo -g cat echo .env", "sudo -C cat echo .env",
 		"gh auth token | secret stash a K > out",
+		"git credential fill | secret stash git PASSWORD",
 		"gh auth token 2>&1 | secret stash a K",
 		"gh auth token | secret stash --env dev --label region=eu a K",
 		"git commit -m 'add .env handling'", "git status .env", "[ -f .env ]",

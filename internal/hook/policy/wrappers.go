@@ -112,3 +112,37 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 	}
 	return args, cwd, shell
 }
+
+// An explicit safe argument file supplies operands instead of cwd/stdin.
+// Inspect only xargs options before the child, not a child's own -a flag.
+func xargsHasArgFile(args []string) bool {
+	table := utilityTable["xargs"]
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" || !strings.HasPrefix(arg, "-") || arg == "-" {
+			break
+		}
+		if strings.HasPrefix(arg, "--") {
+			key, _, attached := strings.Cut(arg[2:], "=")
+			if key == "arg-file" {
+				return true
+			}
+			if optionIn(table.longValues, key) && !attached {
+				i++
+			}
+			continue
+		}
+		for j := 1; j < len(arg); j++ {
+			if arg[j] == 'a' {
+				return true
+			}
+			if strings.ContainsRune(table.values, rune(arg[j])) {
+				if j+1 == len(arg) {
+					i++
+				}
+				break
+			}
+		}
+	}
+	return false
+}

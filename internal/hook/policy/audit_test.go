@@ -56,7 +56,7 @@ func TestAuditBoundaries(t *testing.T) {
 		{"tar --create --file=out.tar .secrets", true},
 		{"tar -xOf a.tar app.env", true},
 		{"unzip -c a.zip app.env", true},
-		{"git show HEAD -- safe/code.go", false},
+		{"git show HEAD -- safe/code.go", true},
 		{"git show HEAD -- .", true},
 		{"git log --patch", true},
 		{"git cat-file -p HEAD:app.env", true},
