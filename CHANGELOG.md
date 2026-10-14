@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Bash hook rejects every non-inert inline Git configuration key, disallows command-text editor and pager interpreters and Git SSH/diff/askpass overrides, and conservatively rejects ambiguous sed grammar. Literal allowlisted editors and pagers remain available.
+
 - Bash guard now denies custom Git aliases without reading Git configuration, analyzes additional shell applets and quoted option names, parses sed scripts before accepting them, and treats indirect environment assignments as uncertain for subsequent consumers.
 
 - Shipped Bash guard closes multi-exec find, attached and multiline sed reads, cdable-variable directory changes, and BusyBox tar stdout extraction. Custom Git aliases are denied; inline transport configuration and indeterminate object sources deny content reads, while inherited editor and pager settings no longer block ordinary Git commands.

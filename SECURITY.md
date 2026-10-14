@@ -28,8 +28,11 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   and protects covered archive reads, including BusyBox tar stdout extraction,
   and detects shell hook variables that can launch readers. Inherited Git editor
   and pager settings are user configuration, not shell text; values assigned in
-  the tool command are analysed. Protected paths are matched after brace and `$IFS`
-  expansion and through symlink aliases, and unknown commands may not take a
+  the tool command permit only literal allowlisted editor/pager programs with
+  non-protected arguments; Git diff, SSH, proxy and askpass overrides deny.
+  Inline Git configuration accepts only inert keys, and ambiguous sed scripts
+  deny rather than guessing their input or execution semantics. Protected
+  paths are matched after brace and `$IFS` expansion and through symlink aliases, and unknown commands may not take a
   protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
   `git check-ignore`) and env-file consumers (`docker --env-file`,
   `node --env-file`, `dotenv -e`) stay allowed. A printer piped straight into
