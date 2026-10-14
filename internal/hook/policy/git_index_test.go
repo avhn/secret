@@ -171,7 +171,7 @@ func TestRepositoryMetadataFailures(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte("gitdir: ../.git\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := resolveGitDirectory(worktree, ""); filepath.Clean(got) != dir {
+	if got := resolveGitDirectory(worktree, ""); !samePath(got, dir) {
 		t.Fatalf("gitfile resolved to %q", got)
 	}
 	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte("invalid\n"), 0600); err != nil {
@@ -262,4 +262,11 @@ func TestGitRepositoryResolution(t *testing.T) {
 			t.Fatal("oversized index allowed")
 		}
 	})
+}
+
+// samePath compares through symlinks, since macOS temp directories live under /private.
+func samePath(a, b string) bool {
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
 }

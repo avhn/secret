@@ -111,6 +111,8 @@ func indexProtected(dir, home string) bool {
 // indexNamesProtected decodes v2/v3 padded and v4 prefix-compressed names.
 // Unknown mandatory extensions (including split/sparse indexes), malformed
 // records, unsupported object formats and budget exhaustion all fail closed.
+var indexAnchor = filepath.Join(string(os.PathSeparator), "index")
+
 func indexNamesProtected(data []byte, home string) bool {
 	if len(data) < 32 || len(data) > maxIndexBytes || string(data[:4]) != "DIRC" {
 		return true
@@ -191,7 +193,8 @@ func indexNamesProtected(data []byte, home string) bool {
 			pos += padding
 		}
 		// Anchor names independently of the host cwd; this is lexical index data.
-		if paths.LexicalProtected(name, string(os.PathSeparator), home) {
+		// A bare separator root would join to a Windows UNC prefix and lose the name.
+		if paths.LexicalProtected(name, indexAnchor, home) {
 			protected = true
 		}
 		previous = name
