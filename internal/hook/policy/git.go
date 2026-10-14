@@ -262,7 +262,13 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	if a.reason != "" || len(args) == 0 {
 		return
 	}
-	configAliases, err := gitAliases(resolveGitDirectory(cwd, gitDir), cwd, a.home, a.env)
+	var configAliases map[string]string
+	var err error
+	if gitBuiltin(args[0]) {
+		// Git never lets an alias shadow a built-in, so no config is needed.
+		goto resolved
+	}
+	configAliases, err = gitAliases(resolveGitDirectory(cwd, gitDir), cwd, a.home, a.env)
 	if err != nil {
 		a.reason = roles.Indeterminate
 		return
@@ -307,7 +313,11 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			return
 		}
 		args = append(expanded, args[1:]...)
+		if gitBuiltin(args[0]) {
+			break
+		}
 	}
+resolved:
 	sub, operands := args[0], args[1:]
 	for _, operand := range operands {
 		if strings.Contains(strings.ToLower(operand), "ext::") {
@@ -396,6 +406,20 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 
 func staticGitPath(value string) bool {
 	return value != "" && !strings.ContainsAny(value, "$`*?[]~\x00\r\n")
+}
+
+// gitContentBuiltins are built-in commands outside the safe table; aliases cannot shadow them either.
+var gitContentBuiltins = map[string]bool{
+	"show": true, "cat-file": true, "grep": true, "archive": true, "format-patch": true, "reflog": true,
+	"diff-tree": true, "diff-index": true, "diff-files": true, "range-diff": true, "fast-export": true,
+	"config": true, "credential": true, "bisect": true, "submodule": true, "am": true, "apply": true,
+	"bundle": true, "difftool": true, "mergetool": true, "filter-branch": true, "notes": true,
+	"ls-remote": true, "help": true, "version": true, "whatchanged": true, "annotate": true,
+}
+
+func gitBuiltin(name string) bool {
+	_, safe := gitSafeOptions[name]
+	return safe || gitContentBuiltins[name]
 }
 
 type gitOptions struct{ flags, values, optional string }
