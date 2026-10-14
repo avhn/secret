@@ -197,11 +197,13 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 	}
 	names, count, pattern, options, positive, includeIgnored := false, false, true, true, false, false
 	unsafeScope := false
+	unsafeNames := false
 	roots := []string{}
 	args := words[start:]
 	for i := 0; i < len(args); i++ {
 		v := args[i]
 		if options {
+			v = searchLongOption(v, kind)
 			if v == "--pre" || strings.HasPrefix(v, "--pre=") {
 				return UncertainReason
 			}
@@ -284,6 +286,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			if strings.HasPrefix(v, "-") {
 				if strings.HasPrefix(v, "--") {
 					if !neutral(v) && !simple(v) {
+						if v != "--cached" && v != "--no-index" && v != "--untracked" {
+							unsafeNames = true
+						}
 						uncertain = true
 					}
 					continue
@@ -304,6 +309,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 					}
 				}
 				if !valid {
+					unsafeNames = true
 					uncertain = true
 				}
 				continue
@@ -321,7 +327,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 		}
 		roots = append(roots, v)
 	}
-	if names && !count {
+	if names && !count && !unsafeNames {
 		return ""
 	}
 	if uncertain || unsafeScope {
@@ -384,6 +390,13 @@ func simple(v string) bool {
 // selectorBraces enumerates bounded selector lists without shell expansion.
 // Unknown or malformed brace forms cannot certify a content selector as safe.
 func selectorBraces(pattern string, budget int) ([]string, bool) {
+	return selectorBracesAt(pattern, budget, 0)
+}
+
+func selectorBracesAt(pattern string, budget, nesting int) ([]string, bool) {
+	if nesting > 16 || budget < 1 {
+		return nil, false
+	}
 	start := strings.IndexByte(pattern, '{')
 	if start < 0 {
 		return []string{pattern}, true
@@ -420,15 +433,49 @@ func selectorBraces(pattern string, budget int) ([]string, bool) {
 		}
 	}
 	parts = append(parts, body[last:])
-	if len(parts) < 2 || len(parts) > budget {
+	if len(parts) > budget {
 		return nil, false
 	}
 	for _, part := range parts {
-		values, ok := selectorBraces(pattern[:start]+part+pattern[end+1:], budget-len(out))
+		values, ok := selectorBracesAt(pattern[:start]+part+pattern[end+1:], budget-len(out), nesting+1)
 		if !ok || len(out)+len(values) > budget {
 			return nil, false
 		}
 		out = append(out, values...)
 	}
 	return out, true
+}
+
+// searchLongOption resolves unique prefixes within the supported role table.
+// Unknown or ambiguous spellings remain unknown and cannot unlock names mode.
+func searchLongOption(arg, kind string) string {
+	if !strings.HasPrefix(arg, "--") || arg == "--" {
+		return arg
+	}
+	key, value, attached := strings.Cut(arg[2:], "=")
+	names := "regexp file files-with-matches files-without-match count ignore-case fixed-strings word-regexp line-regexp line-number no-line-number with-filename no-filename text null null-data only-matching invert-match quiet color after-context before-context context max-count"
+	if kind == "git" {
+		names += " open-files-in-pager cached no-index untracked exclude-standard no-exclude-standard basic-regexp extended-regexp perl-regexp full-name all-match break heading show-function function-context"
+	} else {
+		names += " files count-matches json hidden follow search-zip no-ignore no-ignore-vcs no-ignore-parent no-ignore-dot no-config ignore-file-case-insensitive glob iglob type type-not type-add encoding colors max-depth threads pre pre-glob ignore-file smart-case case-sensitive max-columns-preview column no-column heading no-heading trim no-messages max-columns sort sortr max-filesize pcre2 multiline multiline-dotall stats"
+	}
+	match := ""
+	for _, name := range strings.Fields(names) {
+		if key == name {
+			return arg
+		}
+		if key != "" && strings.HasPrefix(name, key) {
+			if match != "" {
+				return arg
+			}
+			match = name
+		}
+	}
+	if match == "" {
+		return arg
+	}
+	if attached {
+		return "--" + match + "=" + value
+	}
+	return "--" + match
 }

@@ -46,9 +46,9 @@ func TestASTPaths(t *testing.T) {
 		{"rg TOKEN src", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
 		{"git grep TOKEN", "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"},
 		{"cat .{env,x", "command too complex to analyse for secret access; split it or use secret run"},
-		{"find . -name .env -exec cat {} \\;", "reader targets a protected store"},
+		{"find . -name .env -exec cat {} \\;", "file input targets a protected store"},
 		{"find -files0-from=.env -print", "find reads a protected name list"},
-		{"find . -name .env -exec sh -c \"cat \\\"\\$1\\\"\" _ {} \\;", "command too complex to analyse for secret access; split it or use secret run"},
+		{"find . -name .env -exec sh -c \"cat \\\"\\$1\\\"\" _ {} \\;", "file input targets a protected store"},
 		{"ln -s .env", "file input targets a protected store"},
 		{"cat \"$(printf .en; printf v)\"", "command too complex to analyse for secret access; split it or use secret run"},
 		{"wc < \"$(printf .en; printf v)\"", "input redirect reads a protected store"},
@@ -130,7 +130,7 @@ func TestSafeRoleParity(t *testing.T) {
 		"gh auth token | secret stash a K > out",
 		"gh auth token 2>&1 | secret stash a K",
 		"gh auth token | secret stash --env dev --label region=eu a K",
-		"git commit -m 'add .env handling'", "git status .env", "[ -f .env ]", "tar -cf .env src",
+		"git commit -m 'add .env handling'", "git status .env", "[ -f .env ]",
 		"jq --arg label .env -n '$label'", "cp -S .env src/a.ts out",
 	} {
 		if got := Analyze(source, "/synthetic", "/synthetic", protected); got != "" {
@@ -239,12 +239,12 @@ func TestFilteredTransport(t *testing.T) {
 
 // TestLiteralQuoting keeps inert escaped syntax separate from active operands.
 func TestLiteralQuoting(t *testing.T) {
-	for _, source := range []string{`cat .\{env,x\}`, `echo $'\e\a\b\f\r\v' .env`, `echo $'\'$(cat .env)'`, `echo "$(echo $'\'$(cat .env)')"`, "echo hello\x1fworld"} {
+	for _, source := range []string{`cat .\{env,x\}`, `echo $'\e\a\b\f\r\v' .env`, `echo $'\'$(cat .env)'`, `echo "$(echo $'\'$(cat .env)')"`} {
 		if got := Analyze(source, "/synthetic", "/synthetic", protected); got != "" {
 			t.Errorf("%q denied: %s", source, got)
 		}
 	}
-	for _, source := range []string{`cat $'\x2eenv'`, `cat $'\056env'`, "echo .env\x1f", "cat .env\x7f"} {
+	for _, source := range []string{`cat $'\x2eenv'`, `cat $'\056env'`, "echo hello\x1fworld", "echo .env\x1f", "cat .env\x7f"} {
 		if got := Analyze(source, "/synthetic", "/synthetic", protected); got == "" {
 			t.Errorf("%q allowed", source)
 		}

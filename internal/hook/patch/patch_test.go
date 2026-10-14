@@ -46,6 +46,10 @@ func TestDecision(t *testing.T) {
 		{"multiple begins", "*** Begin Patch\n*** Begin Patch\n*** Add File: safe.go\n*** End Patch", "work", invalidReason},
 		{"text after end", wrap("*** Add File: safe.go") + "\n+extra", "work", invalidReason},
 		{"embedded carriage return", wrap("*** Add File: safe\r.go"), "work", invalidReason},
+		{"protected embedded carriage return", wrap("*** Add File: .env\r.secret"), "work", invalidReason},
+		{"indented protected header", wrap("*** Add File: safe.go\n+safe\n *** Update File: .env"), "work", protectedReason},
+		{"indented delete section header", wrap("*** Delete File: safe.go\n\t*** Update File: .env"), "work", protectedReason},
+		{"indented safe header", wrap("  *** Add File: safe.go\n+safe"), "work", ""},
 		{"oversized", wrap("*** Add File: safe.go\n+" + strings.Repeat("s", maxBytes)), "work", invalidReason},
 	}
 	for _, tc := range cases {

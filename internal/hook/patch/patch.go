@@ -3,6 +3,7 @@ package patch
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/avhn/secret/internal/hook/paths"
 )
@@ -28,7 +29,12 @@ func Decision(text, cwd, workdir, home string) string {
 			line = strings.TrimSuffix(line, "\r")
 		}
 		if strings.ContainsAny(line, "\r\x00") {
-			invalid = true
+			// Malformed header bytes take precedence over filesystem checks on
+			// every OS, including Windows path resolution failures.
+			return invalidReason
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "***") {
+			line = strings.TrimLeftFunc(line, unicode.IsSpace)
 		}
 		switch {
 		case line == "*** Begin Patch":

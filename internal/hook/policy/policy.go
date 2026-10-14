@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avhn/secret/internal/hook/patch"
 	"github.com/avhn/secret/internal/hook/roles"
 	"github.com/avhn/secret/internal/hook/search"
 	"mvdan.cc/sh/v3/expand"
@@ -22,11 +23,11 @@ var ErrIndeterminate = errors.New("indeterminate shell command")
 // Analyze returns a fixed denial reason, or an empty reason for an allowed
 // command. Unsupported content-producing syntax is not treated as safe.
 func Analyze(source, cwd, home string, protected func(string, string) bool) string {
-	if strings.IndexFunc(source, func(r rune) bool { return r < 32 && r != '\n' && r != '\t' || r == 127 }) >= 0 {
-		if witness(source) || riskyRole(source) {
-			return roles.Indeterminate
-		}
-		return ""
+	if !filepath.IsAbs(cwd) {
+		return roles.Indeterminate
+	}
+	if invalidControls(source) {
+		return roles.Indeterminate
 	}
 	// The legacy guard treats named protected content in long shell text as
 	// indeterminate. Keep that stricter boundary even when parsing can proceed.
@@ -52,11 +53,11 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 // AnalyzeArgv checks already-tokenized host arguments without joining them
 // into shell source. Only explicit bash/sh -c source is parsed as shell code.
 func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string) bool) string {
-	if len(argv) == 0 || len(argv) > 128 {
+	if !filepath.IsAbs(cwd) || len(argv) == 0 || len(argv) > 128 {
 		return roles.Indeterminate
 	}
 	for _, arg := range argv {
-		if len(arg) > 40<<10 {
+		if len(arg) > 40<<10 || invalidControls(arg) {
 			return roles.Indeterminate
 		}
 	}
@@ -79,6 +80,7 @@ type analyzer struct {
 	inRun               bool
 	configUntrusted     bool
 	structuralUncertain bool
+	cdpath              bool
 	deadline            time.Time
 }
 
@@ -162,6 +164,10 @@ func commandName(stmt *syntax.Stmt) string {
 }
 
 func (a *analyzer) fragment(source string, depth int) {
+	if invalidControls(source) {
+		a.reason = roles.Indeterminate
+		return
+	}
 	if a.reason != "" {
 		return
 	}
@@ -205,6 +211,29 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		switch cmd := s.Cmd.(type) {
 		case *syntax.CallExpr:
 			cmd = unwrapCall(cmd)
+			for _, assign := range cmd.Assigns {
+				if assign.Name != nil {
+					if assign.Name.Value == "CDPATH" {
+						a.cdpath = true
+						cwd = ""
+					}
+					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+				}
+			}
+			if len(cmd.Args) > 0 && path.Base(literal(cmd.Args[0])) == "apply_patch" {
+				found := false
+				for _, r := range s.Redirs {
+					if r.Hdoc != nil {
+						found = true
+						if reason := patch.Decision(a.raw(r.Hdoc), cwd, "", a.home); reason != "" {
+							a.reason = reason
+						}
+					}
+				}
+				if !found {
+					a.reason = roles.Indeterminate
+				}
+			}
 			if len(cmd.Args) == 0 {
 				for _, assign := range cmd.Assigns {
 					a.walkWord(assign.Value, depth, cwd)
@@ -228,6 +257,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				continue
 			}
 			priorUncertain := a.uncertain
+			nestedUncertain := false
 			words := make([]string, 0, len(cmd.Args))
 			unknown := false
 			for idx, w := range cmd.Args {
@@ -245,20 +275,8 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					words = append(words, "[")
 					continue
 				}
-				// jq --arg binds a literal filter variable without reading a file.
-				if literal(cmd.Args[0]) == "jq" && a.raw(w) == `"$label"` {
-					bound := false
-					for j := 1; j+2 < idx; j++ {
-						if literal(cmd.Args[j]) == "--arg" && literal(cmd.Args[j+1]) == "label" {
-							bound = true
-						}
-					}
-					if bound {
-						words = append(words, "$label")
-						continue
-					}
-				}
 				a.walkWord(w, depth, cwd)
+				nestedUncertain = nestedUncertain || a.uncertain
 				values, ok := a.expandWord(w, cwd)
 				if !ok {
 					unknown = true
@@ -279,13 +297,21 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 			name := path.Base(words[0])
 			args := words[1:]
-			if name == "cd" {
-				for len(args) > 0 && (args[0] == "-P" || args[0] == "-L" || args[0] == "--") {
+			if name == "cd" || name == "pushd" || name == "popd" {
+				for len(args) > 0 && len(args[0]) > 1 && strings.HasPrefix(args[0], "-") {
+					option := args[0]
 					args = args[1:]
+					if option == "--" {
+						break
+					}
+					if strings.Trim(option[1:], "LPe@") != "" {
+						unknown = true
+					}
 				}
-				if len(args) > 0 && !unknown {
+				if len(args) > 0 && args[0] != "-" && !unknown && !a.cdpath && cwd != "" && name != "popd" {
 					cwd = a.resolve(args[0], cwd)
 				} else {
+					cwd = ""
 					a.uncertain = true
 				}
 				continue
@@ -350,9 +376,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				}
 			}
 			if (name == "echo" || name == "printf") && a.words <= 128 && time.Now().Before(a.deadline) {
-				a.uncertain = priorUncertain || a.structuralUncertain
+				a.uncertain = priorUncertain || nestedUncertain || a.structuralUncertain
 			}
-			if unknown && roles.Reading(name) && a.reason == "" && !(name == "jq" && strings.Contains(a.rawArgs(cmd.Args), `"$label"`) && !roles.CredentialExpansion(a.rawArgs(cmd.Args))) {
+			if unknown && roles.Reading(name) && a.reason == "" {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
@@ -388,7 +414,10 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			} else {
 				leftCWD := a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				if cmd.Op.String() == "&&" || cmd.Op.String() == "||" {
-					cwd = a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
+					if cmd.Op.String() == "||" {
+						leftCWD = joinedCWD(cwd, leftCWD)
+					}
+					cwd = joinedCWD(cwd, a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD))
 				} else {
 					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 				}
@@ -398,15 +427,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		case *syntax.Block:
 			cwd = a.stmts(cmd.Stmts, depth, cwd)
 		case *syntax.FuncDecl:
-			a.stmts([]*syntax.Stmt{cmd.Body}, depth, cwd)
+			cwd = joinedCWD(cwd, a.stmts([]*syntax.Stmt{cmd.Body}, depth, cwd))
 		case *syntax.IfClause:
 			for clause := cmd; clause != nil; clause = clause.Else {
-				cwd = a.stmts(clause.Cond, depth, cwd)
-				cwd = a.stmts(clause.Then, depth, cwd)
+				cwd = joinedCWD(cwd, a.stmts(clause.Cond, depth, cwd))
+				cwd = joinedCWD(cwd, a.stmts(clause.Then, depth, cwd))
 			}
 		case *syntax.WhileClause:
-			a.stmts(cmd.Cond, depth, cwd)
-			a.stmts(cmd.Do, depth, cwd)
+			cwd = joinedCWD(cwd, a.stmts(cmd.Cond, depth, cwd))
+			cwd = joinedCWD(cwd, a.stmts(cmd.Do, depth, cwd))
 		case *syntax.ForClause:
 			a.walkNode(cmd.Loop, depth, cwd)
 			if loop, ok := cmd.Loop.(*syntax.WordIter); ok {
@@ -414,20 +443,27 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					a.walkWord(w, depth, cwd)
 				}
 			}
-			a.stmts(cmd.Do, depth, cwd)
+			cwd = joinedCWD(cwd, a.stmts(cmd.Do, depth, cwd))
 		case *syntax.CaseClause:
 			a.walkWord(cmd.Word, depth, cwd)
 			for _, item := range cmd.Items {
 				for _, pattern := range item.Patterns {
 					a.walkWord(pattern, depth, cwd)
 				}
-				a.stmts(item.Stmts, depth, cwd)
+				cwd = joinedCWD(cwd, a.stmts(item.Stmts, depth, cwd))
 			}
 			a.uncertain = true
 		case *syntax.DeclClause:
 			a.walkNode(cmd, depth, cwd)
 			args := make([]string, 0, len(cmd.Args))
 			for _, assign := range cmd.Args {
+				if assign.Name != nil {
+					if assign.Name.Value == "CDPATH" {
+						a.cdpath = true
+						cwd = ""
+					}
+					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+				}
 				if assign.Value != nil {
 					args = append(args, literal(assign.Value))
 				} else if assign.Name != nil {
@@ -581,6 +617,13 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 		return
 	}
 	for _, assign := range call.Assigns {
+		if assign.Name != nil {
+			if assign.Name.Value == "CDPATH" {
+				a.cdpath = true
+				cwd = ""
+			}
+			a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+		}
 		a.walkNode(assign, depth, cwd)
 	}
 	words := make([]string, 0, len(call.Args))
@@ -608,11 +651,18 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 	}
 }
 func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
+	if depth > 4 || time.Now().After(a.deadline) {
+		a.reason = roles.Indeterminate
+		return
+	}
 	if len(words) == 0 || a.reason != "" {
 		return
 	}
 	name := path.Base(words[0])
 	args := words[1:]
+	if a.auditCommand(name, args, depth, cwd, direct) {
+		return
+	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
 		if name == "sudo" && dir != cwd && !shell {
@@ -681,7 +731,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		for i, v := range args {
-			if v == "-files0-from" && i+1 < len(args) && a.protected(args[i+1], cwd) || strings.HasPrefix(v, "-files0-from=") && a.protected(strings.TrimPrefix(v, "-files0-from="), cwd) {
+			if v == "-files0-from" && i+1 < len(args) && a.inputProtected(args[i+1], cwd) || strings.HasPrefix(v, "-files0-from=") && a.inputProtected(strings.TrimPrefix(v, "-files0-from="), cwd) {
 				a.reason = "find reads a protected name list"
 				return
 			}
@@ -695,6 +745,32 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 					return
 				}
 				child := append([]string(nil), args[i+1:end]...)
+				roots := []string{}
+				for j := 0; j < len(args); j++ {
+					root := args[j]
+					if root == "-H" || root == "-L" || root == "-P" || root == "--" || strings.HasPrefix(root, "-O") {
+						continue
+					}
+					if root == "-D" {
+						j++
+						continue
+					}
+					if strings.HasPrefix(root, "-") || root == "(" || root == "!" {
+						break
+					}
+					roots = append(roots, root)
+				}
+				if len(roots) == 0 {
+					roots = []string{"."}
+				}
+				if roles.Reading(path.Base(child[0])) {
+					for _, root := range roots {
+						if a.treeProtectedAll(root, cwd) {
+							a.reason = roles.FileInput
+							return
+						}
+					}
+				}
 				if selected && len(child) > 2 && (child[0] == "sh" || child[0] == "bash") && (strings.Contains(child[2], "$1") || strings.Contains(child[2], "${1}")) {
 					a.reason = roles.Indeterminate
 					return
@@ -734,7 +810,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 					a.command(args[1:], depth+1, cwd, direct)
 					return
 				}
-				code := "env " + args[1]
+				code := "env " + splitEnv(args[1])
 				for _, arg := range args[2:] {
 					code += " " + strconv.Quote(arg)
 				}
@@ -746,7 +822,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				if strings.HasPrefix(args[0], "-S") {
 					code = args[0][2:]
 				}
-				a.fragmentAt("env "+code, depth+1, cwd)
+				a.fragmentAt("env "+splitEnv(code), depth+1, cwd)
 				return
 			}
 			// Strip only known option operands, then analyze the actual child.
@@ -787,6 +863,13 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		for i, v := range args {
+			if key, value, ok := strings.Cut(v, "="); ok {
+				a.hookAssignment(key, value, depth, cwd)
+				if key == "CDPATH" {
+					a.cdpath = true
+					cwd = ""
+				}
+			}
 			if v == "--" {
 				a.command(args[i+1:], depth+1, cwd, direct)
 				return
@@ -804,6 +887,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	case "docker", "dotenv":
+		if name == "dotenv" {
+			a.dotenvChild(args, depth, cwd)
+			return
+		}
 		for _, v := range args {
 			if name == "dotenv" && (v == "-p" || v == "--print") {
 				a.reason = "dotenv prints an environment value"
@@ -873,28 +960,31 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		for i, v := range args {
 			if v == "-f" || v == "--file" {
-				if !create && i+1 < len(args) && a.protected(args[i+1], operandCWD) {
+				if !create && i+1 < len(args) && a.inputProtected(args[i+1], operandCWD) {
 					a.reason = roles.FileInput
 					return
 				}
 			}
-			if !create && strings.HasPrefix(v, "--file=") && a.protected(strings.TrimPrefix(v, "--file="), operandCWD) {
+			if !create && strings.HasPrefix(v, "--file=") && a.inputProtected(strings.TrimPrefix(v, "--file="), operandCWD) {
 				a.reason = roles.FileInput
 				return
 			}
 			if !create && strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "f") {
-				if file := v[strings.IndexByte(v, 'f')+1:]; file != "" && a.protected(file, operandCWD) {
+				if file := v[strings.IndexByte(v, 'f')+1:]; file != "" && a.inputProtected(file, operandCWD) {
 					a.reason = roles.FileInput
 					return
 				}
 			}
 		}
 	}
-	if reason := roles.OperandReason(name, args, func(path string) bool { return a.protected(path, operandCWD) }); reason != "" {
+	if reason := roles.OperandReason(name, args, func(path string) bool { return a.inputProtected(path, operandCWD) }); reason != "" {
 		a.reason = reason
 	}
 }
 func (a *analyzer) resolve(name, cwd string) string {
+	if cwd == "" && !path.IsAbs(name) {
+		return ""
+	}
 	if strings.HasPrefix(name, "~/") {
 		name = a.home + "/" + name[2:]
 	}
@@ -911,7 +1001,7 @@ func (a *analyzer) protectedWord(w *syntax.Word, cwd string) bool {
 		return true
 	}
 	for _, v := range values {
-		if a.protected(v, cwd) {
+		if a.inputProtected(v, cwd) {
 			return true
 		}
 	}
@@ -1105,7 +1195,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		}
 		if unquotedGlob && strings.ContainsAny(v, "*?[") {
 			for _, candidate := range []string{".env", ".env.production", "app.env", "app.secret", ".secrets.env", ".netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
-				if matched, _ := path.Match(path.Base(v), candidate); matched && a.protected(path.Join(path.Dir(v), candidate), cwd) {
+				if matched, _ := path.Match(path.Base(v), candidate); matched && a.inputProtected(path.Join(path.Dir(v), candidate), cwd) {
 					expanded = append(expanded, path.Join(path.Dir(v), candidate))
 				}
 			}

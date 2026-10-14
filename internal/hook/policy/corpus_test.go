@@ -223,3 +223,73 @@ func TestGuardDeniedCorpus(t *testing.T) {
 	}
 	t.Logf("%d variants from %d Bash-deny cases, %d allows", count, len(corpus.Cases), failures)
 }
+
+// TestAudit2DeniedVariants keeps the second audit on the same literal-variant
+// generator as the retained Bash corpus. Git root markers suffice here: actual
+// synthetic commits and deleted-history boundaries run in hook/audit_test.go.
+func TestAudit2DeniedVariants(t *testing.T) {
+	data, err := os.ReadFile("../testdata/audit2.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corpus struct {
+		Fixtures [][3]string
+		Cases    []struct {
+			Name, Tool, CWD string
+			Deny            bool
+			Fields          map[string]string
+		}
+	}
+	if err := json.Unmarshal(data, &corpus); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	for _, entry := range corpus.Fixtures {
+		name := filepath.Join(dir, filepath.FromSlash(entry[0]))
+		if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+			t.Fatal(err)
+		}
+		switch entry[1] {
+		case "dir":
+			err = os.MkdirAll(name, 0700)
+		case "file":
+			err = os.WriteFile(name, nil, 0600)
+		case "link":
+			err = os.Symlink(filepath.FromSlash(entry[2]), name)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, repo := range []string{"r", "r2"} {
+		if err := os.MkdirAll(filepath.Join(dir, "w", repo, ".git"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("RIPGREP_CONFIG_PATH", "")
+	count := 0
+	for _, tc := range corpus.Cases {
+		if tc.Tool != "Bash" || !tc.Deny {
+			continue
+		}
+		t.Run(tc.Name, func(t *testing.T) {
+			source := strings.ReplaceAll(tc.Fields["command"], "@TMP@", filepath.ToSlash(dir))
+			cwd := filepath.Join(dir, "w", filepath.FromSlash(tc.CWD))
+			check := func(name, cwd string) bool {
+				if !strings.Contains(name, "/") {
+					if _, err := os.Lstat(paths.Resolve(name, cwd, "", dir)); os.IsNotExist(err) {
+						return false
+					}
+				}
+				return paths.Protected(name, cwd, "", dir)
+			}
+			for _, variant := range deniedVariants(source) {
+				count++
+				if reason := Analyze(variant, cwd, dir, check); reason == "" {
+					t.Errorf("allowed audit2 variant %q", variant)
+				}
+			}
+		})
+	}
+	t.Logf("checked %d audit2 denied variants", count)
+}
