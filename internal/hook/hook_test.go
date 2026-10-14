@@ -2,12 +2,16 @@ package hook
 
 import (
 	"bytes"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 // TestDecide compares the host JSON shape for synthetic paths and empty input.
 func TestDecide(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("cases use Unix host cwds; the Windows hook adapter is M5e")
+	}
 	cases := []struct{ name, host, payload, reason string }{
 		{"read protected", "claude", `{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":".env"}}`, "file access targets a protected store"},
 		{"read safe", "claude", `{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"src/a.go"}}`, ""},
