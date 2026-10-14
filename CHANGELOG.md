@@ -26,6 +26,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Bash guard inspects shell commands beneath unmodelled wrappers and coprocesses, rejects unverified shell stdin and Git submodule foreach, resolves Git configuration write paths through ancestor gitfiles and home variables, and checks MultiEdit and NotebookEdit paths. Expanded permanent audit cases cover read-only common forms and Git write tools.
+
 - Bash guard denies stdin shell scripts, applies a conservative sed allowlist, prevents ordinary writes to Git configuration, and hardens Git subprocess lookup and submodule classification.
 
 - Bash guard isolates bounded Git probes from repository config and process-group signals, rejects alternate-index and config-write ambiguity, and tightens dashed Git, pager/editor, shell stdin, globstar and ambiguous sed write-flag analysis.

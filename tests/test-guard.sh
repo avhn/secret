@@ -1709,5 +1709,54 @@ p' ordinary.txt"
     secrets sed_execute_flag deny Bash "sed 's/x/cat app.env/e' ordinary.txt"
 fi
 
+# Audit 9: nested execution, protected Git targets and newer editor tools.
+# shellcheck disable=SC2016  # literal shell expansions are test inputs
+for cmd in "coproc sh -c 'cat app.env 1>&2'" "coproc bash -c 'cat app.env'" \
+    "coproc S { sh -c 'cat app.env'; }" 'coproc sh < s.sh' \
+    'git submodule foreach echo' 'pushd .git; echo x > config' \
+    'echo x >> .gi?/config' 'echo x > .g*/config' \
+    'echo x > $HOME/.gitconfig' 'echo x > $XDG_CONFIG_HOME/git/config' \
+    "sed -Ei '\$a x' .git/config" "sed -ni 's/a/b/' .git/config" \
+    "sed -si 's/a/b/' .git/config" "sed --in 's/a/b/' .git/config" \
+    "sed --in-pl 's/a/b/' .git/config" "sed --in= 's/a/b/' .git/config" \
+    "perl -pi -e 's/a/b/' .git/config" "perl -pi -e 's/a/b/' '$HOME/.gitconfig'" \
+    'patch -o .git/config < changes.patch' 'patch < changes.patch' \
+    'tar -xf x.tar -C .git' 'tar -xf x.tar --directory .git' \
+    'unzip x.zip -d .git' 'mkdir -p .git/hooks' \
+    "fish -d x < x" 'sed -nf x f' \
+    'rbash' 'ksh93' 'csh' 'tcsh' 'bash5' 'sh5' 'bash-5.2' \
+    'script -q < x' 'sudo -s' 'sudo -i' 'sudo -s < x' \
+    "sudo -i sh -c 'cat app.env'" 'su' ; do
+    secrets audit9_denied deny Bash "$cmd"
+done
+for wrapper in unshare flock chrt taskset ionice chroot nsenter doas run0 pkexec systemd-run firejail rlwrap strace fakeroot bwrap runuser; do
+    secrets audit9_wrapper deny Bash "$wrapper sh -c 'cat app.env'"
+done
+for cmd in "flock -c 'cat app.env'" "watch 'cat app.env'" "tmux new-session 'cat app.env'" "expect -c 'spawn sh -c cat app.env'" "ssh host 'cat app.env'" 'unshare env' 'chrt printenv'; do
+    secrets audit9_inline deny Bash "$cmd"
+done
+mkdir -p "$TMP/linked-worktree/sub"
+printf 'gitdir: %s\n' "$TMP/worktree-gitdir" >"$TMP/search/.git"
+for value in "$TMP/worktree-gitdir/config" "$TMP/worktree-gitdir/hooks/test"; do
+    secrets audit9_gitdir_child deny Bash "cd '$TMP/linked-worktree/sub'; echo x > '$value'"
+    secrets audit9_gitdir_parent deny Bash "cd '$TMP/linked-worktree'; echo x > '$value'"
+    secrets audit9_gitdir_write deny Write "$value"
+    secrets audit9_gitdir_edit deny Edit "$value"
+done
+secrets audit9_multiedit deny MultiEdit "$TMP/search/.git/config"
+secrets audit9_notebook deny NotebookEdit "$TMP/search/.git/config" "{\"notebook_path\":\"$TMP/search/.git/config\"}"
+# shellcheck disable=SC2016  # loop body receives literal shell source
+for cmd in 'git status' 'git log' 'git diff --stat' 'git add src' "git commit -m 'cat .env mention'" 'git push' 'git pull' "sed -i 's/a/b/' src/a.ts" "sed -n '1,5p' src/a.ts" "bash -c 'npm test'" "sh -c 'make'" 'npm test' 'go test ./...' 'rg TODO src' 'echo x > out.txt' 'for f in *.ts; do echo "$f"; done' 'docker run img ls' 'ssh host uptime' 'timeout 5 npm test' 'xargs -n1 echo'; do
+    secrets audit9_allowed allow Bash "$cmd"
+done
+if command -v git >/dev/null 2>&1; then
+    secrets audit9_stash allow Bash "git -C '$TMP/alternate-index' stash"
+fi
+# shellcheck disable=SC2016  # the guard receives a literal shell variable
+secrets audit9_static_write allow Bash 'OUT=out.txt; echo x > "$OUT"'
+# shellcheck disable=SC2016  # the guard receives a literal shell variable
+secrets audit9_static_git deny Bash 'OUT=.git/config; echo x > "$OUT"'
+secrets audit9_write_safe allow Write "$TMP/search/src/new.ts"
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

@@ -80,3 +80,21 @@ func TestGitConfigFileToolWrites(t *testing.T) {
 		t.Fatalf("worktree gitdir write allowed: %s", out.String())
 	}
 }
+
+func TestOrdinaryWriteRemainsAllowed(t *testing.T) {
+	root := t.TempDir()
+	payload, err := json.Marshal(map[string]any{
+		"tool_name": "Write", "cwd": root,
+		"tool_input": map[string]string{"file_path": filepath.Join(root, "src", "new.ts"), "content": "synthetic"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Decide("claude", bytes.NewReader(payload), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), `"permissionDecision":"deny"`) {
+		t.Fatalf("ordinary write denied: %s", out.String())
+	}
+}
