@@ -256,9 +256,6 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		}
 		return ""
 	}
-	if name == "split" && len(args) > 1 {
-		args = args[:len(args)-1]
-	}
 	if name == "zip" && len(args) > 0 {
 		args = args[1:]
 	}
@@ -292,6 +289,7 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 			}
 		}
 	}
+	splitInput := false
 	for i := 0; i < end; i++ {
 		a := args[i]
 		if name == "node" && a == "--env-file" {
@@ -362,6 +360,12 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 		if pattern {
 			pattern = false
 			continue
+		}
+		if name == "split" {
+			if splitInput {
+				continue // remaining positional arguments name the output prefix
+			}
+			splitInput = true
 		}
 		if protected(a) {
 			if readers[name] {

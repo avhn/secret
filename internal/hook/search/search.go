@@ -91,8 +91,12 @@ func Selector(glob string) bool {
 			continue
 		}
 		for _, v := range []string{g, strings.TrimPrefix(g, "**/")} {
-			if ok, _ := path.Match(v, name); ok {
-				return true
+			// A selector with a directory component can also match protected
+			// basenames below an ordinary search root.
+			for _, candidate := range []string{name, "src/" + name} {
+				if ok, _ := path.Match(v, candidate); ok {
+					return true
+				}
 			}
 		}
 	}
@@ -215,7 +219,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 					return UncertainReason
 				}
 				pattern = false
-				if (v == "-f" || v == "--file") && args[i] != "-" && paths.Protected(args[i], cwd, "", home) {
+				if (v == "-f" || v == "--file") && args[i] != "-" && paths.RootProtected(args[i], cwd, home) {
 					return "pattern file targets a protected store"
 				}
 				continue
@@ -239,7 +243,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			}
 			if strings.HasPrefix(v, "--file=") || strings.HasPrefix(v, "-f") && len(v) > 2 {
 				f := strings.TrimPrefix(strings.TrimPrefix(v, "--file="), "-f")
-				if f != "-" && paths.Protected(f, cwd, "", home) {
+				if f != "-" && paths.RootProtected(f, cwd, home) {
 					return "pattern file targets a protected store"
 				}
 				pattern = false
