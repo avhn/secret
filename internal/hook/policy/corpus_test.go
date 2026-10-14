@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -159,6 +160,12 @@ func TestGuardDeniedCorpus(t *testing.T) {
 			case "rg_find_exit", "rg_timeout", "git_grep_timeout", "rg_missing_perl_config", "rg_missing_perl", "rg_missing_find", "rg_missing_jq":
 				t.Skip("Bash-only injected external dependency failure")
 			}
+			if strings.Contains(tc.Command, "/proc") {
+				if _, err := os.Stat("/proc/self"); err != nil {
+					// Without /proc (macOS, Windows) rg reads nothing there; the Bash guard allows it too.
+					t.Skip("host has no /proc")
+				}
+			}
 			tmp := t.TempDir()
 			replace := strings.NewReplacer("@TMP@", filepath.ToSlash(tmp), "@ROOT@", filepath.ToSlash(root))
 			for _, fixture := range corpus.Snapshots[tc.Snapshot] {
@@ -177,6 +184,9 @@ func TestGuardDeniedCorpus(t *testing.T) {
 					err = os.Symlink(replace.Replace(fixture[2]), name)
 				case "file":
 					err = os.WriteFile(name, []byte(replace.Replace(fixture[2])), 0600)
+				}
+				if err != nil && runtime.GOOS == "windows" && strings.ContainsAny(fixture[0], "\n\r:*?\"<>|") {
+					t.Skip("fixture name is not valid on Windows")
 				}
 				if err != nil {
 					t.Fatal(err)
