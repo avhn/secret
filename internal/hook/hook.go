@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/avhn/secret/internal/hook/input"
@@ -31,7 +32,8 @@ func Decide(host string, in io.Reader, out io.Writer) error {
 		cwd, _ = os.Getwd()
 	}
 	// A relative host cwd cannot anchor a relative workdir or file operand.
-	if !filepath.IsAbs(cwd) {
+	// Host cwds are slash paths on Unix and may be drive paths on Windows.
+	if !filepath.IsAbs(cwd) && !path.IsAbs(cwd) {
 		_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
 		return err
 	}
