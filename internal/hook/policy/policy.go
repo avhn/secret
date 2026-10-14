@@ -4,6 +4,7 @@ package policy
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,12 +17,39 @@ var ErrIndeterminate = errors.New("indeterminate shell command")
 // Analyze returns a fixed denial reason, or an empty reason for an allowed
 // command. Unsupported content-producing syntax is not treated as safe.
 func Analyze(source, cwd, home string, protected func(string, string) bool) string {
+	// A deeply nested literal -c chain can hide shell code behind repeated
+	// shell-quote boundaries. Never let it outlive the recursion budget.
+	if strings.Count(source, "bash -c")+strings.Count(source, "sh -c") > 4 && (witness(source) || riskyRole(source)) {
+		return roles.Indeterminate
+	}
 	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second)}
 	a.fragment(source, 0)
 	if a.reason != "" {
 		return a.reason
 	}
-	if a.uncertain && witness(source) {
+	if a.uncertain && (witness(source) || riskyRole(source)) {
+		return roles.Indeterminate
+	}
+	return ""
+}
+
+// AnalyzeArgv checks already-tokenized host arguments without joining them
+// into shell source. Only explicit bash/sh -c source is parsed as shell code.
+func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string) bool) string {
+	if len(argv) == 0 || len(argv) > 128 {
+		return roles.Indeterminate
+	}
+	for _, arg := range argv {
+		if len(arg) > 8192 {
+			return roles.Indeterminate
+		}
+	}
+	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second)}
+	a.command(argv, 0, cwd, false)
+	if a.reason != "" {
+		return a.reason
+	}
+	if a.uncertain && (witness(strings.Join(argv, " ")) || riskyRole(strings.Join(argv, " "))) {
 		return roles.Indeterminate
 	}
 	return ""
@@ -39,6 +67,23 @@ func witness(source string) bool {
 	s := strings.ToLower(source)
 	for _, v := range []string{".env", ".secret", ".secrets", ".netrc", ".npmrc", ".pypirc", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".git-credentials", ".ssh/id_", "/environ", "secret-tool", "printenv", "gh auth token", "$token", "$password", "$secret"} {
 		if strings.Contains(s, v) {
+			return true
+		}
+	}
+	for _, phrase := range []string{"security find-", "git credential fill", "secret get", "secret exec", "pbpaste", "wl-paste", "rg ", "git grep", "env ", "bash -c", "gh auth token", "gcloud auth print-", "aws configure get aws_", "aws configure export-credentials", "op read", "op item get", "pass show", "secret-tool lookup", "kwallet-query -r", "ps e", "jq -n env"} {
+		if strings.Contains(s, phrase) {
+			return true
+		}
+	}
+	return strings.Contains(s, ".en*") || strings.Contains(s, ".en{") || strings.Contains(s, ".{env")
+}
+
+// riskyRole is for parser and budget failures only. It cannot certify shell
+// words, so a possible reader or printer is never treated as an inert command.
+func riskyRole(source string) bool {
+	for _, field := range strings.Fields(source) {
+		name := strings.Trim(field, "'\";|&(){}<> ")
+		if roles.KnownReader(name) || roles.PrinterReason(name, nil, false) != "" {
 			return true
 		}
 	}
@@ -143,7 +188,8 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			// Pipe validation is handled by the containing binary command.
 			if strings.HasPrefix(name, "python") || name == "perl" || name == "ruby" || name == "node" {
 				for _, w := range cmd.Args[1:] {
-					if witness(a.raw(w)) {
+					code := a.raw(w)
+					if witness(code) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -155,7 +201,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			if a.reason == "" {
 				a.command(words, depth, cwd, direct)
 			}
-			if unknown && roles.Reading(name) && witness(a.rawArgs(cmd.Args)) && a.reason == "" {
+			if unknown && roles.Reading(name) && a.reason == "" {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
@@ -179,11 +225,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		case *syntax.FuncDecl:
 			a.stmts([]*syntax.Stmt{cmd.Body}, depth, cwd)
 		case *syntax.IfClause:
-			a.stmts(cmd.Cond, depth, cwd)
-			a.stmts(cmd.Then, depth, cwd)
-			if cmd.Else != nil {
-				a.stmts(cmd.Else.Cond, depth, cwd)
-				a.stmts(cmd.Else.Then, depth, cwd)
+			for clause := cmd; clause != nil; clause = clause.Else {
+				a.stmts(clause.Cond, depth, cwd)
+				a.stmts(clause.Then, depth, cwd)
 			}
 		case *syntax.WhileClause:
 			a.stmts(cmd.Cond, depth, cwd)
@@ -234,13 +278,18 @@ func (a *analyzer) xargsListing(upstream, downstream *syntax.Stmt, cwd string) b
 	if !reader {
 		return false
 	}
-	var args []*syntax.Word
-	if source, ok := upstream.Cmd.(*syntax.CallExpr); ok {
-		args = source.Args[1:]
+	return a.listingWitness(upstream, cwd)
+}
+
+func (a *analyzer) listingWitness(stage *syntax.Stmt, cwd string) bool {
+	if pipe, ok := stage.Cmd.(*syntax.BinaryCmd); ok && pipe.Op.String() == "|" {
+		return a.listingWitness(pipe.X, cwd) || a.listingWitness(pipe.Y, cwd)
 	}
-	for _, w := range args {
-		if a.protectedWord(w, cwd) || witness(a.raw(w)) {
-			return true
+	if source, ok := stage.Cmd.(*syntax.CallExpr); ok {
+		for _, w := range source.Args[1:] {
+			if a.protectedWord(w, cwd) || a.uncertain || witness(a.raw(w)) {
+				return true
+			}
 		}
 	}
 	return false
@@ -299,6 +348,46 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 	}
 	switch name {
+	case "find":
+		selected := false
+		for i, v := range args {
+			if (v == "-name" || v == "-iname" || v == "-path" || v == "-regex") && i+1 < len(args) && witness(args[i+1]) {
+				selected = true
+			}
+		}
+		for i, v := range args {
+			if v == "-files0-from" && i+1 < len(args) && a.protected(args[i+1], cwd) || strings.HasPrefix(v, "-files0-from=") && a.protected(strings.TrimPrefix(v, "-files0-from="), cwd) {
+				a.reason = "find reads a protected name list"
+				return
+			}
+			if v == "-exec" || v == "-execdir" || v == "-ok" || v == "-okdir" {
+				end := i + 1
+				for end < len(args) && args[end] != ";" && args[end] != "+" {
+					end++
+				}
+				if end <= i+1 {
+					a.reason = roles.Indeterminate
+					return
+				}
+				child := append([]string(nil), args[i+1:end]...)
+				if selected && len(child) > 2 && (child[0] == "sh" || child[0] == "bash") && (strings.Contains(child[2], "$1") || strings.Contains(child[2], "${1}")) {
+					a.reason = roles.Indeterminate
+					return
+				}
+				if selected {
+					for j := range child {
+						if child[j] == "{}" {
+							child[j] = ".env"
+						}
+					}
+				}
+				a.command(child, depth+1, cwd, false)
+				if a.reason != "" {
+					return
+				}
+			}
+		}
+		return
 	case "bash", "sh", "zsh", "eval":
 		if name == "eval" {
 			if len(args) > 0 {
@@ -307,12 +396,20 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			return
 		}
 		for i, v := range args {
-			if (v == "-c" || v == "-lc" || strings.HasPrefix(v, "-") && strings.Contains(v, "c")) && i+1 < len(args) {
+			if (v == "-c" || v == "-lc" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "c")) && i+1 < len(args) {
 				a.fragment(args[i+1], depth+1)
 				return
 			}
 		}
 	case "env", "sudo", "nice", "timeout", "nohup", "exec", "command", "builtin", "stdbuf", "caffeinate":
+		if name == "nice" && len(args) > 2 && args[0] == "-n" {
+			a.command(args[2:], depth+1, cwd, direct)
+			return
+		}
+		if name == "sudo" && len(args) > 1 && (args[0] == "-s" || args[0] == "-i") {
+			a.fragment(args[1], depth+1)
+			return
+		}
 		if name == "timeout" {
 			for i, v := range args {
 				if v == "--signal" || v == "--kill-after" {
@@ -325,7 +422,17 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		if name == "env" {
-			for _, v := range args {
+			for i, v := range args {
+				if (v == "-u" || v == "--unset" || v == "-C" || v == "--chdir") && i+1 < len(args) {
+					a.command(args[i+2:], depth+1, cwd, direct)
+					return
+				}
+			}
+			for i, v := range args {
+				if (v == "-u" || v == "--unset" || v == "-C" || v == "--chdir") && i+1 >= len(args) {
+					a.reason = roles.Indeterminate
+					return
+				}
 				if v == "-S" || v == "--split-string" || strings.HasPrefix(v, "-S") || strings.HasPrefix(v, "--split-string=") {
 					a.reason = roles.Indeterminate
 					return
@@ -416,7 +523,47 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = reason
 		return
 	}
-	if reason := roles.OperandReason(name, args, func(path string) bool { return a.protected(path, cwd) }); reason != "" {
+	operandCWD := cwd
+	if name == "git" || name == "tar" {
+		for i, v := range args {
+			if (v == "-C" || v == "--directory") && i+1 < len(args) {
+				operandCWD = a.resolve(args[i+1], operandCWD)
+			}
+			if strings.HasPrefix(v, "--directory=") {
+				operandCWD = a.resolve(strings.TrimPrefix(v, "--directory="), operandCWD)
+			}
+		}
+	}
+	if name == "tar" {
+		create := false
+		for _, v := range args {
+			if v == "-c" || v == "--create" || len(v) > 1 && v[0] == '-' && strings.Contains(v[1:], "c") {
+				create = true
+			}
+		}
+		if len(args) > 0 && strings.HasPrefix(args[0], "c") {
+			create = true
+		}
+		for i, v := range args {
+			if v == "-f" || v == "--file" {
+				if !create && i+1 < len(args) && a.protected(args[i+1], operandCWD) {
+					a.reason = roles.FileInput
+					return
+				}
+			}
+			if !create && strings.HasPrefix(v, "--file=") && a.protected(strings.TrimPrefix(v, "--file="), operandCWD) {
+				a.reason = roles.FileInput
+				return
+			}
+			if !create && strings.HasPrefix(v, "-t") && strings.Contains(v, "f") {
+				if file := v[strings.IndexByte(v, 'f')+1:]; file != "" && a.protected(file, operandCWD) {
+					a.reason = roles.FileInput
+					return
+				}
+			}
+		}
+	}
+	if reason := roles.OperandReason(name, args, func(path string) bool { return a.protected(path, operandCWD) }); reason != "" {
 		a.reason = reason
 	}
 }
@@ -432,11 +579,8 @@ func (a *analyzer) resolve(path, cwd string) string {
 func (a *analyzer) protectedWord(w *syntax.Word, cwd string) bool {
 	values, ok := a.expandWord(w, cwd)
 	if !ok {
-		if w != nil && witness(a.raw(w)) {
-			a.uncertain = true
-			return true
-		}
-		return false
+		a.uncertain = true
+		return true
 	}
 	for _, v := range values {
 		if a.protected(v, cwd) {
@@ -489,6 +633,12 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 	if w == nil {
 		return nil, true
 	}
+	for _, part := range w.Parts {
+		if lit, ok := part.(*syntax.Lit); ok && strings.Count(lit.Value, "{") > strings.Count(lit.Value, "}") {
+			a.uncertain = true
+			return nil, false
+		}
+	}
 	syntax.SplitBraces(w)
 	// Never pass SplitBraces results to syntax.Walk: this parser version
 	// panics on BraceExp nodes, which are introduced by SplitBraces itself.
@@ -502,9 +652,21 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		switch n := part.(type) {
 		case *syntax.Lit:
 			piece = n.Value
+			if strings.Contains(piece, "{") && (strings.Contains(piece, ",") || strings.Contains(piece, "..")) {
+				a.uncertain = true
+				return nil, false
+			}
 			unquotedGlob = unquotedGlob || strings.ContainsAny(piece, "*?[")
 		case *syntax.SglQuoted:
 			piece = n.Value
+			if n.Dollar {
+				var err error
+				piece, err = strconv.Unquote("\"" + strings.ReplaceAll(n.Value, "\"", "\\\"") + "\"")
+				if err != nil {
+					a.uncertain = true
+					return nil, false
+				}
+			}
 		case *syntax.DblQuoted:
 			for _, child := range n.Parts {
 				switch x := child.(type) {

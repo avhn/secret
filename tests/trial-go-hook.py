@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory(prefix="go-hook-trial-") as tmp:
             key = name if seen[name] == 1 else f"{name}#{seen[name]}"
             expected[key] = decision
     groups = collections.defaultdict(collections.Counter)
+    false_allows = []
+    false_denies = []
     actual = {}
     seen.clear()
     for line in results.read_text().splitlines():
@@ -46,6 +48,10 @@ with tempfile.TemporaryDirectory(prefix="go-hook-trial-") as tmp:
         if status == "fail":
             group = re.split(r"[_#]", name)[0]
             groups[group]["false_allow" if expected.get(key) == "deny" else "false_deny"] += 1
+            if expected.get(key) == "deny":
+                false_allows.append(key)
+            else:
+                false_denies.append(key)
     samples = [float(n) for n in times.read_text().splitlines()] if times.exists() else []
     samples.sort()
     if samples:
@@ -55,6 +61,9 @@ with tempfile.TemporaryDirectory(prefix="go-hook-trial-") as tmp:
           f"false_deny={sum(c['false_deny'] for c in groups.values())}")
     for group, counts in sorted(groups.items(), key=lambda pair: (-pair[1]["false_allow"], pair[0])):
         print(f"  {group}: allow={counts['false_allow']} deny={counts['false_deny']}")
+    if os.environ.get("TRIAL_DETAILS"):
+        print("  false-allow cases: " + ", ".join(false_allows))
+        print("  false-deny cases: " + ", ".join(false_denies))
     if set(expected) != set(actual):
         print("suite inventory mismatch", file=sys.stderr)
         raise SystemExit(1)
