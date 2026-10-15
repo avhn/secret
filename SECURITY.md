@@ -122,6 +122,11 @@ documentation or hardening suggestions, but they are not vulnerabilities:
 - **Visibility limits.** A nonempty malformed request or failed static analysis
   denies instead of allowing the tool call. This is a hook decision, not a
   sandbox guarantee: a disabled or missing host hook cannot enforce it.
+  The interim Bash guard also denies requests it cannot analyse within its
+  two-second budget, including very long `&&` chains. Split the command into
+  shorter calls. `kubectl get secret -o custom-columns=...` can select secret
+  data without using a standard printer format, and curl uploads of unresolved
+  shell variables may transmit sensitive values; avoid both with credentials.
 - **Ignored dependency trees.** A content search over a tree skips `.git` and
   `node_modules` unless `--hidden`, a glob or an explicit path brings them
   into scope, so a protected file inside them is not detected.

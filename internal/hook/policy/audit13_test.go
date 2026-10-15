@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/avhn/secret/internal/hook/paths"
 )
@@ -38,7 +39,7 @@ func TestAudit13(t *testing.T) {
 		{`python -c 'from dotenv import dotenv_values; print(dotenv_values())'`, true}, {`curl file://$PWD/.env`, true}, {`zip - .env`, true},
 		{`git grep -n process.env`, false}, {`git grep -e process.env`, false}, {`git log -S process.env`, false},
 		{`sed -n '/process.env/p' src/util.ts`, false}, {`sed -n '/import.meta.env/p' src/util.ts`, false},
-		{`cat src/*`, false}, {`grep foo src/*`, false}, {`wc -l src/*`, false}, {`cp src/* build/`, false}, {`cp -r packages/* build/`, false}, {`cat build/*`, false},
+		{`cat src/*`, false}, {`grep foo src/*`, false}, {`wc -l src/*`, false}, {`cp src/* build/`, false}, {`cp -r packages/* build/`, false}, {`cat build/*`, true},
 		{`grep -rl foo src`, false}, {`grep -ri foo src`, false}, {`grep -rn --include='*.ts' foo .`, false}, {`grep -r foo src`, false}, {`grep -R foo src`, false},
 		{`rg API_KEY`, false}, {`rg --type ts useEffect`, false},
 		{`docker run --rm -v $PWD:/src img`, false}, {`docker run --rm -v ${PWD}:/src img`, false}, {`docker run --rm -v $(pwd):/src img`, false},
@@ -85,7 +86,7 @@ func TestAudit13ParityReproducers(t *testing.T) {
 		{"embedded CR", "true\rtrue", true},
 		{"write after heredoc", "cat <<'EOF' > src/env.ts\nprocess.env.PORT\nEOF", false},
 		{"append before heredoc", "cat >> .gitignore <<'EOF'\n.env.local\nEOF", false},
-		{"unmatched private glob", "cat ~/.ssh/id_*", false},
+		{"unmatched private glob", "cat ~/.ssh/id_*", true},
 		{"unmatched glob with literal store", "cat ~/.ssh/id_* .env", true},
 		{"multiple roots with protected visible file", "rg TOKEN src sub", true},
 	} {
@@ -138,7 +139,11 @@ func TestAudit13IgnoredSearch(t *testing.T) {
 		}
 	}
 	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	if got := Analyze("rg TOKEN", root, root, check); got != "" {
+		t.Logf("rg scope roots=%q fallback=%v protected=%v", rgRoots([]string{"TOKEN"}), (&analyzer{protected: check, home: root, deadline: time.Now().Add(time.Second)}).rgVisibleSafe([]string{"TOKEN"}, root), check(".", root))
 		t.Fatalf("ignored search denied: %q", got)
 	}
 	if got := Analyze("rg --no-ignore TOKEN", root, root, check); got == "" {

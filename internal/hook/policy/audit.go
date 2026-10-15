@@ -184,7 +184,9 @@ func (a *analyzer) dotenvChild(args []string, depth int, cwd string) {
 		case "-p", "--print", "list", "get":
 			a.reason = roles.Printer
 			return
-		case "-e", "--env", "-v", "--variable":
+		case "run":
+			continue
+		case "-f", "--env-file", "-e", "--env", "-v", "--variable":
 			i++
 			if i >= len(args) {
 				a.reason = roles.Indeterminate

@@ -34,6 +34,7 @@ func TestQuotedGlobEscape(t *testing.T) {
 		}
 		got, ok := shellGlobMatches(tc.pattern, root, time.Now().Add(time.Second))
 		if !ok || len(got) != len(tc.want) {
+			globFailure(t, tc.pattern, root)
 			t.Fatalf("%q: paths=%q valid=%v, want=%q", tc.pattern, got, ok, tc.want)
 		}
 		for i, name := range tc.want {
@@ -52,6 +53,31 @@ func TestQuotedGlobEscape(t *testing.T) {
 
 // Native joins exercise the absolute and volume-bearing path split, not only
 // the relative shell spelling accepted by the matcher.
+func globFailure(t *testing.T, pattern, cwd string) {
+	t.Helper()
+	abs := filepath.FromSlash(pattern)
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(cwd, abs)
+	}
+	base := filepath.Clean(cwd)
+	if rel, err := filepath.Rel(base, abs); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		abs = rel
+	} else {
+		base = filepath.VolumeName(abs) + string(os.PathSeparator)
+		abs = strings.TrimPrefix(abs, filepath.VolumeName(abs))
+	}
+	parts := strings.Split(filepath.ToSlash(abs), "/")
+	t.Logf("glob pattern=%q cwd=%q base=%q components=%q", pattern, cwd, base, parts)
+	for _, dir := range []string{base, cwd, filepath.Dir(filepath.Join(cwd, pattern))} {
+		entries, err := os.ReadDir(dir)
+		var names []string
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Logf("glob directory=%q entries=%q err=%v", dir, names, err)
+	}
+}
+
 func TestGlobNativeRoot(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "packages", "unit"), 0700); err != nil {
@@ -64,7 +90,51 @@ func TestGlobNativeRoot(t *testing.T) {
 	for _, pattern := range []string{filepath.Join(root, "packages", "*", "package.json"), filepath.ToSlash(filepath.Join(root, "packages", "*", "package.json"))} {
 		got, ok := shellGlobMatches(pattern, root, time.Now().Add(time.Second))
 		if !ok || len(got) != 1 || got[0] != name {
+			globFailure(t, pattern, root)
 			t.Errorf("%q: matches=%q ok=%v", pattern, got, ok)
+		}
+	}
+}
+
+func TestGlobProtectedNativeNames(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{".env", "app.env"} {
+		if err := os.WriteFile(filepath.Join(root, name), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct{ pattern, want string }{{".env*", ".env"}, {"app.*", "app.env"}, {filepath.Join(root, "*.env"), "app.env"}} {
+		got, ok := shellGlobMatches(tc.pattern, root, time.Now().Add(time.Second))
+		found := false
+		for _, path := range got {
+			if filepath.Base(path) == tc.want {
+				found = true
+			}
+		}
+		if !ok || !found {
+			globFailure(t, tc.pattern, root)
+			t.Errorf("pattern=%q matches=%q valid=%v missing %q", tc.pattern, got, ok, tc.want)
+		}
+	}
+}
+
+func TestGlobSymlinkedTempRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs Windows developer mode")
+	}
+	actual := t.TempDir()
+	link := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(actual, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(actual, ".env"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, pattern := range []string{".env*", filepath.Join(link, ".env*")} {
+		got, ok := shellGlobMatches(pattern, link, time.Now().Add(time.Second))
+		if !ok || len(got) != 1 || filepath.Base(got[0]) != ".env" {
+			globFailure(t, pattern, link)
+			t.Fatalf("pattern=%q matches=%q ok=%v", pattern, got, ok)
 		}
 	}
 }
@@ -84,6 +154,7 @@ func TestGlobVolumeLikeComponent(t *testing.T) {
 	}
 	got, ok := shellGlobMatches(filepath.Join(root, "C:", "*", "*.ts"), root, time.Now().Add(time.Second))
 	if !ok || len(got) != 1 || got[0] != name {
+		globFailure(t, filepath.Join(root, "C:", "*", "*.ts"), root)
 		t.Fatalf("volume-like path: matches=%q ok=%v", got, ok)
 	}
 }

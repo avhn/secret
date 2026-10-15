@@ -162,12 +162,12 @@ if command -v jq >/dev/null 2>&1; then
         secrets read_ssh_space deny Read '~/.ssh/id_custom key'
         secrets cat_ssh_space deny Bash 'cat "~/.ssh/id_custom key"'
         secrets read_ssh_space_public allow Read '~/.ssh/id_custom key.pub'
-        secrets credential_glob allow Bash 'cat ~/.docker/c*.json'
+        secrets credential_glob deny Bash 'cat ~/.docker/c*.json'
         mkdir -p "$HOME/.docker"
         printf '%s\n' synthetic-only >"$HOME/.docker/config.json"
         secrets credential_glob_matched deny Bash 'cat ~/.docker/c*.json'
         secrets credential_selector_glob deny Grep "$TMP/empty-search" '{"glob":"**/.config/gh/*.yml","output_mode":"content"}'
-        secrets ssh_private_glob allow Bash 'cat ~/.ssh/id_*'
+        secrets ssh_private_glob deny Bash 'cat ~/.ssh/id_*'
         mkdir -p "$HOME/.ssh"
         printf '%s\n' synthetic-only >"$HOME/.ssh/id_ed25519"
         secrets ssh_private_glob_matched deny Bash 'cat ~/.ssh/id_*'
@@ -302,7 +302,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets head_glob deny Bash 'head *.secret'
         secrets cat_star deny Bash 'cat *'
         # heredoc bodies are data, except unquoted ones with substitutions
-        secrets heredoc_commit deny Bash $'git commit -F - <<\'EOF\'\nfeat: secret exec and cat .env are prose\nEOF'
+        secrets heredoc_commit allow Bash $'git commit -F - <<\'EOF\'\nfeat: secret exec and cat .env are prose\nEOF'
         secrets heredoc_plain deny Bash $'cat <<EOF\ncat ~/.secrets/x.secret\nEOF'
         secrets heredoc_dash allow Bash $'cat <<-EOF\n\tsecret exec x\n\tEOF'
         secrets heredoc_subst deny Bash $'cat <<EOF\n$(cat ~/.secrets/x.secret)\nEOF'
@@ -2078,6 +2078,13 @@ EOF
 large_command="cat .env; true $(perl -e 'print "x" x 1048576')"
 started="$(perl -MTime::HiRes=time -e 'print time')"
 secrets p19_single_line_budget deny Bash "$large_command"
+budget_reason="$(jq -cn --arg c "true $(printf 'x%.0s' {1..8200})" --arg w "$TMP/search" \
+    '{tool_name:"Bash",cwd:$w,tool_input:{command:$c}}' | invoke_guard | \
+    jq -r '.hookSpecificOutput.permissionDecisionReason // ""')"
+if [[ "$budget_reason" != *'split the command'* ]]; then
+    printf 'FAIL budget deny should ask to split the command\n'
+    FAILED=$((FAILED + 1))
+fi
 elapsed="$(perl -MTime::HiRes=time -e 'print time - $ARGV[0]' "$started")"
 if perl -e 'exit !($ARGV[0] >= 2)' "$elapsed"; then
     printf 'FAIL p19 single-line budget exceeded two seconds (%ss)\n' "$elapsed"
@@ -2108,7 +2115,11 @@ for cmd in 'tail -f .env' 'tail -n 20 -f .env' 'tail -f ~/.ssh/id_ed25519' \
     "python -c 'from dotenv import dotenv_values; print(dotenv_values())'" \
     'curl file://$PWD/.env' 'zip - .env'; do
     audit13_deny=${audit13_deny:-0}; audit13_deny=$((audit13_deny + 1))
-    secrets "audit13_deny_$audit13_deny" deny Bash "$cmd"
+    if [[ "$cmd" == 'pnpm config get x' ]]; then
+        secrets "audit13_deny_$audit13_deny" allow Bash "$cmd"
+    else
+        secrets "audit13_deny_$audit13_deny" deny Bash "$cmd"
+    fi
 done
 for cmd in 'cat src/*' 'grep foo src/*' 'wc -l src/*' \
     'cp src/* build/' 'cp -r packages/* build/' 'cat build/*' \
@@ -2119,7 +2130,12 @@ for cmd in 'cat src/*' 'grep foo src/*' 'wc -l src/*' \
     'git clean -fd' 'git clean -f build' 'docker --env-file .env run app' \
     'ls src | xargs -n1 echo'; do
     audit13_allow=${audit13_allow:-0}; audit13_allow=$((audit13_allow + 1))
-    secrets "audit13_allow_$audit13_allow" allow Bash "$cmd"
+    if [[ "$cmd" == 'cp -r packages/* build/' || "$cmd" == 'cat build/*' ]]; then
+        # No source matches; either glob could later select a protected name.
+        secrets "audit13_allow_$audit13_allow" deny Bash "$cmd"
+    else
+        secrets "audit13_allow_$audit13_allow" allow Bash "$cmd"
+    fi
 done
 mkdir -p "$TMP/hidden-only/src"
 printf '%s\n' '.env' >"$TMP/hidden-only/.gitignore"
@@ -2170,12 +2186,73 @@ secrets audit13_large_python allow Bash "python3 - <<'EOF'"$'\n'"$inert_body"$'\
 secrets audit13_large_commit allow Bash 'git commit -m "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
 # shellcheck disable=SC2016  # The substitution is literal guard input.
 secrets audit13_large_pr allow Bash 'gh pr create --body "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
+# Audit 14: inert message/file data is not an 8 KiB shell fragment.
+# shellcheck disable=SC2016  # Literal command substitution is guard input.
+secrets audit14_large_pr_title allow Bash 'gh pr create --title t --body "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
+secrets audit14_large_commit_f allow Bash "git commit -F - <<'EOF'"$'\n'"$inert_body"$'\nEOF'
+# shellcheck disable=SC2016  # Literal command substitution is guard input.
+secrets audit14_large_commit_m allow Bash 'git commit -m "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
+secrets audit14_large_pr_file allow Bash "gh pr create --body-file - <<'EOF'"$'\n'"$inert_body"$'\nEOF'
+secrets audit14_large_tag_file allow Bash "git tag -a v1 -F - <<'EOF'"$'\n'"$inert_body"$'\nEOF'
 unset inert_body
 secrets audit13_heredoc_after_redirect allow Bash $'cat <<\'EOF\' > src/env.ts\nprocess.env.PORT\nEOF'
 secrets audit13_heredoc_gitignore allow Bash $'cat >> .gitignore <<\'EOF\'\n.env.local\nEOF'
 # A literal backslash-n does not terminate the heredoc header.
 secrets audit13_heredoc_unterminated deny Bash "cat <<'EOF' > src/env.ts\\nprocess.env.PORT\\nEOF"
 secrets audit13_heredoc_missing_end deny Bash $'cat > src/env.ts <<\'EOF\'\nordinary data'
+# Message bodies and their input heredocs are data, not file inputs.
+secrets audit14_commit_env_f allow Bash $'git commit -F - <<\'EOF\'\nsee .env\nEOF'
+secrets audit14_commit_env_file allow Bash $'git commit --file=- <<\'EOF\'\nprocess.env.PORT\nEOF'
+secrets audit14_pipe_env_commit allow Bash $'cat <<\'EOF\' | git commit -F -\nsee .env\nEOF'
+secrets audit14_tag_env_file allow Bash $'git tag -a v1 -F - <<\'EOF\'\nsee .env\nEOF'
+secrets audit14_gh_env_file allow Bash $'gh pr create --body-file - <<\'EOF\'\nsee .env\nEOF'
+secrets audit14_commit_am_env allow Bash "git commit -am 'fix: read PORT from process.env'"
+secrets audit14_commit_am_dotenv allow Bash "git commit -am 'fix: use .env loader'"
+secrets audit14_commit_asm_env allow Bash "git commit -asm 'fix: use .env loader'"
+for cmd in 'python3 -m venv env' 'jest -t env' 'vitest run -t env' 'pytest -k env'; do
+    secrets audit14_env_operand allow Bash "$cmd"
+done
+for cmd in 'env' 'printenv' 'docker exec c env'; do
+    secrets audit14_env_printer deny Bash "$cmd"
+done
+for cmd in 'pnpm config get registry' 'yarn config get npmRegistryServer' 'pnpm -C src config get registry'; do
+    secrets audit14_config_public allow Bash "$cmd"
+done
+for cmd in 'pnpm config get _authToken' 'yarn config get password' 'pnpm config ls' 'yarn config list' 'pnpm --dir src config get credential' 'yarn --filter x config get authToken'; do
+    secrets audit14_config_secret deny Bash "$cmd"
+done
+for cmd in 'kubectl get secret/db -o yaml' 'kubectl get secrets/db -ojson' 'kubectl -n prod get secret db -o yaml' 'kubectl --namespace prod get secret db -o yaml' 'kubectl get -n prod secret s -o yaml'; do
+    secrets audit14_kubectl_secret deny Bash "$cmd"
+done
+secrets audit14_gh_host_short deny Bash 'gh config get -h github.com oauth_token'
+secrets audit14_gh_host_long deny Bash 'gh config get --host github.com oauth_token'
+for cmd in 'pipx run --spec python-dotenv dotenv list' 'npx dotenvx@latest get' 'npx @dotenvx/dotenvx get' 'npm exec -- dotenvx get' 'yarn dotenvx get' 'pnpm dotenvx get' 'uvx --from python-dotenv dotenv list'; do
+    secrets audit14_runner_printer deny Bash "$cmd"
+done
+secrets audit14_docker_json deny Bash 'docker inspect --format json web'
+secrets audit14_docker_json_attached deny Bash 'docker container inspect web --format=json'
+for cmd in 'tar xzf backup.tgz && cat restored/.env*' 'unzip -o creds.zip -d out && cat out/*.env' 'git stash pop && cat .env.*' 'cp -r ../shared/config . && cat config/*.env'; do
+    secrets audit14_unmatched_glob deny Bash "$cmd"
+done
+secrets audit14_unmatched_ts allow Bash 'cat src/*.ts'
+mkdir -p "$TMP/conditional/conf" "$TMP/conditional/empty"
+printf '%s\n' 'synthetic-only' >"$TMP/conditional/conf/app.env"
+secrets audit14_conditional_cat deny Bash 'npm ci && cd empty; cat conf/*' "{\"workdir\":\"$TMP/conditional\"}"
+secrets audit14_conditional_grep deny Bash "cd '$TMP/conditional' && npm ci && cd '$TMP/conditional/empty'; grep -rn KEY ."
+mkdir -p "$TMP/rg-hidden-only"
+printf '%s\n' synthetic >"$TMP/rg-hidden-only/.env"
+prior_audit14_config="${RIPGREP_CONFIG_PATH:-}"
+unset RIPGREP_CONFIG_PATH
+secrets audit14_rg_hidden allow Bash "cd '$TMP/rg-hidden-only'; rg KEY"
+secrets audit14_rg_visible deny Bash "cd '$TMP/search'; rg KEY"
+secrets audit14_rg_explicit_aws deny Bash 'rg KEY ~/.aws'
+export RIPGREP_CONFIG_PATH="$prior_audit14_config"
+secrets audit14_zip_stdout deny Bash 'zip -q - .env'
+secrets audit14_git_rm_cached allow Bash 'git rm --cached .env'
+secrets audit14_fd_hidden allow Bash 'fd -H .env'
+secrets audit14_grep_quiet allow Bash 'grep -q API_KEY .env'
+secrets audit14_grep_count allow Bash 'grep -c API_KEY .env'
+secrets audit14_dotenvx_run allow Bash 'dotenvx run -f .env.production -- node app.js'
 chain="$(printf 'true && %.0s' {1..39})true"
 started="$(perl -MTime::HiRes=time -e 'print time')"
 secrets audit13_chain allow Bash "$chain"

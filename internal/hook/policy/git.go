@@ -3,6 +3,7 @@ package policy
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -471,7 +472,7 @@ var gitSafeOptions = map[string]gitOptions{
 	"shortlog":     {"--oneline --all --reverse --no-merges -s -n -e", "--format --pretty --author --committer --grep --since --until --max-count", "--branches --tags --remotes"},
 	"diff":         {"--stat --name-only --name-status --numstat --shortstat --quiet --exit-code --cached --staged --no-color", "", "--stat"},
 	"branch":       {"--list -l -a --all -r --remotes --show-current", "--sort --format --contains --no-contains --merged --no-merged", "--color"},
-	"tag":          {"--list -l -n", "--sort --format --contains --no-contains --merged --no-merged", "--color"},
+	"tag":          {"--list -l -n -a --annotate", "--sort --format --contains --no-contains --merged --no-merged -F --file -m --message", "--color"},
 	"remote":       {"-v --verbose", "", ""},
 	"rev-parse":    {"--verify --quiet -q --show-toplevel --show-prefix --show-cdup --git-dir --absolute-git-dir --is-inside-work-tree --is-bare-repository --short --symbolic --symbolic-full-name --abbrev-ref --all", "", "--short --abbrev-ref"},
 	"rev-list":     {"--all --count --first-parent --merges --no-merges --reverse --left-right --boundary --no-walk", "-n --max-count --since --until", ""},
@@ -575,7 +576,7 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 			continue
 		}
 		if !options || !strings.HasPrefix(arg, "-") || arg == "-" {
-			if optionIn("add commit restore checkout switch blame rm mv", sub) && a.inputProtected(arg, cwd) {
+			if optionIn("add commit restore checkout switch blame rm mv", sub) && !(sub == "rm" && slices.Contains(args, "--cached")) && a.inputProtected(arg, cwd) {
 				a.reason = roles.FileInput
 				return false
 			}
@@ -583,6 +584,16 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 		}
 		key, value, attached := strings.Cut(arg, "=")
 		if sub == "log" && len(arg) > 1 && strings.Trim(arg[1:], "0123456789") == "" {
+			continue
+		}
+		if sub == "commit" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg, "m") && strings.Trim(arg[1:strings.IndexByte(arg, 'm')], "as") == "" {
+			value := arg[strings.IndexByte(arg, 'm')+1:]
+			if value == "" {
+				i++
+				if i >= len(args) {
+					return false
+				}
+			}
 			continue
 		}
 		if !attached && !strings.HasPrefix(arg, "--") && len(arg) > 2 && optionIn(table.values, arg[:2]) {
@@ -596,7 +607,7 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 				}
 				value = args[i]
 			}
-			if optionIn("-F --file --exclude-from", key) && a.inputProtected(value, cwd) {
+			if optionIn("-F --file --exclude-from", key) && value != "-" && a.inputProtected(value, cwd) {
 				a.reason = roles.FileInput
 				return false
 			}
