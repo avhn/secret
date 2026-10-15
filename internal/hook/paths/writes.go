@@ -15,7 +15,7 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 	if cwd == "" && !filepath.IsAbs(name) {
 		return true
 	}
-	raw := Resolve(name, cwd, workdir, home)
+	raw := StreamBase(Resolve(name, cwd, workdir, home))
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
 	if check(raw) {
 		return true

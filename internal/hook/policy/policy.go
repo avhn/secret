@@ -500,7 +500,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
-			if cmd.Op.String() == "|" && a.filteredFindPipe(cmd.X, cmd.Y, cwd) {
+			if cmd.Op.String() == "|" && (a.filteredFindPipe(cmd.X, cmd.Y, depth, cwd) || a.filteredFDPipe(cmd.X, cmd.Y, depth, cwd)) {
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				prior := a.xargsIDs
 				a.xargsIDs = true
@@ -765,7 +765,10 @@ func (a *analyzer) listingWitness(stage *syntax.Stmt, cwd string) bool {
 		return a.listingWitness(pipe.X, cwd) || a.listingWitness(pipe.Y, cwd)
 	}
 	if source, ok := stage.Cmd.(*syntax.CallExpr); ok {
-		for _, w := range source.Args[1:] {
+		for i, w := range source.Args[1:] {
+			if commandName(stage) == "find" && i > 0 && optionIn("-name -iname", literal(source.Args[i])) && a.protectedGlob(strings.ToLower(literal(w)), cwd) {
+				return true
+			}
 			if a.protectedWord(w, cwd) || a.uncertain || witness(a.raw(w)) {
 				return true
 			}

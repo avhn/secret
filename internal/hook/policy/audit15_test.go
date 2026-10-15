@@ -127,6 +127,32 @@ func TestAudit15(t *testing.T) {
 	}
 }
 
+func TestAudit15FindOtherRoot(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	for _, name := range []string{".env", "a.ts"} {
+		if err := os.WriteFile(filepath.Join(other, name), []byte("synthetic\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	for _, tc := range []struct {
+		selector string
+		deny     bool
+	}{
+		{".e*", true}, {".E*", true}, {".en[v].staging*", true}, {"*.ts", false},
+	} {
+		for _, predicate := range []string{"-name", "-iname"} {
+			source := "find '" + filepath.ToSlash(other) + "' " + predicate + " '" + tc.selector + "' | xargs cat"
+			t.Run(source, func(t *testing.T) {
+				if got := Analyze(source, root, root, check); (got != "") != tc.deny {
+					t.Errorf("denial=%q want deny=%v", got, tc.deny)
+				}
+			})
+		}
+	}
+}
+
 func TestAudit15GitSearch(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "src"), 0700); err != nil {

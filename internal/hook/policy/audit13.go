@@ -221,13 +221,30 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 		if optionIn("dlx exec run", args[0]) {
 			args = args[1:]
 		}
-	case "npm":
-		if len(args) == 0 || args[0] != "exec" {
+	case "python", "python3":
+		if len(args) < 2 || args[0] != "-m" {
 			return nil, false
 		}
 		args = args[1:]
-		if len(args) > 0 && args[0] == "--" {
-			args = args[1:]
+	case "npm":
+		if len(args) == 0 || !optionIn("exec x", args[0]) {
+			return nil, false
+		}
+		args = args[1:]
+		for len(args) > 0 {
+			if args[0] == "--" {
+				args = args[1:]
+				break
+			}
+			if optionIn("-y --yes", args[0]) || strings.HasPrefix(args[0], "--yes=") || strings.HasPrefix(args[0], "--package=") {
+				args = args[1:]
+				continue
+			}
+			if optionIn("-p --package", args[0]) && len(args) >= 2 {
+				args = args[2:]
+				continue
+			}
+			break
 		}
 		// npm's separator belongs to npm, not the selected local binary.
 		args = append([]string(nil), args...)
@@ -286,12 +303,27 @@ func (a *analyzer) rgVisibleSafe(args []string, cwd string) bool {
 	if status == 2 || a.configUntrusted {
 		return false
 	}
-	for _, v := range args {
+	for i := 0; i < len(args); i++ {
+		v := args[i]
 		if v == "--hidden" {
 			hidden = true
 			continue
 		}
-		if optionIn("--no-ignore --no-ignore-vcs -u -uu -uuu", v) || strings.HasPrefix(v, "--no-ignore") || strings.HasPrefix(v, "-g") || strings.HasPrefix(v, "--glob") || strings.HasPrefix(v, "--iglob") {
+		if optionIn("-g --glob --iglob", v) {
+			i++
+			if i >= len(args) || !search.NegativeGlob(args[i]) {
+				return false
+			}
+			continue
+		}
+		if strings.HasPrefix(v, "--glob=") || strings.HasPrefix(v, "--iglob=") || strings.HasPrefix(v, "-g") && len(v) > 2 {
+			g := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(v, "--glob="), "--iglob="), "-g")
+			if !search.NegativeGlob(g) {
+				return false
+			}
+			continue
+		}
+		if optionIn("--no-ignore --no-ignore-vcs -u -uu -uuu", v) || strings.HasPrefix(v, "--no-ignore") {
 			return false
 		}
 	}
@@ -345,12 +377,22 @@ func (a *analyzer) visibleRootSafe(root, cwd string, skipHidden, gitSearch bool)
 		}
 		root = resolved
 	}
+	if !gitSearch {
+		for dir, count := root, 0; count < 128; dir, count = filepath.Dir(dir), count+1 {
+			if rgIgnoreOverride(dir) {
+				return false
+			}
+			if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil || !os.IsNotExist(err) || dir == filepath.Dir(dir) {
+				break
+			}
+		}
+	}
 	// An ignored non-hidden credential file is likewise outside rg's
 	// default search. Only simple root-name ignore patterns are certified;
 	// anything ambiguous leaves the protected file in scope.
 	ignored := []string{}
 	ignorePath := filepath.Join(root, ".gitignore")
-	if _, err := os.Stat(filepath.Join(root, ".git")); err == nil && !a.inputProtected(ignorePath, cwd) {
+	if resolveGitDirectory(root, "") != "" && !a.inputProtected(ignorePath, cwd) {
 		if info, err := os.Stat(ignorePath); err == nil && info.Mode().IsRegular() && info.Size() <= 8192 {
 			if data, err := os.ReadFile(ignorePath); err == nil && len(data) <= 8192 {
 				for _, line := range strings.Split(string(data), "\n") {
@@ -389,14 +431,21 @@ func (a *analyzer) visibleRootSafe(root, cwd string, skipHidden, gitSearch bool)
 			}
 			return nil
 		}
-		if filepath.Dir(name) == root {
-			for _, pattern := range ignored {
-				if matched, err := path.Match(pattern, d.Name()); err == nil && matched {
-					if d.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil
+		if d.IsDir() {
+			if !gitSearch && rgIgnoreOverride(name) {
+				return fs.ErrInvalid
+			}
+			if _, err := os.Lstat(filepath.Join(name, ".gitignore")); name != root && (err == nil || !os.IsNotExist(err)) {
+				return fs.ErrInvalid
+			}
+		}
+		// Slash-free Git ignore patterns also apply in descendant directories.
+		for _, pattern := range ignored {
+			if matched, err := path.Match(pattern, d.Name()); err == nil && matched {
+				if d.IsDir() {
+					return filepath.SkipDir
 				}
+				return nil
 			}
 		}
 		if a.inputProtected(name, cwd) {
@@ -405,6 +454,17 @@ func (a *analyzer) visibleRootSafe(root, cwd string, skipHidden, gitSearch bool)
 		return nil
 	})
 	return err == nil
+}
+
+// Higher-priority ripgrep ignore files can unignore credentials. Their contents
+// are not part of the simple Git-ignore proof; errors also refuse certification.
+func rgIgnoreOverride(dir string) bool {
+	for _, name := range []string{".ignore", ".rgignore"} {
+		if _, err := os.Lstat(filepath.Join(dir, name)); err == nil || !os.IsNotExist(err) {
+			return true
+		}
+	}
+	return false
 }
 
 func dockerPIDPipe(upstream, downstream *syntax.Stmt) bool {

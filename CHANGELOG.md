@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Fix Go future-Git-directory protection across canonical cwd aliases and keep
+  unmatched Windows credential-glob witnesses in their slash-qualified path role.
+  Protect Windows alternate data streams by their base file, harden filtered
+  find/fd and negative-glob scopes, and refuse ripgrep ignore certification when
+  higher-priority ignore files may restore credentials. Restore Python module
+  and npm x runners, attached rg types, quiet searches, Markdown/subtree Grep
+  filters, and bounded cwd alternatives after blocks and conditionals.
+
+- Harden Bash negative search filters, ripgrep ignore certification, fd roots, npm runner options, reader flags and uncertain cwd; restore typed/subtree searches and launcher data operands, and remove redundant long-option Git probes behind the filtered-header flake.
+
 - Harden Bash guard launcher slots, fd execution, message-file roles, conditional cwd and secret printers; protect `.envrc` and restore filtered searches, names-only output, ignored Git paths and runner forms.
 
 - Harden Go launcher, heredoc, fd execution, Kubernetes output and archive

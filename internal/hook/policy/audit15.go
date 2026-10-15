@@ -30,7 +30,7 @@ func packageLeadingOptions(args []string) []string {
 
 func rgOutputOnly(args []string) bool {
 	for _, arg := range args {
-		if optionIn("-l --files --files-with-matches --files-without-match --count --count-matches -c", arg) || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsAny(arg[1:], "lc") {
+		if optionIn("-l --files --files-with-matches --files-without-match --count --count-matches -c -q --quiet", arg) || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsAny(arg[1:], "lcq") {
 			return true
 		}
 	}
@@ -52,10 +52,7 @@ func rgPublicSelector(args []string) bool {
 		} else {
 			continue
 		}
-		if strings.HasPrefix(v, "!") {
-			continue
-		}
-		if search.Selector(v) {
+		if !search.CanNarrow(v) {
 			return false
 		}
 		narrow = true
@@ -76,7 +73,7 @@ func kubernetesSecretResource(value string) bool {
 // These commands give env a documented data role, not a launcher slot. Keep
 // inspecting their other opaque arguments without recasting that data as code.
 func environmentDataArgs(name string, args []string) []string {
-	data := optionIn("jest vitest pytest grep egrep fgrep", name) || name == "python3" && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" || name == "go" && len(args) > 0 && args[0] == "env" || name == "vercel" && len(args) > 1 && args[0] == "env" && args[1] == "ls" || name == "npm" && len(args) > 0 && args[0] == "test"
+	data := optionIn("jest vitest pytest venv grep egrep fgrep", name) || name == "python3" && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" || name == "go" && len(args) > 0 && args[0] == "env" || name == "vercel" && len(args) > 1 && args[0] == "env" && args[1] == "ls" || name == "npm" && len(args) > 0 && args[0] == "test"
 	if !data {
 		return args
 	}
@@ -89,92 +86,147 @@ func environmentDataArgs(name string, args []string) []string {
 	return filtered
 }
 
-// fd lists names until an exec option supplies a child. A potentially protected
-// result is supplied to that child as a synthetic path, just like find -exec.
-func (a *analyzer) fdCommand(args []string, depth int, cwd string) {
-	selector := ""
-	globFilter := false
-	var extensions []string
-	childAt := -1
+// fdScope parses the selector and every search root before the execution slot.
+// Regex patterns without an extension proof remain conservative; -g is boolean.
+func (a *analyzer) fdScope(args []string, cwd string) (child []string, dir string, protected bool) {
+	dir = cwd
+	selector, patternSet, globFilter := "", false, false
+	var extensions, roots []string
+	uncertain := false
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if optionIn("-x --exec -X --exec-batch", arg) {
-			childAt = i + 1
+			child = append([]string(nil), args[i+1:]...)
+			if len(child) == 0 {
+				uncertain = true
+			}
 			break
 		}
-		if optionIn("-e --extension", arg) && i+1 < len(args) {
-			i++
-			selector = "*." + strings.TrimPrefix(args[i], ".")
-			extensions = append(extensions, selector)
-			globFilter = true
-			continue
-		}
-		if strings.HasPrefix(arg, "--extension=") {
-			selector = "*." + strings.TrimPrefix(strings.TrimPrefix(arg, "--extension="), ".")
-			extensions = append(extensions, selector)
-			globFilter = true
-			continue
-		}
 		if optionIn("-g --glob", arg) {
-			if i+1 < len(args) {
+			globFilter = true
+			continue
+		}
+		key, value, attached := strings.Cut(arg, "=")
+		if optionIn("-e --extension --search-path --base-directory -E --exclude", key) {
+			if !attached {
 				i++
-				selector = args[i]
-				globFilter = true
+				if i >= len(args) {
+					uncertain = true
+					break
+				}
+				value = args[i]
+			}
+			switch key {
+			case "-e", "--extension":
+				extensions = append(extensions, "*."+strings.TrimPrefix(value, "."))
+			case "--search-path":
+				roots = append(roots, value)
+			case "--base-directory":
+				dir = a.resolve(value, dir)
 			}
 			continue
 		}
-		if strings.HasPrefix(arg, "--glob=") {
-			selector = strings.TrimPrefix(arg, "--glob=")
-			globFilter = true
+		if strings.HasPrefix(arg, "-") {
+			if !optionIn("-H --hidden -I --no-ignore -u --unrestricted -L --follow -0 --print0 -a --absolute-path -l --list-details --", arg) {
+				uncertain = true
+			}
 			continue
 		}
-		if !strings.HasPrefix(arg, "-") && selector == "" {
-			selector = arg
+		if !patternSet {
+			selector, patternSet = arg, true
+		} else {
+			roots = append(roots, arg)
 		}
 	}
-	if childAt < 0 {
+	if len(roots) == 0 {
+		roots = []string{"."}
+	}
+	filters := extensions
+	if len(filters) == 0 && globFilter && patternSet {
+		filters = []string{selector}
+	}
+	protected = uncertain
+	for _, root := range roots {
+		if len(filters) == 0 && a.treeProtectedAll(root, dir) {
+			protected = true
+		}
+		for _, filter := range filters {
+			if a.protectedGlob(strings.ToLower(filter), dir) || search.FilteredScope(root, filter, "", dir, a.home) != "" {
+				protected = true
+			}
+		}
+	}
+	return child, dir, protected
+}
+
+// fd execution consumes a synthetic protected path whenever any selected root
+// cannot certify public results. Names-only fd remains a metadata operation.
+func (a *analyzer) fdCommand(args []string, depth int, cwd string) {
+	child, dir, protected := a.fdScope(args, cwd)
+	if len(child) == 0 {
 		return
 	}
-	if childAt >= len(args) {
-		a.reason = roles.Indeterminate
-		return
-	}
-	child := append([]string(nil), args[childAt:]...)
-	for i, v := range child {
-		if v == ";" {
-			child = child[:i]
-			break
-		}
-	}
-	protectedResults := !globFilter || selector == "" || search.Selector(selector) || search.FilteredScope(".", selector, "", cwd, a.home) != ""
-	// Repeated extensions are alternatives, not successive restrictions.
-	for _, extension := range extensions {
-		if search.Selector(extension) || search.FilteredScope(".", extension, "", cwd, a.home) != "" {
-			protectedResults = true
-		}
-	}
-	if protectedResults {
-		selected := filepath.ToSlash(filepath.Join(cwd, ".env"))
-		if cwd == "" {
+	if protected {
+		selected := filepath.ToSlash(filepath.Join(dir, ".env"))
+		if dir == "" {
 			selected = "/synthetic/.env"
 		}
 		replaced := false
 		for i, v := range child {
 			if v == "{}" {
-				child[i] = selected
-				replaced = true
+				child[i], replaced = selected, true
 			}
 		}
 		if !replaced {
 			child = append(child, selected)
 		}
 	}
-	a.command(child, depth+1, cwd, false)
+	a.command(child, depth+1, dir, false)
+}
+
+// A filtered fd stream is certified by the same root and selector proof as -x.
+func (a *analyzer) filteredFDPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
+	if commandName(upstream) != "fd" || commandName(downstream) != "xargs" {
+		return false
+	}
+	call, ok := upstream.Cmd.(*syntax.CallExpr)
+	if !ok {
+		return false
+	}
+	var args []string
+	for _, word := range call.Args[1:] {
+		args = append(args, literal(word))
+	}
+	child, dir, protected := a.fdScope(args, cwd)
+	if len(child) != 0 {
+		return false
+	}
+	if protected {
+		a.protectedXargsPipe(downstream, depth, dir)
+		return false
+	}
+	return true
+}
+
+func (a *analyzer) protectedXargsPipe(downstream *syntax.Stmt, depth int, cwd string) {
+	call, ok := downstream.Cmd.(*syntax.CallExpr)
+	if !ok {
+		a.reason = roles.Indeterminate
+		return
+	}
+	var args []string
+	for _, word := range call.Args[1:] {
+		args = append(args, literal(word))
+	}
+	child, dir, shell := a.utilityChild("xargs", args, cwd)
+	if shell || !a.metadataChild(child, depth+1, dir) {
+		a.reason = roles.FileInput
+	}
 }
 
 // A conjunctive name filter can certify the names piped to xargs. Other find
 // expressions keep the existing conservative stdin-source policy.
-func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, cwd string) bool {
+func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
 	if commandName(upstream) != "find" || commandName(downstream) != "xargs" {
 		return false
 	}
@@ -211,7 +263,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, cwd strin
 			}
 			continue
 		}
-		if v == "-P" && !predicates {
+		if optionIn("-P -L -H", v) && !predicates {
 			continue
 		}
 		if strings.HasPrefix(v, "-") || predicates {
@@ -220,7 +272,11 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, cwd strin
 		roots = append(roots, v)
 	}
 
-	if selector == "" || search.Selector(selector) {
+	if selector == "" {
+		return false
+	}
+	if a.protectedGlob(strings.ToLower(selector), cwd) {
+		a.protectedXargsPipe(downstream, depth, cwd)
 		return false
 	}
 	if len(roots) == 0 {
@@ -228,6 +284,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, cwd strin
 	}
 	for _, root := range roots {
 		if search.FilteredScope(root, selector, "", cwd, a.home) != "" {
+			a.protectedXargsPipe(downstream, depth, cwd)
 			return false
 		}
 	}

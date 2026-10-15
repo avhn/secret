@@ -228,5 +228,21 @@ patch_case audit15_envrc deny '*** Begin Patch
 *** Update File: .envrc
 +synthetic-only
 *** End Patch'
+# Audit 16 keeps Codex string and argv adapters on the same Bash policy.
+for cmd in 'npm exec -y --package=dotenvx -- dotenvx get' 'npm x -p dotenvx dotenvx get' \
+    'fd -H -g -x cat .env' 'fd --glob -H "*.env" -X cat' 'rg -rc T .env' \
+    'grep -elocal .env' '! cd nosuch; cat .env' 'cd nowhere | true; cat .env' \
+    'if true; then cd nosuch; fi; cat .env'; do
+    shell_case audit16_deny deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'npx jest -k env' 'npx vitest -t env' 'npx vitest run env' \
+    'uv run pytest -k env' 'yarn jest -t env' 'pnpm vitest -t env' \
+    'npm exec --yes --package=jest -- jest -k env' 'rg -q TOKEN .env' \
+    'rg --quiet TOKEN .env' 'grep -qelocal .env' 'fd --glob "*.go" -X cat' \
+    '! cd nosuch; cat README.md' 'cd nowhere | true; cat README.md'; do
+    shell_case audit16_safe allow "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit16_argv_runner deny '["npm","x","--yes","--package=dotenvx","--","dotenvx","get"]'
+shell_case audit16_argv_quiet allow '["rg","--quiet","TOKEN",".env"]'
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

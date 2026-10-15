@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/avhn/secret/internal/hook/paths"
 )
 
 func TestQuotedGlobEscape(t *testing.T) {
@@ -135,6 +137,37 @@ func TestGlobSymlinkedTempRoot(t *testing.T) {
 		if !ok || len(got) != 1 || filepath.Base(got[0]) != ".env" {
 			globFailure(t, pattern, link)
 			t.Fatalf("pattern=%q matches=%q ok=%v", pattern, got, ok)
+		}
+	}
+}
+
+// Missing credential names still have protected parent context. The callback
+// mirrors the shell adapter's bare-operand exception on every native platform.
+func TestProtectedGlobMissingCredentialContext(t *testing.T) {
+	root := t.TempDir()
+	check := func(name, cwd string) bool {
+		if !strings.Contains(name, "/") {
+			if _, err := os.Lstat(paths.Resolve(name, cwd, "", root)); os.IsNotExist(err) {
+				return false
+			}
+		}
+		return paths.Protected(name, cwd, "", root)
+	}
+	a := &analyzer{home: root, protected: check}
+	for _, tc := range []struct {
+		pattern string
+		want    bool
+	}{
+		{".docker/c*.json", true}, {".aws/cred*", true}, {".config/gh/h*.yml", true},
+		{"public/c*.json", false}, {".docker/*.ts", false}, {".docker/[", true},
+	} {
+		native := filepath.Join(root, filepath.FromSlash(tc.pattern))
+		for _, pattern := range []string{native, filepath.ToSlash(native)} {
+			t.Run(pattern, func(t *testing.T) {
+				if got := a.protectedGlob(pattern, root); got != tc.want {
+					t.Errorf("protected=%v want %v", got, tc.want)
+				}
+			})
 		}
 	}
 }

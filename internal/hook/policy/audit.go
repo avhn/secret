@@ -17,6 +17,11 @@ func (a *analyzer) inputProtected(name, cwd string) bool {
 	if strings.HasPrefix(name, "https://") || strings.HasPrefix(name, "http://") {
 		return false
 	}
+	if base := paths.StreamBase(name); base != name {
+		// An absent stream must not bypass protection of its base file through
+		// the shell callback's bare-operand existence exception.
+		return paths.Protected(base, cwd, "", a.home)
+	}
 	p := path.Clean(name)
 	if paths.ProcessAlias(p) {
 		return true
