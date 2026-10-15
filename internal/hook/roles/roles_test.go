@@ -67,7 +67,7 @@ func TestOptionBoundaries(t *testing.T) {
 		args []string
 		deny bool
 	}{
-		{"grep", []string{"-rl", "x", "src"}, true},
+		{"grep", []string{"-rl", "x", "src"}, false},
 		{"grep", []string{"-Rn", "x", "src"}, true},
 		{"grep", []string{"-rievalue", "src"}, true},
 		{"grep", []string{"-ier", "safe"}, false},

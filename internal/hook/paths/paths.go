@@ -73,7 +73,7 @@ func physical(raw string) (string, error) {
 		next := filepath.Join(current, part)
 		info, err := os.Lstat(next)
 		if err != nil {
-			if !os.IsNotExist(err) {
+			if !missingOperand(err) {
 				return next, err
 			}
 			current = next
@@ -111,7 +111,7 @@ func lexical(p string) bool {
 	if strings.Contains(p, "/.secrets/") || strings.HasSuffix(p, "/.secrets") {
 		return true
 	}
-	if base == ".npmrc" || base == ".pypirc" || base == ".netrc" || base == ".git-credentials" || base == ".secrets.env" {
+	if base == ".envrc" || base == ".npmrc" || base == ".pypirc" || base == ".netrc" || base == ".git-credentials" || base == ".secrets.env" {
 		return true
 	}
 	if strings.HasSuffix(p, "/.aws/credentials") || strings.HasSuffix(p, "/.docker/config.json") || strings.HasSuffix(p, "/.config/gh/hosts.yml") {

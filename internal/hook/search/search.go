@@ -14,7 +14,7 @@ import (
 const ScopeReason = "search content/count scope contains protected names or is incomplete; narrow the path or use -l; install examples/ripgreprc for rg"
 const UncertainReason = "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"
 
-var required = []string{".env", ".env.*", "*.env", "*.secret", ".secrets/", ".netrc", ".git-credentials", ".npmrc", ".pypirc", "**/.aws/credentials", "**/.docker/config.json", "**/gh/hosts.yml", "**/.ssh/id_*"}
+var required = []string{".env", ".envrc", ".env.*", "*.env", "*.secret", ".secrets/", ".netrc", ".git-credentials", ".npmrc", ".pypirc", "**/.aws/credentials", "**/.docker/config.json", "**/gh/hosts.yml", "**/.ssh/id_*"}
 
 // Config returns 0 for certified, 1 for absent or partial, 2 for unsafe.
 func Config(file, cwd, home string) (int, bool) {
@@ -86,6 +86,10 @@ func neutral(s string) bool {
 
 // Selector tests synthetic candidate names, never contents.
 func Selector(glob string) bool {
+	if len(glob) > 4096 {
+		return true
+	}
+	glob = strings.ReplaceAll(glob, "[!", "[^")
 	if strings.Contains(glob, "{") {
 		alternatives, ok := selectorBraces(glob, 64)
 		if !ok {
@@ -101,11 +105,34 @@ func Selector(glob string) bool {
 	if paths.LexicalProtected(glob, "/synthetic", "/synthetic") {
 		return true
 	}
+	// Derive witnesses from the selector itself so arbitrary environment names
+	// such as .en[v].staging* are not limited to a finite sample dictionary.
+	for _, star := range []string{"", "x"} {
+		candidate, valid := selectorWitness(glob, star)
+		if !valid || paths.LexicalProtected(candidate, "/synthetic", "/synthetic") {
+			return true
+		}
+	}
+	// Complete a wildcarded .env prefix with its literal suffix. This also
+	// covers .en?.staging* and .???.production*, which no finite sample list
+	// can enumerate. Bound the prefix work independently of directory depth.
+	base := path.Base(glob)
+	limit := min(len(base), 256)
+	for i := 1; i <= limit && (strings.HasPrefix(base, ".") || strings.HasPrefix(base, "[.]")); i++ {
+		if match, err := path.Match(base[:i], ".env"); err == nil && match {
+			if suffix, valid := selectorWitness(base[i:], "x"); !valid || paths.LexicalProtected(".env"+suffix, "/synthetic", "/synthetic") {
+				return true
+			}
+		}
+	}
+	if len(base) > 256 && strings.ContainsAny(base, "*?[") {
+		return true
+	}
 	if strings.Contains(glob, "/") && Selector(path.Base(glob)) {
 		return true
 	}
 	g := strings.ToLower(strings.TrimPrefix(glob, "!"))
-	for _, name := range []string{".env", ".env.production", "service.env", "service.secret", ".secrets.env", ".netrc", ".git-credentials", ".npmrc", ".pypirc", ".secrets/store", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".ssh/id_rsa", ".ssh/id_ed25519", "proc/self/environ", "proc/thread-self/environ", "proc/123/environ", "proc/123/task/456/environ", "proc/$$/environ", "proc/$ppid/environ"} {
+	for _, name := range []string{".env", ".envrc", ".env.production", "service.env", "service.secret", ".secrets.env", ".netrc", ".git-credentials", ".npmrc", ".pypirc", ".secrets/store", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".ssh/id_rsa", ".ssh/id_ed25519", "proc/self/environ", "proc/thread-self/environ", "proc/123/environ", "proc/123/task/456/environ", "proc/$$/environ", "proc/$ppid/environ"} {
 		if strings.Contains(name, "/") && !strings.Contains(g, "/") {
 			continue
 		}
@@ -155,6 +182,9 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			return "Grep targets a protected store"
 		}
 	}
+	if !names && (glob != "" && !Selector(glob) || glob == "" && typeGlob(typ) != "") {
+		return FilteredScope(root, glob, typ, cwd, home)
+	}
 	if !names && paths.TreeProtectedScope(root, cwd, home, glob != "") {
 		return "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"
 	}
@@ -198,6 +228,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 	names, count, pattern, options, positive, includeIgnored := false, false, true, true, false, false
 	unsafeScope := false
 	unsafeNames := false
+	gitWorkTree := false
+	outputOnly, jsonOutput := false, false
+	var selectors []string
 	roots := []string{}
 	args := words[start:]
 	for i := 0; i < len(args); i++ {
@@ -220,9 +253,22 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 					names = true
 				}
 				continue
-			case "-c", "--count", "--count-matches", "--json":
-				count = true
+			case "-c", "--count", "--count-matches":
+				count, outputOnly = true, true
 				continue
+			case "--json":
+				count, outputOnly, jsonOutput = true, false, true
+				continue
+			case "--no-index", "--no-exclude-standard":
+				if kind == "git" {
+					includeIgnored, gitWorkTree = true, true
+					continue
+				}
+			case "--untracked":
+				if kind == "git" {
+					gitWorkTree = true
+					continue
+				}
 			case "--hidden":
 				includeIgnored = true
 				continue
@@ -233,6 +279,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 				i++
 				if i >= len(args) {
 					return UncertainReason
+				}
+				if !strings.HasPrefix(args[i], "!") {
+					selectors = append(selectors, args[i])
 				}
 				positive = positive || !strings.HasPrefix(args[i], "!")
 				includeIgnored = true
@@ -261,6 +310,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			if strings.HasPrefix(v, "--glob=") || strings.HasPrefix(v, "--iglob=") || strings.HasPrefix(v, "-g") && len(v) > 2 {
 				g := strings.TrimPrefix(strings.TrimPrefix(v, "--glob="), "--iglob=")
 				g = strings.TrimPrefix(g, "-g")
+				if !strings.HasPrefix(g, "!") {
+					selectors = append(selectors, g)
+				}
 				positive = positive || !strings.HasPrefix(g, "!")
 				includeIgnored = true
 				continue
@@ -302,7 +354,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 						names = true
 					}
 					if c == 'c' {
-						count = true
+						count, outputOnly = true, true
 					}
 					if c == 'u' {
 						unsafeScope, includeIgnored = true, true
@@ -319,13 +371,24 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			pattern = false
 			continue
 		}
-		if kind == "git" && options {
+		if kind == "git" && options && !gitWorkTree {
 			uncertain = true
 		}
 		if strings.ContainsAny(v, "*?[`$") {
 			uncertain = true
 		}
 		roots = append(roots, v)
+	}
+	if kind == "rg" && outputOnly && !jsonOutput && len(roots) > 0 && !unsafeNames {
+		filesOnly := true
+		for _, root := range roots {
+			if info, err := os.Stat(paths.Resolve(root, cwd, "", home)); err == nil && info.IsDir() {
+				filesOnly = false
+			}
+		}
+		if filesOnly {
+			return ""
+		}
 	}
 	if names && !count && !unsafeNames {
 		return ""
@@ -354,6 +417,24 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			return "rg config cannot establish safe search inputs"
 		}
 		certified = status == 0 && !positive && !unsafeScope
+		if len(selectors) > 0 {
+			safe := true
+			for _, selector := range selectors {
+				if Selector(selector) {
+					safe = false
+				}
+			}
+			if safe {
+				for _, root := range roots {
+					for _, selector := range selectors {
+						if FilteredScope(root, strings.ToLower(selector), "", cwd, home) != "" {
+							return ScopeReason
+						}
+					}
+				}
+				return ""
+			}
+		}
 		if hidden {
 			includeIgnored = true
 		}

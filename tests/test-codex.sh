@@ -15,6 +15,7 @@ PASSED=0 FAILED=0
 read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$ROOT/hooks/guard-secrets}"
 mkdir -p "$TMP/work" "$TMP/elsewhere"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.env"
+printf '%s\n' 'synthetic-only' >"$TMP/work/.envrc"
 ln -s .env "$TMP/work/alias.txt"
 
 # manifest_case NAME COMMAND [ARGS]: record a manifest assertion.
@@ -200,5 +201,32 @@ for cmd in 'kubectl -n prod get secret db -o yaml' 'npx @dotenvx/dotenvx get' 'd
     shell_case audit14_deny deny "$(jq -cn --arg c "$cmd" '$c')"
 done
 shell_case audit14_commit_message allow "$(jq -cn --arg c $'git commit -F - <<\'EOF\'\nsee .env\nEOF' '$c')"
+# Audit 15 exercises string and argv command slots without running the commands.
+for cmd in 'direnv exec . env' 'flock lock printenv' 'pnpm -C src exec printenv' \
+    'yarn run printenv' 'fd -H .env -x cat' 'fd -H -e env -X cat' \
+    'kubectl get secret db -o=yaml' 'kubectl get cm,secret -o json' \
+    'funzip backup.zip' 'cat .envrc' 'git commit -sF.env' \
+    'cd nosuch && make; cat .env'; do
+    shell_case audit15_deny deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'python3 -m venv env' 'jest -t env' 'yarn run jest -t env' \
+    'git commit -asm "fix: use .env"' 'fd -H .env' 'fd -H -e ts -x cat' \
+    'grep -qi TOKEN .env' 'rg --count TOKEN .env' \
+    'find . -name "*.ts" | xargs wc -l' \
+    'uvx --from=python-dotenv dotenv -e .env -- node app.js' \
+    'pipx run --spec=python-dotenv dotenv -e .env -- node app.js'; do
+    shell_case audit15_safe allow "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit15_argv_launcher deny '["pnpm","--filter=web","exec","printenv"]'
+shell_case audit15_message_heredoc deny "$(jq -cn --arg c $'git commit -m wip && python3 - <<\'EOF\'\nprint(open(".env").read())\nEOF' '$c')"
+mkdir -p "$TMP/work/.secrets"
+printf '%s\n' synthetic-token >"$TMP/work/.secrets/nested.ts"
+for cmd in 'fd -H -e ts -x cat' 'find . -name "*.ts" | xargs cat'; do
+    shell_case audit15_filtered_private_child deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+patch_case audit15_envrc deny '*** Begin Patch
+*** Update File: .envrc
++synthetic-only
+*** End Patch'
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

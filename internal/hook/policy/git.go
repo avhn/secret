@@ -9,6 +9,7 @@ import (
 
 	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/roles"
+	"github.com/avhn/secret/internal/hook/search"
 )
 
 func gitShellEnv(key string) bool {
@@ -396,6 +397,35 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	if workTree != "" {
 		operandCWD = a.gitPath(workTree, cwd)
 	}
+	if sub == "grep" && (slices.Contains(operands, "--no-index") || slices.Contains(operands, "--untracked")) {
+		if !slices.Contains(operands, "--no-index") {
+			if repoUncertain || bareGlobal || gitModulesPresent(cwd) {
+				a.reason = roles.Indeterminate
+				return
+			}
+			if indexProtected(resolveGitDirectory(cwd, gitDir), a.home) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
+		a.reason = search.Scope(append([]string{"git", "grep"}, operands...), operandCWD, a.home, "", false)
+		if a.reason == search.ScopeReason && !slices.Contains(operands, "--no-index") && !slices.Contains(operands, "--no-exclude-standard") {
+			roots := rgRoots(operands)
+			if len(roots) == 0 {
+				roots = []string{"."}
+			}
+			safe := true
+			for _, root := range roots {
+				if !a.visibleRootSafe(root, operandCWD, false, true) {
+					safe = false
+				}
+			}
+			if safe {
+				a.reason = ""
+			}
+		}
+		return
+	}
 	if a.gitSafe(sub, operands, cwd) {
 		if operandCWD != cwd {
 			a.gitSafe(sub, operands, operandCWD)
@@ -472,7 +502,7 @@ var gitSafeOptions = map[string]gitOptions{
 	"shortlog":     {"--oneline --all --reverse --no-merges -s -n -e", "--format --pretty --author --committer --grep --since --until --max-count", "--branches --tags --remotes"},
 	"diff":         {"--stat --name-only --name-status --numstat --shortstat --quiet --exit-code --cached --staged --no-color", "", "--stat"},
 	"branch":       {"--list -l -a --all -r --remotes --show-current", "--sort --format --contains --no-contains --merged --no-merged", "--color"},
-	"tag":          {"--list -l -n -a --annotate", "--sort --format --contains --no-contains --merged --no-merged -F --file -m --message", "--color"},
+	"tag":          {"--list -l -n -a --annotate -s --sign", "--sort --format --contains --no-contains --merged --no-merged -F --file -m --message", "--color"},
 	"remote":       {"-v --verbose", "", ""},
 	"rev-parse":    {"--verify --quiet -q --show-toplevel --show-prefix --show-cdup --git-dir --absolute-git-dir --is-inside-work-tree --is-bare-repository --short --symbolic --symbolic-full-name --abbrev-ref --all", "", "--short --abbrev-ref"},
 	"rev-list":     {"--all --count --first-parent --merges --no-merges --reverse --left-right --boundary --no-walk", "-n --max-count --since --until", ""},
@@ -586,7 +616,7 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 		if sub == "log" && len(arg) > 1 && strings.Trim(arg[1:], "0123456789") == "" {
 			continue
 		}
-		if sub == "commit" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg, "m") && strings.Trim(arg[1:strings.IndexByte(arg, 'm')], "as") == "" {
+		if (sub == "commit" || sub == "tag") && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg, "m") && strings.Trim(arg[1:strings.IndexByte(arg, 'm')], "as") == "" {
 			value := arg[strings.IndexByte(arg, 'm')+1:]
 			if value == "" {
 				i++

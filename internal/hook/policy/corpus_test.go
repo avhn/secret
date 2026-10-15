@@ -199,6 +199,13 @@ func TestGuardDeniedCorpus(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			// Audit 15 makes explicit Git worktree roots scope-sensitive.
+			// Preserve real denied reads rather than the old safe-src over-denial.
+			if tc.Name == "git_scope_--no-index" || tc.Name == "git_scope_--untracked" {
+				if err := os.WriteFile(filepath.Join(tmp, "search", "src", "app.env"), []byte("synthetic"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
 			command := replace.Replace(tc.Command)
 			if raw, ok := tc.Extra["command"]; ok {

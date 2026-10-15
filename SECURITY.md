@@ -145,3 +145,26 @@ that lets a value reach agent output through a path the guard or the CLI
 claims to cover. Describe the command or tool call and the observed decision.
 **Never include a real credential**; synthetic values like `synthetic-token`
 reproduce every case the test suites cover.
+
+### Go guard audit 15 scope
+
+The Go guard treats `.envrc` as protected direnv configuration, alongside
+`.env` stores. The example ripgrep config excludes it; previously copied
+configs need the additional `--iglob=!.envrc` line before they can certify a
+protected-name search. Explicit `fd` execution and package-runner command
+slots are analyzed as children, not name-only listings. Unquoted heredoc
+substitutions are analyzed even when stdout becomes a Git or GitHub message.
+Conditional directory changes retain bounded sets of possible working
+directories instead of recursively repeating the remaining command text.
+Names-only searches and filtered public-source searches can pass without
+printing protected contents. Filters do not exempt matching files inside
+store directories. These are synthetic policy guarantees, not installed-hook
+containment or evidence of macOS and Windows runtime coverage. Windows
+invalid-name path errors cannot certify a file read, while permission and I/O
+errors remain fail-closed.
+
+For the Go search model, an unmatched credential glob retains its parent
+context, including symlink resolution. Repeated `fd --extension` filters are
+alternatives, not a way to replace an earlier sensitive extension. Ripgrep's
+JSON output remains a content mode even when combined with a count option;
+the names/count exemption is not a general exemption for content printers.

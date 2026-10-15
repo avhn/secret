@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Harden Bash guard launcher slots, fd execution, message-file roles, conditional cwd and secret printers; protect `.envrc` and restore filtered searches, names-only output, ignored Git paths and runner forms.
+
+- Harden Go launcher, heredoc, fd execution, Kubernetes output and archive
+  roles; protect direnv `.envrc` files and certify filtered search scopes.
+  Bound conditional-cwd analysis with deduplicated directory sets and preserve
+  Windows non-path data operands without relaxing permission or I/O failures.
+
+- Preserve unmatched credential-glob context in Go, check every fd extension
+  alternative, and keep ripgrep JSON output outside count-only exemptions.
+
 - Classify conditional working directories, future protected-name globs,
   command-word environment printers, package runners and secret output flags.
   Treat quoted heredoc commit/PR bodies as inert data outside the 8 KiB Bash

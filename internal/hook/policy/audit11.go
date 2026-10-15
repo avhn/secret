@@ -60,7 +60,21 @@ func inertMessagePipe(stmt *syntax.Stmt) bool {
 		return false
 	}
 	r := stmt.Redirs[0]
-	return (r.Op.String() == "<<" || r.Op.String() == "<<-") && r.Hdoc != nil
+	return (r.Op.String() == "<<" || r.Op.String() == "<<-") && r.Hdoc != nil && inertHeredoc(r)
+}
+
+// Quoted heredocs have literal AST bodies. Unquoted substitutions must be
+// walked normally, even when stdout becomes a commit or pull-request body.
+func inertHeredoc(redir *syntax.Redirect) bool {
+	inert := true
+	syntax.Walk(redir.Hdoc, func(node syntax.Node) bool {
+		switch node.(type) {
+		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ParamExp, *syntax.ArithmExp:
+			inert = false
+		}
+		return inert
+	})
+	return inert
 }
 
 // Message-file stdin from an inert heredoc is data, not executable code.
@@ -68,6 +82,11 @@ func inertMessageStdin(stmt *syntax.Stmt) bool {
 	call, ok := stmt.Cmd.(*syntax.CallExpr)
 	if !ok || len(call.Args) < 3 {
 		return false
+	}
+	for _, redir := range stmt.Redirs {
+		if redir.Hdoc != nil && !inertHeredoc(redir) {
+			return false
+		}
 	}
 	name := literal(call.Args[0])
 	if name != "git" && name != "gh" {

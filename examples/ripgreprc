@@ -18,6 +18,7 @@
 # No positive template re-include: it turns the search into a whitelist. Use
 # Read or explicit-file rg for .env.example/.sample/.template outside stores.
 --iglob=!.env
+--iglob=!.envrc
 --iglob=!.env.*
 --iglob=!*.env
 --iglob=!*.secret

@@ -28,6 +28,7 @@ func longOption(arg string, names string) (string, string, bool, bool) {
 func GrepReason(args []string, protected func(string) bool) string {
 	const longs = "extended-regexp fixed-strings basic-regexp perl-regexp regexp file ignore-case no-ignore-case word-regexp line-regexp null-data no-messages invert-match version help max-count byte-offset line-number line-buffered with-filename no-filename label only-matching quiet silent binary-files text directories devices recursive dereference-recursive include exclude exclude-from exclude-dir files-without-match files-with-matches count initial-tab null before-context after-context context group-separator no-group-separator color colour binary unix-byte-offsets"
 	options, explicitPattern := true, false
+	outputOnly, recursive := false, false
 	var operands []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -62,8 +63,10 @@ func GrepReason(args []string, protected func(string) bool) string {
 		}
 		for _, opt := range opts {
 			switch opt {
+			case "q", "l", "L", "c", "quiet", "silent", "count", "files-with-matches", "files-without-match":
+				outputOnly = true
 			case "r", "R", "recursive", "dereference-recursive":
-				return recursiveGrep
+				recursive = true
 			case "e", "regexp", "f", "file", "exclude-from", "m", "max-count", "A", "after-context", "B", "before-context", "C", "context", "d", "directories", "D", "devices", "label", "binary-files", "include", "exclude", "exclude-dir", "group-separator":
 				if !attached {
 					i++
@@ -74,7 +77,7 @@ func GrepReason(args []string, protected func(string) bool) string {
 				}
 				if opt == "d" || opt == "directories" {
 					if value == "recurse" {
-						return recursiveGrep
+						recursive = true
 					}
 				}
 				if opt == "f" || opt == "file" || opt == "exclude-from" {
@@ -87,6 +90,12 @@ func GrepReason(args []string, protected func(string) bool) string {
 				}
 			}
 		}
+	}
+	if outputOnly {
+		return ""
+	}
+	if recursive {
+		return recursiveGrep
 	}
 	if !explicitPattern && len(operands) > 0 {
 		operands = operands[1:]

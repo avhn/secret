@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+
+	"github.com/avhn/secret/internal/hook/search"
 )
 
 // Quoted metacharacters use private runes rather than backslashes: filepath
@@ -167,15 +169,19 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 	return dirs, true
 }
 
-// protectedGlob tests canonical future names even when the directory has not
-// been created yet. It does not replace actual filesystem matching.
+// protectedGlob checks the pattern's own protected-name structure, including
+// arbitrary suffixes such as .env.staging*, rather than only fixed examples.
 func (a *analyzer) protectedGlob(pattern, cwd string) bool {
-	base := filepath.Base(pattern)
-	matcher, err := globRegexp(base)
+	if search.Selector(filepath.ToSlash(pattern)) {
+		return true
+	}
+	// Credential basenames depend on their parent, including symlink targets.
+	// Retain that context when no existing file can witness the glob match.
+	matcher, err := globRegexp(filepath.Base(pattern))
 	if err != nil {
 		return true
 	}
-	for _, name := range []string{".env", ".env.local", "app.env", "prod.secret", "id_rsa", "id_ed25519", "credentials", "config.json", "hosts.yml", ".npmrc", ".netrc", ".pypirc", ".git-credentials"} {
+	for _, name := range []string{"credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
 		if matcher.MatchString(name) && a.inputProtected(filepath.Join(filepath.Dir(pattern), name), cwd) {
 			return true
 		}
