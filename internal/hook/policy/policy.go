@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -198,11 +199,11 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		for _, r := range s.Redirs {
 			if r.Hdoc != nil {
 				body := a.raw(r.Hdoc)
-				if (hasProtectedLiteral(body) || gitToken.MatchString(body)) && !a.inertCatTeeBody(s, cwd) {
+				if (hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(commandName(s)) && a.inlineGitDir(body, cwd)) && !a.inertCatTeeBody(s, cwd) {
 					a.reason = roles.FileInput
 				}
 			}
-			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word))) && !a.inertCatTeeBody(s, cwd) {
+			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word)) || interpreter(commandName(s)) && a.inlineGitDir(literal(r.Word), cwd)) && !a.inertCatTeeBody(s, cwd) {
 				a.reason = roles.FileInput
 			}
 			a.walkWord(r.Word, depth, cwd)
@@ -310,7 +311,6 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			priorUncertain := a.uncertain
 			message := len(cmd.Args) > 1 && (strings.EqualFold(literal(cmd.Args[0]), "git") && (literal(cmd.Args[1]) == "commit" || literal(cmd.Args[1]) == "tag") || strings.EqualFold(literal(cmd.Args[0]), "gh") && len(cmd.Args) > 2 && (literal(cmd.Args[1]) == "pr" || literal(cmd.Args[1]) == "issue"))
 			priorMessage := a.messageSubst
-			a.messageSubst = message
 			nestedUncertain := false
 			words := make([]string, 0, len(cmd.Args))
 			unknown := false
@@ -329,6 +329,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					words = append(words, "[")
 					continue
 				}
+				a.messageSubst = message && messageOperand(strings.ToLower(path.Base(literal(cmd.Args[0]))), cmd.Args, idx)
 				a.walkWord(w, depth, cwd)
 				nestedUncertain = nestedUncertain || a.uncertain
 				values, ok := a.expandWord(w, cwd)
@@ -458,7 +459,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			if name == "kill" && unknown && safePIDLookup(cmd.Args) && a.reason == "" {
 				a.uncertain = priorUncertain
 			}
-			if unknown && name == "make" && strings.Contains(a.rawArgs(cmd.Args), "-f") && a.reason == "" {
+			if unknown && (name == "make" || name == "gmake") && strings.Contains(a.rawArgs(cmd.Args), "-f") && a.reason == "" {
 				a.reason = roles.Indeterminate
 			}
 			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) {
@@ -846,7 +847,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.command(args, depth+1, cwd, direct)
 		return
 	}
-	if name == "systemd-run" && launcherShellOption(args) {
+	if name == "systemd-run" && (launcherShellOption(args) || slices.Contains(args, "-S") || slices.Contains(args, "--shell")) {
 		a.reason = roles.Indeterminate
 		return
 	}
@@ -907,7 +908,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			a.reason = roles.Indeterminate
 			return
 		}
-		if name == "machinectl" && args[0] == "shell" || name == "doas" && launcherShellOption(args) {
+		if name == "machinectl" && (args[0] == "shell" || len(args) > 1 && args[1] == "shell") || name == "doas" && launcherShellOption(args) {
 			a.reason = roles.Indeterminate
 			return
 		}
@@ -927,6 +928,26 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if a.indirect && indirectConsumer(name) {
 		a.reason = roles.Indeterminate
 		return
+	}
+	if name == "gmake" {
+		name = "make"
+	}
+	if name == "gh" && len(args) > 0 && args[0] == "api" {
+		for i, arg := range args[1:] {
+			value := ""
+			switch {
+			case optionIn("-F -f --field --raw-field", arg) && i+2 < len(args):
+				value = args[i+2]
+			case strings.HasPrefix(arg, "-F") || strings.HasPrefix(arg, "-f"):
+				value = arg[2:]
+			case strings.HasPrefix(arg, "--field=") || strings.HasPrefix(arg, "--raw-field="):
+				_, value, _ = strings.Cut(arg, "=")
+			}
+			if pos := strings.IndexByte(value, '@'); pos >= 0 && a.inputProtected(value[pos+1:], cwd) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
 	}
 	if name == "git" {
 		a.gitCommand(args, depth, cwd, direct)
@@ -954,6 +975,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if optionIn("npm npx make rsync op gh curl kubectl aws gcloud docker", name) && name != "docker" {
 		genericArgs := args
+		if name == "kubectl" && len(args) > 2 && args[0] == "create" && args[1] == "secret" {
+			genericArgs = nil // Kubernetes resource type, not the secret transport command.
+		}
 		if name == "gh" {
 			genericArgs = make([]string, 0, len(args))
 			for i := 0; i < len(args); i++ {
@@ -1258,7 +1282,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				a.reason = roles.Printer
 				return
 			}
-			if v == "config" && name == "docker" && strings.Contains(strings.Join(args, " "), "--env-file") {
+			if v == "config" && name == "docker" && slices.Contains(args, "compose") {
 				a.reason = "compose config prints env-file values"
 				return
 			}
@@ -1270,6 +1294,33 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			dockerArgs = args[1:]
 		} else if len(args) > 1 && args[0] == "compose" && args[1] == "exec" {
 			dockerArgs = append([]string{"compose"}, args[2:]...)
+		}
+		for i, v := range args {
+			src := ""
+			if (v == "-v" || v == "--volume" || v == "--mount") && i+1 < len(args) {
+				src = args[i+1]
+			} else if strings.HasPrefix(v, "--volume=") || strings.HasPrefix(v, "--mount=") {
+				_, src, _ = strings.Cut(v, "=")
+			} else if strings.HasPrefix(v, "-v") && len(v) > 2 {
+				src = v[2:]
+			}
+			if src == "" {
+				continue
+			}
+			if strings.Contains(v, "mount") {
+				for _, field := range strings.Split(src, ",") {
+					if strings.HasPrefix(field, "src=") || strings.HasPrefix(field, "source=") {
+						_, src, _ = strings.Cut(field, "=")
+						break
+					}
+				}
+			} else {
+				src, _, _ = strings.Cut(src, ":")
+			}
+			if a.inputProtected(src, cwd) {
+				a.reason = roles.FileInput
+				return
+			}
 		}
 		a.unknownExecution(dockerArgs, depth, cwd)
 		return
@@ -1309,6 +1360,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 			operands = append(operands, args[i])
 		}
+	}
+	if name == "grep" && len(operands) >= 3 && (operands[0] == "-rn" || operands[0] == "-nr") && !a.treeProtected(operands[len(operands)-1], cwd) {
+		operands = append([]string{"-n"}, operands[1:]...)
 	}
 	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
@@ -1452,7 +1506,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			globPiece = n.Value
+			globPiece = literalGlobPattern(n.Value)
 			unquotedGlob = unquotedGlob || unescapedGlob(n.Value)
 		case *syntax.SglQuoted:
 			piece = n.Value
@@ -1506,6 +1560,10 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
+			// An unquoted scalar expansion undergoes pathname expansion even
+			// when the assignment that supplied it was quoted.
+			globPiece = piece
+			unquotedGlob = unquotedGlob || unescapedGlob(piece)
 		case *syntax.BraceExp:
 			if n.Sequence || len(n.Elems) > 64 || len(result)*len(n.Elems) > 64 {
 				a.uncertain = true

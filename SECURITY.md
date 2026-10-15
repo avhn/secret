@@ -73,9 +73,16 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   their input, and other dynamic constructs can name a protected file without
   spelling it. Same-command copy, symlink or archive laundering, including
   `cp -r`, `ln -s` and an archive read following an archive creation, is not
-  traced. Concatenated or computed script literals and `eval` are not reliably
+  traced. Archive extraction to disk is allowed and member names inside an
+  archive are not inspected, so an archive can still carry `.git` paths; only
+  the extraction destination and stdout extraction are checked. Concatenated or computed script literals and `eval` are not reliably
   resolved. The guard does not infer protected inputs from an unresolved
   operand whose command text names no protected file.
+- **Deliberate shell and repository construction.** Piped `tee` or `echo`
+  text fed to an interpreter, scripts or build files written and run in one
+  command, and hand-built Git directories are not tracked across command
+  boundaries. Unusual glob classes and rare option abbreviations may also
+  evade static classification. These are outside the accidental-read model.
 - **Shell scripts read from stdin.** A shell without `-c` or a certifiable script file is denied, including static here-strings and quoted here-docs. Use `sh -c` for literal code.
 - **Git probe isolation.** The Bash guard runs index probes with a scrubbed Git environment, disabled fsmonitor, untracked cache and hooks, and a separate session. The guard does not execute repository Git configuration as part of its own index inspection. Git config writes and unmodelled getters are denied; custom editor and pager settings assigned inside command text accept only inert program-specific options.
 - **Custom Git aliases are denied.** The hook does not read Git configuration: aliases can execute arbitrary shell commands and configuration resolution can differ from the command environment. Only case-sensitive built-in Git subcommands are classified. Run the expanded built-in command instead of an alias.

@@ -161,7 +161,7 @@ func (a *analyzer) shellCommand(name string, args []string, depth int, cwd strin
 // modelledCommand keeps opaque strings out of Git messages and other commands
 // whose operand grammar is already explicitly classified.
 func modelledCommand(name string) bool {
-	if optionIn("git gh secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
+	if optionIn("git gh kubectl secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
 		return true
 	}
 	if _, ok := utilityTable[name]; ok {

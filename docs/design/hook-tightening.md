@@ -201,11 +201,11 @@ fixtures cannot be added to the inventory from this scope. Existing reviewed
 now denies under the revised P18 body rule; a `-m` cat heredoc substitution
 remains a valid inert message and must be permitted.
 
-Quoted shell wildcard metacharacters use `path.Match` escaping against bounded
-native directory entries rather than platform-dependent `filepath.Glob` escaping.
+Quoted shell wildcard metacharacters use private sentinel runes against bounded
+native directory entries instead of platform-dependent backslash escaping.
 This keeps quoted JSON, label filters, and prose literal on Windows while
-retaining unquoted wildcard expansion and protected-name checks. The quoted
-pattern unit test runs on every platform; Windows runtime CI remains necessary.
+retaining unquoted wildcard expansion and protected-name checks. Invalid
+Windows fixture names are skipped; Windows runtime CI remains necessary.
 
 ## P18 revised: Go backstop
 
@@ -226,3 +226,18 @@ excluding other GitHub arguments. The synthetic P18 table covers both
 protected inline and unmodelled input and the documented safe forms. Sudo
 shell-option clusters continue to deny even with a command argument. The
 installed Bash hook remains separate from this Go policy.
+
+## P19 audit 12b Go fixes
+
+The bounded matcher now supports negated and POSIX bracket classes, directory
+wildcards, and globstar without treating quoted metacharacters as live on
+Windows. Inert heredoc substitutions are restricted to Git or GitHub message
+values, not file-option operands. Interpreter inline and stdin text receives
+Git directory and path checks, including separate and bare Git directories.
+Docker volume sources and GitHub API field-file inputs have file roles; Docker
+Compose configuration and dotenv listing are printers. Git configuration
+variables assigned in command text, make recipe prefixes and stdin makefiles,
+and interactive shell launchers deny. Safe build globs, metadata Git forms,
+Kubernetes secret creation, and public recursive grep trees remain available.
+`internal/hook/policy/p19_test.go` records these synthetic decisions. These
+checks do not execute any of their source commands.

@@ -115,6 +115,10 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 	if a.reason != "" {
 		return true
 	}
+	if strings.HasPrefix(name, "python") && len(args) >= 3 && args[0] == "-m" && args[1] == "dotenv" && args[2] == "list" {
+		a.reason = roles.Printer
+		return true
+	}
 	if interpreter(name) || name == "sed" || name == "vim" || name == "vi" || name == "nvim" || name == "ex" {
 		skip := 0
 		for i, code := range args {
@@ -172,7 +176,7 @@ func (a *analyzer) dotenvChild(args []string, depth int, cwd string) {
 		case "--":
 			a.command(args[i+1:], depth+1, cwd, false)
 			return
-		case "-p", "--print":
+		case "-p", "--print", "list":
 			a.reason = roles.Printer
 			return
 		case "-e", "--env", "-v", "--variable":
