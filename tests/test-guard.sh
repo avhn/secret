@@ -909,8 +909,12 @@ mkdir "$TMP/search/.secrets"
 printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/.secrets/nested.ts"
 secrets rg_glob_private_child deny Bash 'rg -g "*.ts" TOKEN .'
 for flag in --no-index --untracked --cached; do
-    secrets "git_scope_$flag" deny Bash "git grep $flag TOKEN -- src"
-    secrets "git_scope_names_$flag" deny Bash "git grep $flag -l TOKEN -- src"
+    # Audit 15 O6: --no-index is certified from its explicit clean paths,
+    # independently of an index. The other forms still need a repository.
+    expected=deny
+    [[ "$flag" != --no-index ]] || expected=allow
+    secrets "git_scope_$flag" "$expected" Bash "git grep $flag TOKEN -- src"
+    secrets "git_scope_names_$flag" "$expected" Bash "git grep $flag -l TOKEN -- src"
 done
 secrets git_revision_colon deny Bash 'git grep TOKEN HEAD:.env'
 
@@ -2298,6 +2302,175 @@ for malformed in double_json relative_cwd; do
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\taudit13_%s\tfail\n' "$malformed" >>"$SECRET_TEST_RESULTS"
     fi
 done
+
+# Audit 15: command slots, filename roles, filtered scope and inert messages.
+for launcher in 'direnv exec .' 'flock lock' chronic ionice nice 'yarn' 'pnpm exec' npx uvx 'pipx run' 'uv run'; do
+    for printer in env printenv; do
+        secrets audit15_r1_launcher_printer deny Bash "$launcher $printer"
+    done
+    secrets audit15_r1_launcher_safe allow Bash "$launcher true"
+done
+for cmd in 'direnv exec . env' 'direnv exec . printenv' 'flock lock env' 'flock lock printenv' \
+    'chronic env' 'ionice env' 'nice env' 'yarn env' 'pnpm exec env' 'npx env' \
+    'uvx env' 'pipx run env' 'uv run env' 'pnpm -C src exec printenv' \
+    'pnpm -r exec printenv' 'yarn run printenv' 'pnpm --filter web exec dotenvx get' \
+    'pnpm --dir=src --recursive --workspace-root exec printenv' \
+    'yarn -w run printenv' 'pnpm -C web run cat .env'; do
+    secrets audit15_r1_r3_launcher deny Bash "$cmd"
+done
+for cmd in 'python3 -m venv env' 'jest -t env' 'vitest run -t env' 'pytest -k env' \
+    'pytest tests -k "not env"' 'npm test -- -t env' 'grep -rn env src' \
+    'grep -n env .gitignore' 'go env GOPATH' 'vercel env ls' \
+    'pnpm -C src exec node app.js' 'pnpm --dir=src run cat .env' 'yarn -Csrc run cat .env' \
+    'yarn run jest -t env'; do
+    secrets audit15_r1_data allow Bash "$cmd"
+done
+for cmd in 'cat .env.prod*' 'cat out/.env.staging*' 'cat .env.test?' 'cat empty/*.secrets.env'; do
+    secrets audit15_r4_glob deny Bash "$cmd"
+done
+for cmd in 'git commit -F.env' 'git commit -sF.env' 'git tag -a v1 -F.env' \
+    "git commit -F$TMP/search/.env" "git commit -sF$TMP/search/.env"; do
+    secrets audit15_r5_file deny Bash "$cmd"
+done
+for cmd in "git commit -am 'fix: use .env'" "git commit -asm 'fix: use .env'" \
+    "git tag -sm 'fix: use .env' v1"; do
+    secrets audit15_r5_message allow Bash "$cmd"
+done
+mkdir -p "$TMP/audit15-cwd/sub" "$TMP/audit15-cwd/empty"
+printf '%s\n' synthetic >"$TMP/audit15-cwd/.env"
+for cmd in 'cd nosuch && make; cat .env' $'cd nosuch && make\ncat .env' \
+    'npm ci && cd empty; cat .env' 'npm ci || cd empty; cat .env'; do
+    secrets audit15_r7_uncertain deny Bash "$cmd" "{\"workdir\":\"$TMP/audit15-cwd\"}"
+done
+secrets audit15_r7_success allow Bash 'git pull && cd sub && cat .env' "{\"workdir\":\"$TMP/audit15-cwd\"}"
+secrets audit15_r7_nonreader allow Bash 'git pull && cd sub && npm ci' "{\"workdir\":\"$TMP/audit15-cwd\"}"
+secrets audit15_r8_interpreter deny Bash $'git commit -m wip && python3 - <<\'EOF\'\nprint(open(".env").read())\nEOF'
+secrets audit15_r8_pipe_interpreter deny Bash $'python3 - <<\'EOF\' | git commit -F -\nprint(open(".env").read())\nEOF'
+secrets audit15_r8_message allow Bash $'git commit -m wip; git commit -F - <<\'EOF\'\nsee .env\nEOF'
+for cmd in 'fd -H .env -x cat' 'fd -H -e env -X cat' 'fd -H -x cat .env' \
+    'fd -H --glob "*.env" --exec cat' 'fd -H --exec-batch cat' \
+    'fd -H -e ts -e env -x cat' 'fd -H --extension=ts --extension=env -X cat'; do
+    secrets audit15_l1_fd_exec deny Bash "$cmd"
+done
+# Filtered allow cases must not select the earlier .secrets/nested.ts fixture.
+mkdir -p "$TMP/audit15-filter/src"
+printf '%s\n' code >"$TMP/audit15-filter/src/a.ts"
+printf '%s\n' synthetic-token >"$TMP/audit15-filter/.env"
+printf '%s\n' synthetic-token >"$TMP/audit15-filter/app.env"
+for cmd in 'fd -H .env' 'fd -H -e ts -x cat' 'fd -H --glob "*.ts" -X wc -l'; do
+    secrets audit15_l1_fd_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit15-filter\"}"
+done
+secrets audit15_l1_fd_private_child deny Bash 'fd -H -e ts -x cat'
+for cmd in 'kubectl get secret db -o=yaml' 'kubectl get secret db -o=json' \
+    'kubectl get secret,cm -o yaml' 'kubectl get cm,secret -o json' \
+    'kubectl get cm,secrets/db -o=jsonpath={.data}' 'funzip backup.zip'; do
+    secrets audit15_l3_l4_l7_printer deny Bash "$cmd"
+done
+for cmd in 'kubectl get cm -o=yaml' 'kubectl get secret,cm' 'kubectl get cm,secret -o name' 'unzip -l backup.zip'; do
+    secrets audit15_l3_l4_l7_safe allow Bash "$cmd"
+done
+printf '%s\n' synthetic >"$TMP/search/.envrc"
+for tool in Read Edit Write; do secrets audit15_l8_envrc deny "$tool" "$TMP/search/.envrc"; done
+secrets audit15_l8_envrc_reader deny Bash 'cat .envrc'
+secrets audit15_l8_envrc_glob deny Bash 'cat .envrc*'
+secrets audit15_l8_envrc_template allow Bash 'cat .envrc.example'
+secrets audit15_l8_envrc_rg_safe allow Bash 'rg TOKEN .'
+grep -v -- '--iglob=!.envrc' "$REPO_ROOT/examples/ripgreprc" >"$TMP/audit15-rg-config"
+prior_audit15_envrc_config="${RIPGREP_CONFIG_PATH:-}"
+export RIPGREP_CONFIG_PATH="$TMP/audit15-rg-config"
+secrets audit15_l8_envrc_rg_missing deny Bash 'rg TOKEN .'
+export RIPGREP_CONFIG_PATH="$prior_audit15_envrc_config"
+for flag in qi qE qw qF ls cs sq; do
+    secrets "audit15_o1_grep_$flag" allow Bash "grep -$flag TOKEN .env"
+done
+secrets audit15_o1_grep_content deny Bash 'grep -s TOKEN .env'
+secrets audit15_o1_pattern_file deny Bash 'grep -qf .env src/a.ts'
+for flag in -l --files-with-matches --count -c; do
+    secrets audit15_o2_rg_names allow Bash "rg $flag TOKEN .env"
+done
+secrets audit15_o2_rg_content deny Bash 'rg TOKEN .env'
+secrets audit15_o2_rg_json deny Bash 'rg --count --json TOKEN .env'
+secrets audit15_o2_rg_pattern_file deny Bash 'rg -l -f .env src/a.ts'
+for glob in '*.ts' 'src/**/*.ts' '*.{ts,tsx}'; do
+    secrets audit15_o3_grep_filter allow Grep "$TMP/audit15-filter" "{\"glob\":\"$glob\",\"output_mode\":\"content\"}"
+done
+secrets audit15_o3_grep_type allow Grep "$TMP/audit15-filter" '{"type":"ts","output_mode":"content"}'
+secrets audit15_o3_grep_broad deny Grep "$TMP/search" '{"glob":"*","output_mode":"content"}'
+secrets audit15_o3_grep_private_child deny Grep "$TMP/search" '{"glob":"*.ts","output_mode":"content"}'
+prior_audit15_filter_config="${RIPGREP_CONFIG_PATH:-}"
+unset RIPGREP_CONFIG_PATH
+for cmd in 'rg -g "*.ts" export' 'rg --glob "*.ts" export' 'rg --iglob "*.ts" export' \
+    'rg --glob="*.{ts,tsx}" export'; do
+    secrets audit15_o4_rg_filter allow Bash "$cmd" "{\"workdir\":\"$TMP/audit15-filter\"}"
+done
+for cmd in 'rg -g "!*.ts" export' 'rg -g "*.ts" -g "*.env" export'; do
+    secrets audit15_o4_rg_broad deny Bash "$cmd" "{\"workdir\":\"$TMP/audit15-filter\"}"
+done
+export RIPGREP_CONFIG_PATH="$prior_audit15_filter_config"
+for cmd in 'find . -name "*.ts" | xargs wc -l' 'find . -iname "*.ts" | xargs grep -n export'; do
+    secrets audit15_o5_find_narrow allow Bash "$cmd" "{\"workdir\":\"$TMP/audit15-filter\"}"
+done
+secrets audit15_o5_find_private_child deny Bash 'find . -name "*.ts" | xargs cat'
+secrets audit15_o5_find_clean_root allow Bash 'find src -name "*.ts" | xargs cat'
+secrets audit15_o5_find_generated_names deny Bash 'find . -name "*.ts" -printf ".env\\n" | xargs cat'
+secrets audit15_o5_find_broad deny Bash 'find . -name "*.env" | xargs cat'
+secrets audit15_o5_find_union deny Bash 'find . -name "*.ts" -o -name "*.env" | xargs cat'
+secrets audit15_o8_grep_include_union deny Bash 'grep -rn --include=*.ts --include=*.env TOKEN .'
+for cmd in 'grep -rn --include=*.zz TOKEN src' 'grep -rn --exclude=*.env TOKEN src' \
+    'grep -rn --exclude-dir=*.env TOKEN src'; do
+    secrets audit15_o8_grep_option allow Bash "$cmd"
+done
+for cmd in 'uvx --from=python-dotenv dotenv list' 'pipx run --spec=python-dotenv dotenv list'; do
+    secrets audit15_o9_runner deny Bash "$cmd"
+done
+for cmd in 'uvx --from=python-dotenv dotenv -e .env -- node app.js' \
+    'pipx run --spec=python-dotenv dotenv -e .env -- node app.js'; do
+    secrets audit15_o9_consumer allow Bash "$cmd"
+done
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/audit15-git/src" "$TMP/audit15-notgit"
+    git -C "$TMP/audit15-git" init -q
+    printf '%s\n' '*.env' >"$TMP/audit15-git/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit15-git/app.env"
+    printf '%s\n' code >"$TMP/audit15-git/src/a.ts"
+    git -C "$TMP/audit15-git" add .gitignore src/a.ts
+    prior_audit15_config="${RIPGREP_CONFIG_PATH:-}"
+    unset RIPGREP_CONFIG_PATH
+    secrets audit15_o6_git_noindex allow Bash 'git grep --no-index -n foo src' "{\"workdir\":\"$TMP/audit15-git\"}"
+    secrets audit15_o6_git_noindex_wide deny Bash 'git grep --no-index -n foo .' "{\"workdir\":\"$TMP/audit15-git\"}"
+    secrets audit15_o7_git_untracked allow Bash 'git grep --untracked foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    secrets audit15_o7_git_unrestricted deny Bash 'git grep --untracked --no-exclude-standard foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    git -C "$TMP/audit15-git" add -f app.env
+    secrets audit15_o7_git_tracked deny Bash 'git grep --untracked foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    secrets audit15_o10_rg_ignored allow Bash 'rg foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    secrets audit15_o10_rg_hidden_ignored allow Bash 'rg --hidden foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    printf '%s\n' '--smart-case' >"$TMP/audit15-rg-partial-config"
+    export RIPGREP_CONFIG_PATH="$TMP/audit15-rg-partial-config"
+    secrets audit15_o10_rg_partial_config allow Bash 'rg foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    unset RIPGREP_CONFIG_PATH
+    printf '%s\n' synthetic >"$TMP/audit15-git/unignored.secret"
+    secrets audit15_o10_rg_visible deny Bash 'rg foo' "{\"workdir\":\"$TMP/audit15-git\"}"
+    printf '%s\n' '*.env' >"$TMP/audit15-notgit/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit15-notgit/app.env"
+    secrets audit15_o10_rg_notgit deny Bash 'rg foo' "{\"workdir\":\"$TMP/audit15-notgit\"}"
+    export RIPGREP_CONFIG_PATH="$prior_audit15_config"
+fi
+
+# Case-insensitive selectors and the TypeScript family cannot hide store files.
+mkdir -p "$TMP/audit15-upper/.secrets" "$TMP/audit15-tsx/.secrets" "$TMP/audit15-dir/selected.ts"
+printf '%s\n' synthetic-token >"$TMP/audit15-upper/.secrets/ONLY.TS"
+printf '%s\n' synthetic-token >"$TMP/audit15-tsx/.secrets/only.tsx"
+printf '%s\n' synthetic-token >"$TMP/audit15-dir/selected.ts/.env"
+prior_audit15_type_config="${RIPGREP_CONFIG_PATH:-}"
+unset RIPGREP_CONFIG_PATH
+secrets audit15_o3_type_private_tsx deny Grep "$TMP/audit15-tsx" '{"type":"ts","output_mode":"content"}'
+secrets audit15_o4_iglob_private_upper deny Bash 'rg --iglob "*.ts" TOKEN' "{\"workdir\":\"$TMP/audit15-upper\"}"
+secrets audit15_o4_type_private_tsx deny Bash 'rg --hidden -t ts TOKEN' "{\"workdir\":\"$TMP/audit15-tsx\"}"
+secrets audit15_o5_iname_private_upper deny Bash 'find . -iname "*.ts" | xargs cat' "{\"workdir\":\"$TMP/audit15-upper\"}"
+for cmd in 'fd -H -e ts -x cat' 'find . -name "*.ts" | xargs cat' 'rg -g "*.ts" TOKEN'; do
+    secrets audit15_filtered_directory deny Bash "$cmd" "{\"workdir\":\"$TMP/audit15-dir\"}"
+done
+export RIPGREP_CONFIG_PATH="$prior_audit15_type_config"
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

@@ -226,9 +226,6 @@ func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 // Unknown launchers can pass commands in any argv suffix or opaque code word.
 func (a *analyzer) unknownExecution(args []string, depth int, cwd string) {
 	for i, value := range args {
-		if value == "env" || value == "printenv" {
-			continue
-		} // An argument is not a command word.
 		if strings.HasPrefix(value, "--") {
 			if _, suffix, ok := strings.Cut(value, "="); ok && strings.ContainsAny(suffix, " \t\n;|&$`><(){}") {
 				a.genericShellText(suffix, depth, cwd)

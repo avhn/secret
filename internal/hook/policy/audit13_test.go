@@ -11,6 +11,7 @@ import (
 
 // Commands are parsed only; fixture files never contain real credentials.
 func TestAudit13(t *testing.T) {
+	t.Setenv("RIPGREP_CONFIG_PATH", "")
 	root := t.TempDir()
 	for _, dir := range []string{"src", "packages/api", "build"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0700); err != nil {
@@ -132,6 +133,7 @@ func TestAudit13RecursiveInclude(t *testing.T) {
 }
 
 func TestAudit13IgnoredSearch(t *testing.T) {
+	t.Setenv("RIPGREP_CONFIG_PATH", "")
 	root := t.TempDir()
 	for name, value := range map[string]string{"app.secret": "synthetic", ".gitignore": "app.secret\n"} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(value), 0600); err != nil {

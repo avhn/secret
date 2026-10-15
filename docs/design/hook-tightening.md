@@ -290,3 +290,49 @@ data and curl uploads of unresolved shell variables remain outside the
 syntactically certified subset. Neither guard provides containment against
 arbitrary transformed output or unobserved process behavior. macOS and Windows
 runtime CI remains necessary for native glob behavior.
+
+## Audit 15 Go decisions
+
+R1/R3 and L2 restore environment printers in launcher slots, peel leading
+package-manager options and local `run` binaries, and remove npm's argument
+separator before analyzing its selected command. Known venv/test/search data
+operands retain their non-command roles. R2/R8 analyze substitutions in
+unquoted message heredocs and keep interpreter heredocs scoped to their own
+statement. R4 derives future protected-name witnesses from the selector's
+literal structure, including arbitrary environment suffixes. R6 propagates
+success/failure cwd sets once per statement, with 32-directory and 4096-step
+caps; AST word budgets count each word once across alternative directories.
+
+L1 models fd execution as a child consuming the selected names. L3/L4 cover
+Kubernetes attached output values and comma-separated resource lists. L5/L6
+respect the selected Git worktree roots and effective ripgrep configuration;
+unsafe hidden/ignore settings cannot receive the default-skip exemption.
+L7 treats funzip as an uncertified archive stdout printer. L8 adds `.envrc`
+to path roles and the shipped ripgrep exclusions. O1/O2 keep grep output-only
+clusters and explicit-file rg counts/names available. O3/O4 use bounded,
+filter-aware walks for tool and shell searches. O5 certifies only pure filtered
+find name streams into xargs; formatted, disjunctive or otherwise unmodeled
+streams keep the conservative policy. O6 scopes no-index Git grep to its
+explicit roots. The older denied-corpus Git root fixtures now contain a
+visible `src/app.env`, preserving denied protected reads instead of retaining
+an over-denial of a public-only source tree. The old `grep -rl` role expectation
+flips to allow because names-only output is not a content read.
+
+W1 classifies Win32 invalid-name, bad-pathname, non-directory and filesystem
+invalid-argument errors as absent operand paths on Windows only. Permission
+and I/O errors are unchanged. Injected error tests run on Linux; native invalid
+filename cases still require Windows CI. R5/R7 and O7-O10 are Bash-specific;
+Go retains focused tests for the shared directory and search behavior without
+changing the installed Bash implementation from this workstream.
+
+Audit 15 completion also retains parent-directory and symlink checks for
+unmatched credential globs such as `~/.docker/c*.json`, in addition to deriving
+arbitrary environment-name witnesses from the selector. Repeated fd extension
+filters are alternatives: a later public extension cannot erase an earlier
+protected extension. Ripgrep JSON output does not gain the explicit-file
+count exemption when `--count` appears later in its arguments. Synthetic Go
+cases cover these regressions and the two Windows non-path data operands.
+The default-search proof accepts simple root-name Git ignore patterns, but a
+negation invalidates that proof: dropping `!app.env` after `*.env` could
+otherwise certify a file the search really reads. Both plain rg and untracked
+Git grep have a permanent synthetic negation case.

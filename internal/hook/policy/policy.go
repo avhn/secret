@@ -78,6 +78,8 @@ type analyzer struct {
 	protected           func(string, string) bool
 	cwd, home, reason   string
 	words, globs        int
+	countedWords        map[*syntax.Word]bool
+	flowSteps           int
 	uncertain           bool
 	inRun               bool
 	configUntrusted     bool
@@ -190,13 +192,13 @@ func (a *analyzer) fragment(source string, depth int) {
 	}
 	a.stmts(file.Stmts, depth, a.cwd)
 }
-func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
+func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) string {
 	if depth > 4 || time.Now().After(a.deadline) {
 		a.structuralUncertain = true
 		a.uncertain = true
 		return cwd
 	}
-	for stmtIndex, s := range stmts {
+	for _, s := range stmts {
 		if a.reason != "" {
 			break
 		}
@@ -498,6 +500,14 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
+			if cmd.Op.String() == "|" && a.filteredFindPipe(cmd.X, cmd.Y, cwd) {
+				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
+				prior := a.xargsIDs
+				a.xargsIDs = true
+				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.xargsIDs = prior
+				break
+			}
 			if cmd.Op.String() == "|" && inertMessageStdin(cmd.Y) && inertMessagePipe(cmd.X) {
 				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 				break
@@ -553,9 +563,6 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					}
 					rightCWD := a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
 					if cmd.Op.String() == "&&" {
-						if rightCWD != cwd && stmtIndex+1 < len(stmts) {
-							a.stmts(stmts[stmtIndex+1:], depth, cwd)
-						}
 						cwd = rightCWD
 					} else {
 						cwd = joinedCWD(cwd, rightCWD)
@@ -1025,7 +1032,36 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if child, ok := safePackageChild(name, args); ok {
-		a.command(child, depth+1, cwd, direct)
+		childCWD := cwd
+		if name == "pnpm" || name == "yarn" {
+			for i := 0; i < len(args) && strings.HasPrefix(args[i], "-"); i++ {
+				option, value, attached := strings.Cut(args[i], "=")
+				if optionIn("-C --dir", option) {
+					if !attached {
+						i++
+						if i >= len(args) {
+							a.reason = roles.Indeterminate
+							return
+						}
+						value = args[i]
+					}
+					childCWD = a.resolve(value, childCWD)
+				} else if strings.HasPrefix(option, "-C") && len(option) > 2 {
+					childCWD = a.resolve(option[2:], childCWD)
+				} else if optionIn("--filter", option) && !attached {
+					i++
+				}
+			}
+		}
+		a.command(child, depth+1, childCWD, direct)
+		return
+	}
+	if name == "fd" {
+		a.fdCommand(args, depth, cwd)
+		return
+	}
+	if name == "funzip" {
+		a.reason = roles.Indeterminate
 		return
 	}
 	if name == "git" {
@@ -1075,7 +1111,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				genericArgs = append(genericArgs, args[i])
 			}
 		}
-		a.unknownExecution(genericArgs, depth, cwd)
+		a.unknownExecution(environmentDataArgs(name, genericArgs), depth, cwd)
 		if a.reason != "" {
 			return
 		}
@@ -1444,7 +1480,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if !modelledCommand(name) && !shellName(name) && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
-		a.unknownExecution(args, depth, cwd)
+		a.unknownExecution(environmentDataArgs(name, args), depth, cwd)
 		if a.reason != "" {
 			return
 		}
@@ -1455,21 +1491,23 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason == search.ScopeReason && a.rgVisibleSafe(args, cwd) {
 			a.reason = ""
 		}
-		if a.reason == "" && slices.Contains(args, "--hidden") && !slices.Contains(args, "-l") && !slices.Contains(args, "--files-with-matches") {
-			root := "."
-			if len(args) > 2 && !strings.HasPrefix(args[len(args)-1], "-") {
-				root = args[len(args)-1]
+		if a.reason == "" && slices.Contains(args, "--hidden") && !rgOutputOnly(args) && !rgPublicSelector(args) {
+			roots := rgRoots(args)
+			if len(roots) == 0 {
+				roots = []string{"."}
 			}
-			if a.treeProtectedAll(root, cwd) {
-				a.reason = search.ScopeReason
+			for _, root := range roots {
+				if a.treeProtectedAll(root, cwd) && !a.rgVisibleSafe(args, cwd) {
+					a.reason = search.ScopeReason
+					break
+				}
 			}
 		}
+
 		if a.reason == search.ScopeReason {
 			a.reason = search.UncertainReason
 		}
-		if a.reason != "" {
-			return
-		}
+		return
 	}
 	if reason := roles.PrinterReason(name, args, direct); reason != "" {
 		a.reason = reason
@@ -1519,21 +1557,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "fd" {
 		return
 	} // File names are metadata; execution slots were analyzed above.
-	if name == "grep" {
-		outputOnly := false
-		for i, arg := range operands {
-			if optionIn("-q -c -l -L --quiet --count --files-with-matches --files-without-match", arg) {
-				outputOnly = true
-			}
-			if optionIn("-f --file --exclude-from", arg) && i+1 < len(operands) && a.inputProtected(operands[i+1], cwd) || (strings.HasPrefix(arg, "--file=") || strings.HasPrefix(arg, "--exclude-from=")) && a.inputProtected(arg[strings.IndexByte(arg, '=')+1:], cwd) {
-				a.reason = roles.FileInput
-				return
-			}
-		}
-		if outputOnly && roles.GrepReason(operands, func(file string) bool { return false }) == "" {
-			return
-		}
-	}
+
 	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
 	}
@@ -1612,7 +1636,13 @@ func (a *analyzer) walkNode(node syntax.Node, depth int, cwd string) {
 // expandWord deliberately avoids expand.Fields: its default expander can read
 // ambient variables, execute substitutions, and enumerate the filesystem.
 func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
-	a.words++
+	if a.countedWords == nil {
+		a.countedWords = make(map[*syntax.Word]bool)
+	}
+	if !a.countedWords[w] {
+		a.words++
+		a.countedWords[w] = true
+	}
 	if a.words > 256 || time.Now().After(a.deadline) {
 		a.uncertain = true
 		return nil, false
