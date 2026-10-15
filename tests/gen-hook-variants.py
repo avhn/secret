@@ -72,9 +72,9 @@ def generate():
     replacement = '''secrets() {
     local name="$1" want="$2" tool="$3" value="$4" extra="${5:-}"
     [[ -n "$extra" ]] || extra='{}'
-    jq -cn --arg name "$name" --arg want "$want" --arg tool "$tool" --arg value "$value" \\
+    printf '%s' "$value" | jq -csR --arg name "$name" --arg want "$want" --arg tool "$tool" \\
         --arg cwd "$TMP/search" --arg config "${RIPGREP_CONFIG_PATH:-}" --argjson extra "$extra" \\
-        '{name:$name,want:$want,tool:$tool,cwd:$cwd,config:$config,command:$value,extra:$extra}' |
+        '{name:$name,want:$want,tool:$tool,cwd:$cwd,config:$config,command:.,extra:$extra}' |
         "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --capture "$TMP" "$VARIANT_ROWS"
     return 0
 }'''
@@ -85,7 +85,7 @@ def generate():
         script.write_text(source)
         env = os.environ.copy()
         env.update(VARIANT_PYTHON=sys.executable, VARIANT_GENERATOR=str(pathlib.Path(__file__).resolve()), VARIANT_ROWS=str(rows))
-        run = subprocess.run(["bash", str(script)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
+        run = subprocess.run(["bash", str(script)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=900)
         if run.returncode or not rows.exists():
             raise SystemExit(run.stderr + run.stdout[-2000:])
         cases, snapshots, indices = [], [], {}
@@ -123,18 +123,23 @@ def generate():
 
 def direct():
     """Extract direct JSON assertions omitted by the suite's secrets() helper."""
-    try:
-        envelope = json.load(sys.stdin)
-    except (ValueError, TypeError):
+    raw = sys.stdin.read()
+    if not raw:
         return
+    try:
+        envelope = json.loads(raw)
+    except (ValueError, TypeError):
+        envelope = {}
     command = envelope.get("tool_input", {}).get("command")
     if envelope.get("tool_name") == "Bash" and isinstance(command, str):
         name = "fixed_complexity_reason" if command == "cat .env '" else "control_byte_" + json.dumps(command, separators=(",", ":"))
         capture(dict(name=name, want="deny", tool="Bash", command=command,
                      cwd=envelope.get("cwd", str(pathlib.Path(sys.argv[2]) / "search")),
                      config=os.environ.get("RIPGREP_CONFIG_PATH", ""), extra={}))
-    print(json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason":
-          "command too complex to analyse for secret access; split it or use secret run"}}))
+    reason = "command too complex to analyse for secret access; split it or use secret run"
+    if isinstance(command, str) and len(command) > 8192:
+        reason = "command too complex to analyse for secret access; split the command or use secret run"
+    print(json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}}))
 
 
 if __name__ == "__main__":

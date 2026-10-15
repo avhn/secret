@@ -204,22 +204,28 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 }
 
 func safePackageChild(name string, args []string) ([]string, bool) {
+	// Call values are shell programs, not executable names. Leave them for
+	// commandSlot instead of hiding them behind a peeled package child.
+	if optionIn("npx npm pnpm yarn", name) {
+		for _, arg := range args {
+			if packageCallOption(arg) {
+				return nil, false
+			}
+		}
+		if leading := packageLeadingOptions(args); name == "yarn" && len(leading) > 0 && leading[0] == "exec" {
+			return nil, false
+		}
+	}
 	switch name {
 	case "npx", "bunx":
-		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
-			if args[0] == "--" {
-				args = args[1:]
-				break
-			}
-			args = args[1:]
-		}
+		args = packageRunnerOptions(args)
 	case "pnpm", "yarn":
 		args = packageLeadingOptions(args)
 		if len(args) == 0 || args[0] == "config" {
 			return nil, false
 		}
 		if optionIn("dlx exec run", args[0]) {
-			args = args[1:]
+			args = packageRunnerOptions(args[1:])
 		}
 	case "python", "python3":
 		if len(args) < 2 || args[0] != "-m" {
@@ -378,11 +384,14 @@ func (a *analyzer) visibleRootSafe(root, cwd string, skipHidden, gitSearch bool)
 		root = resolved
 	}
 	if !gitSearch {
-		for dir, count := root, 0; count < 128; dir, count = filepath.Dir(dir), count+1 {
-			if rgIgnoreOverride(dir) {
+		for dir, count := root, 0; ; dir, count = filepath.Dir(dir), count+1 {
+			// Ripgrep's higher-priority ignore files above a work tree can
+			// restore ignored credentials too. Exhausting the bound is not
+			// a proof that those ancestors are safe.
+			if count >= 128 || rgIgnoreOverride(dir) {
 				return false
 			}
-			if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil || !os.IsNotExist(err) || dir == filepath.Dir(dir) {
+			if dir == filepath.Dir(dir) {
 				break
 			}
 		}
