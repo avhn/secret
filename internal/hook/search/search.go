@@ -172,7 +172,7 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			return "Grep type targets protected names"
 		}
 	}
-	if glob != "" && Selector(glob) && (!names || !strings.ContainsAny(glob, "*?[")) {
+	if positiveGlob(glob) && !CanNarrow(glob) && Selector(glob) && (!names || !strings.ContainsAny(glob, "*?[")) {
 		return "Grep selector targets protected names"
 	}
 	if paths.Protected(root, cwd, "", home) {
@@ -182,7 +182,7 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			return "Grep targets a protected store"
 		}
 	}
-	if !names && (glob != "" && !Selector(glob) || glob == "" && typeGlob(typ) != "") {
+	if !names && (CanNarrow(glob) || glob == "" && typeGlob(typ) != "") {
 		return FilteredScope(root, glob, typ, cwd, home)
 	}
 	if !names && paths.TreeProtectedScope(root, cwd, home, glob != "") {
@@ -229,7 +229,7 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 	unsafeScope := false
 	unsafeNames := false
 	gitWorkTree := false
-	outputOnly, jsonOutput := false, false
+	outputOnly, jsonOutput, negativeSelector := false, false, false
 	var selectors []string
 	roots := []string{}
 	args := words[start:]
@@ -252,6 +252,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 				if kind == "rg" {
 					names = true
 				}
+				continue
+			case "-q", "--quiet":
+				outputOnly = true
 				continue
 			case "-c", "--count", "--count-matches":
 				count, outputOnly = true, true
@@ -280,10 +283,12 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 				if i >= len(args) {
 					return UncertainReason
 				}
-				if !strings.HasPrefix(args[i], "!") {
+				if positiveGlob(args[i]) {
 					selectors = append(selectors, args[i])
+				} else {
+					negativeSelector = true
 				}
-				positive = positive || !strings.HasPrefix(args[i], "!")
+				positive = positive || !NegativeGlob(args[i])
 				includeIgnored = true
 				continue
 			case "-e", "--regexp", "-f", "--file":
@@ -310,10 +315,12 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			if strings.HasPrefix(v, "--glob=") || strings.HasPrefix(v, "--iglob=") || strings.HasPrefix(v, "-g") && len(v) > 2 {
 				g := strings.TrimPrefix(strings.TrimPrefix(v, "--glob="), "--iglob=")
 				g = strings.TrimPrefix(g, "-g")
-				if !strings.HasPrefix(g, "!") {
+				if positiveGlob(g) {
 					selectors = append(selectors, g)
+				} else {
+					negativeSelector = true
 				}
-				positive = positive || !strings.HasPrefix(g, "!")
+				positive = positive || !NegativeGlob(g)
 				includeIgnored = true
 				continue
 			}
@@ -329,7 +336,15 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 				pattern = false
 				continue
 			}
-			if strings.HasPrefix(v, "--type=") || strings.HasPrefix(v, "--type-not=") || strings.HasPrefix(v, "--type-add=") || strings.HasPrefix(v, "--max-depth=") || strings.HasPrefix(v, "--color=") || strings.HasPrefix(v, "--colors=") || strings.HasPrefix(v, "--encoding=") || strings.HasPrefix(v, "--max-count=") || strings.HasPrefix(v, "--threads=") || strings.HasPrefix(v, "--context=") {
+			if kind == "rg" && (strings.HasPrefix(v, "-t") && len(v) > 2 || strings.HasPrefix(v, "--type=")) {
+				includeIgnored = true
+				continue
+			}
+			if kind == "rg" && strings.HasPrefix(v, "-T") && len(v) > 2 {
+				includeIgnored = true
+				continue
+			}
+			if strings.HasPrefix(v, "--type-not=") || strings.HasPrefix(v, "--type-add=") || strings.HasPrefix(v, "--max-depth=") || strings.HasPrefix(v, "--color=") || strings.HasPrefix(v, "--colors=") || strings.HasPrefix(v, "--encoding=") || strings.HasPrefix(v, "--max-count=") || strings.HasPrefix(v, "--threads=") || strings.HasPrefix(v, "--context=") {
 				continue
 			}
 			if kind == "git" && (v == "-O" || strings.HasPrefix(v, "-O") || strings.HasPrefix(v, "--open-files-in-pager")) {
@@ -355,6 +370,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 					}
 					if c == 'c' {
 						count, outputOnly = true, true
+					}
+					if c == 'q' {
+						outputOnly = true
 					}
 					if c == 'u' {
 						unsafeScope, includeIgnored = true, true
@@ -417,10 +435,10 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			return "rg config cannot establish safe search inputs"
 		}
 		certified = status == 0 && !positive && !unsafeScope
-		if len(selectors) > 0 {
+		if len(selectors) > 0 && !negativeSelector {
 			safe := true
 			for _, selector := range selectors {
-				if Selector(selector) {
+				if !CanNarrow(selector) {
 					safe = false
 				}
 			}

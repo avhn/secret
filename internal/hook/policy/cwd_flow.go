@@ -16,7 +16,18 @@ type cwdFlow struct{ success, failure []string }
 // Each subsequent statement is visited once per distinct possible cwd. Boolean
 // branches retain success/failure paths so && never reads from a failed cd.
 func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
-	states := []string{cwd}
+	// Anchor the first statement exactly like its successors. Otherwise a
+	// future Git root recorded before cwdUnion retains a symlink/volume alias
+	// while later write targets use the physical cwd and miss that root.
+	states := a.statementStates(stmts, depth, a.cwdUnion([]string{cwd}))
+	if len(states) == 1 {
+		return states[0]
+	}
+	return ""
+}
+
+// statementStates keeps alternatives intact across compound-command boundaries.
+func (a *analyzer) statementStates(stmts []*syntax.Stmt, depth int, states []string) []string {
 	for _, stmt := range stmts {
 		flow := a.statementFlow(stmt, depth, states)
 		states = a.cwdUnion(flow.success, flow.failure)
@@ -32,10 +43,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			break
 		}
 	}
-	if len(states) == 1 {
-		return states[0]
-	}
-	return ""
+	return states
 }
 
 func (a *analyzer) cwdUnion(groups ...[]string) []string {
@@ -71,6 +79,21 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	if a.flowSteps > maxFlowSteps {
 		a.reason = roles.Indeterminate
 		return cwdFlow{}
+	}
+	if len(stmt.Redirs) == 0 {
+		switch cmd := stmt.Cmd.(type) {
+		case *syntax.Block:
+			dirs := a.cwdUnion(states, a.statementStates(cmd.Stmts, depth, states))
+			return cwdFlow{dirs, dirs}
+		case *syntax.IfClause:
+			dirs := states
+			for clause := cmd; clause != nil; clause = clause.Else {
+				conditions := a.statementStates(clause.Cond, depth, dirs)
+				branches := a.statementStates(clause.Then, depth, conditions)
+				dirs = a.cwdUnion(dirs, conditions, branches)
+			}
+			return cwdFlow{dirs, dirs}
+		}
 	}
 	if binary, ok := stmt.Cmd.(*syntax.BinaryCmd); ok && len(stmt.Redirs) == 0 && (binary.Op == syntax.AndStmt || binary.Op == syntax.OrStmt) {
 		left := a.statementFlow(binary.X, depth, states)

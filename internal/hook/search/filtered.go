@@ -17,10 +17,16 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 	if glob == "" {
 		glob = typeGlob(typ)
 	}
-	if glob == "" || Selector(glob) || strings.Count(glob, "**") > 3 || len(glob) > 1024 {
+	if !CanNarrow(glob) || strings.Count(glob, "**") > 3 || len(glob) > 1024 {
 		return ScopeReason
 	}
 	root = paths.Resolve(root, cwd, "", home)
+	if dir, ok := globDirectory(glob); ok {
+		if paths.TreeProtectedScope(filepath.Join(root, filepath.FromSlash(dir)), cwd, home, true) {
+			return ScopeReason
+		}
+		return ""
+	}
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return ScopeReason
@@ -40,10 +46,13 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 		selected := globMatches(strings.ToLower(glob), strings.ToLower(filepath.ToSlash(relative)), strings.ToLower(entry.Name()))
 		if entry.Type()&os.ModeSymlink != 0 {
 			info, err := os.Stat(name)
-			if err == nil && info.Mode().IsRegular() && !selected {
-				return nil
+			if err != nil || !info.Mode().IsRegular() {
+				return fs.ErrInvalid
 			}
-			return fs.ErrInvalid
+			if selected && paths.Protected(name, cwd, "", home) {
+				return fs.ErrPermission
+			}
+			return nil
 		}
 		if entry.IsDir() {
 			if name != root && globMatches(strings.ToLower(glob), "", strings.ToLower(entry.Name())) {
@@ -74,11 +83,60 @@ func typeGlob(typ string) string {
 		return "*.rs"
 	case "py", "python":
 		return "*.py"
+	case "md", "markdown":
+		return "*.{md,markdown,mdown,mkd,mkdn,mdwn}"
 	}
 	return ""
 }
 
+// CanNarrow rejects negative alternatives before considering protected names.
+// A literal DIR/** instead narrows by its directory, whose whole tree is checked.
+func CanNarrow(glob string) bool {
+	_, directory := globDirectory(glob)
+	return positiveGlob(glob) && (directory || !Selector(glob))
+}
+
+// NegativeGlob reports a selector consisting only of exclusions. It cannot
+// enlarge rg's default visible scope, but provides no narrower-scope proof.
+func NegativeGlob(glob string) bool {
+	if glob == "" || len(glob) > 4096 {
+		return false
+	}
+	variants, ok := selectorBraces(glob, 64)
+	if !ok {
+		return false
+	}
+	for _, variant := range variants {
+		if !strings.HasPrefix(variant, "!") {
+			return false
+		}
+	}
+	return true
+}
+
+func positiveGlob(glob string) bool {
+	if glob == "" || len(glob) > 4096 {
+		return false
+	}
+	variants, ok := selectorBraces(glob, 64)
+	if !ok {
+		return false
+	}
+	for _, variant := range variants {
+		if strings.HasPrefix(variant, "!") {
+			return false
+		}
+	}
+	return true
+}
+
+func globDirectory(glob string) (string, bool) {
+	dir, ok := strings.CutSuffix(glob, "/**")
+	return dir, ok && dir != "" && !strings.ContainsAny(dir, "*?[]{}!\\")
+}
+
 func globMatches(glob, relative, base string) bool {
+	glob = strings.ReplaceAll(glob, "[!", "[^")
 	variants, ok := selectorBraces(glob, 64)
 	if !ok {
 		return true

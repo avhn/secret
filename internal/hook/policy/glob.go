@@ -182,7 +182,9 @@ func (a *analyzer) protectedGlob(pattern, cwd string) bool {
 		return true
 	}
 	for _, name := range []string{"credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
-		if matcher.MatchString(name) && a.inputProtected(filepath.Join(filepath.Dir(pattern), name), cwd) {
+		// Keep the shell callback's slash-qualified path role on Windows too;
+		// a native-only path can otherwise enter its absent bare-name exception.
+		if matcher.MatchString(name) && a.inputProtected(filepath.ToSlash(filepath.Join(filepath.Dir(pattern), name)), cwd) {
 			return true
 		}
 	}

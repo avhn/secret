@@ -40,7 +40,7 @@ func Resolve(name, cwd, workdir, home string) string {
 // Protected checks both lexical intent and physical component traversal. It
 // reads only metadata and denies link loops and non-ENOENT resolution errors.
 func Protected(name, cwd, workdir, home string) bool {
-	raw := unresolved(name, cwd, workdir, home)
+	raw := StreamBase(unresolved(name, cwd, workdir, home))
 	if raw == "/proc/self/status" {
 		return false
 	}
@@ -103,7 +103,7 @@ func physical(raw string) (string, error) {
 
 // lexical recognises store directories, credentials and protected basenames.
 func lexical(p string) bool {
-	p = strings.ToLower(filepath.ToSlash(p))
+	p = strings.ToLower(filepath.ToSlash(StreamBase(p)))
 	base := filepath.Base(p)
 	if ProcessAlias(p) {
 		return true

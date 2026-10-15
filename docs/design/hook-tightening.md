@@ -336,3 +336,45 @@ The default-search proof accepts simple root-name Git ignore patterns, but a
 negation invalidates that proof: dropping `!app.env` after `*.env` could
 otherwise certify a file the search really reads. Both plain rg and untracked
 Git grep have a permanent synthetic negation case.
+
+## Audit 16 Go decisions and cross-platform regressions
+
+The initial cwd now goes through the same canonicalization as every subsequent
+flow state. Previously a future bare/clone Git root retained the original cwd
+alias, while a later redirect used the physical cwd and missed that protected
+root. A permanent Linux symlink-root reproducer covers all three creation forms.
+Unmatched credential-glob witnesses are slash-qualified before the shell callback,
+including on Windows, so an absent credential cannot enter the bare-name metadata
+exception merely because filepath.Join returned backslashes.
+
+A1 never uses negative glob alternatives as a narrowing proof, including mixed
+brace alternatives. Pure exclusions retain the ordinary rg default-scope/config
+proof; mixed positive/negative braces cannot reuse a protected config certificate.
+A2 normalizes shell negated classes in both selector and filesystem matching.
+A3 refuses the simple Git-ignore proof in the presence of .ignore/.rgignore files
+at the root, scanned descendant directories or ancestors through the worktree.
+Slash-free Git ignore patterns apply below the root as well; nested .gitignore
+files refuse that proof rather than silently overriding their negations.
+
+A4 models fd -g/--glob as boolean flags. A5 checks every positional/search-path
+root under the effective base directory for both fd execution and fd-to-xargs
+streams. Regex selectors without a glob/extension proof scan the whole selected
+scope. A6 uses the pattern-derived protected-name test for find name/iname
+filters and preserves a failed root proof instead of falling back to scanning
+only xargs' cwd. Metadata-only children stay available. Public file symlinks are
+checked through their resolved target; symlinked directories remain uncertified.
+A7 peels npm x just like npm exec, including package/yes options and its separator.
+A11 judges Windows alternate streams by their base file before missing-name
+handling, including unnamed $DATA streams; non-Windows colon names are unchanged.
+
+B2 peels Python -m modules while retaining venv/test environment-data roles.
+B3 accepts attached rg -tTYPE/-TTYPE with the same policy as separate type values.
+B4 adds the Markdown type family. B5 accepts rg quiet output on explicit files
+without exempting protected pattern-file inputs. B6 checks a literal DIR/** glob
+only within DIR, with the ordinary bounded protected-tree scan. B7 carries
+bounded cwd alternatives through brace blocks and if clauses, joined with the
+outer cwd instead of replacing alternatives with an unknown directory.
+
+These changes have synthetic Go deny and must-allow regressions. Native Windows
+stream behavior and macOS/Windows runner evidence remain CI gates; no installed
+hook or host-containment claim follows from Linux tests or cross-platform vet.

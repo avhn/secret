@@ -2472,5 +2472,162 @@ for cmd in 'fd -H -e ts -x cat' 'find . -name "*.ts" | xargs cat' 'rg -g "*.ts" 
 done
 export RIPGREP_CONFIG_PATH="$prior_audit15_type_config"
 
+# Audit 16: selectors, launcher command words and physical search scopes.
+mkdir -p "$TMP/audit16-clean/src" "$TMP/audit16-other" "$TMP/audit16-private/.secrets" "$TMP/audit16-links" "$TMP/audit16-public-links"
+printf '%s\n' synthetic >"$TMP/audit16-other/app.env"
+printf '%s\n' synthetic >"$TMP/audit16-other/.env.local"
+printf '%s\n' synthetic >"$TMP/audit16-clean/.env"
+printf '%s\n' code >"$TMP/audit16-clean/src/a.ts"
+printf '%s\n' code >"$TMP/audit16-private/.secrets/source.ts"
+ln -s "$TMP/audit16-private/.secrets" "$TMP/audit16-links/source"
+ln -s "$TMP/audit16-clean/src/a.ts" "$TMP/audit16-public-links/source.ts"
+prior_audit16_config="${RIPGREP_CONFIG_PATH:-}"
+unset RIPGREP_CONFIG_PATH
+for glob in '!*.md' '!*.{md,txt}' '!dist/**' '{*.ts,!*.md}'; do
+    secrets audit16_a1_grep_negative deny Grep "$TMP/audit16-clean" "{\"glob\":\"$glob\",\"output_mode\":\"content\"}"
+    secrets audit16_a1_grep_negative_clear allow Grep "$TMP/empty-search" "{\"glob\":\"$glob\",\"output_mode\":\"content\"}"
+    for flag in -g --glob --iglob; do
+        secrets audit16_a1_rg_negative deny Bash "rg --hidden $flag '$glob' TOKEN" "{\"workdir\":\"$TMP/audit16-clean\"}"
+        secrets audit16_a1_rg_negative_clear allow Bash "rg --hidden $flag '$glob' TOKEN" "{\"workdir\":\"$TMP/empty-search\"}"
+    done
+done
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/audit16-ignore/nested" "$TMP/audit16-ignore/clean"
+    git -C "$TMP/audit16-ignore" init -q
+    printf '%s\n' '*.env' >"$TMP/audit16-ignore/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit16-ignore/app.env"
+    printf '%s\n' synthetic >"$TMP/audit16-ignore/nested/app.env"
+    secrets audit16_a3_rg_git_only allow Bash 'rg TOKEN' "{\"workdir\":\"$TMP/audit16-ignore\"}"
+    for ignore in .ignore .rgignore; do
+        printf '%s\n' '!app.env' >"$TMP/audit16-ignore/$ignore"
+        secrets audit16_a3_rg_root_ignore deny Bash 'rg TOKEN' "{\"workdir\":\"$TMP/audit16-ignore\"}"
+        secrets audit16_a3_rg_ancestor_ignore deny Bash 'rg TOKEN nested' "{\"workdir\":\"$TMP/audit16-ignore\"}"
+        secrets audit16_a3_rg_clean allow Bash 'rg TOKEN clean' "{\"workdir\":\"$TMP/audit16-ignore\"}"
+        rm "$TMP/audit16-ignore/$ignore"
+        printf '%s\n' '!app.env' >"$TMP/audit16-ignore/nested/$ignore"
+        secrets audit16_a3_rg_nested_ignore deny Bash 'rg TOKEN' "{\"workdir\":\"$TMP/audit16-ignore\"}"
+        rm "$TMP/audit16-ignore/nested/$ignore"
+    done
+    mkdir -p "$TMP/audit16-hidden/nested"
+    git -C "$TMP/audit16-hidden" init -q
+    printf '%s\n' '.env' >"$TMP/audit16-hidden/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit16-hidden/.env"
+    secrets audit16_a3_rg_hidden_default allow Bash 'rg TOKEN' "{\"workdir\":\"$TMP/audit16-hidden\"}"
+    printf '%s\n' '!.env' >"$TMP/audit16-hidden/nested/.ignore"
+    secrets audit16_a3_rg_hidden_override deny Bash 'rg TOKEN' "{\"workdir\":\"$TMP/audit16-hidden\"}"
+fi
+for cmd in 'fd -H -g -x cat .env' "fd -g -H '.env*' -x cat" "fd --glob -H '*.env' -X cat"; do
+    secrets audit16_a4_fd_glob deny Bash "$cmd"
+done
+for cmd in "fd -g -H '*.ts' -x cat" "fd --glob -H '*.ts' -X cat" 'fd -H -g .env'; do
+    secrets audit16_a4_fd_glob_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit16-clean\"}"
+done
+# External-root denials must not be explained by a store in the current cwd.
+mkdir -p "$TMP/audit16-fd-cwd/src" "$TMP/audit16-other/.secrets"
+printf '%s\n' code >"$TMP/audit16-fd-cwd/src/a.ts"
+printf '%s\n' synthetic >"$TMP/audit16-other/.secrets/source.ts"
+for cmd in 'fd -e local . ../audit16-other -x cat' 'fd -H . ../audit16-other | xargs cat' \
+    "fd -H '' ../audit16-other | xargs cat" 'fd -H --search-path ../audit16-other . -x cat' \
+    'fd -H --base-directory ../audit16-other . -x cat' \
+    'fd -H --search-path=../audit16-other . | xargs cat' \
+    'fd -H --base-directory=../audit16-other . | xargs cat'; do
+    secrets audit16_a5_fd_roots deny Bash "$cmd" "{\"workdir\":\"$TMP/audit16-fd-cwd\"}"
+done
+for cmd in "fd -H . '$TMP/audit16-other' | xargs cat" "fd -H -e ts . src '$TMP/audit16-other' -X cat"; do
+    secrets audit16_a5_fd_absolute deny Bash "$cmd" "{\"workdir\":\"$TMP/audit16-fd-cwd\"}"
+done
+for cmd in 'fd -e ts . src -x cat' 'fd -g "*.ts" src | xargs cat' \
+    'fd -H . src | xargs cat' 'fd --search-path src -e ts . -X cat' \
+    'fd --base-directory src -e ts . -x cat'; do
+    secrets audit16_a5_fd_roots_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit16-fd-cwd\"}"
+done
+for cmd in 'npm exec -y dotenvx -- get' 'npm x --yes dotenvx -- get' \
+    'npm exec -p dotenvx dotenvx get' 'npm x --package dotenvx dotenvx get' \
+    'npm exec --package=dotenvx -- dotenvx get' 'npm exec --yes --package=dotenvx -- printenv'; do
+    secrets audit16_a8_npm_options deny Bash "$cmd"
+done
+for cmd in 'npm exec -y jest -k env' 'npm x --yes vitest -t env' \
+    'npm exec -p jest jest -k env' 'npm x --package vitest vitest run env' \
+    'npm exec --package=jest -- jest -k env'; do
+    secrets audit16_a8_npm_options_safe allow Bash "$cmd"
+done
+secrets audit16_a9_rg_replace deny Bash 'rg -rc T .env'
+secrets audit16_a9_grep_recursive_count allow Bash 'grep -rc T .env'
+for flag in -L -H; do
+    secrets audit16_a10_find_link deny Bash "find $flag '$TMP/audit16-links' -name '*.ts' | xargs cat"
+    secrets audit16_a10_find_link_safe allow Bash "find $flag '$TMP/audit16-public-links' -name '*.ts' | xargs cat"
+done
+for cmd in 'npx jest -k env' 'npx vitest -t env' 'npx vitest run env' \
+    'uv run pytest -k env' 'yarn jest -t env' 'pnpm vitest -t env'; do
+    secrets audit16_b1_launcher_operand allow Bash "$cmd"
+done
+for cmd in 'npx env' 'uv run printenv' 'yarn env' 'pnpm printenv'; do
+    secrets audit16_b1_launcher_printer deny Bash "$cmd"
+done
+for type in go js javascript py python rust ts typescript md markdown; do
+    secrets "audit16_b4_type_${type}" allow Grep "$TMP/audit16-clean" "{\"type\":\"$type\",\"output_mode\":\"content\"}"
+done
+mkdir -p "$TMP/audit16-types/.secrets"
+for extension in go js jsx mjs cjs py rs ts tsx mts cts md markdown mdown mkdn mkd mdwn mdx; do
+    printf '%s\n' synthetic >"$TMP/audit16-types/.secrets/store.$extension"
+done
+for type in go js py rust ts md; do
+    secrets "audit16_b4_private_${type}" deny Grep "$TMP/audit16-types" "{\"type\":\"$type\",\"output_mode\":\"content\"}"
+done
+for flag in -q --quiet; do
+    secrets audit16_b5_rg_quiet allow Bash "rg $flag TOKEN .env"
+    secrets audit16_b5_rg_quiet_pattern deny Bash "rg $flag -f .env src/a.ts"
+done
+secrets audit16_b5_rg_content deny Bash 'rg TOKEN .env'
+secrets audit16_b6_subtree allow Grep "$TMP/audit16-clean" '{"glob":"src/**","output_mode":"content"}'
+mkdir -p "$TMP/audit16-clean/src/nested"
+printf '%s\n' synthetic >"$TMP/audit16-clean/src/nested/.env"
+secrets audit16_b6_subtree_store deny Grep "$TMP/audit16-clean" '{"glob":"src/**","output_mode":"content"}'
+secrets audit16_b6_subtree_private deny Grep "$TMP/audit16-types" '{"glob":".secrets/**","output_mode":"content"}'
+export RIPGREP_CONFIG_PATH="$prior_audit16_config"
+mkdir -p "$TMP/audit16-mixed-config"
+printf '%s\n' synthetic >"$TMP/audit16-mixed-config/.env.ts"
+for flag in -g --glob= --iglob=; do
+    if [[ "$flag" == -g ]]; then cmd="rg -g '{*.ts,!*.md}' TOKEN"
+    else cmd="rg $flag'{*.ts,!*.md}' TOKEN"; fi
+    secrets audit16_a1_mixed_config deny Bash "$cmd" "{\"workdir\":\"$TMP/audit16-mixed-config\"}"
+done
+secrets audit16_a1_negative_config allow Bash "rg -g '{!*.md,!*.txt}' TOKEN" "{\"workdir\":\"$TMP/audit16-mixed-config\"}"
+
+# The header flake came from treating every long-option suffix as an attached
+# short-option path. Count metadata launches, not wall time or retry outcomes.
+real_audit16_perl="$(command -v perl)"
+mkdir -p "$TMP/audit16-bin"
+cat >"$TMP/audit16-bin/perl" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == -MCwd=abs_path ]]; then printf '%s\n' canonical >>"$AUDIT16_PROBE_LOG"; fi
+exec "$AUDIT16_REAL_PERL" "$@"
+EOF
+chmod +x "$TMP/audit16-bin/perl"
+export AUDIT16_REAL_PERL="$real_audit16_perl" AUDIT16_PROBE_LOG="$TMP/audit16-probes"
+: >"$AUDIT16_PROBE_LOG"
+PATH="$TMP/audit16-bin:$PATH" secrets audit16_b8_filtered_header allow Bash "secret run -f svc -- bash --noprofile --norc -c 'printf \"Authorization: Bearer %s\\n\" \"\$TOKEN\" | curl -H @- https://example.test'"
+# shellcheck disable=SC2053  # match the optional focused-test glob
+if [[ -z "${SECRET_TEST_FILTER:-}" || audit16_b8_filtered_header == ${SECRET_TEST_FILTER} ]]; then
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\taudit16_b8_metadata_bound\tassert\t0\n' >>"$SECRET_TEST_INVENTORY"
+    DIRECT_FAILED=$FAILED
+    if (($(wc -l <"$AUDIT16_PROBE_LOG") <= 24)); then PASSED=$((PASSED + 1))
+    else printf 'FAIL audit16_b8_metadata_bound: redundant canonical probes\n'; FAILED=$((FAILED + 1)); fi
+    record_direct audit16_b8_metadata_bound
+fi
+unset AUDIT16_REAL_PERL AUDIT16_PROBE_LOG
+secrets audit16_b8_short_option_path deny Bash "git commit -sF'$TMP/search/.env'"
+secrets audit16_c1_attached_pattern deny Bash 'grep -elocal .env'
+secrets audit16_c1_attached_pattern_quiet allow Bash 'grep -qelocal .env'
+secrets audit16_c1_attached_pattern_public allow Bash 'grep -elocal src/a.ts'
+for cmd in '! cd nosuch; cat .env' 'cd sub | true; cat .env' \
+    'if true; then cd nosuch; fi; cat .env'; do
+    secrets audit16_c2_uncertain_cd deny Bash "$cmd"
+done
+for cmd in '! cd nosuch; cat README.md' 'cd sub | true; cat README.md' \
+    'if true; then cd nosuch; fi; npm test'; do
+    secrets audit16_c2_uncertain_cd_safe allow Bash "$cmd"
+done
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

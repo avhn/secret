@@ -3,11 +3,37 @@ package policy
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/avhn/secret/internal/hook/paths"
 )
+
+// Future Git directories must retain their protection when cwd flow resolves
+// a symlinked root between repository creation and a subsequent write.
+func TestAuditElevenFutureGitSymlinkRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs Windows developer mode")
+	}
+	actual := t.TempDir()
+	root := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(actual, root); err != nil {
+		t.Fatal(err)
+	}
+	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	for _, command := range []string{
+		"git init --bare gd && echo y >> gd/config",
+		"git clone --bare https://example.invalid/project gd && echo y >> gd/config",
+		"git clone --mirror https://example.invalid/project gd && echo y >> gd/config",
+	} {
+		t.Run(command, func(t *testing.T) {
+			if got := Analyze(command, root, root, check); got == "" {
+				t.Fatal("future Git directory write allowed through symlinked cwd")
+			}
+		})
+	}
+}
 
 // TestAuditEleven treats all strings as hook input, never as commands to execute.
 func TestAuditEleven(t *testing.T) {
