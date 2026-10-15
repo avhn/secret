@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/avhn/secret/internal/hook/patch"
+	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/roles"
 	"github.com/avhn/secret/internal/hook/search"
 	"mvdan.cc/sh/v3/expand"
@@ -75,12 +76,14 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 }
 
 type analyzer struct {
+	kubeconfigs         []string
 	protected           func(string, string) bool
 	cwd, home, reason   string
 	words, globs        int
 	countedWords        map[*syntax.Word]bool
 	flowSteps           int
 	functions           map[string][]*syntax.Stmt
+	functionRoots       map[*syntax.Stmt]string
 	uncertain           bool
 	inRun               bool
 	configUntrusted     bool
@@ -100,7 +103,7 @@ type analyzer struct {
 
 func witness(source string) bool {
 	s := strings.ToLower(strings.ReplaceAll(source, `\`, ""))
-	for _, v := range []string{".env", ".secret", ".secrets", ".netrc", ".npmrc", ".pypirc", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".git-credentials", ".ssh/id_", "/environ", "secret-tool", "printenv", "gh auth token", "$token", "$password", "$secret"} {
+	for _, v := range []string{".vault-token", ".pgpass", "application_default_credentials.json", ".kube/config", ".terraform.d/credentials.tfrc.json", ".cargo/credentials", ".config/gcloud/credentials.db", ".config/gcloud/access_tokens.db", ".config/gcloud/legacy_credentials/", ".env", ".secret", ".secrets", ".netrc", ".npmrc", ".pypirc", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".git-credentials", ".ssh/id_", "/environ", "secret-tool", "printenv", "gh auth token", "$token", "$password", "$secret"} {
 		if strings.Contains(s, v) {
 			return true
 		}
@@ -547,7 +550,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 				break
 			}
-			if cmd.Op.String() == "|" && stash(cmd.Y) && !stdoutRedirect(cmd.X) {
+			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
 				if decl, ok := cmd.X.Cmd.(*syntax.DeclClause); ok {
 					for _, assign := range decl.Args {
 						a.walkWord(assign.Value, depth, cwd)
@@ -566,7 +569,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.reason = "xargs reader consumes a protected-name listing"
 				break
 			}
-			if cmd.Op.String() == "|" && stash(cmd.Y) && !stdoutRedirect(cmd.X) {
+			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
 				if a.reason == "" {
 					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
@@ -938,6 +941,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		name = "fd"
 	}
 	args := words[1:]
+	if name == "ack" || name == "ack-grep" {
+		// ack searches recursively without Git ignore certification. Reuse the
+		// conservative grep option grammar and metadata-only tree proof.
+		name = "grep"
+		args = append([]string{"-r"}, args...)
+	}
 	if declarationCommand(name) {
 		cwd = a.declarationAssignments(args, depth, cwd)
 	}
@@ -1328,6 +1337,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	case "sh", "eval":
 		if name == "eval" {
+			if len(args) > 0 && args[0] == "--" {
+				args = args[1:]
+			}
 			a.indirect = true
 			a.shellValue(strings.Join(args, " "), depth, cwd)
 			return
@@ -1513,13 +1525,25 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.unknownExecution(dockerArgs, depth, cwd)
 		return
 	}
-	if !modelledCommand(name) && !shellName(name) && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
+	if !modelledCommand(name) && !shellName(name) && roles.PrinterReason(name, args, false) == "" && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
 		a.unknownExecution(a.environmentDataArgs(name, args), depth, cwd)
 		if a.reason != "" {
 			return
 		}
 	}
 	if name == "rg" {
+		if config := a.kubeconfig(); config != "" && !rgOutputOnly(args) {
+			roots := rgRoots(args)
+			if len(roots) == 0 {
+				roots = []string{"."}
+			}
+			for _, root := range roots {
+				if paths.ConfiguredTreeProtected(root, cwd, a.home, config) {
+					a.reason = roles.FileInput
+					return
+				}
+			}
+		}
 		// Nested wrappers cannot inherit the hook's rg config certification.
 		// Config paths use native filesystem rules, including Windows volumes.
 		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), a.configUntrusted || depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !filepath.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))

@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Keep the Bash cwd after bounded inert literal eval source, retain denials for
+  dynamic source and directory/function effects, and use Bash 3.2-safe empty
+  array expansions. Preserve literal Kubernetes and HOME metadata in generated
+  denied-command fixtures and check audit 19 directional parity.
+  Close regenerated-corpus gaps for multiple/relocated function directory effects,
+  doctl verbose flags, and protected historical Git blobs in log/blame operands.
+  Retain npm global exec options and operand-free pnpm scripts in wide projects.
+  Check configured Kubernetes paths against Git indexes after later assignments.
+
+- Retain Bash protection for historical Git blob operands, refresh relative
+  Kubernetes credential witnesses at reader cwd scopes, and recognize physical
+  credential aliases and global-option token printers. Avoid workspace scans
+  for operand-free pnpm script fallbacks; add Claude/Codex review regressions.
+
+- Harden Bash credential-file coverage, ack search scopes, token printers and
+  direct login transports, function cwd unions, and package-exec workspace and
+  option roles. Preserve public templates and project Yarn configuration, and
+  add permanent Claude/Codex cases with exact platform inventories.
+
+- Expand Go credential-file and token-printer coverage, including literal Kubernetes
+  config paths in filtered listing streams, recursive ack searches and direct
+  password-stdin sinks. Normalize global printer options between subcommands.
+  Preserve eval directory effects and distinguish workspace names from paths;
+  reject protected indexed Git reads while retaining documented env-template reads.
+
 - Close Go package-exec parity gaps for pnpm shell mode, npm prefix and workspace
   selectors, and keyring backend/path options. Bound unresolved workspace scope
   using directory metadata, keep child directories out of sibling commands,

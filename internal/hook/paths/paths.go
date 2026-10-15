@@ -44,11 +44,11 @@ func Protected(name, cwd, workdir, home string) bool {
 	if raw == "/proc/self/status" {
 		return false
 	}
-	if lexical(filepath.Clean(raw)) {
+	if lexical(filepath.Clean(raw)) || homeCredential(raw, home) || ConfiguredProtected(name, cwd, workdir, home, os.Getenv("KUBECONFIG")) {
 		return true
 	}
 	resolved, err := physical(raw)
-	return err != nil || lexical(resolved)
+	return err != nil || lexical(resolved) || homeCredential(resolved, home)
 }
 
 // physical resolves one component at a time with a shared symlink-hop budget.
@@ -111,7 +111,10 @@ func lexical(p string) bool {
 	if strings.Contains(p, "/.secrets/") || strings.HasSuffix(p, "/.secrets") {
 		return true
 	}
-	if base == ".envrc" || base == ".npmrc" || base == ".pypirc" || base == ".netrc" || base == ".git-credentials" || base == ".secrets.env" {
+	if base == ".vault-token" || base == ".pgpass" || base == "application_default_credentials.json" || base == ".envrc" || base == ".npmrc" || base == ".pypirc" || base == ".netrc" || base == ".git-credentials" || base == ".secrets.env" {
+		return true
+	}
+	if strings.HasSuffix(p, "/.kube/config") || strings.HasSuffix(p, "/.terraform.d/credentials.tfrc.json") || strings.HasSuffix(p, "/.cargo/credentials.toml") || strings.HasSuffix(p, "/.cargo/credentials") || strings.HasSuffix(p, "/.config/gcloud/credentials.db") || strings.HasSuffix(p, "/.config/gcloud/access_tokens.db") || strings.Contains(p, "/.config/gcloud/legacy_credentials/") || strings.HasSuffix(p, "/.config/gcloud/legacy_credentials") {
 		return true
 	}
 	if strings.HasSuffix(p, "/.aws/credentials") || strings.HasSuffix(p, "/.docker/config.json") || strings.HasSuffix(p, "/.config/gh/hosts.yml") {
@@ -238,7 +241,8 @@ func digits(s string) bool {
 // LexicalProtected distinguishes an explicitly protected spelling from an
 // ordinary alias, for names-only tools which may return alias names.
 func LexicalProtected(name, cwd, home string) bool {
-	return lexical(filepath.Clean(unresolved(name, cwd, "", home)))
+	raw := filepath.Clean(unresolved(name, cwd, "", home))
+	return lexical(raw) || homeCredential(raw, home) || ConfiguredProtected(name, cwd, "", home, os.Getenv("KUBECONFIG"))
 }
 
 // ProcessAlias rejects dynamic process files and directory-style descriptor aliases.

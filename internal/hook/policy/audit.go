@@ -1,7 +1,9 @@
 package policy
 
 import (
+	"os"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,14 +31,14 @@ func (a *analyzer) inputProtected(name, cwd string) bool {
 	if cwd == "" && !path.IsAbs(name) {
 		return true
 	}
-	return a.protected(name, cwd)
+	return paths.ConfiguredProtected(name, cwd, "", a.home, a.kubeconfig()) || a.protected(name, cwd)
 }
 
 func (a *analyzer) treeProtected(root, cwd string) bool {
 	if time.Now().After(a.deadline) || cwd == "" && !path.IsAbs(root) {
 		return true
 	}
-	return paths.TreeProtected(root, cwd, a.home)
+	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.kubeconfig()) || paths.TreeProtected(root, cwd, a.home)
 }
 
 // Append requires a known prior value for environment-sensitive names.
@@ -52,6 +54,10 @@ func (a *analyzer) hookAppend(key, value string, depth int, cwd string) {
 // hookAssignment checks only variables interpreted by a shell, never ordinary
 // assignment data. No assignment value is evaluated to determine its contents.
 func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
+	// Branches and scoped assignments cannot erase a possible credential path.
+	if key == "KUBECONFIG" && value != "" && !slices.Contains(a.kubeconfigs, value) {
+		a.kubeconfigs = append(a.kubeconfigs, value)
+	}
 	if a.env == nil {
 		a.env = make(map[string]string)
 	}
@@ -242,9 +248,14 @@ func (a *analyzer) treeProtectedAll(root, cwd string) bool {
 	if time.Now().After(a.deadline) || cwd == "" && !path.IsAbs(root) {
 		return true
 	}
-	return paths.TreeProtectedScope(root, cwd, a.home, true)
+	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.kubeconfig()) || paths.TreeProtectedScope(root, cwd, a.home, true)
 }
 
 func invalidControls(source string) bool {
 	return strings.IndexFunc(source, func(r rune) bool { return r < 32 && r != '\n' && r != '\t' || r == 127 }) >= 0
+}
+
+// Keep every literal configured path as an alternative across shell branches.
+func (a *analyzer) kubeconfig() string {
+	return strings.Join(a.kubeconfigs, string(os.PathListSeparator))
 }

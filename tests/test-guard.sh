@@ -1287,10 +1287,12 @@ if command -v git >/dev/null 2>&1; then
     git -C "$TMP/history" add src/safe.txt
     git -C "$TMP/history" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm update
     printf '%s\n' 'synthetic-only' >"$TMP/deleted/.env"
+    printf '%s\n' 'synthetic-only' >"$TMP/deleted/.env.production"
+    printf '%s\n' 'public-only' >"$TMP/deleted/public.txt"
     git -C "$TMP/deleted" init -q
     git -C "$TMP/deleted" add .
     git -C "$TMP/deleted" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm initial
-    rm "$TMP/deleted/.env"
+    rm "$TMP/deleted/.env" "$TMP/deleted/.env.production"
     git -C "$TMP/deleted" add -u
     git -C "$TMP/deleted" -c user.name=synthetic -c user.email=synthetic@example.test commit -qm deletion
     # The historical deleted-file gap is deliberately allowed by policy.
@@ -2860,6 +2862,302 @@ done
 for cmd in 'keyring --help' 'keyring -b backend --help'; do
     secrets audit18_e10_keyring_help allow Bash "$cmd"
 done
+
+# Literal eval source without cwd/function effects must not taint later reads.
+# These strings are inspected, never executed.
+# shellcheck disable=SC2016,SC2088  # shell source is synthetic test input
+for prefix in eval 'command eval' 'builtin eval' "'eval'"; do
+    secrets audit19_h1_eval_inert allow Bash "$prefix 'echo ok'; cat README.md"
+    secrets audit19_h1_eval_function deny Bash "f() { cd ~/.aws; }; $prefix f; head credentials"
+    secrets audit19_h1_eval_cd deny Bash "$prefix 'cd ~/.aws'; cat credentials"
+    secrets audit19_h1_eval_dynamic deny Bash "$prefix \"\$CODE\"; cat credentials"
+done
+# shellcheck disable=SC2016  # literal source, never executed
+for cmd in "eval -- 'echo ok'; cat README.md" 'eval echo ok; cat README.md' \
+    "f() { cd ~/.aws; }; eval 'echo ok'; cat README.md"; do
+    secrets audit19_h1_eval_literal allow Bash "$cmd"
+done
+
+# Audit 19 uses only synthetic metadata and feeds source text to the guard.
+# None of the probed commands, printers or function bodies are executed.
+# shellcheck disable=SC2016,SC2088  # expansions and home forms are test input
+{
+    for entry in kube:.kube/config adc:application_default_credentials.json \
+        gcloud_credentials:.config/gcloud/credentials.db gcloud_tokens:.config/gcloud/access_tokens.db \
+        gcloud_legacy:.config/gcloud/legacy_credentials/account/token.json vault:.vault-token \
+        terraform:.terraform.d/credentials.tfrc.json cargo_toml:.cargo/credentials.toml \
+        cargo:.cargo/credentials pgpass:.pgpass yarn:.yarnrc.yml; do
+        name="${entry%%:*}" credential="${entry#*:}"
+        fixture="$HOME/$credential"
+        mkdir -p "${fixture%/*}"
+        printf '%s\n' synthetic-only >"$fixture"
+        for tool in Read NotebookEdit; do
+            secrets "audit19_g1_${name}_${tool}" deny "$tool" "$fixture"
+        done
+        secrets "audit19_g1_${name}_grep" deny Grep "$fixture" '{"output_mode":"content"}'
+        for reader in cat less 'grep TOKEN' 'rg TOKEN'; do
+            secrets "audit19_g1_${name}_reader" deny Bash "$reader '$fixture'"
+        done
+        secrets "audit19_g1_${name}_tree" deny Grep "${fixture%/*}" '{"output_mode":"content"}'
+    done
+    mkdir -p "$TMP/audit19-kube" "$TMP/audit19-yarn" "$TMP/audit19-ack/apps"
+    printf '%s\n' synthetic-only >"$TMP/audit19-kube/custom.cfg"
+    printf '%s\n' synthetic-only >"$TMP/audit19-kube/second.cfg"
+    ln -s custom.cfg "$TMP/audit19-kube/alias.txt"
+    for tool in Read NotebookEdit Grep; do
+        KUBECONFIG="$TMP/audit19-kube/custom.cfg:$TMP/audit19-kube/second.cfg" \
+            secrets "audit19_g1_kube_literal_$tool" deny "$tool" "$TMP/audit19-kube/second.cfg" '{"output_mode":"content"}'
+    done
+    KUBECONFIG="$TMP/audit19-kube/custom.cfg" secrets audit19_g1_kube_alias deny Read "$TMP/audit19-kube/alias.txt"
+    KUBECONFIG="$TMP/audit19-kube/custom.cfg" secrets audit19_g1_kube_tree deny Grep "$TMP/audit19-kube" '{"output_mode":"content"}'
+    KUBECONFIG="$TMP/audit19-kube/custom.cfg" secrets audit19_g1_kube_rg deny Bash "rg TOKEN '$TMP/audit19-kube'"
+    secrets audit19_g1_kube_variable deny Bash 'cat $KUBECONFIG'
+    secrets audit19_g1_kube_braced deny Bash 'less "${KUBECONFIG}"'
+    secrets audit19_g1_kube_assignment deny Bash 'KUBECONFIG=custom.cfg; cat custom.cfg'
+    secrets audit19_g1_kube_assignment_list deny Bash 'KUBECONFIG=one.cfg:two.cfg; cat two.cfg'
+    secrets audit19_g1_kube_assignment_tree deny Bash "KUBECONFIG='$TMP/audit19-kube/custom.cfg'; rg TOKEN '$TMP/audit19-kube'"
+    secrets audit19_g1_kube_consumer allow Bash 'KUBECONFIG=custom.cfg kubectl get pods'
+    secrets audit19_g1_kube_literal_word allow Bash "cat '\$KUBECONFIG'"
+    printf '%s\n' 'nodeLinker: node-modules' >"$TMP/audit19-yarn/.yarnrc.yml"
+    secrets audit19_g1_project_yarn allow Read "$TMP/audit19-yarn/.yarnrc.yml"
+    secrets audit19_g1_project_yarn_shell allow Bash "cat '$TMP/audit19-yarn/.yarnrc.yml'"
+    secrets audit19_g1_project_yarn_tree allow Grep "$TMP/audit19-yarn" '{"output_mode":"content"}'
+    for credential in .kube/cache/config .cargo/config.toml .config/gcloud/configurations/config_default \
+        .vault-token.example .pgpass.example; do
+        secrets audit19_g1_safe_file allow Read "$HOME/$credential"
+    done
+    printf '%s\n' synthetic-only >"$TMP/audit19-ack/apps/prod.env"
+    printf '%s\n' prod.env >"$TMP/audit19-ack/apps/.gitignore"
+    for reader in ack ack-grep; do
+        secrets audit19_g2_tree deny Bash "$reader -i token apps" "{\"workdir\":\"$TMP/audit19-ack\"}"
+        secrets audit19_g2_hidden deny Bash "$reader token ."
+        secrets audit19_g2_explicit deny Bash "$reader TOKEN .env"
+        secrets audit19_g2_wrapper deny Bash "timeout 5 $reader token apps" "{\"workdir\":\"$TMP/audit19-ack\"}"
+        secrets audit19_g2_clean allow Bash "$reader -i token '$TMP/audit19-yarn'"
+        secrets audit19_g2_names allow Bash "$reader -l token apps" "{\"workdir\":\"$TMP/audit19-ack\"}"
+        secrets audit19_g2_pattern_data allow Bash "$reader -- '.env' '$TMP/audit19-yarn'"
+    done
+    PRINTER_CASES=(
+        'aws ecr get-login-password' 'aws sts get-session-token' 'aws sso get-role-credentials'
+        'aws configure export-credentials' 'gcloud config config-helper'
+        'gcloud auth application-default print-access-token' 'az account get-access-token'
+        'az acr login --name synthetic --expose-token' 'heroku auth:token'
+        'vault print token' 'vault token lookup' 'doctl auth token'
+        'glab auth status --show-token' 'kubectl create token synthetic'
+        'direnv export json' 'direnv export bash' 'direnv export fish'
+    )
+    for cmd in "${PRINTER_CASES[@]}"; do
+        secrets audit19_g3_printer deny Bash "$cmd"
+        secrets audit19_g3_wrapped deny Bash "timeout 5 $cmd"
+        secrets audit19_g3_nested deny Bash "sh -c '$cmd'"
+        secrets audit19_g3_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+        secrets audit19_g3_docker allow Bash "$cmd | docker login --username synthetic --password-stdin registry.example"
+        secrets audit19_g3_helm allow Bash "$cmd | helm registry login registry.example --username synthetic --password-stdin"
+        secrets audit19_g3_indirect deny Bash "$cmd | cat | secret stash synthetic TOKEN"
+        secrets audit19_g3_no_stdin deny Bash "$cmd | docker login registry.example"
+    done
+    for cmd in 'aws sts get-caller-identity' 'aws ecr describe-repositories' 'gcloud config list' \
+        'az account show' 'az acr login --name synthetic' 'heroku auth:whoami' 'vault status' \
+        'doctl auth list' 'glab auth status' 'kubectl get serviceaccounts' 'direnv status'; do
+        secrets audit19_g3_metadata allow Bash "$cmd"
+    done
+    mkdir -p "$TMP/audit19-git/apps/api"
+    if command -v git >/dev/null 2>&1; then
+        git -C "$TMP/audit19-git" init -q
+        for template in .env.example .env.sample .env.template app.env.example; do
+            printf '%s\n' template-only >"$TMP/audit19-git/apps/api/$template"
+        done
+        git -C "$TMP/audit19-git" add apps
+        secrets audit19_g4_pattern allow Bash "git grep -- '*.env*'" "{\"workdir\":\"$TMP/audit19-git\"}"
+        for template in .env.example .env.sample .env.template app.env.example; do
+            secrets audit19_g4_template allow Bash "git show HEAD:apps/api/$template" "{\"workdir\":\"$TMP/audit19-git\"}"
+        done
+        for cmd in 'git show HEAD:apps/api/.env.production' 'git show HEAD:.secrets/.env.example' \
+            'git grep TOKEN -- apps/api/.env' 'git show HEAD:.kube/config'; do
+            secrets audit19_g4_protected deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-git\"}"
+        done
+        printf '%s\n' synthetic-only >"$TMP/audit19-git/custom.cfg"
+        git -C "$TMP/audit19-git" add custom.cfg
+        secrets audit19_g1_kube_git_safe allow Bash 'git show HEAD' "{\"workdir\":\"$TMP/audit19-git\"}"
+        secrets audit19_g1_kube_git_cache deny Bash 'git show HEAD; KUBECONFIG=custom.cfg; git show HEAD' "{\"workdir\":\"$TMP/audit19-git\"}"
+    fi
+    mkdir -p "$TMP/audit19-workspaces/docs" "$TMP/audit19-workspaces/packages/docs" \
+        "$TMP/audit19-workspaces/packages/web" "$TMP/audit19-workspaces/clean"
+    printf '%s\n' '{"private":true,"workspaces":["packages/*"]}' >"$TMP/audit19-workspaces/package.json"
+    printf '%s\n' 'packages:' '  - packages/*' >"$TMP/audit19-workspaces/pnpm-workspace.yaml"
+    for workspace in docs web; do
+        printf '{"name":"%s"}\n' "$workspace" >"$TMP/audit19-workspaces/packages/$workspace/package.json"
+        printf '%s\n' synthetic-only >"$TMP/audit19-workspaces/packages/$workspace/.env"
+        ln -s .env "$TMP/audit19-workspaces/packages/$workspace/config.txt"
+    done
+    printf '%s\n' public-only >"$TMP/audit19-workspaces/docs/config.txt"
+    printf '%s\n' public-only >"$TMP/audit19-workspaces/public.txt"
+    printf '%s\n' synthetic-only >"$TMP/audit19-workspaces/.env"
+    ln -s .env "$TMP/audit19-workspaces/root-config.txt"
+    for cmd in 'f() { cd web || return; }; f; cat config.txt' \
+        'f() { if true; then cd web; fi; }; f; cat config.txt' \
+        'f() { pushd web; }; f; cat config.txt' \
+        'f() { cd web; }; g() { f; }; g; cat config.txt' \
+        'g() { f; }; f() { cd web; }; g; cat config.txt' \
+        'D=web; f() { cd $D; }; f; cat config.txt' \
+        'f() { popd; }; f; cat config.txt'; do
+        secrets audit19_h2_function deny Bash "$cmd" "{\"workdir\":\"$TMP/audit18\"}"
+    done
+    for cmd in 'f() { cd packages/docs || return; }; cat config.txt' \
+        'f() { cd packages/docs; }; f; cat public.txt' \
+        'f() { printf "%s" ok; }; f; cat public.txt'; do
+        secrets audit19_h2_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    done
+    for cmd in 'pnpm --filter docs exec cat config.txt' 'pnpm -F docs exec cat config.txt' \
+        'pnpm --filter=docs exec cat config.txt' 'npm -w docs exec cat config.txt' \
+        'npm --workspace=docs exec cat config.txt' 'npm -w ./docs exec cat config.txt'; do
+        secrets audit19_h3_named deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    done
+    for cmd in 'pnpm --filter ./docs exec cat config.txt' 'npm -w ./packages/docs exec cat public.txt' \
+        'pnpm --filter docs exec cat public.txt' 'pnpm --filter docs build' 'npm -w docs test'; do
+        secrets audit19_h3_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    done
+    for cmd in 'pnpm -r exec cat config.txt' 'pnpm --recursive exec cat config.txt' \
+        'npm -ws exec cat config.txt' 'npm exec --workspaces cat config.txt' \
+        'pnpm --filter docs cat config.txt' 'pnpm -F docs cat config.txt' \
+        'npm exec cat config.txt -w docs' 'npm exec cat config.txt --workspace=docs' \
+        'npm --yes -q -g exec -p synthetic cat config.txt -w docs' \
+        'npm exec --prefix packages/docs cat config.txt' \
+        'npm --prefix clean exec cat root-config.txt'; do
+        secrets audit19_h4_exec deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    done
+    for cmd in 'pnpm -w exec cat root-config.txt' 'pnpm --workspace-root exec cat root-config.txt'; do
+        secrets audit19_h4_root deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces/clean\"}"
+    done
+    for cmd in 'pnpm -r exec cat public.txt' 'npm -ws exec cat public.txt' \
+        'pnpm --filter docs cat public.txt' 'npm exec cat public.txt -w docs' \
+        'npm --yes -q -g exec -p synthetic cat public.txt' \
+        'npm exec --prefix clean cat public.txt' 'npm exec -- jest -t env -w docs' \
+        'npm run lint -w docs' 'npm -w docs exec true; cat config.txt'; do
+        secrets audit19_h4_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    done
+    for cmd in 'keyring --mode=credentials get service user' 'keyring --output json get service user' \
+        'python3 -m keyring --mode credentials --output=json get service user'; do
+        secrets audit19_h4_keyring deny Bash "$cmd"
+        secrets audit19_h4_keyring_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+    done
+    for cmd in 'keyring --mode=credentials --help' 'keyring --output json --help'; do
+        secrets audit19_h4_keyring_safe allow Bash "$cmd"
+    done
+}
+
+# Combined options and later directory changes keep their input alternatives.
+# shellcheck disable=SC2016  # function source is test data
+for cmd in 'f() { cd web || return; }; f; cd sub; cat config.txt' \
+    'f() { cd web; }; cd sub; f; cat config.txt' \
+    'f() { cd web; cd ..; }; f; cat config.txt'; do
+    secrets audit19_h2_later_cwd deny Bash "$cmd" "{\"workdir\":\"$TMP/audit18\"}"
+done
+secrets audit19_h2_absolute_safe allow Bash "f() { cd web || return; }; f; cat '$TMP/audit19-workspaces/public.txt'" "{\"workdir\":\"$TMP/audit18\"}"
+mkdir -p "$TMP/audit19-prefix/packages/docs"
+printf '%s\n' '{"workspaces":["packages/*"]}' >"$TMP/audit19-prefix/package.json"
+printf '%s\n' '{"name":"docs"}' >"$TMP/audit19-prefix/packages/docs/package.json"
+printf '%s\n' synthetic-only >"$TMP/audit19-prefix/packages/docs/.env"
+ln -s .env "$TMP/audit19-prefix/packages/docs/config.txt"
+for opts in '-w docs' '--workspaces'; do
+    secrets audit19_h4_prefix_combined deny Bash "npm --prefix '$TMP/audit19-prefix' exec cat config.txt $opts" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+    secrets audit19_h4_prefix_combined_safe allow Bash "npm --prefix '$TMP/audit19-prefix' exec cat public.txt $opts" "{\"workdir\":\"$TMP/audit19-workspaces\"}"
+done
+for cmd in 'aws --region synthetic ecr get-login-password' \
+    'aws ecr --region synthetic get-login-password' \
+    'gcloud --project synthetic auth application-default print-access-token'; do
+    secrets audit19_g3_globals deny Bash "$cmd"
+    secrets audit19_g3_globals_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+done
+
+# A failed metadata proof must carry a deny reason through raw recovery.
+mkdir -p "$TMP/audit19-wide"
+printf '%s\n' '{"workspaces":["*"]}' >"$TMP/audit19-wide/package.json"
+function_body='f() {'
+for ((index = 0; index < 20; index++)); do
+    mkdir -p "$TMP/audit19-wide/pkg$index"
+    function_body+=" cd pkg$index;"
+done
+printf '%s\n' synthetic-only >"$TMP/audit19-wide/pkg19/.env"
+ln -s .env "$TMP/audit19-wide/pkg19/config.txt"
+for cmd in 'pnpm --filter missing exec cat config.txt' 'npm -ws exec cat config.txt' \
+    "$function_body }; f; cat config.txt"; do
+    secrets audit19_scope_bound_deny deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-wide\"}"
+done
+
+# Review regressions: historical Git blobs, contextual aliases and reader cwd.
+mkdir -p "$TMP/audit19-review/sub" "$TMP/audit19-review/packages/web"
+printf '%s\n' '{"workspaces":["packages/*"]}' >"$TMP/audit19-review/package.json"
+printf '%s\n' '{"name":"web"}' >"$TMP/audit19-review/packages/web/package.json"
+printf '%s\n' synthetic-only >"$TMP/audit19-review/sub/custom.cfg"
+printf '%s\n' synthetic-only >"$TMP/audit19-review/packages/web/custom.cfg"
+printf '%s\n' public-only >"$TMP/audit19-review/public.txt"
+for cmd in 'KUBECONFIG=custom.cfg; cd sub; cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; cd sub; rg TOKEN .' \
+    'KUBECONFIG=custom.cfg; env -C sub cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; pnpm -C sub exec cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; pnpm --filter web exec cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; npm -w web exec cat custom.cfg'; do
+    secrets audit19_review_kube_cwd deny Bash "$cmd" "{\"workdir\":\"$TMP/audit19-review\"}"
+done
+for cmd in 'KUBECONFIG=custom.cfg; cd sub; cat ../public.txt' \
+    'KUBECONFIG=custom.cfg; pnpm --filter web exec cat public.txt'; do
+    secrets audit19_review_kube_cwd_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit19-review\"}"
+done
+mkdir -p "$TMP/audit19-review-home" "$TMP/audit19-review-alias-target"
+printf '%s\n' synthetic-only >"$TMP/audit19-review-home/.yarnrc.yml"
+printf '%s\n' synthetic-only >"$TMP/audit19-review-alias-target/custom.cfg"
+ln -s "$TMP/audit19-review-home" "$TMP/audit19-review-home-link"
+ln -s "$TMP/audit19-review-alias-target" "$TMP/audit19-review-dir-link"
+ln -s "$TMP/audit19-review-alias-target/custom.cfg" "$TMP/audit19-review-file-link"
+for tool in Read NotebookEdit; do
+    HOME="$TMP/audit19-review-home-link" secrets "audit19_review_home_alias_$tool" deny "$tool" "$TMP/audit19-review-home/.yarnrc.yml"
+done
+HOME="$TMP/audit19-review-home-link" secrets audit19_review_home_alias_cat deny Bash "cat '$TMP/audit19-review-home/.yarnrc.yml'"
+HOME="$TMP/audit19-review-home-link" secrets audit19_review_home_alias_tree deny Grep "$TMP/audit19-review-home-link" '{"output_mode":"content"}'
+HOME="$TMP/audit19-review-home-link" secrets audit19_review_home_alias_project allow Read "$TMP/audit19-yarn/.yarnrc.yml"
+for config in "$TMP/audit19-review-dir-link/custom.cfg" "$TMP/audit19-review-file-link"; do
+    KUBECONFIG="$config" secrets audit19_review_kube_physical deny Read "$TMP/audit19-review-alias-target/custom.cfg"
+    KUBECONFIG="$config" secrets audit19_review_kube_physical_cat deny Bash "cat '$TMP/audit19-review-alias-target/custom.cfg'"
+    KUBECONFIG="$config" secrets audit19_review_kube_physical_tree deny Grep "$TMP/audit19-review-dir-link" '{"output_mode":"content"}'
+done
+KUBECONFIG="$TMP/audit19-review-dir-link/missing.cfg" secrets audit19_review_kube_missing_alias deny Read "$TMP/audit19-review-alias-target/missing.cfg"
+KUBECONFIG="$TMP/audit19-review-dir-link/custom.cfg" secrets audit19_review_kube_alias_safe allow Read "$TMP/audit19-review/public.txt"
+for cmd in 'aws --debug ecr get-login-password' 'aws ecr --no-verify-ssl get-login-password' \
+    'aws --cli-connect-timeout 5 sts get-session-token' \
+    'doctl --context synthetic auth token' 'doctl auth --context=synthetic token' \
+    'doctl --verbose auth token' 'doctl --verbose=true auth token' \
+    'gcloud config --project synthetic config-helper' \
+    'gcloud --verbosity=debug config --quiet config-helper' \
+    'gcloud config --quiet=true config-helper'; do
+    secrets audit19_review_printer_options deny Bash "$cmd"
+    secrets audit19_review_printer_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+    secrets audit19_review_printer_docker allow Bash "$cmd | docker login --password-stdin registry.example"
+    secrets audit19_review_printer_helm allow Bash "$cmd | helm registry login --password-stdin registry.example"
+done
+for cmd in 'aws --debug sts get-caller-identity' 'doctl --context synthetic auth list' \
+    'gcloud config --project synthetic list'; do
+    secrets audit19_review_printer_metadata allow Bash "$cmd"
+done
+for ((index = 20; index < 36; index++)); do mkdir -p "$TMP/audit19-wide/pkg$index"; done
+for cmd in 'pnpm --filter web build' 'pnpm --filter web test' 'pnpm -r build'; do
+    secrets audit19_review_wide_script allow Bash "$cmd" "{\"workdir\":\"$TMP/audit19-wide\"}"
+done
+secrets audit19_review_wide_reader deny Bash 'pnpm --filter web cat config.txt' "{\"workdir\":\"$TMP/audit19-wide\"}"
+if command -v git >/dev/null 2>&1; then
+    # The existing deletion fixture has real revisions and a clean public index.
+    secrets audit19_review_git_history deny Bash 'git diff HEAD~1:.env.production HEAD:public.txt' "{\"workdir\":\"$TMP/deleted\"}"
+    # A clean current index must not hide a protected historical blob operand.
+    for sub in diff show cat-file log blame; do
+        case "$sub" in
+            diff) args='HEAD~1:.env.production HEAD:public.txt' ;;
+            cat-file) args='-p HEAD~1:.env.production' ;;
+            *) args='HEAD~1:.env.production' ;;
+        esac
+        secrets audit19_review_git_blob deny Bash "git $sub $args" "{\"workdir\":\"$TMP/audit19-git\"}"
+    done
+    secrets audit19_review_git_template_diff allow Bash 'git diff HEAD~1:apps/api/.env.example HEAD:apps/api/.env.sample' "{\"workdir\":\"$TMP/audit19-git\"}"
+fi
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

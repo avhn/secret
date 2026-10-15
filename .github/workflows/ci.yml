@@ -157,7 +157,8 @@ jobs:
         run: go vet ./...
       - name: Test Go packages
         shell: bash
-        run: go test ./...
+        # The denied-command corpus replays about 2000 fixture trees; Windows needs more than the default.
+        run: go test -timeout 30m ./...
       - name: Compare Bash store goldens
         if: runner.os != 'Windows'
         shell: bash
@@ -172,7 +173,13 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "1"
-        run: go test -race ./...
+        # The corpus replay is single-goroutine; Windows race builds run it too slowly to be useful.
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            go test -race -timeout 30m -skip '^TestGuardDeniedCorpus$' ./...
+          else
+            go test -race -timeout 30m ./...
+          fi
       - name: Check module files
         shell: bash
         run: go mod tidy && git diff --exit-code -- go.mod go.sum

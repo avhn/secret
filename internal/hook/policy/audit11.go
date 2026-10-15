@@ -148,7 +148,7 @@ func inertCatHeredoc(sub *syntax.CmdSubst) bool {
 
 // protectedLiteralToken examines literal argv data after parsing. Dynamic
 // operands are handled by the ordinary word and role checks.
-var protectedLiteralToken = regexp.MustCompile(`(?i)(?:\.env(?:\.[a-z0-9_-]+)?|\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.gitconfig|\.gitmodules|(?:^|/)\.git/|git/config|\.ssh/id_[a-z0-9_-]+|\.aws/credentials|\.docker/config\.json|\.config/gh/hosts\.yml|[a-z0-9_.-]+\.secret(?:[^a-z0-9_-]|$))`)
+var protectedLiteralToken = regexp.MustCompile(`(?i)(?:\.vault-token|\.pgpass|application_default_credentials\.json|\.kube/config|\.terraform\.d/credentials\.tfrc\.json|\.cargo/credentials(?:\.toml)?|\.config/gcloud/(?:credentials\.db|access_tokens\.db|legacy_credentials/)|\.env(?:\.[a-z0-9_-]+)?|\.netrc|\.npmrc|\.pypirc|\.git-credentials|\.gitconfig|\.gitmodules|(?:^|/)\.git/|git/config|\.ssh/id_[a-z0-9_-]+|\.aws/credentials|\.docker/config\.json|\.config/gh/hosts\.yml|[a-z0-9_.-]+\.secret(?:[^a-z0-9_-]|$))`)
 
 func hasProtectedLiteral(value string) bool {
 	value = strings.ReplaceAll(strings.ReplaceAll(value, ".env.example", ""), ".env.template", "")

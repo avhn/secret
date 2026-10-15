@@ -75,6 +75,19 @@ class VariantExtractionTests(unittest.TestCase):
             })
             self.assertEqual(captured["extra"]["command"], ["cat", 1])
 
+    def test_direct_preserves_literal_credential_metadata(self):
+        envelope = dict(tool_name="Bash", tool_input=dict(command="cat custom.cfg"))
+        env = dict(HOME="/synthetic/home-alias", RIPGREP_CONFIG_PATH="/synthetic/rg-config",
+                   KUBECONFIG="/synthetic/custom.cfg:/synthetic/second.cfg")
+        with mock.patch.object(sys, "argv", [str(GENERATOR), "--direct", "/synthetic", "/synthetic/rows"]):
+            with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(envelope))), mock.patch.object(sys, "stdout", io.StringIO()):
+                with mock.patch.dict(variants.os.environ, env), mock.patch.object(variants, "capture") as capture:
+                    variants.direct()
+        row = capture.call_args.args[0]
+        self.assertEqual(row["home"], env["HOME"])
+        self.assertEqual(row["config"], env["RIPGREP_CONFIG_PATH"])
+        self.assertEqual(row["kubeconfig"], env["KUBECONFIG"])
+
     def test_command_bytes_survive_stdin_extraction(self):
         commands = ["", "cat '.env'\\\"\t\n\n", "printf 'synthetic café'", "x" * (1024 * 1024)]
         with tempfile.TemporaryDirectory(prefix="hook-variant-test-") as directory:
@@ -93,7 +106,9 @@ invoke_guard() {
 secrets() {
     return 1
 }
-unset RIPGREP_CONFIG_PATH
+export HOME="$TMP/home-alias"
+export RIPGREP_CONFIG_PATH="$TMP/rg-config"
+export KUBECONFIG="$TMP/custom.cfg:$TMP/second.cfg"
 '''
             for index, command in enumerate(commands[:-1]):
                 source += f"secrets case_{index} deny Bash {shlex.quote(command)}\n"
@@ -108,7 +123,8 @@ secrets case_3 deny Bash "$large"
             self.assertEqual(corpus["snapshots"], [[], []])
             self.assertEqual(corpus["cases"], [
                 dict(name=f"case_{index}", command=command, cwd="@TMP@/search",
-                     home="@TMP@/home", config="", extra={}, snapshot=0)
+                     home="@TMP@/home-alias", config="@TMP@/rg-config",
+                     kubeconfig="@TMP@/custom.cfg:@TMP@/second.cfg", extra={}, snapshot=0)
                 for index, command in enumerate(commands)
             ])
 

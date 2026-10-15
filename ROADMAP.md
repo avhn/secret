@@ -68,9 +68,11 @@ Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded B
 
 Variant extraction streams command text through stdin to handle 1 MiB synthetic
 cases without argv limits. The full denied-command variant corpus is regenerated
-from every Bash-deny case (2,028 cases and 41,793 variants, including audit 18),
+from every Bash-deny case (2,254 cases and 45,471 variants, including audit 19),
 and Go must deny all of them. Focused coverage runs with `python3 -I tests/test-hook-variants.py`;
-corpus refreshes still require review.
+corpus refreshes still require review. Audit 19 integration also retains literal
+KUBECONFIG and per-case HOME metadata, checks inert eval parity, and exercises
+Bash 3.2 empty-array paths. Local checks do not replace the CI runner gate.
 
 Ready for review (not ticked): envelope/path roles, bounded Bash AST, command/printer roles, search certification, Codex argv/workdir and bounded patch-header handling (including moves, aliases and malformed-header denial), exact differential classification, and fuzz/variant coverage. The default Go build now uses the AST policy with 64 KiB envelopes and 40 KiB fragments; the deferral and `hooktrial` split are removed. The installed Bash guard and plugin manifests are unchanged.
 

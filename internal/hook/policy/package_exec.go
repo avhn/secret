@@ -45,6 +45,7 @@ func (a *analyzer) packageExecOptions(name string, args []string, options *packa
 		case name == "pnpm" && optionIn("-w --workspace-root", key):
 			options.root = true
 		case optionIn("-s --silent -q --quiet -y --yes --if-present", key),
+			name == "npm" && optionIn("-g --global", key),
 			name == "yarn" && optionIn("-w --workspace-root", key):
 		default:
 			return args
@@ -81,6 +82,7 @@ func (a *analyzer) packageExec(name string, args []string, depth int, cwd string
 		return false
 	}
 	var child []string
+	fallback := false
 	switch {
 	case name == "npm" && optionIn("exec x", leading[0]):
 		child = a.npmExecArguments(leading[1:], &options)
@@ -88,7 +90,7 @@ func (a *analyzer) packageExec(name string, args []string, depth int, cwd string
 		child = a.packageExecOptions(name, leading[1:], &options)
 	case name == "pnpm" && !optionIn("config run dlx", leading[0]):
 		// pnpm falls back to exec for local binaries, including shell mode.
-		child = leading
+		child, fallback = leading, true
 	default:
 		return false
 	}
@@ -102,6 +104,12 @@ func (a *analyzer) packageExec(name string, args []string, depth int, cwd string
 		a.reason = roles.Indeterminate
 		return true
 	}
+	// Operand-free pnpm script fallbacks do not need a workspace path proof.
+	// Still classify the child so env and other default token printers deny.
+	if fallback && len(child) == 1 && !options.shell {
+		a.command(child, depth+1, options.cwd, direct)
+		return true
+	}
 	dirs := []string{options.cwd}
 	if options.prefix || len(options.workspaces) > 0 {
 		dirs = a.cwdUnion(dirs, []string{cwd})
@@ -111,7 +119,12 @@ func (a *analyzer) packageExec(name string, args []string, depth int, cwd string
 		dir := ""
 		if selector != "" && !strings.ContainsAny(selector, "*?[]{}$`!") && options.cwd != "" {
 			resolved := a.resolve(selector, options.cwd)
-			if info, err := os.Stat(resolved); err == nil && info.IsDir() {
+			pathSelector := name != "pnpm" || strings.HasPrefix(selector, "./") || strings.HasPrefix(selector, "../") || filepath.IsAbs(selector)
+			if name == "npm" {
+				info, err := os.Stat(filepath.Join(resolved, "package.json"))
+				pathSelector = err == nil && info.Mode().IsRegular()
+			}
+			if info, err := os.Stat(resolved); pathSelector && err == nil && info.IsDir() {
 				dir = resolved
 			}
 		}

@@ -14,6 +14,15 @@ import (
 // FilteredScope checks matching names only, never file values. Symlinks and
 // incomplete walks cannot certify a content search outside protected stores.
 func FilteredScope(root, glob, typ, cwd, home string) string {
+	return FilteredScopeConfigured(root, glob, typ, cwd, home, "")
+}
+
+// FilteredScopeConfigured also classifies literal KUBECONFIG alternatives known
+// to the shell analyzer, without changing or relying on the process environment.
+func FilteredScopeConfigured(root, glob, typ, cwd, home, config string) string {
+	protected := func(name string) bool {
+		return paths.ConfiguredProtected(name, cwd, "", home, config) || paths.Protected(name, cwd, "", home)
+	}
 	if glob == "" {
 		glob = typeGlob(typ)
 	}
@@ -22,7 +31,8 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 	}
 	root = paths.Resolve(root, cwd, "", home)
 	if dir, ok := globDirectory(glob); ok {
-		if paths.TreeProtectedScope(filepath.Join(root, filepath.FromSlash(dir)), cwd, home, true) {
+		directory := filepath.Join(root, filepath.FromSlash(dir))
+		if paths.ConfiguredTreeProtected(directory, cwd, home, config) || paths.TreeProtectedScope(directory, cwd, home, true) {
 			return ScopeReason
 		}
 		return ""
@@ -49,7 +59,7 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 			if err != nil || !info.Mode().IsRegular() {
 				return fs.ErrInvalid
 			}
-			if selected && paths.Protected(name, cwd, "", home) {
+			if selected && protected(name) {
 				return fs.ErrPermission
 			}
 			return nil
@@ -60,7 +70,7 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 			}
 			return nil
 		}
-		if selected && paths.Protected(name, cwd, "", home) {
+		if selected && protected(name) {
 			return fs.ErrPermission
 		}
 		return nil

@@ -352,5 +352,116 @@ done
 shell_case audit18_argv_yarn deny '["yarn","exec","cat",".env"]'
 shell_case audit18_argv_shell deny '["pnpm","-c","exec","cat .env"]'
 shell_case audit18_argv_workspace deny '["npm","exec","-w","web","cat","config.txt"]'
+# Literal eval source without cwd/function effects must not taint later reads.
+# These strings are inspected, never executed.
+# shellcheck disable=SC2016,SC2088  # shell source is synthetic test input
+for prefix in eval 'command eval' 'builtin eval' "'eval'"; do
+    shell_case audit19_h1_eval_inert allow "$(jq -cn --arg c "$prefix 'echo ok'; cat README.md" '$c')"
+    shell_case audit19_h1_eval_function deny "$(jq -cn --arg c "f() { cd ~/.aws; }; $prefix f; head credentials" '$c')"
+    shell_case audit19_h1_eval_cd deny "$(jq -cn --arg c "$prefix 'cd ~/.aws'; cat credentials" '$c')"
+    shell_case audit19_h1_eval_dynamic deny "$(jq -cn --arg c "$prefix \"\$CODE\"; cat credentials" '$c')"
+done
+
+# Audit 19 checks the same policy through Codex string, argv and patch inputs.
+mkdir -p "$HOME/.kube" "$TMP/work/packages/docs" "$TMP/work/docs" "$TMP/work/clean"
+printf '%s\n' synthetic-only >"$HOME/.kube/config"
+printf '%s\n' synthetic-only >"$HOME/.yarnrc.yml"
+printf '%s\n' public-only >"$TMP/work/docs/config.txt"
+printf '%s\n' '{"private":true,"workspaces":["packages/*"]}' >"$TMP/work/package.json"
+printf '%s\n' '{"name":"docs"}' >"$TMP/work/packages/docs/package.json"
+printf '%s\n' synthetic-only >"$TMP/work/packages/docs/.env"
+ln -s .env "$TMP/work/packages/docs/config.txt"
+printf '%s\n' public-only >"$TMP/work/public.txt"
+ln -s .env "$TMP/work/root-config.txt"
+# shellcheck disable=SC2016,SC2088  # literal source text, never executed
+for cmd in 'cat ~/.kube/config' 'cat ~/.vault-token' 'cat ~/.cargo/credentials.toml' \
+    'cat ~/.pgpass' 'cat ~/.yarnrc.yml' 'cat $KUBECONFIG' \
+    'KUBECONFIG=custom.cfg; cat custom.cfg' 'ack -i TOKEN .' 'ack-grep TOKEN .' \
+    'aws ecr get-login-password' 'aws sts get-session-token' 'aws sso get-role-credentials' \
+    'gcloud config config-helper' 'az account get-access-token' 'az acr login --expose-token' \
+    'heroku auth:token' 'vault print token' 'vault token lookup' 'doctl auth token' \
+    'glab auth status --show-token' 'kubectl create token synthetic' 'direnv export json' \
+    'f() { cd web || return; }; f; cat config.txt' \
+    'f() { if true; then cd web; fi; }; f; cat config.txt' \
+    'f() { pushd web; }; f; cat config.txt' \
+    'f() { cd web; }; g() { f; }; g; cat config.txt' \
+    'D=web; f() { cd $D; }; f; cat config.txt' \
+    'pnpm --filter docs exec cat config.txt' 'npm -w docs exec cat config.txt' \
+    'pnpm -r exec cat config.txt' 'npm -ws exec cat config.txt' \
+    'pnpm --filter docs cat config.txt' 'npm exec cat config.txt -w docs' \
+    'npm --prefix clean exec cat root-config.txt' \
+    'npm --yes -q -g exec -p synthetic cat config.txt -w docs' \
+    'keyring --mode=credentials get service user' 'keyring --output json get service user'; do
+    shell_case audit19_deny deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'cat docs/config.txt' 'ack -l TOKEN .' 'ack TOKEN docs' \
+    'aws ecr get-login-password | docker login --password-stdin registry.example' \
+    'gcloud config config-helper | helm registry login --password-stdin registry.example' \
+    'direnv export bash | secret stash synthetic TOKEN' \
+    'az account get-access-token | secret stash synthetic TOKEN' \
+    'vault status' 'glab auth status' 'direnv status' \
+    'f() { cd web || return; }; cat config.txt' \
+    'f() { cd web; }; f; cat public.txt' \
+    'pnpm --filter ./docs exec cat config.txt' 'pnpm --filter docs exec cat public.txt' \
+    'npm -w docs exec cat public.txt' 'pnpm -r exec cat public.txt' \
+    'npm exec cat public.txt -w docs' 'npm --yes -q -g exec -p synthetic cat public.txt' \
+    'npm run lint -w docs' 'keyring --mode=credentials --help'; do
+    shell_case audit19_allow allow "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit19_workspace_root deny '"pnpm -w exec cat root-config.txt"' "$TMP/work/clean"
+shell_case audit19_argv_kube deny '["cat","~/.kube/config"]'
+shell_case audit19_argv_printer deny '["aws","ecr","get-login-password"]'
+shell_case audit19_argv_workspace deny '["pnpm","--filter","docs","cat","config.txt"]'
+patch_case audit19_kube_patch deny '*** Begin Patch
+*** Update File: ~/.kube/config
+*** End Patch'
+patch_case audit19_yarn_home_patch deny '*** Begin Patch
+*** Update File: ~/.yarnrc.yml
+*** End Patch'
+patch_case audit19_yarn_project_patch allow '*** Begin Patch
+*** Update File: .yarnrc.yml
+*** End Patch'
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/audit19-git/apps/api"
+    git -C "$TMP/audit19-git" init -q
+    printf '%s\n' template-only >"$TMP/audit19-git/apps/api/.env.example"
+    git -C "$TMP/audit19-git" add apps
+    shell_case audit19_git_pattern allow '"git grep -- '\''*.env*'\''"' "$TMP/audit19-git"
+    shell_case audit19_git_template allow '"git show HEAD:apps/api/.env.example"' "$TMP/audit19-git"
+    shell_case audit19_git_protected deny '"git show HEAD:apps/api/.env.production"' "$TMP/audit19-git"
+fi
+
+# Review regressions use envelopes only, never execute a probed command.
+printf '%s\n' synthetic-only >"$TMP/work/sub/custom.cfg"
+printf '%s\n' synthetic-only >"$TMP/work/packages/docs/custom.cfg"
+for cmd in 'KUBECONFIG=custom.cfg; cd sub; cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; env -C sub cat custom.cfg' \
+    'KUBECONFIG=custom.cfg; pnpm --filter docs exec cat custom.cfg'; do
+    shell_case audit19_review_kube_cwd deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit19_review_kube_safe allow '"KUBECONFIG=custom.cfg; cd sub; cat ../public.txt"'
+mkdir -p "$TMP/review-home" "$TMP/review-config"
+printf '%s\n' synthetic-only >"$TMP/review-home/.yarnrc.yml"
+printf '%s\n' synthetic-only >"$TMP/review-config/custom.cfg"
+ln -s "$TMP/review-home" "$TMP/review-home-link"
+ln -s "$TMP/review-config/custom.cfg" "$TMP/review-config-link"
+HOME="$TMP/review-home-link" shell_case audit19_review_home_alias deny "$(jq -cn --arg p "$TMP/review-home/.yarnrc.yml" '["cat",$p]')"
+KUBECONFIG="$TMP/review-config-link" shell_case audit19_review_kube_alias deny "$(jq -cn --arg p "$TMP/review-config/custom.cfg" '["cat",$p]')"
+for cmd in 'aws --debug ecr get-login-password' 'doctl --context synthetic auth token' \
+    'gcloud config --project synthetic config-helper'; do
+    shell_case audit19_review_printer_options deny "$(jq -cn --arg c "$cmd" '$c')"
+    shell_case audit19_review_printer_stash allow "$(jq -cn --arg c "$cmd | secret stash synthetic TOKEN" '$c')"
+    shell_case audit19_review_printer_login allow "$(jq -cn --arg c "$cmd | docker login --password-stdin registry.example" '$c')"
+done
+mkdir -p "$TMP/review-wide"
+printf '%s\n' '{"workspaces":["*"]}' >"$TMP/review-wide/package.json"
+for ((index = 0; index < 36; index++)); do mkdir -p "$TMP/review-wide/pkg$index"; done
+shell_case audit19_review_wide_build allow '"pnpm --filter web build"' "$TMP/review-wide"
+shell_case audit19_review_wide_reader deny '"pnpm --filter web cat config.txt"' "$TMP/review-wide"
+if command -v git >/dev/null 2>&1; then
+    shell_case audit19_review_git_blob deny '"git diff HEAD~1:.env.production HEAD:public.txt"' "$TMP/audit19-git"
+    shell_case audit19_review_git_template allow '"git diff HEAD~1:apps/api/.env.example HEAD:apps/api/.env.example"' "$TMP/audit19-git"
+fi
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

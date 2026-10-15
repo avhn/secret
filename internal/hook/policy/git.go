@@ -403,7 +403,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				a.reason = roles.Indeterminate
 				return
 			}
-			if indexProtected(resolveGitDirectory(cwd, gitDir), a.home) {
+			if a.gitIndexProtected(resolveGitDirectory(cwd, gitDir), cwd, workTree) {
 				a.reason = roles.FileInput
 				return
 			}
@@ -463,13 +463,13 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 	}
 	if workTree != "" {
 		workTree = a.gitPath(workTree, cwd)
-		if gitDir == "" && indexProtected(resolveGitDirectory(workTree, ""), a.home) {
+		if gitDir == "" && a.gitIndexProtected(resolveGitDirectory(workTree, ""), cwd, workTree) {
 			a.reason = roles.FileInput
 			return
 		}
 	}
 	// Summary and check modes inspect the supplied patch, not indexed files.
-	if !applyReadOnly && indexProtected(resolveGitDirectory(cwd, gitDir), a.home) {
+	if !applyReadOnly && a.gitIndexProtected(resolveGitDirectory(cwd, gitDir), cwd, workTree) {
 		a.reason = roles.FileInput
 	}
 }
@@ -606,6 +606,15 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 			continue
 		}
 		if !options || !strings.HasPrefix(arg, "-") || arg == "-" {
+			// A safe formatting mode does not turn a protected historical
+			// blob into a public input. Pattern/message option values skip
+			// this operand branch and retain their inert data role.
+			if optionIn("log shortlog blame", sub) {
+				if _, member, ok := strings.Cut(arg, ":"); ok && paths.LexicalProtected(member, cwd, a.home) {
+					a.reason = roles.FileInput
+					return false
+				}
+			}
 			if optionIn("add commit restore checkout switch blame rm mv", sub) && !(sub == "rm" && slices.Contains(args, "--cached")) && a.inputProtected(arg, cwd) {
 				a.reason = roles.FileInput
 				return false

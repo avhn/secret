@@ -21,10 +21,13 @@ deliberately trying to read a secret.
   store files and well-known credential files (cloud CLI credentials, Docker
   and gh config, npmrc, pypirc, SSH private keys, `/proc/*/environ`), dumping
   the environment, credential printers (`gh auth token`, `gcloud auth
-print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
-  `security -w`, clipboard readers), and content searches over trees that hold
-  protected files. The shipped guard also rejects control characters in shell
-  commands, gates content-producing Git commands on bounded tracked index names
+  print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
+  tokens, Heroku/Vault/doctl/glab tokens, `kubectl create token`, `direnv export`,
+  `op read`, `pass`, `secret-tool`, `security -w`, clipboard readers), and
+  content searches over trees that hold protected files, including `ack` and
+  `ack-grep`, which cannot rely on ripgrep exclusions or Git ignore rules. The
+  shipped guard also rejects control characters in shell commands, gates
+  content-producing Git commands on bounded tracked index names
   and protects covered archive reads, including BusyBox tar stdout extraction,
   and detects shell hook variables that can launch readers. Inherited Git editor
   and pager settings are user configuration, not shell text; values assigned in
@@ -60,14 +63,45 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   strict command slots and unknown commands. Role-classified operands of
   modelled commands retain their existing rules: `secret show`, `run` and
   `stash` may name stores; metadata commands and env-file consumers may name
-  protected files. A printer piped straight into `secret stash FILE KEY` is
-  allowed, since the value goes into a store instead of output.
+  protected files. A printer piped straight into `secret stash FILE KEY`,
+  `docker login --password-stdin` or `helm registry login --password-stdin` is
+  allowed, since the value goes directly to a store or login consumer instead
+  of output. Supported global options on AWS, gcloud and doctl printers do not
+  change this requirement, even when placed between subcommand words. An
+  intermediate command such as `cat` is not that transport.
+- **Credential filename coverage** also includes `.kube/config`, paths named by
+  a literal `KUBECONFIG` path list, `application_default_credentials.json`,
+  `.config/gcloud/credentials.db`, `.config/gcloud/access_tokens.db`, files under
+  `.config/gcloud/legacy_credentials/`, `.vault-token`,
+  `.terraform.d/credentials.tfrc.json`, `.cargo/credentials.toml`,
+  `.cargo/credentials`, `.pgpass`, and the user's `~/.yarnrc.yml`. These are
+  filename and metadata checks, never inspections of credential contents.
+  Relative `KUBECONFIG` entries are resolved at the reader's effective cwd,
+  including wrapper and workspace alternatives. Both lexical names and physical
+  aliases of these paths and the home Yarn file are protected; missing targets
+  retain their lexical protection. An unresolved `$KUBECONFIG` reader operand
+  also denies. The example ripgrep config excludes the fixed names; arbitrary
+  `KUBECONFIG` paths require scope checks rather than certification from that
+  config alone.
+- **Templates outside stores stay readable.** `.env.example`, `.env.sample`,
+  `.env.template` and names ending in `.env.example`, `.env.sample` or
+  `.env.template` are exempt outside `.secrets/` and other protected credential
+  contexts. The same rule applies to explicit Git blob paths, including diff
+  operands naming earlier revisions: a clean current index does not exempt a
+  protected historical path. A Git grep pattern such as `git grep -- '*.env*'`
+  is search text, not a protected file operand; its content scope still needs
+  the ordinary Git index checks.
 
 ## What it does not protect
 
 These are outside the threat model. Reports about them are welcome as
 documentation or hardening suggestions, but they are not vulnerabilities:
 
+- **Project Yarn configuration.** A project `.yarnrc.yml` remains readable,
+  even though an `npmAuthToken` entry can contain a secret. Only the user's
+  `~/.yarnrc.yml` is protected by this filename rule. Keep project tokens out
+  of that file and use secret transport for token-bearing configuration. The
+  example ripgrep config conservatively excludes all `.yarnrc.yml` files.
 - **Transformed output.** Redaction matches literal values. Base64, URL
   encoding, hex, substrings, reversed or split values are not caught.
 - **Shell indirection the guard cannot resolve statically.** The guard

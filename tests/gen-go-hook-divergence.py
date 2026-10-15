@@ -9,6 +9,7 @@ import collections
 import json
 import os
 import pathlib
+import platform
 import re
 import subprocess
 import sys
@@ -29,7 +30,7 @@ def suite_rows(suite, binary, host, tmp):
     if not re.search(r"(?m)^\d+ passed, \d+ failed", run.stdout):
         raise ValueError(f"{suite}: suite did not finish")
     inventory = ROOT / "testdata/inventory" / f"{suite}.tsv"
-    if sys.platform == "darwin" and inventory.with_name(f"{suite}.darwin.tsv").exists():
+    if platform.system() == "Darwin" and inventory.with_name(f"{suite}.darwin.tsv").exists():
         inventory = inventory.with_name(f"{suite}.darwin.tsv")
     expected = {name: decision for item, name, _, decision in (line.split("\t") for line in inventory.read_text().splitlines()) if item == suite}
     seen, actual, rows = collections.Counter(), set(), []
@@ -95,6 +96,39 @@ def audit_rows(binary, tmp):
     return rows
 
 
+def audit19_rows(binary, tmp):
+    """Check mixed audit 19 outcomes and reject every Go-looser decision."""
+    text = (ROOT / "testdata/hook/audit19.json").read_text()
+    corpus = json.loads(text.replace("@TMP@", tmp.as_posix()))
+    for name, kind, value in corpus["fixtures"]:
+        target = tmp / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if kind == "dir":
+            target.mkdir(exist_ok=True)
+        else:
+            target.write_text(value)
+    rows = []
+    for row in corpus["cases"]:
+        env = os.environ.copy()
+        env.update(HOME=str(tmp / "home"), RIPGREP_CONFIG_PATH="", KUBECONFIG="")
+        settings = row.get("env", {})
+        env["KUBECONFIG"] = settings.get("KUBECONFIG", "")
+        if "KUBECONFIG_LIST" in settings:
+            env["KUBECONFIG"] = os.pathsep.join(settings["KUBECONFIG_LIST"])
+        payload = dict(tool_name=row["tool"], cwd=row["cwd"], tool_input=row["fields"])
+        go = decision([binary, "hook", "claude"], payload, env)
+        bash = decision([str(ROOT / "hooks/guard-secrets")], payload, env)
+        expected = "deny" if row["deny"] else "allow"
+        if go != expected:
+            raise ValueError(f"audit19 unexpected Go outcome: {row['name']}")
+        if go == "allow" and bash == "deny":
+            raise ValueError(f"audit19 Go-looser outcome: {row['name']}")
+        if go != bash:
+            rows.append(("audit", "audit19_" + row["name"], "deliberate-tightening"))
+    print(f"audit19: {len(corpus['cases'])} expected Go outcomes, {len(rows)} stricter than Bash")
+    return rows
+
+
 def main():
     """Write the inventory only after every measured row is reviewed in docs."""
     if len(sys.argv) != 2 or not pathlib.Path(sys.argv[1]).is_absolute():
@@ -104,6 +138,7 @@ def main():
         rows = suite_rows("guard", sys.argv[1], "claude", tmp)
         rows += suite_rows("codex", sys.argv[1], "codex", tmp)
         rows += audit_rows(sys.argv[1], tmp / "audit")
+        rows += audit19_rows(sys.argv[1], tmp / "audit19")
     table = (ROOT / "docs/design/hook-tightening.md").read_text()
     missing = [f"{suite}/{name}" for suite, name, _ in rows if f"`{name}`" not in table]
     if missing:
