@@ -150,6 +150,9 @@ func (a *analyzer) fragment(source string, depth int) {
 	if len(source) > 8192 && (len(source) > 1<<20 || !strings.Contains(source, "<<")) || depth > 4 || time.Now().After(a.deadline) {
 		a.structuralUncertain = true
 		a.uncertain = true
+		if len(source) > 8192 && !witness(source) {
+			a.reason = "command too complex to analyse for secret access; split the command or use secret run"
+		}
 		return
 	}
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
@@ -179,6 +182,9 @@ func (a *analyzer) fragment(source string, depth int) {
 		if len(source)-payload > 8192 {
 			a.structuralUncertain = true
 			a.reason = roles.Indeterminate
+			if !witness(source) {
+				a.reason = "command too complex to analyse for secret access; split the command or use secret run"
+			}
 			return
 		}
 	}
@@ -190,7 +196,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 		a.uncertain = true
 		return cwd
 	}
-	for _, s := range stmts {
+	for stmtIndex, s := range stmts {
 		if a.reason != "" {
 			break
 		}
@@ -205,7 +211,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 		}
 		for _, r := range s.Redirs {
-			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) {
+			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) && !inertMessageStdin(s) {
 				body := a.raw(r.Hdoc)
 				if hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(commandName(s)) && a.inlineGitDir(body, cwd) {
 					a.reason = roles.FileInput
@@ -227,6 +233,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				}
 			}
 			if op == "<" || op == "<>" || op == "<&" {
+				if literal(r.Word) == "/dev/null" && commandName(s) == "gh" {
+					continue
+				}
 				if a.protectedWord(r.Word, cwd) {
 					a.reason = "input redirect reads a protected store"
 				}
@@ -271,6 +280,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 						a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
 					}
 				}
+			}
+			if len(cmd.Args) > 2 && literal(cmd.Args[0]) == "docker" && literal(cmd.Args[1]) == "cp" && strings.Contains(a.raw(cmd.Args[2]), ":/") && hasProtectedLiteral(a.raw(cmd.Args[2])) {
+				a.reason = roles.FileInput
 			}
 			if len(cmd.Args) > 0 && path.Base(literal(cmd.Args[0])) == "apply_patch" {
 				found := false
@@ -442,6 +454,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 							continue
 						}
 					}
+					if strings.HasPrefix(name, "python") && len(cmd.Args) >= 4 && literal(cmd.Args[1]) == "-m" && literal(cmd.Args[2]) == "venv" {
+						break
+					}
+					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
+						continue
+					}
+					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
+						continue
+					}
 					if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
@@ -477,6 +498,10 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
+			if cmd.Op.String() == "|" && inertMessageStdin(cmd.Y) && inertMessagePipe(cmd.X) {
+				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				break
+			}
 			if cmd.Op.String() == "|" && dockerPIDPipe(cmd.X, cmd.Y) {
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				a.xargsIDs = true
@@ -523,8 +548,14 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					if cmd.Op.String() == "||" {
 						leftCWD = joinedCWD(cwd, leftCWD)
 					}
+					if cmd.Op.String() == "||" && leftCWD != cwd && cwd != "" {
+						a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+					}
 					rightCWD := a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
 					if cmd.Op.String() == "&&" {
+						if rightCWD != cwd && stmtIndex+1 < len(stmts) {
+							a.stmts(stmts[stmtIndex+1:], depth, cwd)
+						}
 						cwd = rightCWD
 					} else {
 						cwd = joinedCWD(cwd, rightCWD)
@@ -1029,7 +1060,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if name == "npm" && len(args) > 1 && args[0] == "version" && optionIn("patch minor major", args[1]) {
 			genericArgs = nil
 		}
-		if name == "gh" {
+		if name == "gh" && len(args) > 1 && args[0] == "secret" && args[1] == "set" {
+			genericArgs = nil
+		} else if name == "gh" {
 			genericArgs = make([]string, 0, len(args))
 			for i := 0; i < len(args); i++ {
 				if optionIn("--title --body --jq", args[i]) {
@@ -1108,12 +1141,18 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if strings.HasPrefix(name, "python") || name == "perl" || name == "ruby" || name == "node" {
 		for i := 0; i < len(args); i++ {
+			if strings.HasPrefix(name, "python") && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" {
+				break
+			}
 			code := args[i]
 			if name == "node" && code == "--env-file" {
 				i++
 				continue
 			}
 			if name == "node" && strings.HasPrefix(code, "--env-file=") {
+				continue
+			}
+			if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 				continue
 			}
 			if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
@@ -1339,6 +1378,16 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 		if name == "docker" {
+			if len(args) >= 3 && args[0] == "cp" {
+				src := args[1]
+				if at := strings.Index(src, ":/"); at >= 0 {
+					src = src[at+1:]
+				}
+				if a.inputProtected(src, cwd) {
+					a.reason = roles.FileInput
+					return
+				}
+			}
 			inspect := len(args) > 0 && args[0] == "inspect" || len(args) > 1 && args[0] == "container" && args[1] == "inspect"
 			if inspect {
 				format := ""
@@ -1350,7 +1399,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 						_, format, _ = strings.Cut(arg, "=")
 					}
 				}
-				if format == "" || strings.Contains(format, "Env") || strings.Contains(format, ".Config") || strings.Contains(format, "json .") {
+				if format == "" || strings.EqualFold(format, "json") || strings.Contains(format, "Env") || strings.Contains(format, ".Config") || strings.Contains(format, "json .") {
 					a.reason = roles.Printer
 					return
 				}
@@ -1406,7 +1455,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason == search.ScopeReason && a.rgVisibleSafe(args, cwd) {
 			a.reason = ""
 		}
-		if a.reason == "" && slices.Contains(args, "--hidden") {
+		if a.reason == "" && slices.Contains(args, "--hidden") && !slices.Contains(args, "-l") && !slices.Contains(args, "--files-with-matches") {
 			root := "."
 			if len(args) > 2 && !strings.HasPrefix(args[len(args)-1], "-") {
 				root = args[len(args)-1]
@@ -1466,6 +1515,24 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			filtered = append(filtered, v)
 		}
 		operands = filtered
+	}
+	if name == "fd" {
+		return
+	} // File names are metadata; execution slots were analyzed above.
+	if name == "grep" {
+		outputOnly := false
+		for i, arg := range operands {
+			if optionIn("-q -c -l -L --quiet --count --files-with-matches --files-without-match", arg) {
+				outputOnly = true
+			}
+			if optionIn("-f --file --exclude-from", arg) && i+1 < len(operands) && a.inputProtected(operands[i+1], cwd) || (strings.HasPrefix(arg, "--file=") || strings.HasPrefix(arg, "--exclude-from=")) && a.inputProtected(arg[strings.IndexByte(arg, '=')+1:], cwd) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
+		if outputOnly && roles.GrepReason(operands, func(file string) bool { return false }) == "" {
+			return
+		}
 	}
 	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
@@ -1714,7 +1781,11 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			v = a.home + "/" + v[2:]
 			pattern = a.home + "/" + strings.TrimPrefix(pattern, "~/")
 		}
-		if unquotedGlob && strings.ContainsAny(v, "*?[") {
+		if unquotedGlob && strings.ContainsAny(v, "*?[") && !strings.HasPrefix(v, "-") {
+			if strings.HasPrefix(v, "/proc/") && strings.Contains(v, "/cwd/") {
+				a.uncertain = true
+				return nil, false
+			}
 			matches, valid := shellGlobMatches(pattern, cwd, a.deadline)
 			if !valid || a.globs+len(matches) > 200 {
 				a.uncertain = true
@@ -1728,7 +1799,11 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				expanded = append(expanded, matches...)
 				continue
 			}
-			// A literal unmatched wildcard cannot name a protected file.
+			// A later write may create a matching protected name.
+			if a.protectedGlob(pattern, cwd) {
+				expanded = append(expanded, ".env")
+				continue
+			}
 			v = "__unmatched_glob__"
 		}
 		expanded = append(expanded, v)

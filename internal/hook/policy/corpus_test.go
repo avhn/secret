@@ -192,6 +192,13 @@ func TestGuardDeniedCorpus(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			// Audit 14: the original scope fixture only had hidden descendants.
+			// Keep these denied cases testing a visible protected file instead.
+			if tc.Name == "rg_without_config_multiple" || tc.Name == "rg_without_config_glob" {
+				if err := os.WriteFile(filepath.Join(tmp, "search", "sub", "app.env"), []byte("synthetic"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
 			command := replace.Replace(tc.Command)
 			if raw, ok := tc.Extra["command"]; ok {

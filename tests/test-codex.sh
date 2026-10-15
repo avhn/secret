@@ -189,8 +189,16 @@ patch_case oversized_safe allow "$(printf 'x%.0s' {1..9000})
 shell_case audit13_tail_flag deny '"tail -f .env"'
 shell_case audit13_php_info deny '"php -i"'
 shell_case audit13_docker_inspect deny '"docker inspect app"'
-shell_case audit13_glob_unmatched allow '"cat src/*"'
+shell_case audit13_glob_unmatched deny '"cat src/*"'
 shell_case audit13_invalid_argv deny '["cat",1]'
 shell_case audit13_crlf allow '"true\r"'
+# Bash and Codex envelopes share the installed Bash policy.
+for cmd in 'git commit -am "fix: use .env loader"' 'fd -H .env' 'grep -q TOKEN .env' 'dotenvx run -f .env.production -- node app.js'; do
+    shell_case audit14_safe allow "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'kubectl -n prod get secret db -o yaml' 'npx @dotenvx/dotenvx get' 'docker inspect --format json web' 'zip -q - .env' 'npm ci && cat *.env'; do
+    shell_case audit14_deny deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit14_commit_message allow "$(jq -cn --arg c $'git commit -F - <<\'EOF\'\nsee .env\nEOF' '$c')"
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

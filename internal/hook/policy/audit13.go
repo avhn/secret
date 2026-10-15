@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -109,7 +110,26 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 	deny := func() bool { a.reason = roles.Printer; return true }
 	switch name {
 	case "gh":
-		if len(args) >= 3 && args[0] == "config" && args[1] == "get" && args[2] == "oauth_token" {
+		if len(args) >= 3 && args[0] == "config" && args[1] == "get" && slices.Contains(args[2:], "oauth_token") {
+			return deny()
+		}
+	case "npm", "npx":
+		if name == "npm" && len(args) > 1 && args[0] == "run" && args[1] == "env" {
+			return deny()
+		}
+		for i, arg := range args {
+			if (arg == "--call" || arg == "-c" || arg == "--c") && i+1 < len(args) && optionIn("env printenv", args[i+1]) || strings.HasPrefix(arg, "--call=") && optionIn("env printenv", strings.TrimPrefix(arg, "--call=")) || strings.HasPrefix(arg, "-c") && optionIn("env printenv", strings.TrimPrefix(arg, "-c")) {
+				return deny()
+			}
+		}
+	case "unshare", "chrt":
+		for _, arg := range args {
+			if optionIn("env printenv", arg) {
+				return deny()
+			}
+		}
+	case "pm2":
+		if len(args) > 0 && args[0] == "env" {
 			return deny()
 		}
 	case "php":
@@ -125,15 +145,37 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 			}
 		}
 	case "pnpm", "yarn":
-		if len(args) >= 2 && args[0] == "config" && (args[1] == "list" || args[1] == "get") {
-			return deny()
+		for i := 0; i < len(args); i++ {
+			if optionIn("-C --dir --filter", args[i]) {
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--dir=") || strings.HasPrefix(args[i], "--filter=") {
+				continue
+			}
+			if args[i] == "config" && i+1 < len(args) {
+				if optionIn("list ls", args[i+1]) || args[i+1] == "get" && i+2 < len(args) && credentialConfigKey(args[i+2]) {
+					return deny()
+				}
+			}
+			break
 		}
 	case "kubectl":
-		if len(args) >= 3 && args[0] == "get" && (args[1] == "secret" || args[1] == "secrets") {
-			for i, v := range args[2:] {
+		if len(args) >= 3 && args[0] == "exec" {
+			for _, v := range args[2:] {
+				if optionIn("env printenv", v) {
+					return deny()
+				}
+			}
+		}
+		for i, v := range args {
+			if v != "get" || i+1 >= len(args) || !(optionIn("secret secrets", args[i+1]) || strings.HasPrefix(args[i+1], "secret/") || strings.HasPrefix(args[i+1], "secrets/")) {
+				continue
+			}
+			for j, v := range args {
 				output := ""
-				if (v == "-o" || v == "--output") && i+3 < len(args) {
-					output = args[i+3]
+				if (v == "-o" || v == "--output") && j+1 < len(args) {
+					output = args[j+1]
 				}
 				if strings.HasPrefix(v, "-o=") || strings.HasPrefix(v, "--output=") {
 					_, output, _ = strings.Cut(v, "=")
@@ -170,10 +212,24 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 			args = args[1:]
 		}
 	case "pnpm", "yarn":
-		if len(args) == 0 || !optionIn("dlx exec", args[0]) {
+		if len(args) == 0 || !optionIn("dlx exec dotenv dotenvx", args[0]) {
+			return nil, false
+		}
+		if optionIn("dlx exec", args[0]) {
+			args = args[1:]
+		}
+	case "npm":
+		if len(args) == 0 || args[0] != "exec" {
 			return nil, false
 		}
 		args = args[1:]
+		if len(args) > 0 && args[0] == "--" {
+			args = args[1:]
+		}
+	case "uvx":
+		if len(args) >= 2 && args[0] == "--from" {
+			args = args[2:]
+		}
 	case "uv", "poetry", "pipx":
 		if len(args) == 0 || args[0] != "run" {
 			return nil, false
@@ -182,10 +238,29 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 	default:
 		return nil, false
 	}
+	if name == "pipx" && len(args) >= 2 && args[0] == "--spec" {
+		args = args[2:]
+	}
 	if len(args) == 0 {
 		return nil, false
 	}
+	child := strings.TrimPrefix(args[0], "@dotenvx/")
+	child = strings.SplitN(child, "@", 2)[0]
+	if child == "python-dotenv" {
+		child = "dotenv"
+	}
+	args[0] = child
 	return args, true
+}
+
+func credentialConfigKey(key string) bool {
+	key = strings.ToLower(key)
+	for _, part := range []string{"auth", "token", "password", "credential"} {
+		if strings.Contains(key, part) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *analyzer) rgVisibleSafe(args []string, cwd string) bool {
@@ -194,23 +269,63 @@ func (a *analyzer) rgVisibleSafe(args []string, cwd string) bool {
 			return false
 		}
 	}
-	root := cwd
-	// A default search excludes dotfiles and ignored build trees.
-	if len(args) > 0 {
-		last := args[len(args)-1]
-		if last == "." || last == "src" {
-			root = filepath.Join(cwd, last)
+	roots := rgRoots(args)
+	if len(roots) == 0 {
+		roots = []string{"."}
+	}
+	for _, root := range roots {
+		if a.inputProtected(root, cwd) || !a.rgRootVisibleSafe(root, cwd) {
+			return false
 		}
+	}
+	return true
+}
+
+func rgRoots(args []string) []string {
+	var roots []string
+	pattern := true
+	for i := 0; i < len(args); i++ {
+		v := args[i]
+		if optionIn("-e --regexp -f --file -g --glob --iglob -t --type -T --type-not -A -B -C -m --max-count --color --colors --encoding --threads --max-depth --ignore-file", v) {
+			i++
+			if optionIn("-e --regexp -f --file", v) {
+				pattern = false
+			}
+			continue
+		}
+		if strings.HasPrefix(v, "-") {
+			continue
+		}
+		if pattern {
+			pattern = false
+			continue
+		}
+		roots = append(roots, v)
+	}
+	return roots
+}
+
+func (a *analyzer) rgRootVisibleSafe(root, cwd string) bool {
+	explicit := root != "."
+	root = filepath.Clean(a.resolve(root, cwd))
+	if info, err := os.Lstat(root); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		resolved, resolveErr := filepath.EvalSymlinks(root)
+		if resolveErr != nil {
+			return false
+		}
+		root = resolved
 	}
 	// An ignored non-hidden credential file is likewise outside rg's
 	// default search. Only simple, exact ignore names are certified; anything
 	// ambiguous leaves the protected file in scope.
 	ignored := map[string]bool{}
-	if data, err := os.ReadFile(filepath.Join(root, ".gitignore")); err == nil && len(data) <= 8192 {
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" && !strings.ContainsAny(line, "*?[]!\\/ \t") && !strings.HasPrefix(line, "#") {
-				ignored[line] = true
+	if _, err := os.Stat(filepath.Join(root, ".git")); err == nil {
+		if data, err := os.ReadFile(filepath.Join(root, ".gitignore")); err == nil && len(data) <= 8192 {
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.ContainsAny(line, "*?[]!\\/ \t") && !strings.HasPrefix(line, "#") {
+					ignored[line] = true
+				}
 			}
 		}
 	}
@@ -224,6 +339,9 @@ func (a *analyzer) rgVisibleSafe(args []string, cwd string) bool {
 			return fs.ErrInvalid
 		}
 		if name == root {
+			if explicit && !d.IsDir() && a.inputProtected(name, cwd) {
+				return fs.ErrPermission
+			}
 			return nil
 		}
 		if strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules" {

@@ -75,7 +75,7 @@ func TestAuditEleven(t *testing.T) {
 		{"foo --cmd '<.netrc'", root, true},
 		{"git init --separate-git-dir=newgd", root, true},
 		{"xargs -a list cat", root, true},
-		{"git commit -F - <<'EOF'\nfeat: secret exec and cat .env are prose\nEOF", root, true},
+		{"git commit -F - <<'EOF'\nfeat: secret exec and cat .env are prose\nEOF", root, false},
 		{"git commit -m \"$(cat <<'EOF'\nmsg line\n\nbody\nEOF\n)\"", root, false},
 		{`eval "$(cat <<'EOF'
 printenv

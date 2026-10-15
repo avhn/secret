@@ -92,10 +92,18 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 	if !filepath.IsAbs(pattern) {
 		pattern = filepath.Join(cwd, pattern)
 	}
-	volume := filepath.VolumeName(pattern)
-	remainder := filepath.ToSlash(strings.TrimPrefix(pattern, volume))
-	parts := strings.Split(strings.TrimLeft(remainder, "/"), "/")
-	base := volume + string(os.PathSeparator)
+	// Start at the known cwd when possible. Walking from the volume root
+	// can miss symlinked temp roots and needlessly enumerate a large tree.
+	base := filepath.Clean(cwd)
+	remainder := ""
+	if rel, err := filepath.Rel(base, pattern); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		remainder = rel
+	} else {
+		volume := filepath.VolumeName(pattern)
+		base = volume + string(os.PathSeparator)
+		remainder = strings.TrimPrefix(pattern, volume)
+	}
+	parts := strings.Split(filepath.ToSlash(remainder), "/")
 	dirs := []string{base}
 	for _, part := range parts {
 		if part == "" || part == "." {
@@ -157,6 +165,22 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 		}
 	}
 	return dirs, true
+}
+
+// protectedGlob tests canonical future names even when the directory has not
+// been created yet. It does not replace actual filesystem matching.
+func (a *analyzer) protectedGlob(pattern, cwd string) bool {
+	base := filepath.Base(pattern)
+	matcher, err := globRegexp(base)
+	if err != nil {
+		return true
+	}
+	for _, name := range []string{".env", ".env.local", "app.env", "prod.secret", "id_rsa", "id_ed25519", "credentials", "config.json", "hosts.yml", ".npmrc", ".netrc", ".pypirc", ".git-credentials"} {
+		if matcher.MatchString(name) && a.inputProtected(filepath.Join(filepath.Dir(pattern), name), cwd) {
+			return true
+		}
+	}
+	return false
 }
 
 func escapeGlob(value string) string {

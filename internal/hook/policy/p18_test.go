@@ -38,7 +38,7 @@ func TestP18Revised(t *testing.T) {
 		{"unknown quoted", `foo "load .npmrc"`, true},
 		{"unknown attached", `foo --x='cat .env'`, true},
 		{"unknown malformed git", `foo '.git/config`, true},
-		{"git stdin message body", "git commit -F - <<'EOF'\nfeat: cat .env is prose\nEOF", true},
+		{"git stdin message body", "git commit -F - <<'EOF'\nfeat: cat .env is prose\nEOF", false},
 		{"tab stripped cat body", "cat <<-EOF\n\tsecret exec x\n\tEOF", false},
 		{"separate gitdir inline", `python3 -c 'open("../sepgd/config","w")'`, true},
 		{"inline python token", `python3 -c 'print(".npmrc")'`, true},

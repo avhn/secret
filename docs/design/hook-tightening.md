@@ -269,3 +269,24 @@ contains `.secrets/nested.ts` under its reused cwd. Go correctly denies that
 read even though the new Bash suite expects allow. A clean fixture without a
 matching protected file allows. The Bash fixture or expectation must be
 corrected before this case can have honest parity.
+
+## Audit 14 decisions
+
+Git commit/tag stdin message files and GitHub stdin bodies from inert heredocs
+are data, not readers. This flips the older `git stdin message body` and
+`git commit -F -` prose expectations to allow. Clustered `-am` messages are
+likewise data. Explicit search roots are scanned even when hidden; recursively
+encountered hidden paths are skipped by default, and `.gitignore` exemptions
+require a work tree. The older denied `rg TOKEN src sub` corpus fixture now
+contains a visible `sub/app.env`, because its earlier hidden-only `sub/.env`
+would be skipped by default. An unmatched private-name glob denies if a later
+write could create a protected match, flipping the previous unmatched
+`~/.ssh/id_*` allowance. Conditional directory changes retain the original
+cwd as an alternative for later statements. Git cached removal, names-only
+searches, grep quiet/count output, and env-file consumers do not print values.
+
+Kubernetes `get secret -o custom-columns=...` selectors that target secret
+data and curl uploads of unresolved shell variables remain outside the
+syntactically certified subset. Neither guard provides containment against
+arbitrary transformed output or unobserved process behavior. macOS and Windows
+runtime CI remains necessary for native glob behavior.

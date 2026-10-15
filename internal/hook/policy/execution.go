@@ -161,14 +161,14 @@ func (a *analyzer) shellCommand(name string, args []string, depth int, cwd strin
 // modelledCommand keeps opaque strings out of Git messages and other commands
 // whose operand grammar is already explicitly classified.
 func modelledCommand(name string) bool {
-	if optionIn("git gh kubectl secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
+	if optionIn("git gh kubectl secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh npx npm pnpm yarn pipx uvx dotenv dotenv-cli dotenvx", name) {
 		return true
 	}
 	if _, ok := utilityTable[name]; ok {
 		return true
 	}
 
-	if optionIn("echo printf ls stat file wc cp mv ln install dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for", name) {
+	if optionIn("echo printf ls stat file wc cp mv ln install dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for fd", name) {
 		return true
 	}
 	return false
@@ -226,6 +226,9 @@ func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 // Unknown launchers can pass commands in any argv suffix or opaque code word.
 func (a *analyzer) unknownExecution(args []string, depth int, cwd string) {
 	for i, value := range args {
+		if value == "env" || value == "printenv" {
+			continue
+		} // An argument is not a command word.
 		if strings.HasPrefix(value, "--") {
 			if _, suffix, ok := strings.Cut(value, "="); ok && strings.ContainsAny(suffix, " \t\n;|&$`><(){}") {
 				a.genericShellText(suffix, depth, cwd)

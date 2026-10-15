@@ -54,6 +54,43 @@ func (a *analyzer) inertCatTeeBody(stmt *syntax.Stmt, cwd string) bool {
 	return writesData
 }
 
+func inertMessagePipe(stmt *syntax.Stmt) bool {
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) != 1 || literal(call.Args[0]) != "cat" || len(stmt.Redirs) != 1 {
+		return false
+	}
+	r := stmt.Redirs[0]
+	return (r.Op.String() == "<<" || r.Op.String() == "<<-") && r.Hdoc != nil
+}
+
+// Message-file stdin from an inert heredoc is data, not executable code.
+func inertMessageStdin(stmt *syntax.Stmt) bool {
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) < 3 {
+		return false
+	}
+	name := literal(call.Args[0])
+	if name != "git" && name != "gh" {
+		return false
+	}
+	args := make([]string, 0, len(call.Args)-1)
+	for _, word := range call.Args[1:] {
+		args = append(args, literal(word))
+	}
+	if name == "git" && !optionIn("commit tag", args[0]) {
+		return false
+	}
+	if name == "gh" && !optionIn("pr issue", args[0]) {
+		return false
+	}
+	for i, v := range args {
+		if name == "git" && (v == "-F" || v == "--file") && i+1 < len(args) && args[i+1] == "-" || name == "gh" && v == "--body-file" && i+1 < len(args) && args[i+1] == "-" || v == "--file=-" || v == "--body-file=-" || v == "-F-" {
+			return true
+		}
+	}
+	return false
+}
+
 func inertCatHeredoc(sub *syntax.CmdSubst) bool {
 	if len(sub.Stmts) != 1 {
 		return false
@@ -102,10 +139,17 @@ func p18InlineCode(name string, args []string) bool {
 
 func messageOperand(name string, args []*syntax.Word, i int) bool {
 	if name == "git" && len(args) > 1 && (literal(args[1]) == "commit" || literal(args[1]) == "tag") {
-		if i > 0 && (literal(args[i-1]) == "-m" || literal(args[i-1]) == "--message") {
+		if i > 0 && (literal(args[i-1]) == "-m" || literal(args[i-1]) == "--message" || strings.HasPrefix(literal(args[i-1]), "-") && !strings.HasPrefix(literal(args[i-1]), "--") && strings.HasSuffix(literal(args[i-1]), "m")) {
 			return true
 		}
-		return strings.HasPrefix(literal(args[i]), "--message=") || strings.HasPrefix(literal(args[i]), "-m")
+		value := literal(args[i])
+		if strings.HasPrefix(value, "--message=") {
+			return true
+		}
+		if strings.HasPrefix(value, "-") && !strings.HasPrefix(value, "--") && strings.Contains(value, "m") && !strings.ContainsAny(value, " =") {
+			return true
+		}
+		return false
 	}
 	if name == "gh" {
 		if i > 0 && (literal(args[i-1]) == "--title" || literal(args[i-1]) == "--body") {

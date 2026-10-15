@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Classify conditional working directories, future protected-name globs,
+  command-word environment printers, package runners and secret output flags.
+  Treat quoted heredoc commit/PR bodies as inert data outside the 8 KiB Bash
+  analysis limit; keep benign config getters, names-only searches and env-file
+  consumers available. Document two-second analysis denials.
+
 - Tighten Bash guard reader options, credential printers, Git grep and scoped
   searches. Allow unmatched credential globs and TypeScript-only searches
   when no protected TypeScript files are present; reject malformed envelopes.
