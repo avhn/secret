@@ -1,15 +1,22 @@
 package policy
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/avhn/secret/internal/hook/input"
 	"github.com/avhn/secret/internal/hook/paths"
+	"github.com/avhn/secret/internal/hook/roles"
+	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -122,7 +129,8 @@ func deniedVariants(source string) []string {
 					if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
 						add(start, end, value[:i]+`\`+value[i:])
 						// An additional alternative must not remove the protected operand.
-						add(start, end, "{"+value+",}")
+						// Inner CSV commas are literal data, not brace alternatives.
+						add(start, end, "{"+strings.ReplaceAll(value, ",", `\,`)+",}")
 						break
 					}
 				}
@@ -131,6 +139,84 @@ func deniedVariants(source string) []string {
 		return false
 	})
 	return variants
+}
+
+// corpusEnvelope reconstructs the effective host input before validation. Replace
+// only string values: malformed argv elements must retain their original types.
+func corpusEnvelope(tc corpusCase, replace *strings.Replacer) (input.Envelope, error) {
+	var normalize func(any) any
+	normalize = func(value any) any {
+		switch v := value.(type) {
+		case string:
+			return replace.Replace(v)
+		case []any:
+			for i := range v {
+				v[i] = normalize(v[i])
+			}
+		case map[string]any:
+			for key := range v {
+				v[key] = normalize(v[key])
+			}
+		}
+		return value
+	}
+	command, err := json.Marshal(replace.Replace(tc.Command))
+	if err != nil {
+		return input.Envelope{}, err
+	}
+	fields := map[string]json.RawMessage{"command": command}
+	for key, raw := range tc.Extra {
+		var value any
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&value); err != nil {
+			return input.Envelope{}, err
+		}
+		fields[key], err = json.Marshal(normalize(value))
+		if err != nil {
+			return input.Envelope{}, err
+		}
+	}
+	data, err := json.Marshal(map[string]any{
+		"tool_name": "Bash", "cwd": replace.Replace(tc.CWD), "tool_input": fields,
+	})
+	if err != nil {
+		return input.Envelope{}, err
+	}
+	return input.Decode(bytes.NewReader(data))
+}
+
+type corpusDecision struct {
+	command, reason string
+}
+
+// replayCorpus mirrors the host's validation, workdir and argv dispatch. Invalid
+// input is an expected denial, not a failed fixture setup or a shell fragment.
+func replayCorpus(t *testing.T, tc corpusCase, replace *strings.Replacer, check func(string, string) bool) []corpusDecision {
+	t.Helper()
+	e, err := corpusEnvelope(tc, replace)
+	if err != nil {
+		if !errors.Is(err, input.ErrInvalid) {
+			t.Fatal(err) // Broken corpus metadata is not a policy denial.
+		}
+		return []corpusDecision{{reason: roles.Indeterminate}}
+	}
+	cwd, home := e.CWD, replace.Replace(tc.Home)
+	if workdir := e.String("workdir"); workdir != "" {
+		cwd = paths.Resolve(".", cwd, workdir, home)
+	}
+	if raw := e.Fields["command"]; len(raw) != 0 && raw[0] == '[' {
+		var argv []string
+		if json.Unmarshal(raw, &argv) != nil {
+			return []corpusDecision{{reason: roles.Indeterminate}}
+		}
+		return []corpusDecision{{string(raw), AnalyzeArgv(argv, cwd, home, check)}}
+	}
+	var decisions []corpusDecision
+	for _, variant := range deniedVariants(e.String("command")) {
+		decisions = append(decisions, corpusDecision{variant, Analyze(variant, cwd, home, check)})
+	}
+	return decisions
 }
 
 // TestGuardDeniedCorpus evaluates generated deny cases and semantics-preserving
@@ -207,13 +293,7 @@ func TestGuardDeniedCorpus(t *testing.T) {
 				}
 			}
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
-			command := replace.Replace(tc.Command)
-			if raw, ok := tc.Extra["command"]; ok {
-				if err := json.Unmarshal(raw, &command); err != nil {
-					t.Fatal(err)
-				}
-			}
-			cwd, home := replace.Replace(tc.CWD), replace.Replace(tc.Home)
+			home := replace.Replace(tc.Home)
 			check := func(name, dir string) bool {
 				if !strings.Contains(name, "/") {
 					if _, err := os.Lstat(paths.Resolve(name, dir, "", home)); os.IsNotExist(err) {
@@ -222,12 +302,12 @@ func TestGuardDeniedCorpus(t *testing.T) {
 				}
 				return paths.Protected(name, dir, "", home)
 			}
-			for i, variant := range deniedVariants(command) {
+			for i, decision := range replayCorpus(t, tc, replace, check) {
 				count++
-				if got := Analyze(variant, cwd, home, check); got == "" {
+				if decision.reason == "" {
 					failures++
 					if failures <= 80 {
-						t.Errorf("variant %d allowed: %s", i, strconv.Quote(variant))
+						t.Errorf("variant %d allowed: %s", i, strconv.Quote(decision.command))
 					} else {
 						t.Fail()
 					}
@@ -236,6 +316,201 @@ func TestGuardDeniedCorpus(t *testing.T) {
 		})
 	}
 	t.Logf("%d variants from %d Bash-deny cases, %d allows", count, len(corpus.Cases), failures)
+}
+
+// TestCorpusReplay covers host overrides without running inspected commands.
+func TestCorpusReplay(t *testing.T) {
+	tmp := t.TempDir()
+	for _, dir := range []string{"base", "target"} {
+		if err := os.MkdirAll(filepath.Join(tmp, dir), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "target", ".env"), []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	replace := strings.NewReplacer("@TMP@", filepath.ToSlash(tmp), "@ROOT@", filepath.ToSlash(tmp))
+	home := filepath.Join(tmp, "home")
+	check := func(name, cwd string) bool {
+		if !strings.Contains(name, "/") {
+			if _, err := os.Lstat(paths.Resolve(name, cwd, "", home)); os.IsNotExist(err) {
+				return false
+			}
+		}
+		return paths.Protected(name, cwd, "", home)
+	}
+	for _, tc := range []struct {
+		name, command, extra string
+		deny, invalid        bool
+	}{
+		{"base has no store", "cat .env", `{}`, false, false},
+		{"absolute workdir", "cat .env", `{"workdir":"@TMP@/target"}`, true, false},
+		{"relative workdir", "cat .env", `{"workdir":"../target"}`, true, false},
+		{"absolute argv workdir", "ignored", `{"workdir":"@TMP@/target","command":["cat",".env"]}`, true, false},
+		{"relative argv workdir", "ignored", `{"workdir":"../target","command":["cat",".env"]}`, true, false},
+		{"normalized argv operand", "ignored", `{"command":["cat","@TMP@/target/.env"]}`, true, false},
+		{"safe argv override", "cat @TMP@/target/.env", `{"command":["cat","src/a.go"]}`, false, false},
+		{"literal shell-looking argv", "ignored", `{"workdir":"../target","command":["printf","%s","$(cat .env); cat .env"]}`, false, false},
+		{"explicit shell argv", "ignored", `{"workdir":"../target","command":["bash","-c","cat .env"]}`, true, false},
+		{"malformed argv", "ignored", `{"command":["cat",1]}`, true, true},
+		{"malformed workdir", "true", `{"workdir":1}`, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := corpusCase{Command: tc.command, CWD: "@TMP@/base", Home: "@TMP@/home"}
+			if err := json.Unmarshal([]byte(tc.extra), &c.Extra); err != nil {
+				t.Fatal(err)
+			}
+			_, err := corpusEnvelope(c, replace)
+			if (err != nil) != tc.invalid || tc.invalid && !errors.Is(err, input.ErrInvalid) {
+				t.Fatalf("decode error = %v, want invalid = %v", err, tc.invalid)
+			}
+			decisions := replayCorpus(t, c, replace, check)
+			if len(decisions) == 0 {
+				t.Fatal("no replay decisions")
+			}
+			if strings.Contains(tc.extra, `"command":[`) && len(decisions) != 1 {
+				t.Fatalf("argv was expanded into %d shell variants", len(decisions))
+			}
+			for _, decision := range decisions {
+				if (decision.reason != "") != tc.deny {
+					t.Errorf("command %q reason = %q, want deny = %v", decision.command, decision.reason, tc.deny)
+				}
+			}
+		})
+	}
+}
+
+func TestCorpusEnvelopePreservesTypes(t *testing.T) {
+	tmp := filepath.ToSlash(t.TempDir())
+	tc := corpusCase{Command: "true", CWD: "@TMP@", Extra: map[string]json.RawMessage{
+		"metadata": json.RawMessage(`{"strings":["@TMP@/one","@ROOT@/two"],"number":9007199254740993,"bool":true,"nil":null}`),
+	}}
+	e, err := corpusEnvelope(tc, strings.NewReplacer("@TMP@", tmp, "@ROOT@", tmp+"/root"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"bool":true,"nil":null,"number":9007199254740993,"strings":["` + tmp + `/one","` + tmp + `/root/two"]}`
+	if got := string(e.Fields["metadata"]); got != want {
+		t.Fatalf("metadata = %s, want %s", got, want)
+	}
+}
+
+func TestDeniedVariantsRoles(t *testing.T) {
+	for _, tc := range []struct {
+		name, source string
+		want         []string
+	}{
+		{"literal operands", "cat .env", []string{
+			"cat .env", "command cat .env", "'cat' .env", `"cat" .env`, "$'cat' .env",
+			"cat '.env'", `cat ".env"`, "cat $'.env'", `cat .\env`, "cat {.env,}",
+		}},
+		{"heredoc roles", "cat <<'EOF'\ncat .env\nEOF\n", []string{
+			"cat <<'EOF'\ncat .env\nEOF\n", "command cat <<'EOF'\ncat .env\nEOF\n",
+			"'cat' <<'EOF'\ncat .env\nEOF\n", "\"cat\" <<'EOF'\ncat .env\nEOF\n", "$'cat' <<'EOF'\ncat .env\nEOF\n",
+		}},
+		{"active expansion", "cat \"$STORE\"", []string{
+			"cat \"$STORE\"", "command cat \"$STORE\"", "'cat' \"$STORE\"", "\"cat\" \"$STORE\"", "$'cat' \"$STORE\"",
+		}},
+		{"active glob", "cat .env*", []string{
+			"cat .env*", "command cat .env*", "'cat' .env*", `"cat" .env*`, "$'cat' .env*",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := deniedVariants(tc.source); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("variants = %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+// expandedLiteralArgv uses only the AST expander. No subprocess or command
+// substitution callback is available, and pathname globbing is disabled.
+func expandedLiteralArgv(t *testing.T, source string) []string {
+	t.Helper()
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(file.Stmts) != 1 {
+		t.Fatalf("not one simple command: %q", source)
+	}
+	call, ok := file.Stmts[0].Cmd.(*syntax.CallExpr)
+	if !ok {
+		t.Fatalf("not a simple command: %q", source)
+	}
+	cfg := &expand.Config{}
+	var words []*syntax.Word
+	for _, word := range call.Args {
+		syntax.SplitBraces(word)
+		for expanded, err := range expand.BracesSeq(cfg, word) {
+			if err != nil {
+				t.Fatal(err)
+			}
+			// BracesSeq retains empty AST alternatives. Bash removes the
+			// unquoted ones before argv formation, but preserves quoted empties.
+			unquotedEmpty := true
+			for _, part := range expanded.Parts {
+				if lit, ok := part.(*syntax.Lit); !ok || lit.Value != "" {
+					unquotedEmpty = false
+					break
+				}
+			}
+			if !unquotedEmpty {
+				words = append(words, expanded)
+			}
+		}
+	}
+	argv, err := expand.Fields(cfg, words...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return argv
+}
+
+func TestDeniedVariantsCSVExpansion(t *testing.T) {
+	const source = "docker run --mount type=bind,src=.env,dst=/x img cat /x"
+	const preserved = `docker run --mount {type=bind\,src=.env\,dst=/x,} img cat /x`
+	const splitCSV = "docker run --mount {type=bind,src=.env,dst=/x,} img cat /x"
+	variants := deniedVariants(source)
+	if !slices.Contains(variants, preserved) || slices.Contains(variants, splitCSV) {
+		t.Fatalf("CSV alternatives not preserved: %#v", variants)
+	}
+	want := []string{"docker", "run", "--mount", "type=bind,src=.env,dst=/x", "img", "cat", "/x"}
+	cwd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cwd, ".env"), []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	check := func(name, dir string) bool { return paths.Protected(name, dir, "", cwd) }
+	for _, variant := range variants {
+		got := expandedLiteralArgv(t, variant)
+		if len(got) > 0 && got[0] == "command" {
+			got = got[1:]
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("variant %q argv = %#v, want %#v", variant, got, want)
+		}
+		if reason := Analyze(variant, cwd, cwd, check); reason == "" {
+			t.Errorf("protected CSV mount variant allowed: %q", variant)
+		}
+	}
+}
+
+// TestDeniedVariantsCSVSplitFieldsAllow classifies the former generated spelling:
+// brace expansion splits CSV fields, so --mount never receives the bind source.
+func TestDeniedVariantsCSVSplitFieldsAllow(t *testing.T) {
+	const splitCSV = "docker run --mount {type=bind,src=.env,dst=/x,} img cat /x"
+	wantSplit := []string{"docker", "run", "--mount", "type=bind", "src=.env", "dst=/x", "img", "cat", "/x"}
+	if got := expandedLiteralArgv(t, splitCSV); !reflect.DeepEqual(got, wantSplit) {
+		t.Fatalf("split CSV argv = %#v, want %#v", got, wantSplit)
+	}
+	cwd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cwd, ".env"), []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	check := func(name, dir string) bool { return paths.Protected(name, dir, "", cwd) }
+	if got := Analyze(splitCSV, cwd, cwd, check); got != "" {
+		t.Errorf("changed-argv allow regression denied: %q", got)
+	}
 }
 
 // TestAudit2DeniedVariants keeps the second audit on the same literal-variant

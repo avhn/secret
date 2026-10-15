@@ -60,6 +60,27 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 		}
 	case "keyring":
+		// Backend and path options precede the action and consume one value,
+		// including attached short and equals forms. Do not scan their values
+		// for actions or skip help to find a later get operand.
+		for len(args) > 0 {
+			a := args[0]
+			if a == "-b" || a == "--keyring-backend" || a == "-p" || a == "--keyring-path" || a == "--mode" || a == "--output" {
+				if len(args) < 2 {
+					break
+				}
+				args = args[2:]
+				continue
+			}
+			if strings.HasPrefix(a, "-b") || strings.HasPrefix(a, "-p") || strings.HasPrefix(a, "--keyring-backend=") || strings.HasPrefix(a, "--keyring-path=") || strings.HasPrefix(a, "--mode=") || strings.HasPrefix(a, "--output=") {
+				args = args[1:]
+				continue
+			}
+			if a == "--" {
+				args = args[1:]
+			}
+			break
+		}
 		printValue = arg(0) == "get"
 	case "gh":
 		printValue = arg(0) == "auth" && arg(1) == "token"

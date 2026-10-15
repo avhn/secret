@@ -25,29 +25,48 @@ func (a *analyzer) inlineGitDir(code, cwd string) bool {
 
 // inertCatTeeBody certifies data-only stdin only when no output store is named.
 func (a *analyzer) inertCatTeeBody(stmt *syntax.Stmt, cwd string) bool {
-	name := strings.ToLower(commandName(stmt))
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok {
+		return false
+	}
+	call, name := a.stdinCall(call, cwd)
+	name = strings.ToLower(name)
 	if !optionIn("cat tee", name) {
 		return false
 	}
 	writesData := a.messageSubst
 	for _, target := range stmt.Redirs {
 		if strings.Contains(target.Op.String(), ">") && target.Word != nil {
-			if a.inputProtected(literal(target.Word), cwd) {
+			// Here-strings supply stdin; they are not output destinations.
+			if target.Op.String() == "<<<" {
+				continue
+			}
+			values, known := a.expandWord(target.Word, cwd)
+			if !known || len(values) != 1 || a.inputProtected(values[0], cwd) {
 				return false
 			}
 			writesData = true
 		}
 	}
 	if name == "tee" {
-		if call, ok := stmt.Cmd.(*syntax.CallExpr); ok {
-			for _, word := range call.Args[1:] {
-				value := literal(word)
-				if !strings.HasPrefix(value, "-") {
-					if a.inputProtected(value, cwd) {
-						return false
-					}
-					writesData = true
+		options := true
+		for _, word := range call.Args[1:] {
+			values, known := a.expandWord(word, cwd)
+			if !known {
+				return false
+			}
+			for _, value := range values {
+				if options && value == "--" {
+					options = false
+					continue
 				}
+				if options && strings.HasPrefix(value, "-") {
+					continue
+				}
+				if a.inputProtected(value, cwd) {
+					return false
+				}
+				writesData = true
 			}
 		}
 	}
@@ -80,7 +99,11 @@ func inertHeredoc(redir *syntax.Redirect) bool {
 // Message-file stdin from an inert heredoc is data, not executable code.
 func inertMessageStdin(stmt *syntax.Stmt) bool {
 	call, ok := stmt.Cmd.(*syntax.CallExpr)
-	if !ok || len(call.Args) < 3 {
+	if !ok {
+		return false
+	}
+	call = unwrapCall(call)
+	if len(call.Args) < 3 {
 		return false
 	}
 	for _, redir := range stmt.Redirs {

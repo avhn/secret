@@ -80,6 +80,7 @@ type analyzer struct {
 	words, globs        int
 	countedWords        map[*syntax.Word]bool
 	flowSteps           int
+	functions           map[string][]*syntax.Stmt
 	uncertain           bool
 	inRun               bool
 	configUntrusted     bool
@@ -212,14 +213,20 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				}
 			}
 		}
+		// Redirected stdin belongs to the effective recipient, not a transparent
+		// command/builtin prefix. Keep the original statement's redirects intact.
+		recipient := commandName(s)
+		if call, ok := s.Cmd.(*syntax.CallExpr); ok && len(s.Redirs) > 0 {
+			_, recipient = a.stdinCall(call, cwd)
+		}
 		for _, r := range s.Redirs {
 			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) && !inertMessageStdin(s) {
 				body := a.raw(r.Hdoc)
-				if hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(commandName(s)) && a.inlineGitDir(body, cwd) {
+				if hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(recipient) && a.inlineGitDir(body, cwd) {
 					a.reason = roles.FileInput
 				}
 			}
-			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word)) || interpreter(commandName(s)) && a.inlineGitDir(literal(r.Word), cwd)) && !a.inertCatTeeBody(s, cwd) {
+			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word)) || interpreter(recipient) && a.inlineGitDir(literal(r.Word), cwd)) && !a.inertCatTeeBody(s, cwd) {
 				a.reason = roles.FileInput
 			}
 			a.walkWord(r.Word, depth, cwd)
@@ -235,7 +242,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				}
 			}
 			if op == "<" || op == "<>" || op == "<&" {
-				if literal(r.Word) == "/dev/null" && commandName(s) == "gh" {
+				if literal(r.Word) == "/dev/null" && recipient == "gh" {
 					continue
 				}
 				if a.protectedWord(r.Word, cwd) {
@@ -335,20 +342,27 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 			priorMessage := a.messageSubst
 			nestedUncertain := false
 			words := make([]string, 0, len(cmd.Args))
+			operands := make([]expandedOperand, 0, len(cmd.Args))
+			addValues := func(word *syntax.Word, values []string, known bool) {
+				words = append(words, values...)
+				for _, value := range values {
+					operands = append(operands, expandedOperand{value, word, known})
+				}
+			}
 			unknown := false
 			for idx, w := range cmd.Args {
 				// A filtered child may use a credential in a curl header, not a file.
 				if a.inRun && path.Base(literal(cmd.Args[0])) == "curl" && idx > 0 && literal(cmd.Args[idx-1]) == "-H" {
 					a.walkWord(w, depth, cwd)
-					words = append(words, "header")
+					addValues(w, []string{"header"}, true)
 					continue
 				}
 				if literal(cmd.Args[0]) == "jq" && a.raw(w) == `"$ENV"` {
-					words = append(words, "$ENV")
+					addValues(w, []string{"$ENV"}, true)
 					continue
 				}
 				if idx == 0 && (w.Lit() == "[" || literal(w) == "[") {
-					words = append(words, "[")
+					addValues(w, []string{"["}, true)
 					continue
 				}
 				a.messageSubst = message && messageOperand(strings.ToLower(path.Base(literal(cmd.Args[0]))), cmd.Args, idx)
@@ -357,10 +371,10 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				values, ok := a.expandWord(w, cwd)
 				if !ok {
 					unknown = true
-					words = append(words, "")
+					addValues(w, []string{""}, false)
 					continue
 				}
-				words = append(words, values...)
+				addValues(w, values, true)
 			}
 			a.messageSubst = priorMessage
 			if a.reason != "" {
@@ -384,6 +398,11 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				break
 			}
 			args := words[1:]
+			if declaration := declarationOperands(operands); len(declaration) > 0 && declarationCommand(declaration[0].value) {
+				for _, operand := range declaration[1:] {
+					cwd = a.declarationWords([]*syntax.Word{operand.source}, depth, cwd)
+				}
+			}
 			if writePatternCommand(name, cmd.Args) {
 				a.reason = roles.Indeterminate
 				break
@@ -493,10 +512,10 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 			if unknown && (name == "make" || name == "gmake") && strings.Contains(a.rawArgs(cmd.Args), "-f") && a.reason == "" {
 				a.reason = roles.Indeterminate
 			}
-			if unknown && nonReaderUnknown(name, cmd.Args) && a.reason == "" && !a.structuralUncertain {
+			if unknown && a.nonReaderUnknown(name, operands, cwd) && a.reason == "" && !a.structuralUncertain {
 				a.uncertain = priorUncertain
 			}
-			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) && !nonReaderUnknown(name, cmd.Args) {
+			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) && !a.nonReaderUnknown(name, operands, cwd) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
@@ -576,7 +595,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		case *syntax.Block:
 			cwd = a.stmts(cmd.Stmts, depth, cwd)
 		case *syntax.FuncDecl:
-			cwd = joinedCWD(cwd, a.stmts([]*syntax.Stmt{cmd.Body}, depth, cwd))
+			a.defineFunction(cmd, depth, cwd)
 		case *syntax.IfClause:
 			for clause := cmd; clause != nil; clause = clause.Else {
 				cwd = joinedCWD(cwd, a.stmts(clause.Cond, depth, cwd))
@@ -660,10 +679,16 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 						args = append(args, assign.Name.Value)
 					}
 				} else if assign.Value != nil {
+					if declarationCommand(cmd.Variant.Value) {
+						cwd = a.declarationWords([]*syntax.Word{assign.Value}, depth, cwd)
+					}
 					values, ok := a.expandWord(assign.Value, cwd)
 					if !ok {
 						a.indirect = true
 					} else {
+						if declarationCommand(cmd.Variant.Value) {
+							cwd = a.declarationAssignments(values, depth, cwd)
+						}
 						args = append(args, values...)
 					}
 				}
@@ -913,6 +938,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		name = "fd"
 	}
 	args := words[1:]
+	if declarationCommand(name) {
+		cwd = a.declarationAssignments(args, depth, cwd)
+	}
 	if unmodelledCommand(name) {
 		for _, arg := range args {
 			if hasProtectedLiteral(arg) {
@@ -1034,7 +1062,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 	}
-	if a.audit13Printer(name, args, cwd) {
+	if a.packageExec(name, args, depth, cwd, direct) || a.audit13Printer(name, args, cwd) {
 		return
 	}
 	if child, ok := safePackageChild(name, args); ok {
@@ -1117,7 +1145,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				genericArgs = append(genericArgs, args[i])
 			}
 		}
-		a.unknownExecution(environmentDataArgs(name, genericArgs), depth, cwd)
+		a.unknownExecution(a.environmentDataArgs(name, genericArgs), depth, cwd)
 		if a.reason != "" {
 			return
 		}
@@ -1486,14 +1514,15 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if !modelledCommand(name) && !shellName(name) && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
-		a.unknownExecution(environmentDataArgs(name, args), depth, cwd)
+		a.unknownExecution(a.environmentDataArgs(name, args), depth, cwd)
 		if a.reason != "" {
 			return
 		}
 	}
 	if name == "rg" {
 		// Nested wrappers cannot inherit the hook's rg config certification.
-		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), a.configUntrusted || depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !path.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))
+		// Config paths use native filesystem rules, including Windows volumes.
+		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), a.configUntrusted || depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !filepath.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))
 		if a.reason == search.ScopeReason && a.rgVisibleSafe(args, cwd) {
 			a.reason = ""
 		}
@@ -1656,47 +1685,65 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 	if w == nil {
 		return nil, true
 	}
+	// Brace delimiters can straddle quoted alternatives. Check the whole
+	// word's unquoted literals rather than rejecting an opening literal part.
+	braces := 0
 	for _, part := range w.Parts {
-		if lit, ok := part.(*syntax.Lit); ok && strings.Count(lit.Value, "{") > strings.Count(lit.Value, "}") {
-			a.uncertain = true
-			return nil, false
+		if lit, ok := part.(*syntax.Lit); ok {
+			for i := 0; i < len(lit.Value); i++ {
+				switch lit.Value[i] {
+				case '\\':
+					i++
+				case '{':
+					braces++
+				case '}':
+					braces--
+				}
+			}
 		}
+	}
+	if braces > 0 {
+		a.uncertain = true
+		return nil, false
 	}
 	copy := *w
 	syntax.SplitBraces(&copy)
 	// Never pass SplitBraces results to syntax.Walk: this parser version
 	// panics on BraceExp nodes, which are introduced by SplitBraces itself.
-	values, ok := a.literalWord(&copy, cwd)
-	if ok && len(values) > 1 {
-		// Unquoted empty brace alternatives do not create empty argv entries.
+	if _, ok := braceWordCount(&copy); !ok {
+		a.uncertain = true
+		return nil, false
+	}
+	var values []string
+	// BracesSeq is AST-only and lazy. Expand each alternative separately so
+	// quoted-empty provenance never leaks to a different brace alternative.
+	for field, err := range expand.BracesSeq(nil, &copy) {
+		if err != nil || time.Now().After(a.deadline) {
+			a.uncertain = true
+			return nil, false
+		}
+		if len(field.Parts) == 0 {
+			continue // An unquoted empty alternative does not create an argv field.
+		}
+		fields, ok := a.literalWord(field, cwd)
+		if !ok {
+			return nil, false
+		}
 		quoted := false
-		syntax.Walk(w, func(n syntax.Node) bool {
-			switch n.(type) {
+		syntax.Walk(field, func(node syntax.Node) bool {
+			switch node.(type) {
 			case *syntax.SglQuoted, *syntax.DblQuoted:
 				quoted = true
 			}
 			return true
 		})
-		if quoted {
-			// Mixed quoted/unquoted empty alternatives need field provenance.
-			// Do not let a retained empty field shift a printer's subcommand.
-			for _, value := range values {
-				if value == "" {
-					a.uncertain = true
-				}
+		for _, value := range fields {
+			if value != "" || quoted {
+				values = append(values, value)
 			}
-		}
-		if !quoted {
-			nonempty := values[:0]
-			for _, value := range values {
-				if value != "" {
-					nonempty = append(nonempty, value)
-				}
-			}
-			values = nonempty
 		}
 	}
-	return values, ok
+	return values, true
 }
 func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 	result := []string{""}
@@ -1772,32 +1819,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			// when the assignment that supplied it was quoted.
 			globPiece = piece
 			unquotedGlob = unquotedGlob || unescapedGlob(piece)
-		case *syntax.BraceExp:
-			if n.Sequence || len(n.Elems) > 64 || len(result)*len(n.Elems) > 64 {
-				a.uncertain = true
-				return nil, false
-			}
-			next := make([]string, 0, len(result)*len(n.Elems))
-			nextPatterns := make([]string, 0, len(result)*len(n.Elems))
-			for index, prefix := range result {
-				for _, elem := range n.Elems {
-					values, ok := a.literalWord(elem, cwd)
-					if !ok {
-						return nil, false
-					}
-					for _, v := range values {
-						next = append(next, prefix+v)
-						nextPatterns = append(nextPatterns, patterns[index]+escapeGlob(v))
-						if len(next) > 64 {
-							a.uncertain = true
-							return nil, false
-						}
-					}
-				}
-			}
-			result = next
-			patterns = nextPatterns
-			continue
+
 		default:
 			a.uncertain = true
 			return nil, false
@@ -1897,7 +1919,15 @@ func unwrapCall(call *syntax.CallExpr) *syntax.CallExpr {
 			break
 		}
 		i := 1
-		if literal(copy.Args[i]) == "--" || name == "command" && literal(copy.Args[i]) == "-p" {
+		for i < len(copy.Args) {
+			option := literal(copy.Args[i])
+			if option == "--" {
+				i++
+				break
+			}
+			if name != "command" || option != "-p" {
+				break
+			}
 			i++
 		}
 		if i >= len(copy.Args) || strings.HasPrefix(literal(copy.Args[i]), "-") {

@@ -224,6 +224,64 @@ func (a *analyzer) writeCommand(name string, args []string, cwd string) bool {
 	return false
 }
 
+// indirectStaticAssignment disqualifies stale literal values using normalized
+// AST command/option words, not source spelling. It does not deny the assignment
+// itself: only a later operation relying on a static variable loses certification.
+func indirectStaticAssignment(source string) bool {
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
+	if err != nil {
+		return true
+	}
+	indirect := false
+	check := func(name string, args []string) {
+		flag := byte(0)
+		switch name {
+		case "printf":
+			flag = 'v'
+		case "declare", "typeset", "local", "unset":
+			flag = 'n'
+		default:
+			return
+		}
+		for _, arg := range args {
+			if arg == "--" || !strings.HasPrefix(arg, "-") {
+				break
+			}
+			if strings.ContainsRune(arg[1:], rune(flag)) {
+				indirect = true
+				return
+			}
+		}
+	}
+	syntax.Walk(file, func(node syntax.Node) bool {
+		if indirect {
+			return false
+		}
+		switch cmd := node.(type) {
+		case *syntax.CallExpr:
+			cmd = unwrapCall(cmd)
+			if len(cmd.Args) > 0 {
+				args := make([]string, 0, len(cmd.Args)-1)
+				for _, word := range cmd.Args[1:] {
+					args = append(args, literal(word))
+				}
+				check(literal(cmd.Args[0]), args)
+			}
+		case *syntax.DeclClause:
+			args := make([]string, 0, len(cmd.Args))
+			for _, assign := range cmd.Args {
+				if assign.Name != nil {
+					break // Declaration options precede variable operands.
+				}
+				args = append(args, literal(assign.Value))
+			}
+			check(cmd.Variant.Value, args)
+		}
+		return !indirect
+	})
+	return indirect
+}
+
 // staticVariable resolves only literal assignments made in this command and
 // the two explicitly permitted home locations from the hook environment.
 func (a *analyzer) staticVariable(name string) (string, bool) {
@@ -248,7 +306,7 @@ func (a *analyzer) staticVariable(name string) (string, bool) {
 			return "", false
 		}
 		// Indirect assignment options can overwrite any previously static name.
-		if regexp.MustCompile(`\bprintf\s+-[^\s;]*v|\b(?:declare|typeset|local|unset)\s+-[^\s;]*n`).MatchString(a.source) {
+		if indirectStaticAssignment(a.source) {
 			return "", false
 		}
 	}

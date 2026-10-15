@@ -225,6 +225,12 @@ func (a *analyzer) parseSedScript(code string, _ int, cwd string) {
 				break
 			}
 			file := code[start:p.pos]
+			// The sed-specific rule rejects every device/process filename,
+			// including aliases the ordinary protected-path policy permits.
+			if strings.HasPrefix(file, "/dev/") || strings.HasPrefix(file, "/proc/") {
+				a.reason = "sed script targets a device or process file"
+				break
+			}
 			if cmd == 'r' || cmd == 'R' {
 				if a.inputProtected(file, cwd) {
 					a.reason = roles.FileInput

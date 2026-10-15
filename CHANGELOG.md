@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Close Go package-exec parity gaps for pnpm shell mode, npm prefix and workspace
+  selectors, and keyring backend/path options. Bound unresolved workspace scope
+  using directory metadata, keep child directories out of sibling commands,
+  retain npm script data operands, and refresh audit 18 platform inventories.
+
+- Harden Bash credential-path normalization, package shell-mode and workspace exec
+  scopes, npm/dlx option roles, Git listing pathspecs, function-local directory
+  changes and keyring options; retain ordinary developer runner commands.
+
 - Harden Go xargs listing streams over every producer root, package shell-call
   slots, backgrounded directory changes, fdfind execution and keyring printers.
   Continue ripgrep ignore-override checks above work trees to the filesystem root

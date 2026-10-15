@@ -13,6 +13,7 @@ from unittest import mock
 
 GENERATOR = pathlib.Path(__file__).with_name("gen-hook-variants.py")
 spec = importlib.util.spec_from_file_location("hook_variants", GENERATOR)
+assert spec is not None and spec.loader is not None
 variants = importlib.util.module_from_spec(spec)
 with mock.patch.object(sys, "dont_write_bytecode", True):
     spec.loader.exec_module(variants)
@@ -39,6 +40,40 @@ class VariantExtractionTests(unittest.TestCase):
                     response = json.loads(output.getvalue())["hookSpecificOutput"]
                     self.assertEqual(response["permissionDecision"], "deny")
                     self.assertIn(phrase, response["permissionDecisionReason"])
+
+    def test_capture_preserves_only_bounded_synthetic_metadata_contents(self):
+        with tempfile.TemporaryDirectory(prefix="hook-variant-test-") as directory:
+            root = pathlib.Path(directory)
+            fixtures = root / "fixtures"
+            fixtures.mkdir()
+            contents = {
+                "linked/.git": f"gitdir: {fixtures}/metadata\n",
+                "bounded/.git": "g" * 9000,
+                "oversized/.git": "g" * 9001,
+                "repository/.git/config": "[core]\n\tbare = false\n",
+                "ordinary": "synthetic payload not captured",
+                "not.git": "not a gitfile",
+            }
+            for name, data in contents.items():
+                path = fixtures / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(data)
+            rows = root / "rows.jsonl"
+            row = dict(name="gitfile", want="deny", tool="Bash", command="true",
+                       cwd=str(fixtures), config="", extra={"command": ["cat", 1]})
+            with mock.patch.object(sys, "argv", [str(GENERATOR), "--capture", str(fixtures), str(rows)]):
+                variants.capture(row)
+            captured = json.loads(rows.read_text())
+            files = {name: data for name, kind, data in captured["fixtures"] if kind == "file"}
+            self.assertEqual(files, {
+                "linked/.git": "gitdir: @TMP@/metadata\n",
+                "bounded/.git": "g" * 9000,
+                "oversized/.git": "",
+                "repository/.git/config": contents["repository/.git/config"],
+                "ordinary": "",
+                "not.git": "",
+            })
+            self.assertEqual(captured["extra"]["command"], ["cat", 1])
 
     def test_command_bytes_survive_stdin_extraction(self):
         commands = ["", "cat '.env'\\\"\t\n\n", "printf 'synthetic café'", "x" * (1024 * 1024)]
