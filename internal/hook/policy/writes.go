@@ -55,6 +55,9 @@ func (a *analyzer) uncertainWriteWord(word *syntax.Word, cwd string) bool {
 
 // writeProtected applies the same configuration target rule as file tools and patches.
 func (a *analyzer) writeProtected(name, cwd string) bool {
+	if name == "" {
+		return false
+	}
 	if !a.staticWriteTarget(name, cwd) {
 		return true
 	}
@@ -124,6 +127,9 @@ func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
 		return true
 	}
 	for _, word := range args {
+		if strings.HasPrefix(word, "https://") || strings.HasPrefix(word, "http://") || name == "docker" && (strings.HasPrefix(word, "-v") || strings.HasPrefix(word, "--volume") || strings.HasPrefix(word, "--mount") || strings.Contains(word, ":/")) {
+			continue
+		}
 		if gitToken.MatchString(word) {
 			a.reason = "git configuration write target"
 			return true
@@ -155,7 +161,7 @@ func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
 // writeCommand checks known output roles before generic reader classification.
 func (a *analyzer) writeCommand(name string, args []string, cwd string) bool {
 	target := func(value string) bool {
-		if a.writeProtected(value, cwd) {
+		if value != "" && a.writeProtected(value, cwd) {
 			a.reason = "git configuration write target"
 			return true
 		}

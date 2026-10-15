@@ -12,6 +12,11 @@ import (
 // inputProtected keeps unknown shell directories and process-relative aliases
 // out of the filesystem existence exception for bare operands.
 func (a *analyzer) inputProtected(name, cwd string) bool {
+	// Web addresses are values, not local file inputs. file:// remains a
+	// filesystem access and is handled by the normal protected-name checks.
+	if strings.HasPrefix(name, "https://") || strings.HasPrefix(name, "http://") {
+		return false
+	}
 	p := path.Clean(name)
 	if paths.ProcessAlias(p) {
 		return true
@@ -115,7 +120,7 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 	if a.reason != "" {
 		return true
 	}
-	if strings.HasPrefix(name, "python") && len(args) >= 3 && args[0] == "-m" && args[1] == "dotenv" && args[2] == "list" {
+	if strings.HasPrefix(name, "python") && len(args) >= 3 && args[0] == "-m" && args[1] == "dotenv" && optionIn("list get", args[2]) {
 		a.reason = roles.Printer
 		return true
 	}
@@ -176,7 +181,7 @@ func (a *analyzer) dotenvChild(args []string, depth int, cwd string) {
 		case "--":
 			a.command(args[i+1:], depth+1, cwd, false)
 			return
-		case "-p", "--print", "list":
+		case "-p", "--print", "list", "get":
 			a.reason = roles.Printer
 			return
 		case "-e", "--env", "-v", "--variable":
@@ -192,6 +197,11 @@ func (a *analyzer) dotenvChild(args []string, depth int, cwd string) {
 					a.reason = roles.Printer
 					return
 				}
+			}
+		case "decrypt":
+			if strings.Contains(strings.Join(args[i+1:], " "), "--stdout") {
+				a.reason = roles.Printer
+				return
 			}
 		case "--debug", "-o", "--override", "--no-expand":
 		default:

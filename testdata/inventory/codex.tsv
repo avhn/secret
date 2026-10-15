@@ -11,6 +11,12 @@ codex	Update_File_alias	decision	deny
 codex	Update_File_aws	decision	deny
 codex	Update_File_env	decision	deny
 codex	argv_workdir	decision	deny
+codex	audit13_crlf	decision	allow
+codex	audit13_docker_inspect	decision	deny
+codex	audit13_glob_unmatched	decision	allow
+codex	audit13_invalid_argv	decision	deny
+codex	audit13_php_info	decision	deny
+codex	audit13_tail_flag	decision	deny
 codex	bash_lc	decision	deny
 codex	cwd_safe	decision	allow
 codex	direct	decision	deny

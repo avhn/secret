@@ -186,5 +186,11 @@ patch_case oversized_named deny "$(printf 'x%.0s' {1..9000})
 *** Delete File: .env"
 patch_case oversized_safe allow "$(printf 'x%.0s' {1..9000})
 *** Update File: src/app.ts"
+shell_case audit13_tail_flag deny '"tail -f .env"'
+shell_case audit13_php_info deny '"php -i"'
+shell_case audit13_docker_inspect deny '"docker inspect app"'
+shell_case audit13_glob_unmatched allow '"cat src/*"'
+shell_case audit13_invalid_argv deny '["cat",1]'
+shell_case audit13_crlf allow '"true\r"'
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

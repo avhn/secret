@@ -241,3 +241,31 @@ and interactive shell launchers deny. Safe build globs, metadata Git forms,
 Kubernetes secret creation, and public recursive grep trees remain available.
 `internal/hook/policy/p19_test.go` records these synthetic decisions. These
 checks do not execute any of their source commands.
+
+## Audit 13: Go hook
+
+The Go policy now rejects Compose configuration printers, dotenv/dotenvx
+printers through named package runners, credential configuration getters, PHP
+environment dumps, Docker environment inspection, and Kubernetes secret
+output with a Kubernetes printer reason. It denies credential-reading file URLs
+and zip inputs without evaluating source commands. Bounded glob expansion and
+recursive search check files actually in scope, while Git patterns and code
+identifiers are not mistaken for input paths. Ordinary unresolved non-reader
+operands, inert empty write arguments, static cwd changes in `&&` chains, and
+Docker PID pipelines remain available. Default rg excludes hidden files and
+simple root-level exact gitignored names; explicit hidden/no-ignore searches
+still deny. Windows native volume glob matching and quoted non-path operands
+have focused synthetic tests. Inert large heredocs skip content scans when
+their destination is already certified safe; non-inert bodies still receive
+protected-name checks. None of this changes the installed Bash hook.
+
+The `credential_glob` synthetic fixture now includes an actual matching home
+file. A glob over a missing credential file must allow under audit 13 even if
+the previous Bash guard denied its protected-looking spelling; this is a
+reviewed flipped expectation, not a weakening of a real protected read.
+
+The retained shell audit-13 fixture for `grep -rn --include='*.ts' foo .`
+contains `.secrets/nested.ts` under its reused cwd. Go correctly denies that
+read even though the new Bash suite expects allow. A clean fixture without a
+matching protected file allows. The Bash fixture or expectation must be
+corrected before this case can have honest parity.

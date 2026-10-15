@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Tighten Bash guard reader options, credential printers, Git grep and scoped
+  searches. Allow unmatched credential globs and TypeScript-only searches
+  when no protected TypeScript files are present; reject malformed envelopes.
+
 - Harden the Bash guard for inline code targeting independent Git directories,
   bind mounts, Git configuration overrides, Make recipes and options, and
   ordinary upload and environment-printing commands. Restore safe developer

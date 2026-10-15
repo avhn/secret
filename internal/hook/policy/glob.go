@@ -85,15 +85,17 @@ func globRegexp(part string) (*regexp.Regexp, error) {
 
 // shellGlobMatches never executes the shell or follows an unbounded tree.
 func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) {
+	// Work with native separators before removing the volume. Windows temp
+	// paths can use extended-length volumes (\\?\C:), whose separator is
+	// a backslash even when the shell supplies forward slashes elsewhere.
+	pattern = filepath.FromSlash(pattern)
 	if !filepath.IsAbs(pattern) {
-		pattern = filepath.ToSlash(cwd) + "/" + pattern
+		pattern = filepath.Join(cwd, pattern)
 	}
 	volume := filepath.VolumeName(pattern)
-	parts := strings.Split(strings.TrimPrefix(strings.TrimPrefix(pattern, volume), "/"), "/")
+	remainder := filepath.ToSlash(strings.TrimPrefix(pattern, volume))
+	parts := strings.Split(strings.TrimLeft(remainder, "/"), "/")
 	base := volume + string(os.PathSeparator)
-	if volume == "" && !strings.HasPrefix(pattern, "/") {
-		base = "."
-	}
 	dirs := []string{base}
 	for _, part := range parts {
 		if part == "" || part == "." {

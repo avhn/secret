@@ -162,9 +162,15 @@ if command -v jq >/dev/null 2>&1; then
         secrets read_ssh_space deny Read '~/.ssh/id_custom key'
         secrets cat_ssh_space deny Bash 'cat "~/.ssh/id_custom key"'
         secrets read_ssh_space_public allow Read '~/.ssh/id_custom key.pub'
-        secrets credential_glob deny Bash 'cat ~/.docker/c*.json'
+        secrets credential_glob allow Bash 'cat ~/.docker/c*.json'
+        mkdir -p "$HOME/.docker"
+        printf '%s\n' synthetic-only >"$HOME/.docker/config.json"
+        secrets credential_glob_matched deny Bash 'cat ~/.docker/c*.json'
         secrets credential_selector_glob deny Grep "$TMP/empty-search" '{"glob":"**/.config/gh/*.yml","output_mode":"content"}'
-        secrets ssh_private_glob deny Bash 'cat ~/.ssh/id_*'
+        secrets ssh_private_glob allow Bash 'cat ~/.ssh/id_*'
+        mkdir -p "$HOME/.ssh"
+        printf '%s\n' synthetic-only >"$HOME/.ssh/id_ed25519"
+        secrets ssh_private_glob_matched deny Bash 'cat ~/.ssh/id_*'
         secrets ssh_public_glob allow Bash 'cat ~/.ssh/id_*.pub'
         safe_index=0
         for safe_path in '~/.ssh/config' '~/.ssh/known_hosts' '~/.ssh/id_ed25519.pub' /repo/config.json /repo/package.json /repo/.npmrc.example /repo/.npmrc.sample /repo/.npmrc.template /repo/.pypirc.example /proc/self/status /proc/cpuinfo; do
@@ -289,7 +295,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets jq_arg_role allow Bash "jq --arg file .env '.value' src/a.ts"
         secrets header_transport allow Bash "secret run -f svc -- bash -c 'printf \"Authorization: Bearer %s\\n\" \"\$TOKEN\" | curl -H @- https://example.test'"
         secrets rg_iglob deny Bash "rg --iglob='.env*' TOKEN dir"
-        secrets rg_hidden allow Bash 'rg --hidden TOKEN dir'
+        secrets rg_hidden allow Bash 'rg --hidden TOKEN src'
         secrets rg_exclude allow Bash "rg --glob='!.env' TOKEN dir"
         secrets rg_reinclude deny Bash "rg --glob='.env*' TOKEN dir"
         secrets cat_glob deny Bash 'cat .env*'
@@ -779,7 +785,12 @@ secrets rg_without_config_count_cluster deny Bash 'rg -nc TOKEN .'
 secrets rg_without_config_regexp deny Bash 'rg -e TOKEN .'
 secrets rg_without_config_regexp_equals deny Bash 'rg --regexp=TOKEN .'
 secrets rg_without_config_double_dash deny Bash 'rg TOKEN -- .'
+# The visible non-ignored file is in scope even without --hidden.
+printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/search/sub/app.env"
 secrets rg_without_config_multiple deny Bash 'rg TOKEN src sub'
+mkdir -p "$TMP/rg-hidden/src"
+printf '%s\n' 'TOKEN=synthetic-only' >"$TMP/rg-hidden/src/.env"
+secrets rg_without_config_hidden_only allow Bash 'cd ../rg-hidden && rg TOKEN src'
 secrets rg_without_config_cd allow Bash 'cd src && rg TOKEN'
 secrets rg_without_config_glob deny Bash 'rg TOKEN s*'
 secrets rg_without_config_unknown deny Bash 'rg --unknown src'
@@ -2073,6 +2084,143 @@ if perl -e 'exit !($ARGV[0] >= 2)' "$elapsed"; then
     FAILED=$((FAILED + 1))
 fi
 unset large_command
+
+# Audit 13: reader switches are not pattern-file arity for ordinary readers.
+# shellcheck disable=SC2016  # Command strings are passed to the guard verbatim.
+for cmd in 'tail -f .env' 'tail -n 20 -f .env' 'tail -f ~/.ssh/id_ed25519' \
+    'sort -f ~/.aws/credentials' 'head -f .env' 'less -f .env' 'more -f .env' \
+    'bat -f .env' 'jq -e . .env' 'jq -e .auths ~/.docker/config.json' \
+    'xxd -e .env' 'od -f .env' 'base64 -e .env' \
+    'docker-compose config' 'docker-compose convert' 'docker compose convert' \
+    'dotenvx get K' 'dotenvx get --env K' 'dotenvx decrypt --stdout' \
+    'dotenv get K' 'python3 -m dotenv get K' 'npx dotenv -p K' \
+    'npx dotenv-cli -p K' 'pnpm dlx dotenv -p K' 'bunx dotenv -p K' \
+    'npx dotenvx get K' 'uv run dotenv list' 'poetry run dotenv list' \
+    'gh config get oauth_token -h github.com' 'php -i' 'php --info' \
+    "php -r 'phpinfo();'" "php -r 'print_r(\$_SERVER);'" \
+    "php -r 'var_dump(\$_ENV);'" 'pnpm config get x' 'pnpm config list' \
+    'yarn config list' 'docker inspect app' \
+    "docker inspect --format '{{.Config.Env}}' app" \
+    'docker container inspect --format={{.Config.Env}} app' \
+    'kubectl get secret app -o yaml' 'kubectl get secret app -o json' \
+    'kubectl get secret app -o jsonpath={.data}' \
+    'kubectl get secret app -o go-template={{.data}}' \
+    "python -c 'from dotenv import dotenv_values; print(dotenv_values())'" \
+    'curl file://$PWD/.env' 'zip - .env'; do
+    audit13_deny=${audit13_deny:-0}; audit13_deny=$((audit13_deny + 1))
+    secrets "audit13_deny_$audit13_deny" deny Bash "$cmd"
+done
+for cmd in 'cat src/*' 'grep foo src/*' 'wc -l src/*' \
+    'cp src/* build/' 'cp -r packages/* build/' 'cat build/*' \
+    'grep -rl foo src' 'grep -ri foo src' \
+    'rg API_KEY' 'rg --type ts useEffect' \
+    "sed -i 's/process.env.PORT/process.env.APP_PORT/g' src/*.ts" \
+    "sed -n '/process.env/p' src/index.ts" \
+    'git clean -fd' 'git clean -f build' 'docker --env-file .env run app' \
+    'ls src | xargs -n1 echo'; do
+    audit13_allow=${audit13_allow:-0}; audit13_allow=$((audit13_allow + 1))
+    secrets "audit13_allow_$audit13_allow" allow Bash "$cmd"
+done
+mkdir -p "$TMP/hidden-only/src"
+printf '%s\n' '.env' >"$TMP/hidden-only/.gitignore"
+printf '%s\n' 'synthetic-only' >"$TMP/hidden-only/.env"
+printf '%s\n' 'useEffect' >"$TMP/hidden-only/src/index.ts"
+prior_rg_config="${RIPGREP_CONFIG_PATH:-}"
+unset RIPGREP_CONFIG_PATH
+secrets audit13_rg_hidden_ignored allow Bash "cd '$TMP/hidden-only' && rg API_KEY"
+secrets audit13_rg_ts_ignored allow Bash "cd '$TMP/hidden-only' && rg --type ts useEffect"
+export RIPGREP_CONFIG_PATH="$prior_rg_config"
+secrets audit13_include_clean allow Bash "cd src && grep -rn --include='*.ts' foo ."
+mkdir -p "$TMP/search/.secrets"
+printf '%s\n' 'synthetic-only' >"$TMP/search/.secrets/nested.ts"
+secrets audit13_include_protected deny Bash "grep -rn --include='*.ts' foo ."
+secrets audit13_grep_count allow Bash 'grep -rc foo .'
+secrets audit13_grep_quiet allow Bash 'grep -rq foo .'
+secrets audit13_pipx_dotenv deny Bash 'pipx run dotenv list'
+secrets audit13_docker_image_inspect allow Bash 'docker image inspect app'
+secrets audit13_docker_safe_format allow Bash "docker inspect --format '{{.Name}}' app"
+secrets audit13_kubectl_describe allow Bash 'kubectl describe secret app'
+secrets audit13_kubectl_names allow Bash 'kubectl get secret app'
+secrets audit13_still_cat deny Bash 'cat .env'
+secrets audit13_still_grep deny Bash 'grep -r foo .'
+secrets audit13_still_rg deny Bash 'rg --hidden API_KEY'
+secrets audit13_still_glob deny Bash 'cat *'
+# Only tracked names enter Git's content gate; .env is ignored here.
+if command -v git >/dev/null 2>&1; then
+    secrets audit13_git_grep allow Bash "git -C '$TMP/ignored-index' grep foo"
+    secrets audit13_git_grep_option allow Bash "git -C '$TMP/ignored-index' grep -n process.env"
+    secrets audit13_git_grep_e allow Bash "git -C '$TMP/ignored-index' grep -e process.env"
+    secrets audit13_git_grep_rev allow Bash "git -C '$TMP/ignored-index' grep -n foo HEAD"
+    secrets audit13_git_log_pickaxe allow Bash "git -C '$TMP/ignored-index' log -S process.env"
+    secrets audit13_git_log_grep allow Bash "git -C '$TMP/ignored-index' log --grep=.env"
+fi
+secrets audit13_python_heredoc_gitdir deny Bash $'python3 - <<\'EOF\'\nopen("../sepgd/config","w")\nEOF'
+secrets audit13_node_heredoc_gitdir deny Bash "node <<'EOF'"$'\n'"require('fs').writeFileSync('$TMP/search/bare.git/config','x')"$'\nEOF'
+secrets audit13_crlf allow Bash $'true\r'
+secrets audit13_cr_middle deny Bash $'true\rtrue'
+secrets audit13_glob_depth deny Bash 'cat /*/*/*/*/*/*.ts; cat .env'
+secrets audit13_glob_deeper deny Bash 'cat /*/*/*/*/*/*/*.ts'
+# Heredoc bodies are data, not 256 command words or an 8 KiB header.
+inert_body="$(printf 'a%.0s' {1..11000})"
+secrets audit13_large_cat allow Bash "cat <<'EOF' > f"$'\n'"$inert_body"$'\nEOF'
+secrets audit13_large_cat_redirect allow Bash "cat > f << 'EOF'"$'\n'"$inert_body"$'\nEOF'
+secrets audit13_large_tee allow Bash "tee f <<'EOF'"$'\n'"$inert_body"$'\nEOF'
+secrets audit13_large_python allow Bash "python3 - <<'EOF'"$'\n'"$inert_body"$'\nEOF'
+# shellcheck disable=SC2016  # The substitution is literal guard input.
+secrets audit13_large_commit allow Bash 'git commit -m "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
+# shellcheck disable=SC2016  # The substitution is literal guard input.
+secrets audit13_large_pr allow Bash 'gh pr create --body "$(cat <<'"'"'EOF'"'"''$'\n'"$inert_body"$'\nEOF\n)"'
+unset inert_body
+secrets audit13_heredoc_after_redirect allow Bash $'cat <<\'EOF\' > src/env.ts\nprocess.env.PORT\nEOF'
+secrets audit13_heredoc_gitignore allow Bash $'cat >> .gitignore <<\'EOF\'\n.env.local\nEOF'
+# A literal backslash-n does not terminate the heredoc header.
+secrets audit13_heredoc_unterminated deny Bash "cat <<'EOF' > src/env.ts\\nprocess.env.PORT\\nEOF"
+secrets audit13_heredoc_missing_end deny Bash $'cat > src/env.ts <<\'EOF\'\nordinary data'
+chain="$(printf 'true && %.0s' {1..39})true"
+started="$(perl -MTime::HiRes=time -e 'print time')"
+secrets audit13_chain allow Bash "$chain"
+elapsed="$(perl -MTime::HiRes=time -e 'print time - $ARGV[0]' "$started")"
+if perl -e 'exit !($ARGV[0] >= 1.5)' "$elapsed"; then
+    printf 'FAIL audit13 chain exceeded 1.5 seconds (%ss)\n' "$elapsed"
+    FAILED=$((FAILED + 1))
+fi
+chain="$(printf 'true && %.0s' {1..79})true"
+secrets audit13_chain_80 allow Bash "$chain"
+unset chain
+nested="$(printf '(%.0s' {1..200})true$(printf ')%.0s' {1..200})"
+secrets audit13_nested_parens allow Bash "$nested"
+nested="$(printf '{ %.0s' {1..200})true$(printf '; }%.0s' {1..200})"
+secrets audit13_nested_braces allow Bash "$nested"
+unset nested
+for depth in 5 6; do
+    started="$(perl -MTime::HiRes=time -e 'print time')"
+    secrets "audit13_glob_time_$depth" deny Bash "cat $(printf '/*%.0s' $(seq 1 "$depth"))/*.ts; cat .env"
+    elapsed="$(perl -MTime::HiRes=time -e 'print time - $ARGV[0]' "$started")"
+    if perl -e 'exit !($ARGV[0] >= 2)' "$elapsed"; then
+        printf 'FAIL audit13 glob exceeded two seconds (%ss)\n' "$elapsed"
+        FAILED=$((FAILED + 1))
+    fi
+done
+secrets audit13_bad_argv deny Bash 'ignored' '{"command":["cat",1]}'
+# Raw envelopes exercise framing and cwd checks that `secrets` always fills in.
+for malformed in double_json relative_cwd; do
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\taudit13_%s\tdecision\tdeny\n' "$malformed" >>"$SECRET_TEST_INVENTORY"
+    if [[ "$malformed" == double_json ]]; then
+        payload="$(jq -cn --arg w "$TMP/search" '{tool_name:"Bash",cwd:$w,tool_input:{command:"true"}}')"
+        payload="$payload"$'\n'"$payload"
+    else
+        payload='{"tool_name":"Bash","cwd":"relative","tool_input":{"command":"true"}}'
+    fi
+    got="$(printf '%s' "$payload" | invoke_guard | jq -r '.hookSpecificOutput.permissionDecision // "allow"')"
+    if [[ "$got" == deny ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\taudit13_%s\tpass\n' "$malformed" >>"$SECRET_TEST_RESULTS"
+    else
+        printf 'FAIL audit13_%s: got %s\n' "$malformed" "$got"
+        FAILED=$((FAILED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\taudit13_%s\tfail\n' "$malformed" >>"$SECRET_TEST_RESULTS"
+    fi
+done
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

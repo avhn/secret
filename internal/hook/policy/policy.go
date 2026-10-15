@@ -27,6 +27,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	if !filepath.IsAbs(cwd) {
 		return roles.Indeterminate
 	}
+	source = stripLineCR(source)
 	if invalidControls(source) {
 		return roles.Indeterminate
 	}
@@ -44,6 +45,11 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 		return roles.Indeterminate
 	}
 	return ""
+}
+
+// stripLineCR accepts CRLF and a final CR without accepting embedded controls.
+func stripLineCR(source string) string {
+	return strings.TrimSuffix(strings.ReplaceAll(source, "\r\n", "\n"), "\r")
 }
 
 // AnalyzeArgv checks already-tokenized host arguments without joining them
@@ -82,6 +88,7 @@ type analyzer struct {
 	assignments         map[string]int
 	loopVars            map[string]string
 	messageSubst        bool
+	xargsIDs            bool
 	heredoc             map[*syntax.Word]string
 	cdpath              bool
 	indirect            bool
@@ -132,6 +139,7 @@ func commandName(stmt *syntax.Stmt) string {
 }
 
 func (a *analyzer) fragment(source string, depth int) {
+	source = stripLineCR(source)
 	if invalidControls(source) {
 		a.reason = roles.Indeterminate
 		return
@@ -197,9 +205,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 		}
 		for _, r := range s.Redirs {
-			if r.Hdoc != nil {
+			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) {
 				body := a.raw(r.Hdoc)
-				if (hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(commandName(s)) && a.inlineGitDir(body, cwd)) && !a.inertCatTeeBody(s, cwd) {
+				if hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(commandName(s)) && a.inlineGitDir(body, cwd) {
 					a.reason = roles.FileInput
 				}
 			}
@@ -462,10 +470,20 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			if unknown && (name == "make" || name == "gmake") && strings.Contains(a.rawArgs(cmd.Args), "-f") && a.reason == "" {
 				a.reason = roles.Indeterminate
 			}
-			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) {
+			if unknown && nonReaderUnknown(name, cmd.Args) && a.reason == "" && !a.structuralUncertain {
+				a.uncertain = priorUncertain
+			}
+			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) && !nonReaderUnknown(name, cmd.Args) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
+			if cmd.Op.String() == "|" && dockerPIDPipe(cmd.X, cmd.Y) {
+				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
+				a.xargsIDs = true
+				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.xargsIDs = false
+				break
+			}
 			if (cmd.Op.String() == "|" || cmd.Op.String() == "|&") && (a.shellStdinStatement(cmd.Y, cwd) || launcherStdinStatement(cmd.Y)) {
 				a.reason = roles.Indeterminate
 				break
@@ -505,7 +523,12 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					if cmd.Op.String() == "||" {
 						leftCWD = joinedCWD(cwd, leftCWD)
 					}
-					cwd = joinedCWD(cwd, a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD))
+					rightCWD := a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
+					if cmd.Op.String() == "&&" {
+						cwd = rightCWD
+					} else {
+						cwd = joinedCWD(cwd, rightCWD)
+					}
 				} else {
 					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 				}
@@ -532,16 +555,34 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				}
 				if loop.Name != nil && len(loop.Items) > 0 {
 					safe := true
+					first := ""
 					for _, w := range loop.Items {
-						if literal(w) == "" || a.inputProtected(literal(w), cwd) {
+						values, ok := a.expandWord(w, cwd)
+						if !strings.ContainsAny(a.raw(w), "*?[") {
+							for _, body := range cmd.Do {
+								if roles.KnownReader(commandName(body)) {
+									safe = false
+								}
+							}
+						}
+						if !ok || len(values) == 0 {
 							safe = false
+							break
+						}
+						for _, value := range values {
+							if value == "" || a.inputProtected(value, cwd) {
+								safe = false
+							}
+						}
+						if first == "" {
+							first = values[0]
 						}
 					}
 					if safe {
 						if a.loopVars == nil {
 							a.loopVars = make(map[string]string)
 						}
-						a.loopVars[loop.Name.Value] = literal(loop.Items[0])
+						a.loopVars[loop.Name.Value] = first
 					}
 				}
 			}
@@ -949,6 +990,13 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 	}
+	if a.audit13Printer(name, args, cwd) {
+		return
+	}
+	if child, ok := safePackageChild(name, args); ok {
+		a.command(child, depth+1, cwd, direct)
+		return
+	}
 	if name == "git" {
 		a.gitCommand(args, depth, cwd, direct)
 		return
@@ -975,17 +1023,20 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if optionIn("npm npx make rsync op gh curl kubectl aws gcloud docker", name) && name != "docker" {
 		genericArgs := args
-		if name == "kubectl" && len(args) > 2 && args[0] == "create" && args[1] == "secret" {
-			genericArgs = nil // Kubernetes resource type, not the secret transport command.
+		if name == "kubectl" && len(args) > 1 && optionIn("get describe create", args[0]) && optionIn("secret secrets", args[1]) {
+			genericArgs = append([]string{args[0]}, args[2:]...) // Resource type is not the secret transport.
+		}
+		if name == "npm" && len(args) > 1 && args[0] == "version" && optionIn("patch minor major", args[1]) {
+			genericArgs = nil
 		}
 		if name == "gh" {
 			genericArgs = make([]string, 0, len(args))
 			for i := 0; i < len(args); i++ {
-				if optionIn("--title --body", args[i]) {
+				if optionIn("--title --body --jq", args[i]) {
 					i++
 					continue
 				}
-				if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") {
+				if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") || strings.HasPrefix(args[i], "--jq=") {
 					continue
 				}
 				genericArgs = append(genericArgs, args[i])
@@ -1027,7 +1078,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		if a.reason == "" && name == "xargs" && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
+		if a.reason == "" && name == "xargs" && !a.xargsIDs && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
 		if a.reason == "" && name == "xargs" && xargsHasArgFile(args) && len(child) > 0 && roles.KnownReader(strings.ToLower(path.Base(child[0]))) {
@@ -1262,8 +1313,8 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			a.reason = roles.Printer
 		}
 		return
-	case "docker", "dotenv":
-		if name == "dotenv" {
+	case "docker", "docker-compose", "dotenv", "dotenv-cli", "dotenvx":
+		if name == "dotenv" || name == "dotenv-cli" || name == "dotenvx" {
 			a.dotenvChild(args, depth, cwd)
 			return
 		}
@@ -1282,9 +1333,27 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				a.reason = roles.Printer
 				return
 			}
-			if v == "config" && name == "docker" && slices.Contains(args, "compose") {
+			if (v == "config" || v == "convert") && (name == "docker-compose" || name == "docker" && slices.Contains(args, "compose")) {
 				a.reason = "compose config prints env-file values"
 				return
+			}
+		}
+		if name == "docker" {
+			inspect := len(args) > 0 && args[0] == "inspect" || len(args) > 1 && args[0] == "container" && args[1] == "inspect"
+			if inspect {
+				format := ""
+				for i, arg := range args {
+					if (arg == "--format" || arg == "-f") && i+1 < len(args) {
+						format = args[i+1]
+					}
+					if strings.HasPrefix(arg, "--format=") || strings.HasPrefix(arg, "-f=") {
+						_, format, _ = strings.Cut(arg, "=")
+					}
+				}
+				if format == "" || strings.Contains(format, "Env") || strings.Contains(format, ".Config") || strings.Contains(format, "json .") {
+					a.reason = roles.Printer
+					return
+				}
 			}
 		}
 		// Docker's printer rules do not certify arbitrary command options.
@@ -1334,6 +1403,18 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "rg" {
 		// Nested wrappers cannot inherit the hook's rg config certification.
 		a.reason = search.Scope(words, cwd, a.home, os.Getenv("RIPGREP_CONFIG_PATH"), a.configUntrusted || depth > 0 || cwd != a.cwd && os.Getenv("RIPGREP_CONFIG_PATH") != "" && !path.IsAbs(os.Getenv("RIPGREP_CONFIG_PATH")) || strings.Contains(strings.Join(words, " "), "RIPGREP_CONFIG_PATH"))
+		if a.reason == search.ScopeReason && a.rgVisibleSafe(args, cwd) {
+			a.reason = ""
+		}
+		if a.reason == "" && slices.Contains(args, "--hidden") {
+			root := "."
+			if len(args) > 2 && !strings.HasPrefix(args[len(args)-1], "-") {
+				root = args[len(args)-1]
+			}
+			if a.treeProtectedAll(root, cwd) {
+				a.reason = search.ScopeReason
+			}
+		}
 		if a.reason == search.ScopeReason {
 			a.reason = search.UncertainReason
 		}
@@ -1346,23 +1427,45 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	operands := args
+	if name == "sqlite3" && len(args) > 1 {
+		// SQL is program text, not a second database path. P18 scans it above.
+		operands = args[:1]
+	}
 	if name == "gh" {
-		// Titles and bodies are data, not file input operands. Keep every
-		// other gh argument subject to the existing role checks.
+		// Titles, bodies and --jq filters are data, not file input operands.
+		// Keep every other gh argument subject to the existing role checks.
 		operands = make([]string, 0, len(args))
 		for i := 0; i < len(args); i++ {
-			if optionIn("--title --body", args[i]) {
+			if optionIn("--title --body --jq", args[i]) {
 				i++
 				continue
 			}
-			if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") {
+			if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") || strings.HasPrefix(args[i], "--jq=") {
 				continue
 			}
 			operands = append(operands, args[i])
 		}
 	}
-	if name == "grep" && len(operands) >= 3 && (operands[0] == "-rn" || operands[0] == "-nr") && !a.treeProtected(operands[len(operands)-1], cwd) {
-		operands = append([]string{"-n"}, operands[1:]...)
+	if name == "grep" && recursiveGrepSafe(operands, cwd, a) {
+		filtered := make([]string, 0, len(operands))
+		for _, v := range operands {
+			if strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") {
+				v = "-" + strings.Map(func(r rune) rune {
+					if r == 'r' || r == 'R' {
+						return -1
+					}
+					return r
+				}, v[1:])
+				if v == "-" {
+					continue
+				}
+			}
+			if strings.HasPrefix(v, "--include=") {
+				continue
+			}
+			filtered = append(filtered, v)
+		}
+		operands = filtered
 	}
 	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
@@ -1536,6 +1639,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 					}
 					if x.Param.Value == "PWD" && cwd != "" && !strings.Contains(a.source, "PWD=") {
 						piece += cwd
+					} else if value, ok := a.loopVars[x.Param.Value]; ok {
+						piece += value
 					} else if value, ok := a.staticVariable(x.Param.Value); ok {
 						piece += value
 					} else {
@@ -1610,11 +1715,6 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			pattern = a.home + "/" + strings.TrimPrefix(pattern, "~/")
 		}
 		if unquotedGlob && strings.ContainsAny(v, "*?[") {
-			for _, candidate := range []string{".env", ".env.production", "app.env", "app.secret", ".secrets.env", ".netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
-				if matched, _ := path.Match(path.Base(pattern), candidate); matched && a.inputProtected(path.Join(path.Dir(v), candidate), cwd) {
-					expanded = append(expanded, path.Join(path.Dir(v), candidate))
-				}
-			}
 			matches, valid := shellGlobMatches(pattern, cwd, a.deadline)
 			if !valid || a.globs+len(matches) > 200 {
 				a.uncertain = true
@@ -1622,9 +1722,14 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			}
 			a.globs += len(matches)
 			if len(matches) > 0 {
+				if v == "*" && a.inputProtected(".env", cwd) {
+					expanded = append(expanded, ".env")
+				}
 				expanded = append(expanded, matches...)
 				continue
 			}
+			// A literal unmatched wildcard cannot name a protected file.
+			v = "__unmatched_glob__"
 		}
 		expanded = append(expanded, v)
 	}
