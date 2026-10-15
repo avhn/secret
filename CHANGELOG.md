@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Scan protected-name and Git configuration tokens in unknown shell arguments,
+  shell input bodies, inline code and strict command slots. Modelled metadata,
+  store and env-file operands retain their earlier decisions. Sudo shell-option
+  clusters now deny.
+
+- Harden Bash guard handling of independent Git directories, Git apply options,
+  templates, shell stdin, command slots, launchers and bounded shell analysis.
+  Add synthetic guard regression cases for these paths and common safe forms.
+  Over-budget requests and xargs readers of external input now deny; inert
+  quoted heredoc file writes remain allowed up to 1 MiB.
+
 - Bash guard protects independent Git directories and Git configuration tokens
   in attached options and inline code, rejects interactive launchers and
   unverified command slots, and handles nested coprocesses, shell option

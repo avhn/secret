@@ -16,7 +16,9 @@ codex	cwd_safe	decision	allow
 codex	direct	decision	deny
 codex	direct_inherited_cmd	decision	deny
 codex	direct_literal	decision	allow
+codex	git_apply_unsafe	decision	deny
 codex	gitdir_nongit_allow	decision	allow
+codex	gitdir_workdir	decision	deny
 codex	gitdir_write_elsewhere	decision	deny
 codex	gitdir_write_work	decision	deny
 codex	guard	assert	0
@@ -25,11 +27,13 @@ codex	hook_config	assert	0
 codex	indented_delete	decision	deny
 codex	indented_update	decision	deny
 codex	json	assert	0
+codex	make_target_safe	decision	allow
 codex	malformed_named	decision	deny
 codex	malformed_safe	decision	allow
 codex	manual_fallback	assert	0
 codex	move_from	decision	deny
 codex	nbsp_update	decision	deny
+codex	npm_call_printer	decision	deny
 codex	ordinary	decision	allow
 codex	ordinary_patch	decision	allow
 codex	oversized_named	decision	deny

@@ -121,8 +121,8 @@ func TestPolicyV2FailurePaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	check := func(name, dir string) bool { return paths.Protected(name, dir, "", root) }
-	if reason := Analyze("xargs -a safe.go cat", root, root, check); reason != "" {
-		t.Fatalf("safe explicit xargs arg-file denied: %s", reason)
+	if reason := Analyze("xargs -a safe.go cat", root, root, check); reason == "" {
+		t.Fatal("reader accepts uncertified arg-file contents")
 	}
 	for _, command := range []string{
 		"git --unknown status", "git --namespace", "git -c", "git --config-env=core.editor=MISSING status",

@@ -183,12 +183,12 @@ func TestReadingProtectedLiteral(t *testing.T) {
 
 func TestBudgets(t *testing.T) {
 	skipUnixCWD(t)
-	if got := Analyze(" # "+strings.Repeat("a", 33000), "/synthetic", "/synthetic", protected); got != "" {
-		t.Errorf("long inert comment denied: %q", got)
+	if got := Analyze(" # "+strings.Repeat("a", 33000), "/synthetic", "/synthetic", protected); got == "" {
+		t.Fatal("long comment exceeded text budget without denial")
 	}
 	safe := "echo " + strings.Repeat("a", 33000)
-	if got := Analyze(safe, "/synthetic", "/synthetic", protected); got != "" {
-		t.Errorf("safe long command denied: %q", got)
+	if got := Analyze(safe, "/synthetic", "/synthetic", protected); got == "" {
+		t.Fatal("long command exceeded text budget without denial")
 	}
 	if got := Analyze(safe+" .env", "/synthetic", "/synthetic", protected); got == "" {
 		t.Error("long protected witness allowed")

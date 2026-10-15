@@ -1,6 +1,8 @@
 package policy
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
@@ -10,18 +12,69 @@ import (
 // Unlike generic prose arguments, these must be certifiable shell text.
 func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string) bool {
 	strict := func(code string) bool {
+		if hasProtectedLiteral(code) || a.inlineGitDir(code, cwd) {
+			a.reason = roles.FileInput
+			return true
+		}
+		if name == "make" {
+			for _, line := range strings.Split(code, "\n") {
+				if _, recipe, ok := strings.Cut(line, ";"); ok {
+					recipe = strings.TrimLeft(strings.TrimSpace(recipe), "@+- \t")
+					if recipe != "" {
+						a.shellValue(recipe, depth, cwd)
+						if a.reason != "" {
+							return true
+						}
+					}
+				}
+			}
+		}
 		a.shellValue(code, depth, cwd)
 		return true
 	}
 	switch name {
 	case "flock", "su", "runuser", "expect", "npm", "npx", "make", "rsync":
+		npmExec := false
+		if name == "npm" {
+			for _, arg := range args {
+				if arg == "exec" || arg == "x" {
+					npmExec = true
+					break
+				}
+			}
+		}
 		for i, arg := range args {
+			if name == "make" {
+				if strings.Contains(arg, "=") && !strings.HasPrefix(arg, "-") {
+					_, value, _ := strings.Cut(arg, "=")
+					if strings.Contains(value, "$(") || strings.Contains(value, "${") || strings.Contains(value, "`") {
+						a.reason = roles.Indeterminate
+						return true
+					}
+				}
+			}
 			key, attached, hasValue := strings.Cut(arg, "=")
-			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && (arg == "-c" || key == "--command") ||
-				(name == "npm" && len(args) > 0 && args[0] == "exec" || name == "npx") && (arg == "-c" || key == "--call") ||
-				name == "make" && (arg == "--eval" || key == "--eval") ||
-				name == "rsync" && (arg == "-e" || key == "--rsh")
+			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--command" || strings.HasPrefix(key, "--co") && strings.HasPrefix("--command", key)) ||
+				(name == "npm" && npmExec || name == "npx") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--call") ||
+				name == "make" && (arg == "-E" || strings.HasPrefix(arg, "-E") && len(arg) > 2 || arg == "--eval" || key == "--eval") ||
+				name == "rsync" && (arg == "-e" || key == "--rsh" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e"))
 			if slot {
+				if name == "rsync" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e") && arg != "-e" {
+					suffix := strings.SplitN(arg[1:], "e", 2)[1]
+					if suffix != "" {
+						return strict(suffix)
+					}
+				}
+				if arg == "-E" {
+					if i+1 >= len(args) {
+						a.reason = roles.Indeterminate
+						return true
+					}
+					return strict(args[i+1])
+				}
+				if len(arg) > 2 && (strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-E")) && !strings.HasPrefix(arg, "--") {
+					return strict(arg[2:])
+				}
 				if hasValue {
 					return strict(attached)
 				}
@@ -31,17 +84,29 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 				}
 				return strict(args[i+1])
 			}
-			if name == "make" && (arg == "-f" || arg == "--file" || key == "--file" || strings.HasPrefix(arg, "-f") && len(arg) > 2) {
+			if name == "make" && (arg == "-f" || arg == "--file" || arg == "--makefile" || key == "--file" || key == "--makefile" || strings.HasPrefix(arg, "-f") && len(arg) > 2) {
 				file := attached
 				if strings.HasPrefix(arg, "-f") && len(arg) > 2 {
 					file = arg[2:]
 				}
-				if !hasValue && arg == "-f" || arg == "--file" {
-					if i+1 < len(args) {
-						file = args[i+1]
+				if arg == "-f" || arg == "--file" || arg == "--makefile" {
+					if i+1 >= len(args) {
+						a.reason = roles.Indeterminate
+						return true
 					}
+					file = args[i+1]
 				}
-				if strings.HasPrefix(file, "/dev/") || strings.HasPrefix(file, "<(") || strings.HasPrefix(file, ">(") {
+				if file == "-" || strings.HasPrefix(file, "/dev/") || strings.HasPrefix(file, "<(") || strings.HasPrefix(file, ">(") {
+					a.reason = roles.Indeterminate
+					return true
+				}
+				resolved := a.resolve(file, cwd)
+				info, err := os.Stat(filepath.Clean(resolved))
+				if err == nil && !info.Mode().IsRegular() {
+					a.reason = roles.Indeterminate
+					return true
+				}
+				if err != nil && !os.IsNotExist(err) {
 					a.reason = roles.Indeterminate
 					return true
 				}
@@ -78,8 +143,12 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 			}
 		}
 	case "gh":
-		if len(args) >= 4 && args[0] == "alias" && args[1] == "set" {
-			for _, arg := range args[3:] {
+		if len(args) >= 3 && args[0] == "alias" && args[1] == "set" {
+			for _, arg := range args[2:] {
+				if arg == "--shell" || strings.HasPrefix(arg, "--shell=") {
+					a.reason = roles.Indeterminate
+					return true
+				}
 				if strings.HasPrefix(arg, "!") {
 					return strict(strings.TrimPrefix(arg, "!"))
 				}

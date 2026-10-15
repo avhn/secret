@@ -29,11 +29,6 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	if invalidControls(source) {
 		return roles.Indeterminate
 	}
-	// The legacy guard treats named protected content in long shell text as
-	// indeterminate. Keep that stricter boundary even when parsing can proceed.
-	if len(source) > 8192 && (longPrinter(source) || longProtected(source)) {
-		return roles.Indeterminate
-	}
 	// A deeply nested literal -c chain can hide shell code behind repeated
 	// shell-quote boundaries. Never let it outlive the recursion budget.
 	if strings.Count(source, "bash -c")+strings.Count(source, "sh -c") > 4 && (witness(source) || riskyRole(source)) {
@@ -44,7 +39,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	if a.reason != "" {
 		return a.reason
 	}
-	if a.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source)) {
+	if a.structuralUncertain || a.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source)) {
 		return roles.Indeterminate
 	}
 	return ""
@@ -66,7 +61,7 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 	if a.reason != "" {
 		return a.reason
 	}
-	if a.uncertain && (witness(strings.Join(argv, " ")) || riskyRole(strings.Join(argv, " ")) || contentSyntax(strings.Join(argv, " "))) {
+	if a.structuralUncertain || a.uncertain && (witness(strings.Join(argv, " ")) || riskyRole(strings.Join(argv, " ")) || contentSyntax(strings.Join(argv, " "))) {
 		return roles.Indeterminate
 	}
 	return ""
@@ -84,6 +79,9 @@ type analyzer struct {
 	gitRoots            []string
 	source              string
 	assignments         map[string]int
+	loopVars            map[string]string
+	messageSubst        bool
+	heredoc             map[*syntax.Word]string
 	cdpath              bool
 	indirect            bool
 	deadline            time.Time
@@ -102,42 +100,6 @@ func witness(source string) bool {
 		}
 	}
 	return strings.Contains(s, ".en*") || strings.Contains(s, ".en{") || strings.Contains(s, ".{env")
-}
-
-// longProtected retains the stricter legacy treatment for protected path
-// witnesses in long source without treating public suffixes as private files.
-func longProtected(source string) bool {
-	before := strings.SplitN(source, " # ", 2)[0]
-	fields := strings.Fields(before)
-	if len(fields) > 0 && strings.EqualFold(fields[0], "ENV") {
-		return true
-	}
-	for _, field := range fields {
-		item := strings.Trim(strings.ReplaceAll(field, `\`, ""), "'$\";|&(){}<>,")
-		lower := strings.ToLower(item)
-		if lower == ".npmrc" || lower == ".pypirc" || strings.Contains(lower, ".secret*") || lower == ".env" || strings.HasPrefix(lower, ".env.") && !strings.HasSuffix(lower, ".example") && !strings.HasSuffix(lower, ".template") || strings.Contains(lower, ".ssh/id_") && !strings.HasSuffix(lower, ".pub") || strings.Contains(field, ".npmrc\\") || strings.Contains(lower, "*.secret") {
-			return true
-		}
-	}
-	return false
-}
-
-// longPrinter catches bare printers whose role is lost behind a long comment.
-func longPrinter(source string) bool {
-	for _, cmd := range strings.Split(source, ";") {
-		fields := strings.Fields(strings.ToLower(strings.SplitN(cmd, "#", 2)[0]))
-		for len(fields) > 0 && (strings.Trim(fields[0], "'\"") == "command" || strings.Trim(fields[0], "'\"") == "builtin") {
-			fields = fields[1:]
-		}
-		if len(fields) == 0 {
-			continue
-		}
-		switch strings.Trim(fields[0], "'$\"") {
-		case "compgen", "xclip", "xsel", "rg", "env":
-			return true
-		}
-	}
-	return false
 }
 
 // riskyRole is for parser and budget failures only. It cannot certify shell
@@ -176,7 +138,7 @@ func (a *analyzer) fragment(source string, depth int) {
 	if a.reason != "" {
 		return
 	}
-	if len(source) > 40<<10 || depth > 4 || time.Now().After(a.deadline) {
+	if len(source) > 8192 && (len(source) > 1<<20 || !strings.Contains(source, "<<")) || depth > 4 || time.Now().After(a.deadline) {
 		a.structuralUncertain = true
 		a.uncertain = true
 		return
@@ -184,12 +146,32 @@ func (a *analyzer) fragment(source string, depth int) {
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
 	if err != nil {
 		a.uncertain = true
+		// Unparseable source has no classified operands to exempt from P18.
 		// Bash and the parser can disagree on arithmetic-looking command
 		// substitutions. Never certify opaque substitution-bearing source.
-		if strings.Contains(source, "$(") || strings.Contains(source, "`") {
+		if hasProtectedLiteral(source) || gitToken.MatchString(source) || strings.Contains(source, "$(") || strings.Contains(source, "`") {
 			a.reason = roles.Indeterminate
 		}
 		return
+	}
+	if len(source) > 8192 {
+		payload := 0
+		if a.heredoc == nil {
+			a.heredoc = make(map[*syntax.Word]string)
+		}
+		syntax.Walk(file, func(node syntax.Node) bool {
+			if redir, ok := node.(*syntax.Redirect); ok && redir.Hdoc != nil {
+				body := a.raw(redir.Hdoc)
+				a.heredoc[redir.Hdoc] = body
+				payload += len(body)
+			}
+			return true
+		})
+		if len(source)-payload > 8192 {
+			a.structuralUncertain = true
+			a.reason = roles.Indeterminate
+			return
+		}
 	}
 	a.stmts(file.Stmts, depth, a.cwd)
 }
@@ -214,6 +196,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			}
 		}
 		for _, r := range s.Redirs {
+			if r.Hdoc != nil {
+				body := a.raw(r.Hdoc)
+				if (hasProtectedLiteral(body) || gitToken.MatchString(body)) && !a.inertCatTeeBody(s, cwd) {
+					a.reason = roles.FileInput
+				}
+			}
+			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word))) && !a.inertCatTeeBody(s, cwd) {
+				a.reason = roles.FileInput
+			}
 			a.walkWord(r.Word, depth, cwd)
 			a.walkWord(r.Hdoc, depth, cwd)
 			op := r.Op.String()
@@ -226,7 +217,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 					a.reason = roles.FileInput
 				}
 			}
-			if strings.HasPrefix(op, "<") || op == "<>" {
+			if op == "<" || op == "<>" || op == "<&" {
 				if a.protectedWord(r.Word, cwd) {
 					a.reason = "input redirect reads a protected store"
 				}
@@ -317,6 +308,9 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				continue
 			}
 			priorUncertain := a.uncertain
+			message := len(cmd.Args) > 1 && (strings.EqualFold(literal(cmd.Args[0]), "git") && (literal(cmd.Args[1]) == "commit" || literal(cmd.Args[1]) == "tag") || strings.EqualFold(literal(cmd.Args[0]), "gh") && len(cmd.Args) > 2 && (literal(cmd.Args[1]) == "pr" || literal(cmd.Args[1]) == "issue"))
+			priorMessage := a.messageSubst
+			a.messageSubst = message
 			nestedUncertain := false
 			words := make([]string, 0, len(cmd.Args))
 			unknown := false
@@ -345,6 +339,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				}
 				words = append(words, values...)
 			}
+			a.messageSubst = priorMessage
 			if a.reason != "" {
 				break
 			}
@@ -356,6 +351,15 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				break
 			}
 			name := strings.ToLower(path.Base(words[0]))
+			for i, w := range cmd.Args[1:] {
+				if unmodelledCommand(name) && hasProtectedLiteral(a.raw(w)) && !messageOperand(name, cmd.Args, i+1) {
+					a.reason = roles.FileInput
+					break
+				}
+			}
+			if a.reason != "" {
+				break
+			}
 			args := words[1:]
 			if writePatternCommand(name, cmd.Args) {
 				a.reason = roles.Indeterminate
@@ -429,7 +433,7 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 							continue
 						}
 					}
-					if witness(code) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+					if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -454,11 +458,14 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 			if name == "kill" && unknown && safePIDLookup(cmd.Args) && a.reason == "" {
 				a.uncertain = priorUncertain
 			}
+			if unknown && name == "make" && strings.Contains(a.rawArgs(cmd.Args), "-f") && a.reason == "" {
+				a.reason = roles.Indeterminate
+			}
 			if unknown && roles.Reading(name) && a.reason == "" && !(name == "kill" && safePIDLookup(cmd.Args)) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
-			if (cmd.Op.String() == "|" || cmd.Op.String() == "|&") && a.shellStdinStatement(cmd.Y, cwd) {
+			if (cmd.Op.String() == "|" || cmd.Op.String() == "|&") && (a.shellStdinStatement(cmd.Y, cwd) || launcherStdinStatement(cmd.Y)) {
 				a.reason = roles.Indeterminate
 				break
 			}
@@ -522,8 +529,25 @@ func (a *analyzer) stmts(stmts []*syntax.Stmt, depth int, cwd string) string {
 				for _, w := range loop.Items {
 					a.walkWord(w, depth, cwd)
 				}
+				if loop.Name != nil && len(loop.Items) > 0 {
+					safe := true
+					for _, w := range loop.Items {
+						if literal(w) == "" || a.inputProtected(literal(w), cwd) {
+							safe = false
+						}
+					}
+					if safe {
+						if a.loopVars == nil {
+							a.loopVars = make(map[string]string)
+						}
+						a.loopVars[loop.Name.Value] = literal(loop.Items[0])
+					}
+				}
 			}
 			cwd = joinedCWD(cwd, a.stmts(cmd.Do, depth, cwd))
+			if loop, ok := cmd.Loop.(*syntax.WordIter); ok && loop.Name != nil {
+				delete(a.loopVars, loop.Name.Value)
+			}
 		case *syntax.CaseClause:
 			a.walkWord(cmd.Word, depth, cwd)
 			for _, item := range cmd.Items {
@@ -803,11 +827,27 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	name := strings.ToLower(path.Base(words[0]))
 	args := words[1:]
+	if unmodelledCommand(name) {
+		for _, arg := range args {
+			if hasProtectedLiteral(arg) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
+	}
+	if p18InlineCode(name, args) {
+		a.reason = roles.FileInput
+		return
+	}
 	if name == "setsid" {
 		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
 			args = args[1:]
 		}
 		a.command(args, depth+1, cwd, direct)
+		return
+	}
+	if name == "systemd-run" && launcherShellOption(args) {
+		a.reason = roles.Indeterminate
 		return
 	}
 	if name == "script" {
@@ -867,7 +907,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			a.reason = roles.Indeterminate
 			return
 		}
-		if (name == "doas" || name == "run0") && len(args) > 0 && strings.HasPrefix(args[0], "-") && !strings.HasPrefix(args[0], "--") && strings.ContainsAny(args[0][1:], "si") {
+		if name == "machinectl" && args[0] == "shell" || name == "doas" && launcherShellOption(args) {
 			a.reason = roles.Indeterminate
 			return
 		}
@@ -876,7 +916,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = roles.Indeterminate
 		return
 	}
-	if name == "sudo" && len(args) > 0 && strings.HasPrefix(args[0], "-") && !strings.HasPrefix(args[0], "--") && strings.ContainsAny(args[0][1:], "si") && len(args) == 1 {
+	if name == "sudo" && launcherShellOption(args) {
 		a.reason = roles.Indeterminate
 		return
 	}
@@ -892,16 +932,45 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.gitCommand(args, depth, cwd, direct)
 		return
 	}
+	if name == "compgen" {
+		for _, arg := range args {
+			if arg == "-e" || arg == "-v" || arg == "-A" && len(args) > 1 && args[1] == "variable" {
+				a.reason = roles.Printer
+				return
+			}
+		}
+	}
 	if name == "find" {
 		for _, arg := range args {
 			if optionIn("-fprintf -fprint0 -fls", arg) {
-				a.reason = roles.Indeterminate
-				return
+				// Output primaries have a destination operand and are checked
+				// by configArgument, not rejected when writing public files.
+				continue
 			}
 		}
 	}
 	if a.commandSlot(name, args, depth, cwd) {
 		return
+	}
+	if optionIn("npm npx make rsync op gh curl kubectl aws gcloud docker", name) && name != "docker" {
+		genericArgs := args
+		if name == "gh" {
+			genericArgs = make([]string, 0, len(args))
+			for i := 0; i < len(args); i++ {
+				if optionIn("--title --body", args[i]) {
+					i++
+					continue
+				}
+				if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") {
+					continue
+				}
+				genericArgs = append(genericArgs, args[i])
+			}
+		}
+		a.unknownExecution(genericArgs, depth, cwd)
+		if a.reason != "" {
+			return
+		}
 	}
 	if a.configArgument(name, args, cwd) {
 		return
@@ -937,6 +1006,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason == "" && name == "xargs" && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
+		if a.reason == "" && name == "xargs" && xargsHasArgFile(args) && len(child) > 0 && roles.KnownReader(strings.ToLower(path.Base(child[0]))) {
+			a.reason = roles.Indeterminate
+			return
+		}
 		if name == "sudo" && dir != cwd && !shell {
 			a.command(child, depth+1, cwd, direct)
 		}
@@ -968,7 +1041,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			if name == "node" && strings.HasPrefix(code, "--env-file=") {
 				continue
 			}
-			if witness(code) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+			if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 				a.reason = "interpreter argument names a protected file or credential operation"
 				return
 			}
@@ -1201,7 +1274,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.unknownExecution(dockerArgs, depth, cwd)
 		return
 	}
-	if !modelledCommand(name) && !shellName(name) {
+	if !modelledCommand(name) && !shellName(name) && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
 		a.unknownExecution(args, depth, cwd)
 		if a.reason != "" {
 			return
@@ -1221,7 +1294,23 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = reason
 		return
 	}
-	if reason := roles.OperandReason(name, args, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
+	operands := args
+	if name == "gh" {
+		// Titles and bodies are data, not file input operands. Keep every
+		// other gh argument subject to the existing role checks.
+		operands = make([]string, 0, len(args))
+		for i := 0; i < len(args); i++ {
+			if optionIn("--title --body", args[i]) {
+				i++
+				continue
+			}
+			if strings.HasPrefix(args[i], "--title=") || strings.HasPrefix(args[i], "--body=") {
+				continue
+			}
+			operands = append(operands, args[i])
+		}
+	}
+	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
 		a.reason = reason
 	}
 }
@@ -1254,6 +1343,9 @@ func (a *analyzer) protectedWord(w *syntax.Word, cwd string) bool {
 func (a *analyzer) raw(w *syntax.Word) string {
 	if w == nil {
 		return ""
+	}
+	if body, ok := a.heredoc[w]; ok {
+		return body
 	}
 	var b strings.Builder
 	syntax.NewPrinter().Print(&b, w)
@@ -1348,9 +1440,11 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 }
 func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 	result := []string{""}
+	patterns := []string{""}
 	unquotedGlob := false
 	for _, part := range w.Parts {
 		var piece string
+		var globPiece string
 		switch n := part.(type) {
 		case *syntax.Lit:
 			piece = strings.ReplaceAll(n.Value, `\`, ``)
@@ -1358,7 +1452,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			unquotedGlob = unquotedGlob || strings.ContainsAny(piece, "*?[")
+			globPiece = n.Value
+			unquotedGlob = unquotedGlob || unescapedGlob(n.Value)
 		case *syntax.SglQuoted:
 			piece = n.Value
 			if n.Dollar {
@@ -1374,12 +1469,20 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				switch x := child.(type) {
 				case *syntax.Lit:
 					piece += doubleLiteral(x.Value)
+				case *syntax.CmdSubst:
+					if !a.messageSubst || !inertCatHeredoc(x) {
+						a.uncertain = true
+						return nil, false
+					}
+					piece += "message"
 				case *syntax.ParamExp:
 					if x.Param == nil || x.Exp != nil || x.Repl != nil || x.Slice != nil || x.Index != nil || x.Length || x.Excl {
 						a.uncertain = true
 						return nil, false
 					}
-					if value, ok := a.staticVariable(x.Param.Value); ok {
+					if x.Param.Value == "PWD" && cwd != "" && !strings.Contains(a.source, "PWD=") {
+						piece += cwd
+					} else if value, ok := a.staticVariable(x.Param.Value); ok {
 						piece += value
 					} else {
 						a.uncertain = true
@@ -1395,7 +1498,9 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			if value, ok := a.staticVariable(n.Param.Value); ok {
+			if value, ok := a.loopVars[n.Param.Value]; ok {
+				piece = value
+			} else if value, ok := a.staticVariable(n.Param.Value); ok {
 				piece = value
 			} else {
 				a.uncertain = true
@@ -1407,7 +1512,8 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				return nil, false
 			}
 			next := make([]string, 0, len(result)*len(n.Elems))
-			for _, prefix := range result {
+			nextPatterns := make([]string, 0, len(result)*len(n.Elems))
+			for index, prefix := range result {
 				for _, elem := range n.Elems {
 					values, ok := a.literalWord(elem, cwd)
 					if !ok {
@@ -1415,6 +1521,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 					}
 					for _, v := range values {
 						next = append(next, prefix+v)
+						nextPatterns = append(nextPatterns, patterns[index]+escapeGlob(v))
 						if len(next) > 64 {
 							a.uncertain = true
 							return nil, false
@@ -1423,28 +1530,35 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				}
 			}
 			result = next
+			patterns = nextPatterns
 			continue
 		default:
 			a.uncertain = true
 			return nil, false
 		}
+		if globPiece == "" {
+			globPiece = escapeGlob(piece)
+		}
 		for i := range result {
 			result[i] += piece
+			patterns[i] += globPiece
 		}
 	}
 	expanded := make([]string, 0, len(result))
-	for _, v := range result {
+	for i, v := range result {
+		pattern := patterns[i]
 		if strings.HasPrefix(v, "~/") {
 			v = a.home + "/" + v[2:]
+			pattern = a.home + "/" + strings.TrimPrefix(pattern, "~/")
 		}
 		if unquotedGlob && strings.ContainsAny(v, "*?[") {
 			for _, candidate := range []string{".env", ".env.production", "app.env", "app.secret", ".secrets.env", ".netrc", ".npmrc", ".pypirc", ".git-credentials", "credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
-				if matched, _ := path.Match(path.Base(v), candidate); matched && a.inputProtected(path.Join(path.Dir(v), candidate), cwd) {
+				if matched, _ := path.Match(path.Base(pattern), candidate); matched && a.inputProtected(path.Join(path.Dir(v), candidate), cwd) {
 					expanded = append(expanded, path.Join(path.Dir(v), candidate))
 				}
 			}
-			matches, err := filepath.Glob(a.resolve(v, cwd))
-			if err != nil || a.globs+len(matches) > 200 {
+			matches, valid := shellGlobMatches(pattern, cwd, a.deadline)
+			if !valid || a.globs+len(matches) > 200 {
 				a.uncertain = true
 				return nil, false
 			}

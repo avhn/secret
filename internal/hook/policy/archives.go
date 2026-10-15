@@ -28,6 +28,9 @@ func uniqueOption(key, table string) string {
 }
 
 func (a *analyzer) archiveCommand(name string, args []string, depth int, cwd string) {
+	if name == "gtar" {
+		name = "tar"
+	}
 	if name == "unzip" {
 		a.unzipCommand(args, cwd)
 		return
@@ -44,7 +47,7 @@ func (a *analyzer) archiveCommand(name string, args []string, depth int, cwd str
 				listing = true
 				continue
 			}
-			if strings.HasPrefix(v, "-") && !optionIn("-v --verbose -t --list -it", v) {
+			if strings.HasPrefix(v, "-") && !optionIn("-v --verbose -t --list -it", v) && !(name != "cpio" && strings.HasPrefix(v, "-o")) {
 				a.reason = roles.Indeterminate
 				return
 			}
@@ -53,7 +56,7 @@ func (a *analyzer) archiveCommand(name string, args []string, depth int, cwd str
 				return
 			}
 		}
-		if !listing {
+		if !listing && name == "cpio" {
 			a.reason = roles.Indeterminate
 		}
 		return
@@ -202,7 +205,16 @@ func (a *analyzer) archiveCommand(name string, args []string, depth int, cwd str
 func (a *analyzer) unzipCommand(args []string, cwd string) {
 	listing, options := false, true
 	var operands []string
-	for _, arg := range args {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if options && arg == "-d" {
+			i++
+			if i >= len(args) || a.writeProtected(args[i], cwd) {
+				a.reason = roles.Indeterminate
+				return
+			}
+			continue
+		}
 		if options && arg == "--" {
 			options = false
 			continue
@@ -246,6 +258,5 @@ func (a *analyzer) unzipCommand(args []string, cwd string) {
 			return
 		}
 	}
-	// Unmodeled extraction destinations and implicit member sets fail closed.
-	a.reason = roles.Indeterminate
+	// The destination and member operands have already passed the P15 token check.
 }

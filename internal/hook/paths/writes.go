@@ -80,7 +80,7 @@ func gitConfigTarget(name, cwd, home, xdg, global string) bool {
 		}
 	}
 	// A separate gitdir need not have a .git component in its path.
-	for dir, count := filepath.Dir(rawName), 0; dir != filepath.Dir(dir) && count < 128; dir, count = filepath.Dir(dir), count+1 {
+	for dir, count := filepath.Clean(rawName), 0; dir != filepath.Dir(dir) && count < 128; dir, count = filepath.Dir(dir), count+1 {
 		if info, err := os.Stat(filepath.Join(dir, "HEAD")); err == nil && info.Mode().IsRegular() {
 			objects, objErr := os.Stat(filepath.Join(dir, "objects"))
 			refs, refsErr := os.Stat(filepath.Join(dir, "refs"))
