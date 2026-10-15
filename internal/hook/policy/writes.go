@@ -88,7 +88,7 @@ func (a *analyzer) configPath(name, cwd string) bool {
 }
 
 func readOnlyConfigCommand(name string, args []string) bool {
-	if name == "git" {
+	if optionIn("git true false test :", name) {
 		return true
 	}
 	if name == "jq" {
@@ -116,8 +116,12 @@ var gitToken = regexp.MustCompile(`(?i)\.git(?:modules|config|[^a-z0-9_-]|$)|git
 
 // Non-read-only commands cannot even name a Git configuration file.
 func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
-	if readOnlyConfigCommand(name, args) {
+	if readOnlyConfigCommand(name, args) || optionIn("echo printf", name) {
 		return false
+	}
+	if a.configPath(".", cwd) {
+		a.reason = "git configuration write target"
+		return true
 	}
 	for _, word := range args {
 		if gitToken.MatchString(word) {
@@ -130,6 +134,10 @@ func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
 		values := []string{word}
 		if _, value, ok := strings.Cut(word, "="); ok {
 			values = append(values, value)
+		} else if strings.HasPrefix(word, "-") {
+			for i := 2; i < len(word); i++ {
+				values = append(values, word[i:])
+			}
 		}
 		for _, value := range values {
 			if strings.HasPrefix(value, "-") || strings.HasPrefix(value, "~") && !strings.HasPrefix(value, "~/") || strings.ContainsAny(value, "; \n\t") {
@@ -203,22 +211,31 @@ func (a *analyzer) writeCommand(name string, args []string, cwd string) bool {
 // the two explicitly permitted home locations from the hook environment.
 func (a *analyzer) staticVariable(name string) (string, bool) {
 	if a.source != "" {
-		// Bare names include targets of read, for, mapfile, printf -v and similar
-		// mutations. Neither a prefix assignment nor a second assignment proves
-		// that the value remains the one originally seen by the scanner.
-		bare := regexp.MustCompile(`(^|[\s;])` + regexp.QuoteMeta(name) + `([\s;]|$)`)
-		if bare.MatchString(a.source) {
-			return "", false
-		}
+		// Only one plain assignment may establish the value. Every other
+		// identifier run, apart from parameter expansions, invalidates it.
 		assigned := regexp.MustCompile(`(^|[;\n])\s*` + regexp.QuoteMeta(name) + `=`)
-		count := len(assigned.FindAllStringIndex(a.source, -1))
-		if count > 1 || count == 1 && a.assignments[name] != 1 {
+		matches := assigned.FindAllStringIndex(a.source, -1)
+		if len(matches) != 1 || a.assignments[name] != 1 {
+			if !(name == "HOME" || name == "XDG_CONFIG_HOME") || len(matches) != 0 {
+				return "", false
+			}
+		}
+
+		bare := regexp.MustCompile(`(^|[^a-zA-Z0-9_])` + regexp.QuoteMeta(name) + `([^a-zA-Z0-9_]|$)`)
+		for _, loc := range bare.FindAllStringSubmatchIndex(a.source, -1) {
+			start := loc[3]
+			end := start + len(name)
+			if len(matches) == 1 && start >= matches[0][0] && end <= matches[0][1] || start > 0 && a.source[start-1] == '$' || start > 1 && a.source[start-2:start] == "${" && end < len(a.source) && a.source[end] == '}' {
+				continue
+			}
 			return "", false
 		}
-		if name != "HOME" && name != "XDG_CONFIG_HOME" && count != 1 {
+		// Indirect assignment options can overwrite any previously static name.
+		if regexp.MustCompile(`\bprintf\s+-[^\s;]*v|\b(?:declare|typeset|local|unset)\s+-[^\s;]*n`).MatchString(a.source) {
 			return "", false
 		}
 	}
+
 	if name == "HOME" {
 		return a.home, a.home != ""
 	}

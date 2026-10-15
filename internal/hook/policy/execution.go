@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -27,6 +28,9 @@ func shellArguments(name string, args []string) (bool, int, []string, bool) {
 	end := false
 	for i := 0; i < len(args); i++ {
 		word := args[i]
+		if !end && word == "-" && i == len(args)-1 && !command {
+			return false, -1, init, false
+		}
 		if !end && (word == "--" || word == "-") {
 			end = true
 			continue
@@ -157,7 +161,7 @@ func (a *analyzer) shellCommand(name string, args []string, depth int, cwd strin
 // modelledCommand keeps opaque strings out of Git messages and other commands
 // whose operand grammar is already explicitly classified.
 func modelledCommand(name string) bool {
-	if optionIn("git sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
+	if optionIn("git gh secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh", name) {
 		return true
 	}
 	if _, ok := utilityTable[name]; ok {
@@ -170,6 +174,13 @@ func modelledCommand(name string) bool {
 	return false
 }
 
+// unmodelledCommand has no operand grammar; only these argv data operands
+// receive the P18 raw-token check, including the host's direct argv route.
+func unmodelledCommand(name string) bool {
+	return !modelledCommand(name) && !shellName(name) && !roles.KnownReader(name) &&
+		!optionIn("tar bsdtar unzip cpio 7z 7za split dotenv eval docker openssl zip rsync scp du realpath readlink basename dirname chmod chown chgrp rm find [ [[", name)
+}
+
 func knownNested(name string) bool {
 	name = strings.ToLower(path.Base(name))
 	return shellName(name) || modelledCommand(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
@@ -180,6 +191,22 @@ func knownNested(name string) bool {
 func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(value), "")
 	if err != nil || len(file.Stmts) == 0 {
+		return
+	}
+	syntax.Walk(file, func(node syntax.Node) bool {
+		if stmt, ok := node.(*syntax.Stmt); ok {
+			for _, redir := range stmt.Redirs {
+				if strings.HasPrefix(redir.Op.String(), "<") && redir.Word != nil && paths.LexicalProtected(literal(redir.Word), cwd, a.home) {
+					a.reason = roles.FileInput
+				}
+			}
+		}
+		if call, ok := node.(*syntax.CallExpr); ok && len(call.Args) > 1 && optionIn("source .", literal(call.Args[0])) && paths.LexicalProtected(literal(call.Args[1]), cwd, a.home) {
+			a.reason = roles.FileInput
+		}
+		return a.reason == ""
+	})
+	if a.reason != "" {
 		return
 	}
 	probe := *a

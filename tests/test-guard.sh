@@ -75,7 +75,13 @@ printf '%s\n' 'KEY=synthetic-private' >"$TMP/upper-private/.Secrets/file.txt"
 printf '%s\n' 'TOKEN=template-only' >"$TMP/template-search/.ENV.EXAMPLE"
 secrets() {
     local name="$1" want="$2" tool="$3" value="$4" extra="${5:-}" got
-    local guard_cmd=("${GUARD_ARGS[@]}")
+    local guard_cmd=("${GUARD_ARGS[@]}") jq_value_args=(--arg v "$value")
+    if ((${#value} > 100000)); then
+        printf '%s' "$value" >"$TMP/large-command"
+        jq_value_args=(--rawfile v "$TMP/large-command")
+    fi
+    # shellcheck disable=SC2053  # optional glob filters focused synthetic runs
+    if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
     if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
         guard_cmd=("$BASH" "$SECRETS_GUARD")
     fi
@@ -87,10 +93,10 @@ secrets() {
         printf 'guard\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
     fi
     [[ -n "$extra" ]] || extra='{}'
-    got="$(jq -cn --arg t "$tool" --arg v "$value" --arg w "$TMP/search" --argjson extra "$extra" \
+    got="$(jq -cn --arg t "$tool" "${jq_value_args[@]}" --arg w "$TMP/search" --argjson extra "$extra" \
         '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
         perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" 2>"$TMP/$name.err" |
-        jq -r '.hookSpecificOutput.permissionDecision // "allow"' 2>/dev/null)" || got="crash"
+        jq -r 'if env.SECRET_TEST_REASON == "1" then (.hookSpecificOutput.permissionDecision // "allow") + " " + (.hookSpecificOutput.permissionDecisionReason // "") else .hookSpecificOutput.permissionDecision // "allow" end' 2>/dev/null)" || got="crash"
     got="${got:-allow}"
     if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
         if [[ "$got" == "$want" ]]; then
@@ -290,8 +296,8 @@ if command -v jq >/dev/null 2>&1; then
         secrets head_glob deny Bash 'head *.secret'
         secrets cat_star deny Bash 'cat *'
         # heredoc bodies are data, except unquoted ones with substitutions
-        secrets heredoc_commit allow Bash $'git commit -F - <<\'EOF\'\nfeat: secret exec and cat .env are prose\nEOF'
-        secrets heredoc_plain allow Bash $'cat <<EOF\ncat ~/.secrets/x.secret\nEOF'
+        secrets heredoc_commit deny Bash $'git commit -F - <<\'EOF\'\nfeat: secret exec and cat .env are prose\nEOF'
+        secrets heredoc_plain deny Bash $'cat <<EOF\ncat ~/.secrets/x.secret\nEOF'
         secrets heredoc_dash allow Bash $'cat <<-EOF\n\tsecret exec x\n\tEOF'
         secrets heredoc_subst deny Bash $'cat <<EOF\n$(cat ~/.secrets/x.secret)\nEOF'
         secrets heredoc_after deny Bash $'cat <<\'EOF\'\nhi\nEOF\ncat ~/.secrets/x.secret'
@@ -402,12 +408,12 @@ if command -v jq >/dev/null 2>&1; then
             SAFE_DEEP_CMD="bash -c '${SAFE_DEEP_CMD//\'/\'\\\'\'}'"
         done
         secrets deep_risk deny Bash "$DEEP_CMD"
-        secrets deep_safe allow Bash "$SAFE_DEEP_CMD"
+        secrets deep_safe deny Bash "$SAFE_DEEP_CMD"
         LONG_TEXT="$(printf 'a%.0s' $(seq 1 33000))"
-        secrets long_safe allow Bash "echo $LONG_TEXT"
+        secrets long_safe deny Bash "echo $LONG_TEXT"
         secrets long_risk deny Bash "echo $LONG_TEXT .env"
         MEDIUM_TEXT="$(printf 'a%.0s' $(seq 1 8200))"
-        secrets bounded_length_safe allow Bash "echo $MEDIUM_TEXT"
+        secrets bounded_length_safe deny Bash "echo $MEDIUM_TEXT"
         secrets bounded_length_risk deny Bash "echo $MEDIUM_TEXT .ENV"
         MANY_TOKENS="$(printf 'word %.0s' $(seq 1 130))"
         secrets bounded_tokens_safe allow Bash "echo $MANY_TOKENS"
@@ -485,7 +491,7 @@ if command -v jq >/dev/null 2>&1; then
             risk_index=$((risk_index + 1))
         done
         for safe_word in environment settings exported declared typesetting xclipboard rgument; do
-            secrets "over_cap_safe_$risk_index" allow Bash "echo $safe_word $LONG_TEXT"
+            secrets "over_cap_safe_$risk_index" deny Bash "echo $safe_word $LONG_TEXT"
             risk_index=$((risk_index + 1))
         done
         for entry in "${PRINTER_CASES[@]}"; do
@@ -501,7 +507,7 @@ if command -v jq >/dev/null 2>&1; then
             risk_index=$((risk_index + 1))
         done
         for operation in 'ps aux' 'ps -ef' 'ps -e' 'gh auth status' 'aws sts get-caller-identity' 'aws configure list' 'gcloud auth list' 'op whoami' 'pass ls' 'pass insert x' 'secret-tool store service mail' "jq -n '1'" 'cat ~/.ssh/id_ed25519.pub' 'cat ~/.ssh/config' 'cat ~/.ssh/known_hosts' 'cat .npmrc.example' 'cat .pypirc.template' 'cat /proc/self/status' 'cat /proc/cpuinfo' 'cat config.json' 'cat package.json' 'echo gcloudish opportune passage psalm secret-tooling kwallet-querying'; do
-            secrets "over_cap_safe_$risk_index" allow Bash "$operation # $LONG_TEXT"
+            secrets "over_cap_safe_$risk_index" deny Bash "$operation # $LONG_TEXT"
             risk_index=$((risk_index + 1))
         done
         secrets over_cap_pass_after_safe deny Bash "pass ls; pass show mail # $LONG_TEXT"
@@ -552,8 +558,9 @@ if command -v jq >/dev/null 2>&1; then
         secrets xargs_arg_file_long deny Bash 'xargs --arg-file .env cat'
         secrets xargs_arg_file_equals deny Bash 'xargs --arg-file=.env cat'
         secrets xargs_arg_file_default deny Bash 'xargs -a .env'
-        secrets xargs_arg_file_safe allow Bash 'xargs -a src/a.ts cat'
-        secrets xargs_arg_file_template allow Bash 'xargs --arg-file=.env.example cat'
+        # Reader children cannot certify names supplied by an argument file.
+        secrets xargs_arg_file_safe deny Bash 'xargs -a src/a.ts cat'
+        secrets xargs_arg_file_template deny Bash 'xargs --arg-file=.env.example cat'
         for wrapper in timeout nice stdbuf caffeinate xargs exec; do
             secrets "unknown_${wrapper}_reader" deny Bash "$wrapper --unrecognised value cat .env"
             secrets "unknown_${wrapper}_printer" deny Bash "$wrapper --unrecognised value env"
@@ -602,7 +609,7 @@ if command -v jq >/dev/null 2>&1; then
         secrets sudo_long deny Bash 'sudo --user=root cat .env'
         secrets sudo_shell deny Bash "sudo -s 'cat .env'"
         secrets sudo_login deny Bash "sudo -i 'cat .env'"
-        secrets sudo_shell_safe allow Bash "sudo -s 'cat src/a.ts'"
+        secrets sudo_shell_cluster deny Bash "sudo -s 'cat src/a.ts'"
         secrets sudo_unknown deny Bash 'sudo --unknown value cat .env'
         secrets sudo_unknown_safe deny Bash 'sudo --unknown value echo hello'
         secrets continuation_operand deny Bash $'cat \\\n.env'
@@ -703,7 +710,7 @@ if command -v jq >/dev/null 2>&1; then
             risk_index=$((risk_index + 1))
         done
         for safe_word in 'gcloudish auth print-access-token' 'awsome configure export-credentials' 'opportune read' 'passage show mail' 'secret-tooling lookup' 'kwallet-querying -r' 'psalm eww' 'declaration' 'typesetting' 'jqish environment' 'securityish find-password' 'ghastly auth token' 'git credentialed fill' 'xclipboard -o' 'xselection --output' 'wl-pasted' 'pbpasted'; do
-            secrets "over_cap_safe_parity_$risk_index" allow Bash "echo $safe_word # $LONG_TEXT"
+            secrets "over_cap_safe_parity_$risk_index" deny Bash "echo $safe_word # $LONG_TEXT"
             risk_index=$((risk_index + 1))
         done
 
@@ -1850,6 +1857,159 @@ for cmd in 'cat .gitignore' 'echo x >> .gitignore' 'cp a .github/workflows/b.yml
     'kubectl set image d x=y' 'git apply --check p.diff'; do
     audit10=$((audit10 + 1))
     secrets "audit10_allowed_$audit10" allow Bash "$cmd"
+done
+
+# Independent gitdirs are synthetic metadata, not a live repository or store.
+mkdir -p "$TMP/search/bare/objects" "$TMP/search/bare/refs" "$TMP/search/sepgd/objects" "$TMP/search/sepgd/refs"
+printf 'ref: refs/heads/main\n' >"$TMP/search/bare/HEAD"
+printf 'ref: refs/heads/main\n' >"$TMP/search/sepgd/HEAD"
+mkdir -p "$TMP/sepgd/objects" "$TMP/sepgd/refs"
+printf 'ref: refs/heads/main\n' >"$TMP/sepgd/HEAD"
+printf 'TOKEN=synthetic-only\n' >"$HOME/.env"
+audit11=0
+# shellcheck disable=SC2016  # commands are literal synthetic guard inputs
+for cmd in \
+    'tar -xf t.tar -C bare' 'tar -xf t.tar --directory bare' 'tar -xf t.tar -C sepgd' \
+    'tar -xf t.tar -Cbare' 'cd bare && tar -xf ../t.tar' \
+    'unzip -o z.zip -d bare' 'cd sepgd && cpio -id < ../a.cpio' \
+    'cp x bare' 'mv x bare' 'rsync -a tmpl/ bare' \
+    'git apply --stat --apply p.patch' 'git apply --check --apply p.patch' \
+    'git apply --check --unsafe-paths --directory=bare p.patch' \
+    'git init --template=../tmpl' 'git init --template ../tmpl' \
+    'GIT_TEMPLATE_DIR=../tmpl git init' 'git clone --template=../tmpl url bare' \
+    'git -c core.hooksPath=x init' 'git clone -c core.hooksPath=x url bare' \
+    'd=build;read d<f;echo x > $d/pre-commit' \
+    'd=build && read d<f && echo x > $d/pre-commit' \
+    'd=build;printf -vd x;echo x > $d/pre-commit' \
+    'd=build;d[0]=bare;echo x > $d/pre-commit' \
+    "echo 'cat .netrc' | bash -" "echo 'cat .netrc' | sh -" \
+    "echo 'cat .netrc' | bash -x -" 'coproc X bash -' \
+    'npm exec --call printenv' 'npx --call=env' 'npm x -c printenv' \
+    'npm --yes exec -c printenv' 'npm exec -cprintenv' 'npx -cprintenv' \
+    'make -E '\''$(info $(shell cat .netrc))'\''' \
+    'make '\''X=$(shell cat .netrc)'\''' \
+    'make -f<(echo x)' "make --eval 'all: ; @printenv'" \
+    'gh alias set --shell x printenv' 'make -E '\''x: ; @env'\''' \
+    'make -E '\''x:;+env'\''' 'compgen -e' 'compgen -v' \
+    'echo printenv | run0 -u root' 'echo printenv | runuser -u root' \
+    'echo printenv | runuser -l root' 'echo printenv | machinectl shell root@' \
+    'echo printenv | pkexec --user root' 'machinectl shell' 'doas -u root -s' \
+    'foo --cmd '\''cp x bare/hooks/pre-commit'\''' \
+    'foo --cmd '\''source .netrc'\''' 'foo --cmd '\''<.netrc'\''' \
+    $'foo --cmd\tset' 'echo > git/config' 'echo > x/.gitconfig' \
+    'python3 -c '\''open("../sepgd/config","w")'\''' \
+    'python3 <<'\''EOF'\''
+print(open(".env").read())
+EOF' \
+    'node <<'\''EOF'\''
+require("fs").writeFileSync(".git/config","x")
+EOF' \
+    'cd ~ && cat .env' 'cd ~ && echo y >> .gitconfig' 'cd ~user; cat .env' \
+    'xargs cat <<EOF
+.env
+EOF' 'xargs cat < list' 'sudo xargs cat < x' \
+    'xargs -a list cat' 'echo "x:;cat .env" | make -f -' \
+    'rsync -ae printenv' 'rsync -azeprintenv a h:b' \
+    'flock --co=printenv /tmp/l' 'runuser --comm=printenv' \
+    'echo printenv | systemd-run -S' 'env -S"doas -s"' \
+    'declare -n R=D; D[0]=../sepgd; echo x > $D/config' \
+    'git init --bare gd && echo y >> gd/config' \
+    'git clone --mirror url gd && echo y >> gd/config' \
+    'tar -xvC../sepgd -f a.tar' '7z x -o../sepgd a.7z' \
+    'git -C .. --git-dir=newgd init; echo > ../newgd/config' \
+    'git -C .. init --separate-git-dir=newgd' ; do
+    audit11=$((audit11 + 1))
+    secrets "audit11_deny_$audit11" deny Bash "$cmd"
+done
+secrets audit11_template_prefix deny Bash 'git init --templ=../tmpl'
+secrets audit11_cwd_bare deny Bash 'tar -xf ../t.tar' "{\"workdir\":\"$TMP/search/bare\"}"
+secrets audit11_python_here deny Bash $'python3 <<\'EOF\'\nprint(open(".env").read())\nEOF'
+secrets audit11_node_here deny Bash $'node <<\'EOF\'\nrequire("fs").writeFileSync(".git/config","x")\nEOF'
+secrets audit11_perl_here deny Bash $'perl <<\'EOF\'\nopen F,"<.env"\nEOF'
+secrets audit11_ruby_here deny Bash $'ruby <<\'EOF\'\nFile.write(".git/config","x")\nEOF'
+secrets audit11_python_string deny Bash 'python3 <<< '\''open(".git/config","w")'\'''
+secrets audit11_python_npmrc deny Bash $'python3 <<\'EOF\'\nprint(open(".npmrc").read())\nEOF'
+# P18 scans unknown arguments but exempts only certified data roles.
+secrets p18_unknown_npmrc deny Bash 'foo "load .npmrc"'
+secrets p18_unknown_inline deny Bash "foo --x='cat .env'"
+# shellcheck disable=SC2016  # literal substitution is sent to the guard
+secrets p18_unknown_substitution deny Bash 'foo "$(echo .env)"'
+secrets p18_malformed_git deny Bash "foo '.git/config"
+secrets p18_commit_message allow Bash "git commit -m 'drop .env from docs'"
+secrets p18_pr_body allow Bash "gh pr create --title 'fix' --body 'never commit .env'"
+secrets p18_echo_docs allow Bash "echo 'see .git/config' > notes.md"
+secrets p18_printf_template allow Bash "printf '%s\\n' .env.example"
+secrets p18_rg_pattern allow Bash "rg -n '.env' src"
+secrets p18_cat_heredoc allow Bash $'cat > notes.md <<\'EOF\'\n.env\nEOF'
+secrets p18_cat_here_string allow Bash "cat > notes.md <<<'.env'"
+secrets p18_tee_here_string allow Bash "tee notes.md <<<'.env'"
+secrets p18_protected_here_string deny Bash "cat > .env <<<'.env'"
+secrets p18_protected_heredoc deny Bash $'cat > .env <<\'EOF\'\n.env\nEOF'
+secrets p18_comment allow Bash '# .env'
+secrets p18_script_comment deny Bash $'python3 <<\'EOF\'\n# .env\nEOF'
+# Role-classified operands bypass P18 and retain their established decisions.
+secrets p18_secret_show allow Bash 'secret show .env'
+secrets p18_secret_run allow Bash 'secret run -f .env -- npm test'
+secrets p18_secret_run_home allow Bash 'secret run -f ~/.secrets/app.env -- npm test'
+secrets p18_secret_stash allow Bash 'secret stash .env K'
+secrets p18_docker_env allow Bash 'docker run --env-file .env img'
+secrets p18_node_env allow Bash 'node --env-file=.env app.js'
+secrets p18_dotenv allow Bash 'dotenv -e .env -- npm test'
+secrets p18_ls allow Bash 'ls -la .env'
+secrets p18_rm allow Bash 'rm .env'
+secrets p18_chmod allow Bash 'chmod 600 .env'
+secrets p18_git_check_ignore allow Bash 'git check-ignore .env'
+secrets p18_cp_template allow Bash 'cp .env.example .env'
+secrets audit11_cd_group deny Bash '( cd ~; cat .env )'
+secrets audit11_cd_braces deny Bash '{ cd ~; cat .env; }'
+secrets audit11_cd_physical deny Bash 'cd -P ~ && cat .env'
+secrets audit11_builtin_cd deny Bash 'builtin cd ~ && cat .env'
+secrets audit11_git_bare_clone deny Bash 'git clone --bare url gd && echo y >> gd/config'
+secrets audit11_make_stdin deny Bash 'make -f /dev/stdin < input'
+secrets audit11_find_output allow Bash 'find -L . -fprint0 output'
+secrets audit11_heredoc_docs allow Bash $'cat > notes.md <<\'EOF\'\nsee .git/config docs\nEOF'
+# shellcheck disable=SC2016  # literal command substitutions and here-docs
+for cmd in \
+    'git commit -m "$(cat <<'\''EOF'\''
+body
+EOF
+)"' \
+    'gh pr create --body "$(cat <<'\''EOF'\''
+body
+EOF
+)"' \
+    'docker run -v "$PWD":/src node:20 npm test' \
+    'make' 'make test' 'make -C sub -j 4' 'make VAR=1' \
+    'npm exec eslint .' 'npx prettier --check .' \
+    'tar -xf a.tar -C build' 'cp -r a dist' \
+    'cat > src/a.ts <<'\''X'\''
+code
+X' \
+    'echo '\''see .git/config docs'\'' > notes.md' \
+    'cat > notes.md <<'\''EOF'\''
+see .git/config docs
+EOF' \
+    'find -L . -fprint0 o' ; do
+    audit11=$((audit11 + 1))
+    secrets "audit11_allow_$audit11" allow Bash "$cmd"
+done
+# A quoted heredoc is data, and its body is exempt from the shell word cap.
+large_body="$(perl -e 'print "a" x 1048400')"
+secrets audit11_large_heredoc allow Bash "$(printf "cat > src/big.ts <<'X'\n%s\nX" "$large_body")"
+secrets audit11_large_heredoc_git deny Bash "$(printf "cat > .git/config <<'X'\n%s\nX" "$large_body")"
+secrets audit11_large_early_delimiter deny Bash "$(printf "cat > src/big.ts <<'X'\n%s\nX\necho x > .git/config\nX" "$large_body")"
+unset large_body
+long_statements='' long_pipe=cat
+for ((j = 0; j < 300; j++)); do long_statements+='cat x > build/o;'; done
+for ((j = 0; j < 2000; j++)); do long_pipe+=' | cat'; done
+for cmd in "$long_statements" "$long_pipe"; do
+    started=$SECONDS
+    audit11=$((audit11 + 1))
+    secrets "audit11_budget_$audit11" deny Bash "$cmd"
+    if ((SECONDS - started >= 4)); then
+        printf 'FAIL audit11 budget %s exceeded four seconds\n' "$audit11"
+        FAILED=$((FAILED + 1))
+    fi
 done
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"

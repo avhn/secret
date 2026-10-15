@@ -249,13 +249,29 @@ func launcherStdin(call *syntax.CallExpr, redirs []*syntax.Redirect) bool {
 		return false
 	}
 	name := strings.ToLower(path.Base(literal(call.Args[0])))
-	if !optionIn("doas run0 pkexec expect runuser su machinectl sudo", name) {
+	if !optionIn("doas run0 pkexec expect runuser su machinectl sudo script systemd-run", name) {
 		return false
 	}
 	for _, r := range redirs {
 		if strings.HasPrefix(r.Op.String(), "<") {
 			return true
 		}
+	}
+	return false
+}
+
+func launcherShellOption(args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.ContainsAny(arg[1:], "si") {
+			return true
+		}
+	}
+	return false
+}
+
+func launcherStdinStatement(stmt *syntax.Stmt) bool {
+	if call, ok := stmt.Cmd.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+		return optionIn("doas run0 pkexec su runuser machinectl sudo script expect systemd-run", strings.ToLower(path.Base(literal(call.Args[0]))))
 	}
 	return false
 }

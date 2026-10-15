@@ -125,6 +125,10 @@ for workdir in "$TMP/work" "$TMP/elsewhere"; do
     shell_case "gitdir_write_${workdir##*/}" deny "$(jq -cn --arg p "$TMP/git-objects/config" '"echo x > " + $p')" "$workdir"
 done
 shell_case gitdir_nongit_allow allow "$(jq -cn --arg p "$TMP/elsewhere/config" '"echo x > " + $p')"
+shell_case gitdir_workdir deny '"cp x git-objects"' "$TMP"
+shell_case git_apply_unsafe deny '"git apply --stat --apply p.patch"'
+shell_case npm_call_printer deny '"npm exec --call printenv"'
+shell_case make_target_safe allow '"make test"'
 for op in 'Add File' 'Update File' 'Delete File' 'Move to'; do
     patch_case "${op// /_}_env" deny "*** Begin Patch
 *** $op: .env

@@ -9,7 +9,6 @@ guard	audit6_sed_change_line	deliberate-tightening
 guard	audit6_sed_comment	deliberate-tightening
 guard	audit6_sed_insert_line	deliberate-tightening
 guard	audit6_sed_text_line	deliberate-tightening
-guard	deep_safe	deliberate-tightening
 guard	grep_find_exit	deliberate-find-shim
 guard	grep_find_exit_count	deliberate-find-shim
 guard	grep_timeout	deliberate-find-shim

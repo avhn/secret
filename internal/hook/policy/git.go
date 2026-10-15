@@ -284,16 +284,60 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				a.reason = roles.Indeterminate
 				return
 			}
+			if sub == "init" {
+				a.reason = roles.Indeterminate
+				return
+			}
 			a.gitRoots = append(a.gitRoots, filepath.Clean(paths.Resolve(value, cwd, "", a.home)))
 		}
 	}
-	applyReadOnly := false
-	if sub == "apply" {
-		for _, operand := range operands {
-			if optionIn("--check --stat --numstat", operand) {
-				applyReadOnly = true
+	if sub == "init" || sub == "clone" {
+		if _, present := a.env["GIT_TEMPLATE_DIR"]; present {
+			a.reason = roles.Indeterminate
+			return
+		}
+		for _, arg := range operands {
+			key, _, _ := strings.Cut(arg, "=")
+			if strings.HasPrefix(key, "--tem") && strings.HasPrefix("--template", key) || strings.HasPrefix(arg, "--template") {
+				a.reason = roles.Indeterminate
+				return
 			}
 		}
+	}
+	// A newly created repository is a protected target even before HEAD exists.
+	if sub == "init" || sub == "clone" {
+		if gitDir != "" && sub == "init" {
+			a.gitRoots = append(a.gitRoots, a.gitPath(gitDir, cwd))
+		}
+		var target string
+		for i := 0; i < len(operands); i++ {
+			word := operands[i]
+			if word == "--separate-git-dir" {
+				i++
+				continue
+			}
+			if strings.HasPrefix(word, "-") {
+				continue
+			}
+			if sub == "clone" && target == "" {
+				target = word
+				continue
+			}
+			target = word
+		}
+		if target != "" && staticGitPath(target) && (sub == "init" || sub == "clone") {
+			root := a.gitPath(target, cwd)
+			if sub == "init" && !bareGlobal && !optionIn("--bare --mirror", strings.Join(operands, " ")) && !strings.Contains(strings.Join(operands, " "), "--bare") {
+				root = filepath.Join(root, ".git")
+			}
+			if sub == "clone" && !strings.Contains(strings.Join(operands, " "), "--bare") && !strings.Contains(strings.Join(operands, " "), "--mirror") {
+				root = filepath.Join(root, ".git")
+			}
+			a.gitRoots = append(a.gitRoots, root)
+		}
+	}
+	applyReadOnly := sub == "apply" && gitApplyReadOnly(operands)
+	if sub == "apply" {
 		if !applyReadOnly {
 			a.reason = roles.Indeterminate
 			return
@@ -558,4 +602,45 @@ func gitModulesPresent(cwd string) bool {
 		}
 	}
 	return false
+}
+
+// gitApplyReadOnly requires an explicit check or summary mode and rejects
+// every option that might also apply the patch or redirect its targets.
+func gitApplyReadOnly(args []string) bool {
+	readOnly := false
+	options := true
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			options = false
+			continue
+		}
+		if !options || !strings.HasPrefix(arg, "-") || arg == "-" {
+			continue
+		}
+		if optionIn("--check --stat --numstat --summary", arg) {
+			readOnly = true
+			continue
+		}
+		if optionIn("-v --verbose -z --recount --allow-empty", arg) || strings.HasPrefix(arg, "--exclude=") || strings.HasPrefix(arg, "--include=") {
+			continue
+		}
+		if arg == "-p" || arg == "-C" {
+			i++
+			if i == len(args) {
+				return false
+			}
+			if _, err := strconv.Atoi(args[i]); err != nil {
+				return false
+			}
+			continue
+		}
+		if len(arg) > 2 && (strings.HasPrefix(arg, "-p") || strings.HasPrefix(arg, "-C")) {
+			if _, err := strconv.Atoi(arg[2:]); err == nil {
+				continue
+			}
+		}
+		return false
+	}
+	return readOnly
 }

@@ -27,7 +27,7 @@ func TestHookAddenda(t *testing.T) {
 		{"EDITOR='code -w' git commit -m x", false},
 		{"FOO+=bar echo ok", false}, {"bash -o errexit -c 'npm test'", false},
 		{"busybox hush -c 'npm test'", false}, {"script -qc \"sh -c 'npm test'\"", false},
-		{"sudo -s 'cat in'", false}, {"sudo -s 'cat .env'", true}, {"sh in", false}, {"sh /dev/stdin", true}, {"bash missing.sh", true},
+		{"sudo -s 'cat in'", true}, {"sudo -s 'cat .env'", true}, {"sh in", false}, {"sh /dev/stdin", true}, {"bash missing.sh", true},
 		{"sed ':a s/x/touch PROBE/e' in", true}, {"sed 't a s/x/touch PROBE/e;:a' in", true},
 		{"sed 'e :;cd .;cat .env' in", true}, {"sed -e 'e :\\' -e 'cat .env' in", true},
 		{`sed 'e echo \;cat .env' in`, true}, {"sed 's/x/cat .env/e' in", true},

@@ -135,8 +135,9 @@ disable substitution, and invalid arithmetic rewrites are excluded.
 
 ## Measurement and regeneration
 
-The default path uses bounded AST analysis with 64 KiB envelopes and 40 KiB
-recursive fragments. Word, brace, recursion, glob, and scan limits remain
+The default path uses bounded AST analysis with envelopes up to 1 MiB plus
+framing overhead. Ordinary shell text has an 8 KiB limit; inert heredoc bodies
+are excluded from that text limit but capped at 1 MiB overall. Word, brace, recursion, glob, and scan limits remain
 bounded. The timing wrapper measures process launch plus decision, not an
 installed host callback.
 
@@ -171,3 +172,57 @@ assignment no longer certify a write target. Synthetic fixtures under
 `internal/hook/policy/` and `internal/hook/paths/` pair the denials with
 ordinary Git metadata, safe file names, and public command forms. These are
 policy checks, not evidence that the installed Bash hook was replaced.
+
+## Audit 11a and 11b: Go hook
+
+Git configuration writes now include the destination itself, both bare and
+separate gitdirs, the effective working directory, attached destination options,
+and roots created by `git init` or `git clone` within the command. `git apply`
+passes only explicit check and summary modes with options from the reviewed
+allowlist; templates and command-running Git config do not pass. Static write
+variables are invalidated by subsequent identifier uses and indirect assignments.
+
+Make recipe and stdin sources, npm and npx call options, alias shells, launcher
+stdin, and abbreviated or clustered command slots are denied when execution
+cannot be certified. Heredocs fed to interpreters are not inert data. A command
+substitution containing only `cat` of an inert quoted heredoc is acceptable as
+Git or GitHub message data, and ordinary writes of a large inert heredoc remain
+acceptable. The Go envelope permits up to 1 MiB of such input; structural
+limits and internal failures still deny. The command corpus retains the audited
+allowances for public archive extraction, benign build tools, and literal copy
+and loop forms. Neither this policy nor synthetic tests assert installed-hook
+protection. The xargs reader with a named safe argument file now denies, because
+contents of that file are not certified to contain only safe paths.
+
+Additional unreviewed shell-suite divergence names from concurrent audit 11
+fixtures cannot be added to the inventory from this scope. Existing reviewed
+`sudo_shell_safe` and xargs argument-file permits now tighten under audit 11a;
+`heredoc_commit` supplies a protected token in a Git stdin message file and
+now denies under the revised P18 body rule; a `-m` cat heredoc substitution
+remains a valid inert message and must be permitted.
+
+Quoted shell wildcard metacharacters use `path.Match` escaping against bounded
+native directory entries rather than platform-dependent `filepath.Glob` escaping.
+This keeps quoted JSON, label filters, and prose literal on Windows while
+retaining unquoted wildcard expansion and protected-name checks. The quoted
+pattern unit test runs on every platform; Windows runtime CI remains necessary.
+
+## P18 revised: Go backstop
+
+The revised backstop checks protected name tokens in interpreter heredoc and
+here-string bodies, literal interpreter code-option values, strict command
+slots, and arguments to commands without a classified model. Cat and tee
+bodies remain inert only when their output does not target a protected file;
+Cat heredocs inside Git commit message substitutions retain their previously
+classified data role; Git stdin message-file bodies still undergo P18 scanning.
+Existing Git configuration
+write checks still apply independently.
+
+Modelled operands retain their role classifications: secret transports,
+env-file consumers, metadata tools, Git messages, GitHub titles and bodies,
+reader patterns, and copy destinations are not raw-token denials. GitHub
+message operands are excluded from generic file-input checks without
+excluding other GitHub arguments. The synthetic P18 table covers both
+protected inline and unmodelled input and the documented safe forms. Sudo
+shell-option clusters continue to deny even with a command argument. The
+installed Bash hook remains separate from this Go policy.

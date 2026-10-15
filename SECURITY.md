@@ -44,13 +44,21 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   denies over-limit token streams rather than falling back to a raw regex.
   Generic shell-looking arguments are inspected for positive findings; known
   command slots such as flock -c, make --eval and rsync -e are inspected
-  strictly. This is syntax-only accident prevention, not execution isolation.
+  strictly. The Bash guard also checks independent bare Git directories as
+  destinations, refuses unsafe Git apply options and template directories,
+  and limits shell statement fanout. Over-budget commands deny, including
+  oversized otherwise safe requests; split them into smaller tool calls.
+  Reader children of xargs given a file, heredoc or here-string also deny
+  because their input names cannot be certified. These checks do not execute
+  the command.
+  This is syntax-only accident prevention, not execution isolation.
   Protected paths are matched after brace and `$IFS` expansion and through
-  symlink aliases; unknown commands may not take a protected file as an input; metadata commands (`ls`, `stat`, `chmod`, `rm`,
-  `git check-ignore`) and env-file consumers (`docker --env-file`,
-  `node --env-file`, `dotenv -e`) stay allowed. A printer piped straight into
-  `secret stash FILE KEY` is allowed, since the value goes into a store instead
-  of the output.
+  symlink aliases. The P18 backstop scans shell input bodies, inline code,
+  strict command slots and unknown commands. Role-classified operands of
+  modelled commands retain their existing rules: `secret show`, `run` and
+  `stash` may name stores; metadata commands and env-file consumers may name
+  protected files. A printer piped straight into `secret stash FILE KEY` is
+  allowed, since the value goes into a store instead of output.
 
 ## What it does not protect
 
