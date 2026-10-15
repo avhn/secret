@@ -228,7 +228,7 @@ func (a *analyzer) unzipCommand(args []string, cwd string) {
 				switch flag {
 				case 'l', 'Z':
 					listing = true
-				case 'q', 'v', 'C', '1', '2', 's', 'm', 'h', 't', 'T':
+				case 'q', 'v', 'C', '1', '2', 's', 'm', 'h', 't', 'T', 'o':
 				case 'p', 'c':
 					a.reason = roles.Indeterminate
 					return

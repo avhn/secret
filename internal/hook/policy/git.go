@@ -409,6 +409,11 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		return
 	}
 	for _, arg := range operands {
+		if sub == "grep" || sub == "log" {
+			if arg == "process.env" || arg == "import.meta.env" || strings.HasPrefix(arg, "-S") || strings.HasPrefix(arg, "-G") || strings.HasPrefix(arg, "--grep=") {
+				continue
+			}
+		}
 		_, value, attached := strings.Cut(arg, "=")
 		if attached && strings.HasPrefix(arg, "-") {
 			arg = value
@@ -462,7 +467,7 @@ type gitOptions struct{ flags, values, optional string }
 // whole form as content-producing, rather than silently skipping a value.
 var gitSafeOptions = map[string]gitOptions{
 	"status":       {"-s --short -b --branch --porcelain --long --show-stash --ahead-behind --no-ahead-behind -z --ignored", "--untracked-files --ignore-submodules --column", "--porcelain --ignored --untracked-files"},
-	"log":          {"--oneline --graph --all-match -i --stat --shortstat --numstat --name-only --name-status --all --reverse --first-parent --merges --no-merges --follow --no-color", "-n --max-count --skip --since --until --after --before --author --committer --grep --format --pretty --date", "--decorate --abbrev --abbrev-commit --no-abbrev-commit --branches --tags --remotes --color --stat"},
+	"log":          {"--oneline --graph --all-match -i --stat --shortstat --numstat --name-only --name-status --all --reverse --first-parent --merges --no-merges --follow --no-color", "-n -S -G --max-count --skip --since --until --after --before --author --committer --grep --format --pretty --date", "--decorate --abbrev --abbrev-commit --no-abbrev-commit --branches --tags --remotes --color --stat"},
 	"shortlog":     {"--oneline --all --reverse --no-merges -s -n -e", "--format --pretty --author --committer --grep --since --until --max-count", "--branches --tags --remotes"},
 	"diff":         {"--stat --name-only --name-status --numstat --shortstat --quiet --exit-code --cached --staged --no-color", "", "--stat"},
 	"branch":       {"--list -l -a --all -r --remotes --show-current", "--sort --format --contains --no-contains --merged --no-merged", "--color"},
@@ -536,7 +541,15 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 		}
 	}
 	if sub == "clean" {
-		return len(args) == 1 && (args[0] == "-n" || args[0] == "--dry-run")
+		if len(args) == 0 || !optionIn("-n --dry-run -f -fd -fdx", args[0]) {
+			return false
+		}
+		for _, target := range args[1:] {
+			if strings.HasPrefix(target, "-") || a.inputProtected(target, cwd) {
+				return false
+			}
+		}
+		return true
 	}
 	if sub == "stash" {
 		if len(args) == 0 {

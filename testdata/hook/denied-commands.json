@@ -388,15 +388,6 @@
       "snapshot": 13
     },
     {
-      "command": "cat ~/.ssh/id_*",
-      "config": "@ROOT@/examples/ripgreprc",
-      "cwd": "@TMP@/search",
-      "extra": {},
-      "home": "@TMP@/home",
-      "name": "ssh_private_glob",
-      "snapshot": 13
-    },
-    {
       "command": "cat ~/.secrets/svc.secret",
       "config": "@ROOT@/examples/ripgreprc",
       "cwd": "@TMP@/search",
@@ -11394,6 +11385,16 @@
         "upper-search/X.SECRET",
         "file",
         ""
+      ],
+      [
+        "home/.docker",
+        "dir",
+        ""
+      ],
+      [
+        "home/.docker/config.json",
+        "file",
+        "synthetic-only\n"
       ]
     ],
     [

@@ -48,6 +48,9 @@ print-access-token`, `aws configure get`, `op read`, `pass`, `secret-tool`,
   destinations, refuses unsafe Git apply options and template directories,
   and limits shell statement fanout. Over-budget commands deny, including
   oversized otherwise safe requests; split them into smaller tool calls.
+  Bash permits up to 256 command words (heredoc body text does not count).
+  A trailing CR in CRLF input is ignored, but a CR in the middle of a line
+  still denies.
   Reader children of xargs given a file, heredoc or here-string also deny
   because their input names cannot be certified. These checks do not execute
   the command.

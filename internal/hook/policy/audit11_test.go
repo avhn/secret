@@ -97,8 +97,8 @@ EOF
 		{"unknown --title '.env'", root, true},
 		{"gh pr create --body 'see .env docs'", root, false},
 		{"echo 'see .git/config docs' > notes.md", root, false},
-		{"cat > src/big.ts <<'X'\n" + strings.Repeat("a", 400<<10) + "\nX", root, false},
-		{"cat > src/big.ts <<'X'\n" + strings.Repeat("a", 400<<10) + "\nsee .env in docs\nX", root, false},
+		{"cat > src/big.ts <<'X'\n" + strings.Repeat("a", 1<<20-4096) + "\nX", root, false},
+		{"cat > src/big.ts <<'X'\n" + strings.Repeat("a", 1<<20-4096) + "\nsee .env in docs\nX", root, false},
 		{strings.Repeat("true\n", 9000) + "x; echo y > .git/config", root, true},
 	}
 	for _, tc := range tests {
