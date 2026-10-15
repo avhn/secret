@@ -38,6 +38,15 @@ codex	ordinary	decision	allow
 codex	ordinary_patch	decision	allow
 codex	oversized_named	decision	deny
 codex	oversized_safe	decision	allow
+codex	p19_compose_config	decision	deny
+codex	p19_config_override	decision	deny
+codex	p19_curl_upload	decision	deny
+codex	p19_docker_mount	decision	deny
+codex	p19_git_clone_allow	decision	allow
+codex	p19_gitdir_code	decision	deny
+codex	p19_make_eval	decision	deny
+codex	p19_pm2_env	decision	deny
+codex	p19_sed_allow	decision	allow
 codex	parent_env	decision	deny
 codex	patch_heredoc_prose	decision	deny
 codex	patch_shell_heredoc	decision	deny

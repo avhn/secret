@@ -17,14 +17,20 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 			return true
 		}
 		if name == "make" {
+			if !strings.ContainsAny(code, ":=\n") {
+				a.reason = roles.Indeterminate
+				return true
+			}
 			for _, line := range strings.Split(code, "\n") {
-				if _, recipe, ok := strings.Cut(line, ";"); ok {
-					recipe = strings.TrimLeft(strings.TrimSpace(recipe), "@+- \t")
-					if recipe != "" {
-						a.shellValue(recipe, depth, cwd)
-						if a.reason != "" {
-							return true
-						}
+				recipe := line
+				if _, after, ok := strings.Cut(line, ";"); ok {
+					recipe = after
+				}
+				recipe = strings.TrimLeft(strings.TrimSpace(recipe), "@+- \t")
+				if recipe != "" && !strings.HasSuffix(recipe, ":") {
+					a.shellValue(recipe, depth, cwd)
+					if a.reason != "" {
+						return true
 					}
 				}
 			}
@@ -56,7 +62,7 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 			key, attached, hasValue := strings.Cut(arg, "=")
 			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--command" || strings.HasPrefix(key, "--co") && strings.HasPrefix("--command", key)) ||
 				(name == "npm" && npmExec || name == "npx") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--call") ||
-				name == "make" && (arg == "-E" || strings.HasPrefix(arg, "-E") && len(arg) > 2 || arg == "--eval" || key == "--eval") ||
+				name == "make" && (arg == "-E" || strings.HasPrefix(arg, "-E") && len(arg) > 2 || strings.HasPrefix("--eval", key) && len(key) >= 3 && strings.HasPrefix(key, "--e")) ||
 				name == "rsync" && (arg == "-e" || key == "--rsh" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e"))
 			if slot {
 				if name == "rsync" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e") && arg != "-e" {
@@ -84,12 +90,12 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 				}
 				return strict(args[i+1])
 			}
-			if name == "make" && (arg == "-f" || arg == "--file" || arg == "--makefile" || key == "--file" || key == "--makefile" || strings.HasPrefix(arg, "-f") && len(arg) > 2) {
+			if name == "make" && (strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "f") || arg == "--file" || arg == "--makefile" || key == "--file" || key == "--makefile" || strings.HasPrefix(arg, "-f") && len(arg) > 2) {
 				file := attached
-				if strings.HasPrefix(arg, "-f") && len(arg) > 2 {
-					file = arg[2:]
+				if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "f") {
+					file = strings.SplitN(arg[1:], "f", 2)[1]
 				}
-				if arg == "-f" || arg == "--file" || arg == "--makefile" {
+				if file == "" && (strings.Contains(arg, "f") || arg == "--file" || arg == "--makefile") {
 					if i+1 >= len(args) {
 						a.reason = roles.Indeterminate
 						return true

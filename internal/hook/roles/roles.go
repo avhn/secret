@@ -227,6 +227,9 @@ func OperandReason(name string, args []string, protected func(string) bool) stri
 	if name == "split" {
 		return splitReason(args, protected)
 	}
+	if name == "kubectl" && len(args) >= 4 && args[0] == "create" && args[1] == "secret" {
+		return ""
+	}
 	if metadata[name] || name == "echo" || name == "printf" || name == "secret" || name == "tee" {
 		return ""
 	}

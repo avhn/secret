@@ -198,8 +198,19 @@ func (a *analyzer) writeCommand(name string, args []string, cwd string) bool {
 		}
 		if inplace {
 			for _, arg := range args {
-				if !strings.HasPrefix(arg, "-") && target(arg) {
-					return true
+				if !strings.HasPrefix(arg, "-") {
+					if strings.ContainsAny(arg, "*?[") {
+						parent := filepath.Dir(arg)
+						if !a.configPath(parent, cwd) && !a.treeProtected(parent, cwd) {
+							continue
+						}
+						if _, err := os.Lstat(a.resolve(parent, cwd)); os.IsNotExist(err) && !a.configPath(parent, cwd) {
+							continue // An unmatched glob is a literal, not a write target.
+						}
+					}
+					if target(arg) {
+						return true
+					}
 				}
 			}
 		}
@@ -243,7 +254,7 @@ func (a *analyzer) staticVariable(name string) (string, bool) {
 	if !ok && name == "XDG_CONFIG_HOME" {
 		value, ok = os.LookupEnv(name)
 	}
-	return value, ok && value != "" && !strings.ContainsAny(value, "$`*?[]")
+	return value, ok && value != "" && !strings.ContainsAny(value, "$`")
 }
 
 // writePatternWord catches unquoted globs before the command's argv expansion
@@ -260,6 +271,8 @@ func writePatternWord(word *syntax.Word) bool {
 	return false
 }
 
+// In-place edits expand file globs before checking every target; only
+// commands with direct literal write destinations are rejected here.
 func writePatternCommand(name string, args []*syntax.Word) bool {
 	if len(args) < 2 {
 		return false
@@ -273,20 +286,6 @@ func writePatternCommand(name string, args []*syntax.Word) bool {
 		}
 	case "cp", "mv", "ln", "install", "rsync":
 		return writePatternWord(args[len(args)-1])
-	case "sed", "perl":
-		inplace := false
-		for _, w := range args[1:] {
-			if v := literal(w); v == "-i" || strings.HasPrefix(v, "-i") || v == "--in-place" || strings.HasPrefix(v, "--in-place=") || name == "perl" && strings.HasPrefix(v, "-p") && strings.Contains(v, "i") {
-				inplace = true
-			}
-		}
-		if inplace {
-			for _, w := range args[1:] {
-				if writePatternWord(w) {
-					return true
-				}
-			}
-		}
 	}
 	return false
 }

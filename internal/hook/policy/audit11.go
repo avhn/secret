@@ -12,7 +12,7 @@ var inlinePath = regexp.MustCompile(`['"]([^'"\r\n]+)['"]`)
 
 func (a *analyzer) inlineGitDir(code, cwd string) bool {
 	for _, match := range inlinePath.FindAllStringSubmatch(code, -1) {
-		value := match[1]
+		value := strings.TrimLeft(match[1], "><")
 		if strings.ContainsAny(value, " ;(){}") {
 			continue
 		}

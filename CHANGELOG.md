@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Harden the Bash guard for inline code targeting independent Git directories,
+  bind mounts, Git configuration overrides, Make recipes and options, and
+  ordinary upload and environment-printing commands. Restore safe developer
+  Git, search, and message commands, and bound oversized single-line analysis.
+
 - Scan protected-name and Git configuration tokens in unknown shell arguments,
   shell input bodies, inline code and strict command slots. Modelled metadata,
   store and env-file operands retain their earlier decisions. Sudo shell-option

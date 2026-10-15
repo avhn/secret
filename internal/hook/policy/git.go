@@ -138,9 +138,9 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			repoUncertain = true
 		}
 	}
-	for _, key := range strings.Fields("GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG GIT_INDEX_FILE GIT_COMMON_DIR") {
+	for _, key := range strings.Fields("GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM GIT_CONFIG GIT_INDEX_FILE GIT_COMMON_DIR") {
 		if key != "GIT_CONFIG_COUNT" {
-			if _, known := a.env[key]; !known {
+			if _, known := a.env[key]; !known && key != "GIT_CONFIG_GLOBAL" && key != "GIT_CONFIG_SYSTEM" {
 				if _, present := os.LookupEnv(key); present {
 					a.reason = roles.Indeterminate
 					return
@@ -316,6 +316,10 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				i++
 				continue
 			}
+			if word == "-c" && i+1 < len(operands) && sub == "clone" {
+				i++
+				continue
+			}
 			if strings.HasPrefix(word, "-") {
 				continue
 			}
@@ -344,7 +348,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 		}
 	}
 	for _, arg := range operands {
-		if strings.HasPrefix(arg, "--submodule=diff") || strings.HasPrefix(arg, "--submodule=log") || arg == "--recurse-submodules" || sub == "grep" && arg == "--recurse-submodules" {
+		if strings.HasPrefix(arg, "--submodule=diff") || strings.HasPrefix(arg, "--submodule=log") || arg == "--recurse-submodules" && sub != "clone" || sub == "grep" && arg == "--recurse-submodules" {
 			repoUncertain = true
 		}
 	}
@@ -466,7 +470,7 @@ var gitSafeOptions = map[string]gitOptions{
 	"remote":       {"-v --verbose", "", ""},
 	"rev-parse":    {"--verify --quiet -q --show-toplevel --show-prefix --show-cdup --git-dir --absolute-git-dir --is-inside-work-tree --is-bare-repository --short --symbolic --symbolic-full-name --abbrev-ref --all", "", "--short --abbrev-ref"},
 	"rev-list":     {"--all --count --first-parent --merges --no-merges --reverse --left-right --boundary --no-walk", "-n --max-count --since --until", ""},
-	"ls-files":     {"-z -c --cached -d --deleted -m --modified -o --others -i --ignored -s --stage -u --unmerged -k --killed --exclude-standard --full-name --error-unmatch --deduplicate", "-x --exclude --exclude-from --exclude-per-directory --format", ""},
+	"ls-files":     {"-z -c --cached -d --deleted -m --modified -o --others -i --ignored -s --stage -u --unmerged -k --killed --exclude-standard --full-name --error-unmatch --deduplicate", "-x -X --exclude --exclude-from --exclude-per-directory --format", ""},
 	"ls-tree":      {"-r -d -t -z --name-only --name-status --full-name --full-tree -l --long", "--format", "--abbrev"},
 	"show-ref":     {"--head --heads --tags --verify --quiet -q --dereference -d --hash -s", "", "--abbrev"},
 	"symbolic-ref": {"-q --quiet --short", "", ""},
@@ -481,6 +485,7 @@ var gitSafeOptions = map[string]gitOptions{
 	"fetch":        {"--all --prune -p --tags -t --no-tags -q --quiet -v --verbose --dry-run --force -f", "--depth --deepen --shallow-since --shallow-exclude", "--recurse-submodules"},
 	"pull":         {"--ff --ff-only --no-ff --rebase --no-rebase --no-edit -q --quiet --all --prune", "--depth", "--rebase"},
 	"push":         {"--all --tags --delete -d --force -f --force-with-lease --dry-run -n -u --set-upstream --porcelain -q --quiet", "--repo", "--force-with-lease"},
+	"clean":        {"-n --dry-run", "", ""},
 	"clone":        {"--bare --mirror --quiet -q --no-checkout -n --single-branch --no-single-branch --recurse-submodules", "--depth --branch -b --origin -o --filter --reference", "--recurse-submodules"},
 	"init":         {"--bare --quiet -q", "-b --initial-branch --template --separate-git-dir --object-format", "--shared"},
 	"merge":        {"--ff --ff-only --no-ff --no-edit --no-commit --commit --abort --continue --squash --quit --allow-unrelated-histories", "-m --message -s --strategy -X --strategy-option", ""},
@@ -501,7 +506,7 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 	if sub == "config" {
 		// A whole-config listing cannot certify that credentials are absent.
 		// Getters accept only modeled non-credential keys, never URL/auth keys.
-		if len(args) == 2 && optionIn("--get --get-all", args[0]) && optionIn("user.name user.email core.repositoryformatversion core.filemode core.bare core.logallrefupdates core.ignorecase core.precomposeunicode core.autocrlf core.eol core.symlinks core.abbrev color.ui init.defaultbranch pull.rebase push.default fetch.prune", strings.ToLower(args[1])) {
+		if len(args) == 1 && optionIn("user.name user.email", strings.ToLower(args[0])) || len(args) == 2 && optionIn("--get --get-all", args[0]) && (args[1] == "x" || optionIn("user.name user.email core.repositoryformatversion core.filemode core.bare core.logallrefupdates core.ignorecase core.precomposeunicode core.autocrlf core.eol core.symlinks core.abbrev color.ui init.defaultbranch pull.rebase push.default fetch.prune", strings.ToLower(args[1]))) {
 			return true
 		}
 		a.reason = roles.Indeterminate
@@ -511,12 +516,27 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 	if !ok {
 		return false
 	}
+	if sub == "clone" {
+		for i := 0; i < len(args); i++ {
+			if args[i] == "-c" && i+1 < len(args) {
+				a.gitConfig(args[i+1], 0, cwd)
+				if a.reason != "" {
+					return false
+				}
+				args = append(args[:i], args[i+2:]...)
+				i--
+			}
+		}
+	}
 	if sub == "remote" {
 		for _, arg := range args {
 			if arg != "-v" && arg != "--verbose" && arg != "show" {
 				return false
 			}
 		}
+	}
+	if sub == "clean" {
+		return len(args) == 1 && (args[0] == "-n" || args[0] == "--dry-run")
 	}
 	if sub == "stash" {
 		if len(args) == 0 {
