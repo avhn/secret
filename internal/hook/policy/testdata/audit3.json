@@ -1263,7 +1263,7 @@
     "name": "cd-41",
     "cwd": "proj",
     "command": "cd .secrets & paste store",
-    "deny": true
+    "deny": false
   },
   {
     "name": "cd-42",

@@ -500,7 +500,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.BinaryCmd:
-			if cmd.Op.String() == "|" && (a.filteredFindPipe(cmd.X, cmd.Y, depth, cwd) || a.filteredFDPipe(cmd.X, cmd.Y, depth, cwd)) {
+			if cmd.Op.String() == "|" && a.certifiedListingPipe(cmd.X, cmd.Y, depth, cwd) {
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				prior := a.xargsIDs
 				a.xargsIDs = true
@@ -909,6 +909,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	name := strings.ToLower(path.Base(words[0]))
+	if name == "fdfind" {
+		name = "fd"
+	}
 	args := words[1:]
 	if unmodelledCommand(name) {
 		for _, arg := range args {

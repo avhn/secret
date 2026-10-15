@@ -34,7 +34,7 @@ func (a *analyzer) statementStates(stmts []*syntax.Stmt, depth int, states []str
 		// Preserve the modeled unconditional cd into an existing static
 		// directory. Conditional cd outcomes still flow through the boolean
 		// node above, and missing targets retain their failure directory.
-		if commandName(stmt) == "cd" && !stmt.Negated && len(flow.success) == 1 {
+		if commandName(stmt) == "cd" && !stmt.Negated && !stmt.Background && len(flow.success) == 1 {
 			if info, err := os.Stat(flow.success[0]); err == nil && info.IsDir() {
 				states = flow.success
 			}
@@ -80,11 +80,28 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 		a.reason = roles.Indeterminate
 		return cwdFlow{}
 	}
+	if stmt.Background {
+		// The asynchronous command still needs analysis, but its directory
+		// changes happen in a child and cannot change the parent's cwd.
+		child := *stmt
+		child.Background = false
+		a.statementFlow(&child, depth, states)
+		return cwdFlow{states, states}
+	}
 	if len(stmt.Redirs) == 0 {
 		switch cmd := stmt.Cmd.(type) {
 		case *syntax.Block:
 			dirs := a.cwdUnion(states, a.statementStates(cmd.Stmts, depth, states))
 			return cwdFlow{dirs, dirs}
+		case *syntax.WhileClause:
+			// A statically false while condition cannot move the parent cwd.
+			// Still analyze its body for prohibited operations, like other
+			// syntactically present branches, without exporting its cd.
+			if !cmd.Until && len(cmd.Cond) == 1 && commandName(cmd.Cond[0]) == "false" && !cmd.Cond[0].Negated {
+				conditions := a.statementStates(cmd.Cond, depth, states)
+				a.statementStates(cmd.Do, depth, conditions)
+				return cwdFlow{states, states}
+			}
 		case *syntax.IfClause:
 			dirs := states
 			for clause := cmd; clause != nil; clause = clause.Else {

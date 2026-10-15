@@ -9,6 +9,9 @@ func TestPrinterTable(t *testing.T) {
 		direct bool
 		reason string
 	}{
+		{"keyring", []string{"get", "service", "user"}, false, Printer},
+		{"keyring", []string{"get", "service", "user"}, true, ""},
+		{"keyring", []string{"--help"}, false, ""},
 		{"gh", []string{"auth", "token"}, false, Printer},
 		{"gh", []string{"auth", "token"}, true, ""},
 		{"gh", []string{"auth", "status"}, false, ""},

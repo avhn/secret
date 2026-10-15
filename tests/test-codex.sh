@@ -244,5 +244,59 @@ for cmd in 'npx jest -k env' 'npx vitest -t env' 'npx vitest run env' \
 done
 shell_case audit16_argv_runner deny '["npm","x","--yes","--package=dotenvx","--","dotenvx","get"]'
 shell_case audit16_argv_quiet allow '["rg","--quiet","TOKEN",".env"]'
+# Audit 17 runs only synthetic hook requests with an isolated home.
+export HOME="$TMP/audit17-home" XDG_CONFIG_HOME="$TMP/audit17-home/.config"
+mkdir -p "$HOME/.aws" "$HOME/.ssh" "$HOME/.docker" "$TMP/audit17/clean/src" "$TMP/audit17/proj" "$TMP/audit17/ext"
+printf '%s\n' synthetic >"$HOME/.aws/credentials"
+printf '%s\n' synthetic >"$HOME/.docker/config.json"
+printf '%s\n' synthetic >"$HOME/.ssh/id_ed25519"
+printf '%s\n' synthetic >"$TMP/audit17/proj/.env"
+printf '%s\n' synthetic >"$TMP/audit17/ext/.env.ts"
+printf '%s\n' code >"$TMP/audit17/clean/src/a.ts"
+ln -s ../ext "$TMP/audit17/clean/shared"
+for cmd in 'find ~/.aws | xargs cat' 'find ~/.aws -type f | xargs cat' \
+    "find ~ -name '*.json' | xargs cat" 'find ../proj -type f | xargs grep -n T' \
+    'find ../proj -type f -print0 | xargs -0 head' 'ls -A ../proj | xargs -I{} cat ../proj/{}' \
+    'git -C ../proj ls-files -o | xargs cat' 'rg --files ../proj | xargs cat' \
+    "find ../ext -name '*.ts' | xargs cat" "find -L . -name '*.ts' | xargs cat" \
+    "find shared -name '*.ts' | xargs cat" 'fdfind -H . ../proj | xargs cat'; do
+    shell_case audit17_d1_roots deny "$(jq -cn --arg c "$cmd" '$c')" "$TMP/audit17/clean"
+done
+shell_case audit17_d1_find_safe allow '"find src -name '\''*.ts'\'' | xargs wc -l"' "$TMP/audit17/clean"
+shell_case audit17_d1_fd_safe allow '"fd -e ts -x gofmt -l"' "$TMP/audit17/clean/src"
+for cmd in "npx -c 'cat .env'" "npx --call='printenv TOKEN'" "npm exec --call 'cat .env'" \
+    "yarn exec 'cat .env'" "pnpm exec -c 'cat .env'"; do
+    shell_case audit17_d2_shell deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit17_d2_safe allow '"npx --call '\''printf ok'\''"'
+for cmd in 'cat ~/.aws/./credentials' 'cd ~/.aws && cat ./credentials' 'cd ~/.ssh; cat ./id_ed25519'; do
+    shell_case audit17_d3_dots deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in '( cd src ); cat .env' 'while false; do cd src; done; cat .env' \
+    'if false; then true; elif true; then cd src; fi; cat .env' 'cd src & cat .env'; do
+    shell_case audit17_d4_cwd deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit17_d4_safe allow '"( cd src ); cat README.md"'
+for cmd in "rg --iglob '{*.secret,!*.md}' K" "rg --iglob '{!*.md,*.secret}' K" \
+    'npm run-script env' 'npm -s run env' 'dotenv run -- env' 'python3 -m dotenv run -- env' \
+    'fdfind -H .env -x cat' 'keyring get service user' 'python3 -m keyring get service user' \
+    'pnpm dlx --silent dotenvx get K' 'yarn dlx --package dotenvx printenv' \
+    'npx -p dotenvx printenv' 'bunx -p dotenvx printenv'; do
+    shell_case audit17_d5_d10 deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit17_d7_names allow '"fdfind -H .env"'
+shell_case audit17_d8_help allow '"keyring --help"'
+shell_case audit17_d10_safe allow '"bunx -p jest jest -t env"'
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/audit17-ignore/project"
+    git -C "$TMP/audit17-ignore/project" init -q
+    printf '%s\n' '*.env' >"$TMP/audit17-ignore/project/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit17-ignore/project/prod.env"
+    for ignore in .ignore .rgignore; do
+        printf '%s\n' '!prod.env' >"$TMP/audit17-ignore/$ignore"
+        shell_case audit17_d9_ancestor deny '"rg K"' "$TMP/audit17-ignore/project"
+        rm "$TMP/audit17-ignore/$ignore"
+    done
+fi
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

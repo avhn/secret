@@ -467,7 +467,8 @@ if command -v jq >/dev/null 2>&1; then
         secrets xargs_replace deny Bash 'echo .env | xargs -I {} cat {}'
         secrets xargs_options deny Bash 'ls .env | xargs -0 -n 1 -P 2 cat'
         secrets xargs_chain deny Bash "find . -name '.env' | sort | xargs cat"
-        secrets xargs_safe_reader deny Bash 'ls src/a.ts | xargs cat'
+        # Audit 17 D1: a clean explicit producer file is safe despite cwd stores.
+        secrets xargs_safe_reader allow Bash 'ls src/a.ts | xargs cat'
         secrets xargs_safe_listing allow Bash 'ls .env | xargs ls'
         secrets python_code deny Bash "python -c 'open(\".env\").read()'"
         secrets perl_code deny Bash "perl -e 'open F, \"<\", \".env\"'"
@@ -556,9 +557,9 @@ if command -v jq >/dev/null 2>&1; then
         secrets xargs_optional_replace deny Bash 'ls .env | xargs --replace cat'
         secrets xargs_optional_lines deny Bash 'ls .env | xargs --max-lines cat'
         secrets xargs_optional_eof deny Bash 'ls .env | xargs --eof cat'
-        secrets xargs_optional_safe deny Bash 'ls src/a.ts | xargs --replace cat'
-        secrets xargs_R_safe deny Bash 'ls src/a.ts | xargs -R 1 cat'
-        secrets xargs_S_safe deny Bash 'ls src/a.ts | xargs -S 255 cat'
+        secrets xargs_optional_safe allow Bash 'ls src/a.ts | xargs --replace cat'
+        secrets xargs_R_safe allow Bash 'ls src/a.ts | xargs -R 1 cat'
+        secrets xargs_S_safe allow Bash 'ls src/a.ts | xargs -S 255 cat'
         secrets xargs_arg_file deny Bash 'xargs -a .env cat'
         secrets xargs_arg_file_attached deny Bash 'xargs -a.env cat'
         secrets xargs_arg_file_long deny Bash 'xargs --arg-file .env cat'
@@ -2627,6 +2628,139 @@ done
 for cmd in '! cd nosuch; cat README.md' 'cd sub | true; cat README.md' \
     'if true; then cd nosuch; fi; npm test'; do
     secrets audit16_c2_uncertain_cd_safe allow Bash "$cmd"
+done
+
+# Confirmation audit 17: all commands below are hook input, never executed.
+mkdir -p "$TMP/audit17/clean/src" "$TMP/audit17/proj" "$TMP/audit17/ext" "$HOME/.aws"
+printf '%s\n' code >"$TMP/audit17/clean/src/a.ts"
+printf '%s\n' synthetic >"$TMP/audit17/proj/.env"
+printf '%s\n' synthetic >"$TMP/audit17/ext/.env.ts"
+printf '%s\n' synthetic >"$HOME/.aws/credentials"
+printf '%s\n' synthetic >"$HOME/.aws/config.json"
+ln -s ../ext "$TMP/audit17/clean/shared"
+ln -s ../ext "$TMP/audit17/clean/followed"
+for cmd in 'find ~/.aws | xargs cat' 'find ~/.aws -type f | xargs cat' \
+    "find ~ -name '*.json' | xargs cat" 'find ../proj -type f | xargs grep -n T' \
+    'find ../proj -type f -print0 | xargs -0 head' \
+    'ls -A ../proj | xargs -I{} cat ../proj/{}' 'git -C ../proj ls-files -o | xargs cat' \
+    "find ../ext -name '*.ts' | xargs cat" "find -L . -name '*.ts' | xargs cat" \
+    "find shared -name '*.ts' | xargs cat" 'rg --files ../proj | xargs cat' \
+    'find src ../proj -type f | xargs cat' 'ls src ../proj | xargs cat' \
+    'find ../missing | xargs cat' 'fd -H . ../proj | xargs cat' \
+    'fdfind -H . ../proj | xargs cat' 'find ../proj | sort | xargs cat' \
+    'command find ../proj -type f | xargs cat' 'env -C ../proj find . | xargs cat' \
+    "sh -c 'find ../proj' | xargs cat"; do
+    secrets audit17_d1_producer_roots deny Bash "$cmd" "{\"workdir\":\"$TMP/audit17/clean\"}"
+done
+# A clean consumer must not rescue a failed physical/narrow producer proof.
+for cmd in "find src -name '*.ts' | xargs wc -l" "find src -name '*.ts' | xargs grep -n export" \
+    'fd -e ts . src -x gofmt -l' 'fd -e ts . src | xargs cat' \
+    'ls src | xargs cat' 'rg --files src | xargs cat' \
+    "command find src -name '*.ts' | xargs wc -l"; do
+    secrets audit17_d1_filtered_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit17/clean\"}"
+done
+# The required no-root fd form runs in a tree without symlinked directories.
+secrets audit17_d1_fd_clean allow Bash 'fd -e ts -x gofmt -l' "{\"workdir\":\"$TMP/audit17/clean/src\"}"
+secrets audit17_d1_filtered_sibling allow Bash "find ../clean/src -name '*.ts' | xargs cat" "{\"workdir\":\"$TMP/audit17/proj\"}"
+for cmd in "npx -c 'cat .env'" "npx --call 'printenv TOKEN'" "npx -c'cat .env'" \
+    "npx --call='cat .env'" "npm exec -c 'cat .env'" "npm exec --call 'printenv TOKEN'" \
+    "npm exec --call='cat .env'" "npm x -c'cat .env'" "yarn exec 'cat .env'" \
+    "pnpm exec -c 'cat .env'" "npx -p dotenvx --call 'printenv TOKEN'"; do
+    secrets audit17_d2_shell_calls deny Bash "$cmd"
+done
+for cmd in "npx -c 'printf ok'" "npx --call='printf ok'" "npm exec --call 'printf ok'" \
+    "yarn exec 'printf ok'" "yarn exec -- 'printf ok'" "pnpm exec -c 'printf ok'"; do
+    secrets audit17_d2_shell_calls_safe allow Bash "$cmd"
+done
+for cmd in 'cat ~/.aws/./credentials' 'cat ~/.aws/sub/../credentials' \
+    'cd ~/.aws && cat ./credentials' 'cd ~/.ssh; cat ./id_ed25519' \
+    'cat ~/.ssh/./id_ed25519' 'cat ~/.aws/../.ssh/./id_ed25519'; do
+    secrets audit17_d3_dot_segments deny Bash "$cmd"
+done
+mkdir -p "$HOME/.aws/sub"
+ln -s "$HOME/.aws/sub" "$TMP/audit17/clean/aws-child"
+secrets audit17_d3_physical_parent deny Bash "cat '$TMP/audit17/clean/aws-child/../credentials'"
+secrets audit17_d3_newline deny Bash "cat '$HOME/line
+/.aws/./credentials'"
+for cmd in 'cat ~/.ssh/./known_hosts' 'cat ~/.aws/../.ssh/./id_ed25519.pub'; do
+    secrets audit17_d3_dot_segments_safe allow Bash "$cmd"
+done
+for cmd in '( cd src ); cat .env' '( cd src && true ); cat .env' \
+    'while false; do cd src; done; cat .env' 'for item in a; do cd src; done; cat .env' \
+    'until true; do cd src; done; cat .env' 'if false; then true; elif true; then cd src; fi; cat .env' \
+    'if false; then true; else cd src; fi; cat .env' 'cd src & cat .env' \
+    'cd src & wait; cat .env' '( ( cd src ); true ); cat .env' \
+    'while false; do cd src; done; find . | xargs cat' \
+    'while false; do cd src; done; fd -x cat'; do
+    secrets audit17_d4_compound_cd deny Bash "$cmd"
+done
+mkdir -p "$TMP/audit17/branches/a" "$TMP/audit17/branches/b/sub"
+printf '%s\n' synthetic >"$TMP/audit17/branches/b/.env"
+ln -s ../.env "$TMP/audit17/branches/b/sub/link"
+secrets audit17_d4_elif_root deny Bash 'if false; then cd a; elif true; then cd b; fi; cat .env' "{\"workdir\":\"$TMP/audit17/branches\"}"
+secrets audit17_d4_joined_relative deny Bash 'if false; then cd a; else cd b; fi; cd sub; cat link' "{\"workdir\":\"$TMP/audit17/branches\"}"
+for cmd in '( cd src ); cat README.md' 'while false; do cd src; done; cat README.md' \
+    'if false; then true; elif true; then cd src; fi; npm test' 'cd src & cat README.md'; do
+    secrets audit17_d4_compound_cd_safe allow Bash "$cmd"
+done
+for glob in '{*.secret,!*.md}' '{!*.md,*.secret}'; do
+    secrets audit17_d5_mixed_glob deny Bash "rg --iglob '$glob' K"
+done
+secrets audit17_d5_negative_glob allow Bash "rg --iglob '{!*.md,!*.txt}' K"
+for cmd in 'npm run-script env' 'npm rum env' 'npm urn env' 'npm -s run env' \
+    'npm --silent run env' 'npm --prefix src run env' 'npm -w web run-script env' \
+    'npm --workspace web run env' 'npm --workspace=web run env' \
+    'npm run --silent env' 'npm run-script -w web env' \
+    'dotenv run -- env' 'python3 -m dotenv run -- env'; do
+    secrets audit17_d6_runner_env deny Bash "$cmd"
+done
+for cmd in 'npm -s run lint' 'npm --prefix src run-script lint' \
+    'npm --workspace web run lint' 'dotenv run -- jest -t env' 'python3 -m dotenv run -- jest -t env'; do
+    secrets audit17_d6_runner_safe allow Bash "$cmd"
+done
+for cmd in 'fdfind -H .env -x cat' 'fdfind -H -e env -X cat' \
+    'fdfind -H . ../proj | xargs cat'; do
+    secrets audit17_d7_fdfind deny Bash "$cmd"
+done
+secrets audit17_d7_fdfind_names allow Bash 'fdfind -H .env'
+secrets audit17_d7_fdfind_clean allow Bash 'fdfind -e ts -x gofmt -l' "{\"workdir\":\"$TMP/audit17/clean/src\"}"
+for cmd in 'keyring get service user' 'python3 -m keyring get service user' \
+    'timeout 5 keyring get service user'; do
+    secrets audit17_d8_keyring deny Bash "$cmd"
+done
+secrets audit17_d8_keyring_help allow Bash 'keyring --help'
+secrets audit17_d8_keyring_stash allow Bash 'keyring get service user | secret stash svc KEY'
+if command -v git >/dev/null 2>&1; then
+    mkdir -p "$TMP/audit17-ignore/project/sub"
+    git -C "$TMP/audit17-ignore/project" init -q
+    printf '%s\n' '*.env' '*.secret' >"$TMP/audit17-ignore/project/.gitignore"
+    printf '%s\n' synthetic >"$TMP/audit17-ignore/project/prod.env"
+    printf '%s\n' synthetic >"$TMP/audit17-ignore/project/prod.secret"
+    for glob in '{*.secret,!*.md}' '{!*.md,*.secret}'; do
+        secrets audit17_d5_gitignored_mixed deny Bash "rg --iglob '$glob' K" "{\"workdir\":\"$TMP/audit17-ignore/project\"}"
+    done
+    prior_audit17_config="${RIPGREP_CONFIG_PATH:-}"
+    unset RIPGREP_CONFIG_PATH
+    secrets audit17_d9_gitignored_safe allow Bash 'rg K' "{\"workdir\":\"$TMP/audit17-ignore/project\"}"
+    for ignore in .ignore .rgignore; do
+        printf '%s\n' '!prod.env' >"$TMP/audit17-ignore/$ignore"
+        secrets audit17_d9_ancestor_override deny Bash 'rg K' "{\"workdir\":\"$TMP/audit17-ignore/project\"}"
+        secrets audit17_d9_ancestor_subdir deny Bash 'rg K ..' "{\"workdir\":\"$TMP/audit17-ignore/project/sub\"}"
+        rm "$TMP/audit17-ignore/$ignore"
+    done
+    export RIPGREP_CONFIG_PATH="$prior_audit17_config"
+fi
+for cmd in 'pnpm dlx --silent dotenvx get K' 'pnpm dlx -s dotenvx get K' \
+    'pnpm dlx --package dotenvx printenv' 'pnpm dlx --package=dotenvx printenv' \
+    'yarn dlx --silent dotenvx get K' 'yarn dlx -s dotenvx get K' \
+    'yarn dlx --package dotenvx printenv' 'yarn dlx --package=dotenvx printenv' \
+    'npx -p dotenvx printenv' 'npx --package dotenvx printenv' \
+    'bunx -p dotenvx printenv' 'bunx --package dotenvx printenv'; do
+    secrets audit17_d10_package_options deny Bash "$cmd"
+done
+for cmd in 'pnpm dlx --silent jest -t env' 'yarn dlx --package=jest jest -t env' \
+    'npx -p jest jest -t env' 'bunx --package jest jest -t env'; do
+    secrets audit17_d10_package_options_safe allow Bash "$cmd"
 done
 
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"

@@ -59,6 +59,8 @@ func PrinterReason(name string, args []string, direct bool) string {
 				printValue = true
 			}
 		}
+	case "keyring":
+		printValue = arg(0) == "get"
 	case "gh":
 		printValue = arg(0) == "auth" && arg(1) == "token"
 		if arg(0) == "auth" && arg(1) == "status" {

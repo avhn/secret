@@ -378,3 +378,44 @@ outer cwd instead of replacing alternatives with an unknown directory.
 These changes have synthetic Go deny and must-allow regressions. Native Windows
 stream behavior and macOS/Windows runner evidence remain CI gates; no installed
 hook or host-containment claim follows from Linux tests or cross-platform vet.
+
+## Audit 17 Go decisions and parity evidence
+
+D1 checks the roots supplying listing streams to xargs: every find path,
+fd/fdfind root and base directory, ls operand, Git -C directory and rg --files
+operand. Static shell expansion is shared with command dispatch. Missing,
+dynamic, unmodeled or protected scopes cannot fall back to a clean consumer
+cwd. Git repository/index overrides, scope-widening parent/top pathspecs and
+transformed or compound listing streams remain uncertified. Modeled wrappers check producer roots before retaining the
+existing consumer-scope check. Filtered find/fd proofs still walk matching
+physical names, including protected names such as .env.ts; directory symlinks
+remain uncertified unless
+the explicitly resolved root can be scanned safely. Metadata-only children
+remain available, as do public TypeScript find-to-wc and fd-to-gofmt commands.
+
+D2 leaves npx/npm exec call options and yarn exec shell strings out of
+safePackageChild. The strict shell-slot analyzer checks separate and attached
+call values, including pnpm exec calls and effective yarn/pnpm directory flags.
+D4 analyzes background commands without exporting their cwd, preserves the
+existing subshell/loop/branch denial coverage, and retains the parent cwd after
+a statically zero-iteration while-false loop. The historical audit3 `cd-41`
+expectation is a classified class (iii) over-denial correction: `cd .secrets &
+paste store` reads the ordinary outer `store`, not `.secrets/store`. Its command
+is retained with an allow expectation; new background-cd cases deny actual
+protected reads in the outer cwd.
+
+D7 shares fd roles with fdfind before raw operand checks and in pipe proofs.
+D8 treats keyring get, including Python module dispatch, as a credential printer;
+the existing direct-stash transport exception remains unchanged. D9 checks
+.ignore/.rgignore ancestors through the filesystem root, not merely through
+.git, and refuses certification if the 128-directory bound is exhausted.
+D3 dotted HOME store paths, D5 mixed brace selectors, D6 npm aliases/options and
+dotenv environment printers, and D10 option-prefixed package printers already
+deny in Go and now have permanent tests. D10 also consumes package-option values
+when peeling safe runners, preserving ordinary jest/vitest data operands.
+
+The audit 17 Go table runs shell text and argv-host routes against a fake HOME,
+with a shell-realistic missing-bare-operand callback. Dedicated physical-root
+and ancestor-ignore tests use disposable metadata only. No probed command is
+executed and these checks do not establish installed-host containment or native
+macOS/Windows runtime behavior.

@@ -168,7 +168,7 @@ func modelledCommand(name string) bool {
 		return true
 	}
 
-	if optionIn("echo printf ls stat file wc cp mv ln install dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for fd", name) {
+	if optionIn("echo printf ls stat file wc cp mv ln install dd tee touch truncate mkdir patch shopt set cd pushd popd dirs true false test for fd fdfind", name) {
 		return true
 	}
 	return false

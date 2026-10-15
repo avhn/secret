@@ -145,7 +145,7 @@ func (a *analyzer) fdScope(args []string, cwd string) (child []string, dir strin
 	if len(filters) == 0 && globFilter && patternSet {
 		filters = []string{selector}
 	}
-	protected = uncertain
+	protected = uncertain || patternSet && selector != "" && selector != "." && a.protectedGlob(strings.ToLower(selector), dir)
 	for _, root := range roots {
 		if len(filters) == 0 && a.treeProtectedAll(root, dir) {
 			protected = true
@@ -186,18 +186,18 @@ func (a *analyzer) fdCommand(args []string, depth int, cwd string) {
 
 // A filtered fd stream is certified by the same root and selector proof as -x.
 func (a *analyzer) filteredFDPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
-	if commandName(upstream) != "fd" || commandName(downstream) != "xargs" {
+	if !optionIn("fd fdfind", commandName(upstream)) || commandName(downstream) != "xargs" {
 		return false
 	}
 	call, ok := upstream.Cmd.(*syntax.CallExpr)
 	if !ok {
 		return false
 	}
-	var args []string
-	for _, word := range call.Args[1:] {
-		args = append(args, literal(word))
+	words, known := a.listingWords(call, cwd)
+	if !known {
+		return false
 	}
-	child, dir, protected := a.fdScope(args, cwd)
+	child, dir, protected := a.fdScope(words[1:], cwd)
 	if len(child) != 0 {
 		return false
 	}
@@ -214,18 +214,19 @@ func (a *analyzer) protectedXargsPipe(downstream *syntax.Stmt, depth int, cwd st
 		a.reason = roles.Indeterminate
 		return
 	}
-	var args []string
-	for _, word := range call.Args[1:] {
-		args = append(args, literal(word))
+	words, known := a.listingWords(call, cwd)
+	if !known {
+		a.reason = roles.Indeterminate
+		return
 	}
-	child, dir, shell := a.utilityChild("xargs", args, cwd)
+	child, dir, shell := a.utilityChild("xargs", words[1:], cwd)
 	if shell || !a.metadataChild(child, depth+1, dir) {
 		a.reason = roles.FileInput
 	}
 }
 
-// A conjunctive name filter can certify the names piped to xargs. Other find
-// expressions keep the existing conservative stdin-source policy.
+// A conjunctive name filter narrows a find stream, but every producer root
+// must still be scanned. Unfiltered streams use the complete root scope.
 func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
 	if commandName(upstream) != "find" || commandName(downstream) != "xargs" {
 		return false
@@ -234,21 +235,25 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 	if !ok {
 		return false
 	}
+	words, known := a.listingWords(call, cwd)
+	if !known {
+		return false
+	}
 	selector := ""
 	roots := []string{}
 	predicates := false
-	for i := 1; i < len(call.Args); i++ {
-		v := literal(call.Args[i])
+	for i := 1; i < len(words); i++ {
+		v := words[i]
 		if v == "" {
 			return false
 		}
 		if optionIn("-name -iname", v) {
 			predicates = true
 			i++
-			if i >= len(call.Args) {
+			if i >= len(words) {
 				return false
 			}
-			selector = literal(call.Args[i])
+			selector = words[i]
 			continue
 		}
 		if optionIn("-print -print0", v) {
@@ -258,7 +263,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 		if v == "-type" {
 			predicates = true
 			i++
-			if i >= len(call.Args) || literal(call.Args[i]) != "f" {
+			if i >= len(words) || words[i] != "f" {
 				return false
 			}
 			continue
@@ -272,10 +277,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 		roots = append(roots, v)
 	}
 
-	if selector == "" {
-		return false
-	}
-	if a.protectedGlob(strings.ToLower(selector), cwd) {
+	if selector != "" && a.protectedGlob(strings.ToLower(selector), cwd) {
 		a.protectedXargsPipe(downstream, depth, cwd)
 		return false
 	}
@@ -283,7 +285,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 		roots = []string{"."}
 	}
 	for _, root := range roots {
-		if search.FilteredScope(root, selector, "", cwd, a.home) != "" {
+		if selector == "" && a.treeProtectedAll(root, cwd) || selector != "" && search.FilteredScope(root, selector, "", cwd, a.home) != "" {
 			a.protectedXargsPipe(downstream, depth, cwd)
 			return false
 		}

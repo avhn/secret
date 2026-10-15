@@ -4,6 +4,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Harden Go xargs listing streams over every producer root, package shell-call
+  slots, backgrounded directory changes, fdfind execution and keyring printers.
+  Continue ripgrep ignore-override checks above work trees to the filesystem root
+  under a fixed bound; retain public filtered find/fd and package-runner forms.
+
+- Harden Bash xargs producer-root and physical-path certification, shell-call runners,
+  dot-segment credential paths, compound-command cwd, mixed brace globs, ancestor
+  ignore overrides, npm/dlx option roles, fdfind execution and keyring printers.
+
+- Stream synthetic variant-generator commands into jq instead of argv, including
+  1 MiB cases, and keep its direct-call stub compatible with suite assertions.
+
 - Fix Go future-Git-directory protection across canonical cwd aliases and keep
   unmatched Windows credential-glob witnesses in their slash-qualified path role.
   Protect Windows alternate data streams by their base file, harden filtered

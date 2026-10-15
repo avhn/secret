@@ -38,8 +38,45 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 		a.shellValue(code, depth, cwd)
 		return true
 	}
+	if name == "yarn" || name == "pnpm" {
+		leading := args
+		for len(leading) > 0 && strings.HasPrefix(leading[0], "-") {
+			key, value, attached := strings.Cut(leading[0], "=")
+			leading = leading[1:]
+			if optionIn("-C --dir --filter", key) {
+				if !attached {
+					if len(leading) == 0 {
+						a.reason = roles.Indeterminate
+						return true
+					}
+					value, leading = leading[0], leading[1:]
+				}
+				if key != "--filter" {
+					cwd = a.resolve(value, cwd)
+				}
+			} else if strings.HasPrefix(key, "-C") && len(key) > 2 {
+				cwd = a.resolve(key[2:], cwd)
+			}
+		}
+		if len(leading) == 0 || leading[0] != "exec" {
+			return false
+		}
+		args = leading[1:]
+		if name == "yarn" {
+			for len(args) > 0 && optionIn("-s --silent --", args[0]) {
+				option := args[0]
+				args = args[1:]
+				if option == "--" {
+					break
+				}
+			}
+			if len(args) == 0 || !strings.HasPrefix(args[0], "-") {
+				return strict(strings.Join(args, " "))
+			}
+		}
+	}
 	switch name {
-	case "flock", "su", "runuser", "expect", "npm", "npx", "make", "rsync":
+	case "flock", "su", "runuser", "expect", "npm", "npx", "pnpm", "yarn", "make", "rsync":
 		npmExec := false
 		if name == "npm" {
 			for _, arg := range args {
@@ -61,7 +98,7 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 			}
 			key, attached, hasValue := strings.Cut(arg, "=")
 			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--command" || strings.HasPrefix(key, "--co") && strings.HasPrefix("--command", key)) ||
-				(name == "npm" && npmExec || name == "npx") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--call") ||
+				(name == "npm" && npmExec || optionIn("npx pnpm yarn", name)) && packageCallOption(arg) ||
 				name == "make" && (arg == "-E" || strings.HasPrefix(arg, "-E") && len(arg) > 2 || strings.HasPrefix("--eval", key) && len(key) >= 3 && strings.HasPrefix(key, "--e")) ||
 				name == "rsync" && (arg == "-e" || key == "--rsh" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e"))
 			if slot {
