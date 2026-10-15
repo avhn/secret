@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
@@ -27,6 +28,14 @@ func (a *analyzer) defineFunction(decl *syntax.FuncDecl, depth int, cwd string) 
 	bodies := a.functions[decl.Name.Value]
 	if !slices.Contains(bodies, decl.Body) {
 		a.functions[decl.Name.Value] = append(slices.Clone(bodies), decl.Body)
+	}
+	if a.functionRoots == nil {
+		a.functionRoots = make(map[*syntax.Stmt]string)
+	}
+	if root, exists := a.functionRoots[decl.Body]; exists && root != cwd {
+		a.functionRoots[decl.Body] = ""
+	} else if !exists {
+		a.functionRoots[decl.Body] = cwd
 	}
 	parent := a.functions
 	a.functions = maps.Clone(parent)
@@ -59,11 +68,58 @@ func (a *analyzer) functionStates(body *syntax.Stmt, depth int, states []string)
 		a.reason = roles.Indeterminate
 		return nil
 	}
+	var dirs []string
 	if block, ok := body.Cmd.(*syntax.Block); ok && len(body.Redirs) == 0 {
-		return a.statementStates(block.Stmts, depth, states)
+		dirs = a.statementStates(block.Stmts, depth, states)
+	} else {
+		flow := a.statementFlow(body, depth, states)
+		dirs = a.cwdUnion(flow.success, flow.failure)
 	}
-	flow := a.statementFlow(body, depth, states)
-	return a.cwdUnion(flow.success, flow.failure)
+	// Match the retained guard's bounded function-effect proof: only one
+	// direct directory change at the definition cwd has a precise target.
+	changes := a.functionDirectoryChanges(body, depth)
+	if changes > 1 || changes == 1 && (len(states) != 1 || a.functionRoots[body] != states[0]) {
+		dirs = a.cwdUnion(dirs, []string{""})
+	}
+	return dirs
+}
+
+// Count current-shell directory effects, capped at two for uncertainty. Child
+// shells and uncalled nested definitions cannot change the function's caller.
+func (a *analyzer) functionDirectoryChanges(body *syntax.Stmt, depth int) int {
+	if depth > 4 {
+		return 2
+	}
+	changes := 0
+	syntax.Walk(body, func(node syntax.Node) bool {
+		if changes > 1 {
+			return false
+		}
+		switch cmd := node.(type) {
+		case *syntax.FuncDecl, *syntax.Subshell, *syntax.CoprocClause:
+			return false
+		case *syntax.Stmt:
+			return !cmd.Background
+		case *syntax.BinaryCmd:
+			return cmd.Op != syntax.Pipe && cmd.Op != syntax.PipeAll
+		case *syntax.CallExpr:
+			name := flowCommandName(&syntax.Stmt{Cmd: cmd})
+			switch name {
+			case "cd", "pushd", "popd", "dirs":
+				changes++
+			default:
+				for _, nested := range a.functions[name] {
+					if a.functionDirectoryChanges(nested, depth+1) > 0 {
+						changes = 2
+						break
+					}
+				}
+			}
+			return false
+		}
+		return true
+	})
+	return changes
 }
 
 // flowCommandName matches singleStmt's transparent wrapper normalization without
@@ -208,6 +264,12 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	name := flowCommandName(stmt)
 	for _, cwd := range states {
 		next := a.singleStmt([]*syntax.Stmt{stmt}, depth, cwd)
+		if name == "eval" && a.reason == "" {
+			dirs := a.evalStates(stmt, depth, cwd)
+			result.success = append(result.success, dirs...)
+			result.failure = append(result.failure, dirs...)
+			continue
+		}
 		if bodies := a.calledFunctions(stmt, cwd); len(bodies) > 0 && a.reason == "" {
 			// A definition may be conditional, so keep the original cwd as
 			// well as every body's effects. Do not infer status from its name.
@@ -242,4 +304,32 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 		result.success, result.failure = result.failure, result.success
 	}
 	return result
+}
+
+// eval executes in the current shell. Replay its bounded literal source so
+// directory effects, including defined function calls, reach later statements.
+func (a *analyzer) evalStates(stmt *syntax.Stmt, depth int, cwd string) []string {
+	if depth >= 4 {
+		a.reason = roles.Indeterminate
+		return nil
+	}
+	call := unwrapCall(stmt.Cmd.(*syntax.CallExpr))
+	var words []string
+	for _, word := range call.Args[1:] {
+		values, known := a.expandWord(word, cwd)
+		if !known {
+			return a.cwdUnion([]string{cwd, ""})
+		}
+		words = append(words, values...)
+	}
+	if len(words) > 0 && words[0] == "--" {
+		words = words[1:]
+	}
+	source := strings.Join(words, " ")
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
+	if err != nil {
+		a.reason = roles.Indeterminate
+		return nil
+	}
+	return a.cwdUnion([]string{cwd}, a.statementStates(file.Stmts, depth+1, []string{cwd}))
 }

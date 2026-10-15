@@ -241,7 +241,7 @@ func (a *analyzer) unknownExecution(args []string, depth int, cwd string) {
 			a.reason = roles.Printer
 			return
 		}
-		if knownNested(value) {
+		if knownNested(value) || optionIn("aws gcloud az vault doctl heroku glab kubectl direnv", strings.ToLower(path.Base(value))) && roles.PrinterReason(strings.ToLower(path.Base(value)), args[i+1:], false) != "" {
 			a.command(args[i:], depth+1, cwd, false)
 			if a.reason != "" {
 				return

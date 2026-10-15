@@ -1179,7 +1179,7 @@
     "name": "cd-27",
     "cwd": "proj",
     "command": "eval cd .secrets; paste store",
-    "deny": false
+    "deny": true
   },
   {
     "name": "cd-28",

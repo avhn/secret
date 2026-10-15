@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -240,5 +241,39 @@ func TestPackageExecWorkspaceRootOption(t *testing.T) {
 				t.Errorf("workspace-root shell read allowed: %q", argv)
 			}
 		}
+	}
+}
+
+func TestAudit19PackageExecGlobalFlagsAndWideScripts(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 36; i++ {
+		if err := os.Mkdir(filepath.Join(root, "pkg"+strconv.Itoa(i)), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"workspaces":["*"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KUBECONFIG", "")
+	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	for _, tc := range []struct {
+		argv []string
+		deny bool
+	}{
+		{[]string{"pnpm", "--filter", "web", "build"}, false},
+		{[]string{"pnpm", "-r", "test"}, false},
+		{[]string{"pnpm", "--filter", "web", "printenv"}, true},
+		{[]string{"pnpm", "--filter", "web", "cat", "config.txt"}, true},
+		{[]string{"npm", "--yes", "-q", "-g", "exec", "-p", "synthetic", "cat", "README.md"}, false},
+		{[]string{"npm", "exec", "--global", "-p", "synthetic", "cat", ".env"}, true},
+	} {
+		t.Run(strings.Join(tc.argv, " "), func(t *testing.T) {
+			if reason := AnalyzeArgv(tc.argv, root, root, check); (reason != "") != tc.deny {
+				t.Errorf("reason=%q, deny=%v", reason, tc.deny)
+			}
+			if reason := Analyze(strings.Join(tc.argv, " "), root, root, check); (reason != "") != tc.deny {
+				t.Errorf("shell reason=%q, deny=%v", reason, tc.deny)
+			}
+		})
 	}
 }

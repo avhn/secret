@@ -127,7 +127,7 @@ func TestAudit13RecursiveInclude(t *testing.T) {
 		t.Fatal("included protected nested file allowed")
 	}
 
-	if got := Analyze("kubectl get secret app -o yaml", root, root, check); got != "credential printer requires a direct pipe to secret stash FILE KEY" {
+	if got := Analyze("kubectl get secret app -o yaml", root, root, check); got != "credential printer requires a direct pipe to secret stash FILE KEY or a password-stdin login" {
 		t.Fatalf("wrong Kubernetes printer role: %q", got)
 	}
 }

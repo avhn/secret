@@ -10,7 +10,7 @@ import (
 const (
 	FileInput     = "file input targets a protected store"
 	Reader        = "reader targets a protected store"
-	Printer       = "credential printer requires a direct pipe to secret stash FILE KEY"
+	Printer       = "credential printer requires a direct pipe to secret stash FILE KEY or a password-stdin login"
 	Indeterminate = "command too complex to analyse for secret access; split it or use secret run"
 )
 
@@ -21,7 +21,7 @@ var metadata = map[string]bool{}
 var credential = regexp.MustCompile(`(?i)\$\{?[a-z0-9_]*(token|secret|pass(word|wd)?|api_?key|private_key|credential|_key)[a-z0-9_]*\}?`)
 
 func init() {
-	for _, name := range strings.Fields("cat bat less more head tail grep egrep fgrep rg ag sed awk gawk perl python python3 ruby node source . xxd od hexdump strings cut sort uniq base64 jq yq tr nl tac rev diff cmp vim vi nvim nano emacs pbcopy open wc") {
+	for _, name := range strings.Fields("cat bat less more head tail grep egrep fgrep rg ag ack ack-grep sed awk gawk perl python python3 ruby node source . xxd od hexdump strings cut sort uniq base64 jq yq tr nl tac rev diff cmp vim vi nvim nano emacs pbcopy open wc") {
 		readers[name] = true
 	}
 	for _, name := range strings.Fields("ls stat test [ [[ realpath readlink basename dirname chmod chown chgrp touch rm") {
@@ -41,8 +41,9 @@ func Reading(name string) bool {
 }
 
 // PrinterReason identifies output which cannot enter agent context. A direct
-// stdout pipe is permitted only when the sink is a validated secret stash.
+// stdout pipe is permitted only for a validated stash or password-stdin login.
 func PrinterReason(name string, args []string, direct bool) string {
+	args = printerArguments(name, args)
 	arg := func(n int) string {
 		if n < len(args) {
 			return args[n]
@@ -82,11 +83,11 @@ func PrinterReason(name string, args []string, direct bool) string {
 			break
 		}
 		printValue = arg(0) == "get"
-	case "gh":
+	case "gh", "glab":
 		printValue = arg(0) == "auth" && arg(1) == "token"
 		if arg(0) == "auth" && arg(1) == "status" {
 			for _, v := range args[2:] {
-				if v == "--show-token" || v == "-t" {
+				if v == "--show-token" || v == "--show-token=true" || v == "-t" {
 					printValue = true
 				}
 			}
@@ -104,6 +105,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 			printValue = arg(1) == "get" && key || arg(1) == "list" && (key || strings.Contains(lower, "--json") || strings.Contains(" "+lower+" ", " -l "))
 		}
 	case "kubectl":
+		printValue = arg(0) == "create" && arg(1) == "token"
 		if arg(0) == "config" && arg(1) == "view" {
 			for _, v := range args[2:] {
 				if v == "--raw" || v == "--raw=true" {
@@ -112,6 +114,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 		}
 	case "gcloud":
+		printValue = arg(0) == "config" && arg(1) == "config-helper"
 		j := 0
 		if arg(j) == "auth" {
 			j++
@@ -120,7 +123,18 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 			printValue = arg(j) == "print-access-token" || arg(j) == "print-identity-token"
 		}
+	case "az":
+		printValue = arg(0) == "account" && arg(1) == "get-access-token" || arg(0) == "acr" && arg(1) == "login" && hasOption(args[2:], "--expose-token")
+	case "heroku":
+		printValue = arg(0) == "auth:token"
+	case "vault":
+		printValue = arg(0) == "print" && arg(1) == "token" || arg(0) == "token" && arg(1) == "lookup"
+	case "doctl":
+		printValue = arg(0) == "auth" && arg(1) == "token"
+	case "direnv":
+		printValue = arg(0) == "export"
 	case "aws":
+		printValue = arg(0) == "ecr" && arg(1) == "get-login-password" || arg(0) == "sts" && arg(1) == "get-session-token" || arg(0) == "sso" && arg(1) == "get-role-credentials"
 		filtered := make([]string, 0, len(args))
 		for i := 0; i < len(args); i++ {
 			if args[i] == "--profile" {

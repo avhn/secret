@@ -452,3 +452,87 @@ The retained Bash denial corpus and exact guard/Codex inventories include audit
 18, with Linux and Darwin guard inventories updated together. No denial case or
 expectation was removed, and no new acceptable divergence was added. The new Go
 tests use fabricated paths and values and never execute the probed commands.
+
+## Confirmation audit 19 credential and cwd coverage
+
+G1 protects Kubernetes config, literal inherited or command-assigned `KUBECONFIG`
+path lists, gcloud application-default credentials and its default credential
+DB/cache directory, Vault and Terraform tokens, Cargo credentials, PostgreSQL
+password files, and the user HOME's `.yarnrc.yml`. Matching uses names and physical
+path metadata, never credential contents. Project `.yarnrc.yml` remains readable:
+project npmAuthToken lines are outside this name-based protection. Static ripgrep
+certification requires the additional credential exclusions; custom KUBECONFIG
+names cannot be certified by that static list. Content-producing Git checks
+indexed names against inherited and command-assigned literal paths using both
+the command cwd and worktree root; a prior public index decision cannot erase a
+later configured credential witness. Filtered find/fd listing proofs
+and fd execution classify selected names against the analyzer's retained literal
+KUBECONFIG alternatives, including branch unions and physical aliases. Unfiltered
+ls, rg and Git listing proofs check those alternatives over the producer roots.
+Filters excluding the configured names and metadata-only consumers retain their
+allowances. Explicit names-only searches retain their existing rules.
+
+G2 treats `ack` and `ack-grep` as recursive content searches, not metadata tools.
+Their scopes get the conservative grep tree proof, without a Git-ignore
+exemption. Clean roots and names-only output remain allowed.
+
+G3 adds cloud, registry, Kubernetes and shell-environment token printers. Known
+global options are normalized throughout the applicable subcommand hierarchy,
+not merely before its first action; their values remain data, never actions.
+Unknown options and the option terminator retain their positional roles. A
+literal direct pipe to `docker login --password-stdin`, `helm registry login
+--password-stdin`, or validated `secret stash FILE KEY` is allowed. A tee,
+intermediate command, alternate stdin, upstream stdout diversion or unsupported
+sink cannot establish that exception. These syntax checks do not assert that an
+arbitrary child cannot transform or disclose values.
+
+G4 retains the deliberate template exemption: `.env.example`, `.env.sample`,
+`.env.template`, and names ending in those suffixes are readable outside protected
+directories. Git revision-member reads follow that rule as direct file reads do.
+Broad Git selectors such as `*.env*` are allowed with a safe bounded index,
+including template-only repositories; a protected index or explicit protected
+member still denies. The Bash side must use the same exemption; this is not
+permission for Go to be looser than the installed guard.
+
+H1 replays bounded literal eval source in the caller's cwd flow, including defined
+function calls and transparent command/builtin prefixes. Directory alternatives
+reach following statements, but child-shell and pipeline effects stay scoped.
+The former audit3 `cd-27` allowance is intentionally reclassified as a denial:
+eval can move the caller into a store before a relative read.
+
+H2 retains unknown cwd alongside replayed alternatives after multiple direct
+function directory changes, indirect function directory effects, or a call made
+away from the definition cwd. A single direct change at its definition cwd keeps
+its precise alternatives. Child-shell, background and uncalled nested-definition
+effects do not move the caller. Safe Git log/blame formatting still checks
+historical revision-member operands; pattern option values remain inert data.
+Doctl verbose flags, including equals forms, do not hide its auth token action.
+
+H4 includes npm global flags before or after exec operands. Operand-free pnpm
+script fallbacks avoid workspace enumeration even in wide projects, while still
+classifying default environment/token printers. Operand-bearing readers retain
+the complete bounded workspace-scope proof and deny if it cannot be completed.
+
+H3 accepts pnpm path selectors only with `./`, `../`, or an absolute path. npm
+workspace paths require a regular `package.json`. Other selectors conservatively
+check the bounded project directory tree rather than trusting an unrelated folder
+with the same name. This is the existing metadata-only fallback, not manifest
+parsing; incomplete or over-limit enumeration denies.
+
+Permanent mixed allow/deny envelopes are in `testdata/hook/audit19.json`, with
+additional quoted, escaped and wrapper variants for eval and Git in Go tests.
+Safe literal eval followed by a public read, including command/builtin and quoted
+forms, remains a required allow. Bash certifies the literal source in an isolated
+analysis scope without discarding its tracked cwd; dynamic source, shell-state
+mutations, and defined function calls still deny. The denied corpus retains
+per-case HOME and literal KUBECONFIG path metadata, including physical aliases,
+so replay uses the same credential witnesses as the synthetic shell suite.
+The directional inventory generator rejects
+any Bash-deny/Go-allow outcome rather than recording that split as tightening.
+
+Reviewed audit 19 directional tightening rows:
+
+| Case | Go difference | Reason |
+| --- | --- | --- |
+| `audit19_G3_13_printer_unknown_wrapper` | Deny an unknown launcher's Kubernetes token child | The recognized printer argv suffix is not ordinary data under an unmodeled launcher. |
+| `audit19_G1_kube_branch_union` | Deny a literal configured path after conflicting branch assignments | Branch merging must retain every possible configured credential path instead of clearing the proof. |

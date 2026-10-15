@@ -95,7 +95,7 @@ func resolveGitDirectory(cwd, explicit string) string {
 	return ""
 }
 
-func indexProtected(dir, home string) bool {
+func indexProtected(dir, home string, checks ...func(string) bool) bool {
 	if dir == "" {
 		return true
 	}
@@ -107,7 +107,46 @@ func indexProtected(dir, home string) bool {
 	data, err := boundedMetadata(filepath.Join(dir, "index"), maxIndexBytes)
 	// History can read objects even when an index has never been written.
 	// Missing or unreadable indexes cannot certify content-producing Git.
-	return err != nil || indexNamesProtected(data, home)
+	return err != nil || indexNamesProtected(data, home, checks...)
+}
+
+// Configured paths are relative to the command cwd, whereas index names are
+// relative to the worktree root. Keep both anchors and the current alternatives
+// in this per-command check, never a repository-only cached decision.
+func (a *analyzer) gitIndexProtected(dir, cwd, worktree string) bool {
+	config := a.kubeconfig()
+	if inherited := os.Getenv("KUBECONFIG"); inherited != "" {
+		config = inherited + string(os.PathListSeparator) + config
+	}
+	if config == "" {
+		return indexProtected(dir, a.home)
+	}
+	root := ""
+	if worktree != "" {
+		root = a.gitPath(worktree, cwd)
+	} else {
+		target, err := os.Stat(dir)
+		if err != nil {
+			return true
+		}
+		for candidate, count := cwd, 0; candidate != "" && count < 128; candidate, count = filepath.Dir(candidate), count+1 {
+			gitdir := gitDirectory(filepath.Join(candidate, ".git"))
+			if info, err := os.Stat(gitdir); err == nil && os.SameFile(info, target) {
+				root = candidate
+				break
+			}
+			if filepath.Dir(candidate) == candidate {
+				break
+			}
+		}
+	}
+	if root == "" {
+		return true
+	}
+	return indexProtected(dir, a.home, func(name string) bool {
+		target := filepath.Join(root, filepath.FromSlash(name))
+		return paths.ConfiguredProtected(target, cwd, "", a.home, config)
+	})
 }
 
 // indexNamesProtected decodes v2/v3 padded and v4 prefix-compressed names.
@@ -115,7 +154,7 @@ func indexProtected(dir, home string) bool {
 // records, unsupported object formats and budget exhaustion all fail closed.
 var indexAnchor = filepath.Join(string(os.PathSeparator), "index")
 
-func indexNamesProtected(data []byte, home string) bool {
+func indexNamesProtected(data []byte, home string, checks ...func(string) bool) bool {
 	if len(data) < 32 || len(data) > maxIndexBytes || string(data[:4]) != "DIRC" {
 		return true
 	}
@@ -198,6 +237,11 @@ func indexNamesProtected(data []byte, home string) bool {
 		// A bare separator root would join to a Windows UNC prefix and lose the name.
 		if paths.LexicalProtected(name, indexAnchor, home) {
 			protected = true
+		}
+		for _, check := range checks {
+			if check(name) {
+				protected = true
+			}
 		}
 		previous = name
 	}

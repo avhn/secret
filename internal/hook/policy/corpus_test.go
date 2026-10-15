@@ -22,9 +22,9 @@ import (
 
 // corpusCase contains only synthetic command text and metadata fixture references.
 type corpusCase struct {
-	Name, Command, CWD, Config, Home string
-	Snapshot                         int
-	Extra                            map[string]json.RawMessage
+	Name, Command, CWD, Config, Home, Kubeconfig string
+	Snapshot                                     int
+	Extra                                        map[string]json.RawMessage
 }
 
 // deniedVariants changes literal words without making active expansions inert.
@@ -293,6 +293,7 @@ func TestGuardDeniedCorpus(t *testing.T) {
 				}
 			}
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
+			t.Setenv("KUBECONFIG", replace.Replace(tc.Kubeconfig))
 			home := replace.Replace(tc.Home)
 			check := func(name, dir string) bool {
 				if !strings.Contains(name, "/") {

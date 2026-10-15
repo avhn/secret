@@ -35,3 +35,18 @@
 --iglob=!**/.docker/config.json
 --iglob=!**/gh/hosts.yml
 --iglob=!**/.ssh/id_*
+
+# Cloud, registry and developer credential files. The home-only Yarn rule in
+# the guard is conservatively excluded here at every level. Project .yarnrc.yml
+# remains readable directly, but can contain npmAuthToken values.
+--iglob=!**/.kube/config
+--iglob=!application_default_credentials.json
+--iglob=!**/gcloud/credentials.db
+--iglob=!**/gcloud/access_tokens.db
+--iglob=!**/gcloud/legacy_credentials/
+--iglob=!.vault-token
+--iglob=!**/.terraform.d/credentials.tfrc.json
+--iglob=!**/.cargo/credentials.toml
+--iglob=!**/.cargo/credentials
+--iglob=!.pgpass
+--iglob=!.yarnrc.yml

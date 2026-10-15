@@ -47,10 +47,10 @@ def capture(row=None):
                         continue
                 fixtures.append([relative, "file", data])
     row["fixtures"] = fixtures
-    row["home"] = "@TMP@/home"
+    row.setdefault("home", "@TMP@/home")
     text = json.dumps(row, sort_keys=True)
     text = text.replace(str(tmp), "@TMP@").replace(str(ROOT), "@ROOT@")
-    # Only HOME's pathname is normalized; no environment values are collected.
+    # Normalize only configured path metadata, never credential contents.
     text = text.replace(os.path.expanduser("~"), "@TMP@/home")
     with output.open("a") as stream:
         stream.write(text + "\n")
@@ -72,8 +72,9 @@ def generate():
     local name="$1" want="$2" tool="$3" value="$4" extra="${5:-}"
     [[ -n "$extra" ]] || extra='{}'
     printf '%s' "$value" | jq -csR --arg name "$name" --arg want "$want" --arg tool "$tool" \\
-        --arg cwd "$TMP/search" --arg config "${RIPGREP_CONFIG_PATH:-}" --argjson extra "$extra" \\
-        '{name:$name,want:$want,tool:$tool,cwd:$cwd,config:$config,command:.,extra:$extra}' |
+        --arg cwd "$TMP/search" --arg config "${RIPGREP_CONFIG_PATH:-}" \\
+        --arg home "$HOME" --arg kubeconfig "${KUBECONFIG:-}" --argjson extra "$extra" \\
+        '{name:$name,want:$want,tool:$tool,cwd:$cwd,config:$config,home:$home,kubeconfig:$kubeconfig,command:.,extra:$extra}' |
         "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --capture "$TMP" "$VARIANT_ROWS"
     return 0
 }'''
@@ -134,7 +135,8 @@ def direct():
         name = "fixed_complexity_reason" if command == "cat .env '" else "control_byte_" + json.dumps(command, separators=(",", ":"))
         capture(dict(name=name, want="deny", tool="Bash", command=command,
                      cwd=envelope.get("cwd", str(pathlib.Path(sys.argv[2]) / "search")),
-                     config=os.environ.get("RIPGREP_CONFIG_PATH", ""), extra={}))
+                     config=os.environ.get("RIPGREP_CONFIG_PATH", ""),
+                     home=os.environ.get("HOME", ""), kubeconfig=os.environ.get("KUBECONFIG", ""), extra={}))
     reason = "command too complex to analyse for secret access; split it or use secret run"
     if isinstance(command, str) and len(command) > 8192:
         reason = "command too complex to analyse for secret access; split the command or use secret run"

@@ -1,0 +1,2803 @@
+{
+  "fixtures": [
+    [
+      "home",
+      "dir",
+      ""
+    ],
+    [
+      "project/docs",
+      "dir",
+      ""
+    ],
+    [
+      "project/packages/docs",
+      "dir",
+      ""
+    ],
+    [
+      "project/web",
+      "dir",
+      ""
+    ],
+    [
+      "project/clean",
+      "dir",
+      ""
+    ],
+    [
+      "project/apps",
+      "dir",
+      ""
+    ],
+    [
+      "home/.kube/config",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.config/gcloud/application_default_credentials.json",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.config/gcloud/credentials.db",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.config/gcloud/access_tokens.db",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.config/gcloud/legacy_credentials/synthetic/token",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.vault-token",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.terraform.d/credentials.tfrc.json",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.cargo/credentials.toml",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.cargo/credentials",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.pgpass",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.yarnrc.yml",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/apps/.env",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/packages/docs/.env",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/packages/docs/.env.production",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/packages/docs/.env.local",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/README.md",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/clean/README.md",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/.yarnrc.yml",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/web/package.json",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/web/README.md",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/custom-kube.json",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/other-kube.json",
+      "file",
+      "synthetic"
+    ],
+    [
+      "home/.aws",
+      "dir",
+      ""
+    ],
+    [
+      "home/.aws/credentials",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/.env.example",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/.env.sample",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/.env.template",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/service.env.example",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/clean/kube.yaml",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/clean/other.yaml",
+      "file",
+      "synthetic"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "G1_0_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.kube/config"
+      }
+    },
+    {
+      "name": "G1_0_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.kube/config"
+      }
+    },
+    {
+      "name": "G1_0_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.kube/config",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_0_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.kube/config'"
+      }
+    },
+    {
+      "name": "G1_0_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.kube/config'"
+      }
+    },
+    {
+      "name": "G1_0_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.kube/config'"
+      }
+    },
+    {
+      "name": "G1_0_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.kube/config'"
+      }
+    },
+    {
+      "name": "G1_1_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.config/gcloud/application_default_credentials.json"
+      }
+    },
+    {
+      "name": "G1_1_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.config/gcloud/application_default_credentials.json"
+      }
+    },
+    {
+      "name": "G1_1_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.config/gcloud/application_default_credentials.json",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_1_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.config/gcloud/application_default_credentials.json'"
+      }
+    },
+    {
+      "name": "G1_1_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.config/gcloud/application_default_credentials.json'"
+      }
+    },
+    {
+      "name": "G1_1_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.config/gcloud/application_default_credentials.json'"
+      }
+    },
+    {
+      "name": "G1_1_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.config/gcloud/application_default_credentials.json'"
+      }
+    },
+    {
+      "name": "G1_2_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.config/gcloud/credentials.db"
+      }
+    },
+    {
+      "name": "G1_2_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.config/gcloud/credentials.db"
+      }
+    },
+    {
+      "name": "G1_2_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.config/gcloud/credentials.db",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_2_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.config/gcloud/credentials.db'"
+      }
+    },
+    {
+      "name": "G1_2_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.config/gcloud/credentials.db'"
+      }
+    },
+    {
+      "name": "G1_2_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.config/gcloud/credentials.db'"
+      }
+    },
+    {
+      "name": "G1_2_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.config/gcloud/credentials.db'"
+      }
+    },
+    {
+      "name": "G1_3_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.config/gcloud/access_tokens.db"
+      }
+    },
+    {
+      "name": "G1_3_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.config/gcloud/access_tokens.db"
+      }
+    },
+    {
+      "name": "G1_3_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.config/gcloud/access_tokens.db",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_3_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.config/gcloud/access_tokens.db'"
+      }
+    },
+    {
+      "name": "G1_3_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.config/gcloud/access_tokens.db'"
+      }
+    },
+    {
+      "name": "G1_3_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.config/gcloud/access_tokens.db'"
+      }
+    },
+    {
+      "name": "G1_3_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.config/gcloud/access_tokens.db'"
+      }
+    },
+    {
+      "name": "G1_4_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token"
+      }
+    },
+    {
+      "name": "G1_4_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token"
+      }
+    },
+    {
+      "name": "G1_4_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_4_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token'"
+      }
+    },
+    {
+      "name": "G1_4_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token'"
+      }
+    },
+    {
+      "name": "G1_4_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token'"
+      }
+    },
+    {
+      "name": "G1_4_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.config/gcloud/legacy_credentials/synthetic/token'"
+      }
+    },
+    {
+      "name": "G1_5_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.vault-token"
+      }
+    },
+    {
+      "name": "G1_5_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.vault-token"
+      }
+    },
+    {
+      "name": "G1_5_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.vault-token",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_5_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.vault-token'"
+      }
+    },
+    {
+      "name": "G1_5_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.vault-token'"
+      }
+    },
+    {
+      "name": "G1_5_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.vault-token'"
+      }
+    },
+    {
+      "name": "G1_5_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.vault-token'"
+      }
+    },
+    {
+      "name": "G1_6_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.terraform.d/credentials.tfrc.json"
+      }
+    },
+    {
+      "name": "G1_6_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.terraform.d/credentials.tfrc.json"
+      }
+    },
+    {
+      "name": "G1_6_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.terraform.d/credentials.tfrc.json",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_6_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.terraform.d/credentials.tfrc.json'"
+      }
+    },
+    {
+      "name": "G1_6_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.terraform.d/credentials.tfrc.json'"
+      }
+    },
+    {
+      "name": "G1_6_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.terraform.d/credentials.tfrc.json'"
+      }
+    },
+    {
+      "name": "G1_6_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.terraform.d/credentials.tfrc.json'"
+      }
+    },
+    {
+      "name": "G1_7_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.cargo/credentials.toml"
+      }
+    },
+    {
+      "name": "G1_7_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.cargo/credentials.toml"
+      }
+    },
+    {
+      "name": "G1_7_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.cargo/credentials.toml",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_7_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.cargo/credentials.toml'"
+      }
+    },
+    {
+      "name": "G1_7_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.cargo/credentials.toml'"
+      }
+    },
+    {
+      "name": "G1_7_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.cargo/credentials.toml'"
+      }
+    },
+    {
+      "name": "G1_7_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.cargo/credentials.toml'"
+      }
+    },
+    {
+      "name": "G1_8_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.cargo/credentials"
+      }
+    },
+    {
+      "name": "G1_8_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.cargo/credentials"
+      }
+    },
+    {
+      "name": "G1_8_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.cargo/credentials",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_8_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.cargo/credentials'"
+      }
+    },
+    {
+      "name": "G1_8_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.cargo/credentials'"
+      }
+    },
+    {
+      "name": "G1_8_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.cargo/credentials'"
+      }
+    },
+    {
+      "name": "G1_8_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.cargo/credentials'"
+      }
+    },
+    {
+      "name": "G1_9_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.pgpass"
+      }
+    },
+    {
+      "name": "G1_9_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.pgpass"
+      }
+    },
+    {
+      "name": "G1_9_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.pgpass",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_9_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.pgpass'"
+      }
+    },
+    {
+      "name": "G1_9_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.pgpass'"
+      }
+    },
+    {
+      "name": "G1_9_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.pgpass'"
+      }
+    },
+    {
+      "name": "G1_9_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.pgpass'"
+      }
+    },
+    {
+      "name": "G1_10_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.yarnrc.yml"
+      }
+    },
+    {
+      "name": "G1_10_NotebookEdit",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "@TMP@/home/.yarnrc.yml"
+      }
+    },
+    {
+      "name": "G1_10_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.yarnrc.yml",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "G1_10_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat '@TMP@/home/.yarnrc.yml'"
+      }
+    },
+    {
+      "name": "G1_10_less",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "less '@TMP@/home/.yarnrc.yml'"
+      }
+    },
+    {
+      "name": "G1_10_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -n TOKEN '@TMP@/home/.yarnrc.yml'"
+      }
+    },
+    {
+      "name": "G1_10_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "rg TOKEN '@TMP@/home/.yarnrc.yml'"
+      }
+    },
+    {
+      "name": "G1_home_tree",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -r TOKEN ../home"
+      }
+    },
+    {
+      "name": "G1_project_yarn",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat .yarnrc.yml"
+      }
+    },
+    {
+      "name": "G1_project_yarn_read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "file_path": ".yarnrc.yml"
+      }
+    },
+    {
+      "name": "G1_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat README.md"
+      }
+    },
+    {
+      "name": "G1_unresolved_kube",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat \"$KUBECONFIG\""
+      }
+    },
+    {
+      "name": "G1_inline_kube",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom-kube.json; cat custom-kube.json"
+      }
+    },
+    {
+      "name": "G1_scoped_kube",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom-kube.json cat custom-kube.json"
+      }
+    },
+    {
+      "name": "G1_inline_kube_tree",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom-kube.json; rg TOKEN ."
+      }
+    },
+    {
+      "name": "G1_inherited_kube",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "custom-kube.json"
+      },
+      "env": {
+        "KUBECONFIG": "@TMP@/project/custom-kube.json"
+      }
+    },
+    {
+      "name": "G1_kube_list",
+      "tool": "NotebookEdit",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "notebook_path": "other-kube.json"
+      },
+      "env": {
+        "KUBECONFIG_LIST": [
+          "@TMP@/project/custom-kube.json",
+          "@TMP@/project/other-kube.json"
+        ]
+      }
+    },
+    {
+      "name": "G1_kube_grep_filter",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": ".",
+        "glob": "*.json",
+        "output_mode": "content"
+      },
+      "env": {
+        "KUBECONFIG": "@TMP@/project/custom-kube.json"
+      }
+    },
+    {
+      "name": "G2_ack",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack -i token apps"
+      }
+    },
+    {
+      "name": "G2_ack_home",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack token ../home"
+      }
+    },
+    {
+      "name": "G2_ack_clean",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "ack -i token clean"
+      }
+    },
+    {
+      "name": "G2_ack_names",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "ack -l token apps"
+      }
+    },
+    {
+      "name": "G2_ack_pattern",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack -e token apps"
+      }
+    },
+    {
+      "name": "G2_ack-grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack-grep -i token apps"
+      }
+    },
+    {
+      "name": "G2_ack-grep_home",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack-grep token ../home"
+      }
+    },
+    {
+      "name": "G2_ack-grep_clean",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "ack-grep -i token clean"
+      }
+    },
+    {
+      "name": "G2_ack-grep_names",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "ack-grep -l token apps"
+      }
+    },
+    {
+      "name": "G2_ack-grep_pattern",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "ack-grep -e token apps"
+      }
+    },
+    {
+      "name": "G3_0_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr get-login-password"
+      }
+    },
+    {
+      "name": "G3_0_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-login-password | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_0_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-login-password | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_0_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-login-password | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_0_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr get-login-password | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_1_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts get-session-token"
+      }
+    },
+    {
+      "name": "G3_1_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts get-session-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_1_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts get-session-token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_1_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts get-session-token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_1_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts get-session-token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_2_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sso get-role-credentials"
+      }
+    },
+    {
+      "name": "G3_2_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sso get-role-credentials | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_2_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sso get-role-credentials | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_2_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sso get-role-credentials | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_2_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sso get-role-credentials | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_3_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws configure export-credentials"
+      }
+    },
+    {
+      "name": "G3_3_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws configure export-credentials | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_3_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws configure export-credentials | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_3_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws configure export-credentials | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_3_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws configure export-credentials | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_4_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud config config-helper"
+      }
+    },
+    {
+      "name": "G3_4_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud config config-helper | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_4_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud config config-helper | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_4_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud config config-helper | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_4_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud config config-helper | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_5_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token"
+      }
+    },
+    {
+      "name": "G3_5_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_5_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_5_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_5_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_6_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "az account get-access-token"
+      }
+    },
+    {
+      "name": "G3_6_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az account get-access-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_6_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az account get-access-token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_6_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az account get-access-token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_6_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "az account get-access-token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_7_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "az acr login --expose-token"
+      }
+    },
+    {
+      "name": "G3_7_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az acr login --expose-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_7_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az acr login --expose-token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_7_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az acr login --expose-token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_7_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "az acr login --expose-token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_8_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "heroku auth:token"
+      }
+    },
+    {
+      "name": "G3_8_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "heroku auth:token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_8_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "heroku auth:token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_8_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "heroku auth:token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_8_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "heroku auth:token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_9_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "vault print token"
+      }
+    },
+    {
+      "name": "G3_9_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault print token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_9_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault print token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_9_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault print token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_9_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "vault print token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_10_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "vault token lookup"
+      }
+    },
+    {
+      "name": "G3_10_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault token lookup | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_10_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault token lookup | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_10_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault token lookup | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_10_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "vault token lookup | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_11_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "doctl auth token"
+      }
+    },
+    {
+      "name": "G3_11_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "doctl auth token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_11_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "doctl auth token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_11_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "doctl auth token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_11_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "doctl auth token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_12_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "glab auth status --show-token"
+      }
+    },
+    {
+      "name": "G3_12_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "glab auth status --show-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_12_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "glab auth status --show-token | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_12_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "glab auth status --show-token | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_12_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "glab auth status --show-token | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_13_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "kubectl create token synthetic"
+      }
+    },
+    {
+      "name": "G3_13_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "kubectl create token synthetic | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_13_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "kubectl create token synthetic | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_13_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "kubectl create token synthetic | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_13_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "kubectl create token synthetic | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_14_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "direnv export json"
+      }
+    },
+    {
+      "name": "G3_14_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export json | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_14_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export json | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_14_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export json | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_14_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "direnv export json | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_15_printer",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "direnv export bash"
+      }
+    },
+    {
+      "name": "G3_15_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export bash | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_15_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export bash | docker login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_15_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv export bash | helm registry login --username synthetic --password-stdin registry.invalid"
+      }
+    },
+    {
+      "name": "G3_15_tee",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "direnv export bash | tee captured | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_globals_178",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --profile synthetic --region synthetic ecr get-login-password"
+      }
+    },
+    {
+      "name": "G3_globals_179",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud --project synthetic config config-helper"
+      }
+    },
+    {
+      "name": "G3_globals_180",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "kubectl -n synthetic create token synthetic"
+      }
+    },
+    {
+      "name": "G3_globals_181",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "glab auth status --show-token=true"
+      }
+    },
+    {
+      "name": "G3_allow_182",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts get-caller-identity"
+      }
+    },
+    {
+      "name": "G3_allow_183",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud config list"
+      }
+    },
+    {
+      "name": "G3_allow_184",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az account show"
+      }
+    },
+    {
+      "name": "G3_allow_185",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az acr login"
+      }
+    },
+    {
+      "name": "G3_allow_186",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "vault status"
+      }
+    },
+    {
+      "name": "G3_allow_187",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "doctl auth list"
+      }
+    },
+    {
+      "name": "G3_allow_188",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "heroku auth:whoami"
+      }
+    },
+    {
+      "name": "G3_allow_189",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "glab auth status"
+      }
+    },
+    {
+      "name": "G3_allow_190",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "kubectl get pods"
+      }
+    },
+    {
+      "name": "G3_allow_191",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "direnv status"
+      }
+    },
+    {
+      "name": "H1_function_192",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "f() { cd ../home/.aws; }; eval f; head credentials"
+      }
+    },
+    {
+      "name": "H1_literal_193",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval 'cd ../home/.kube'; cat config"
+      }
+    },
+    {
+      "name": "H1_public_194",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "eval 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_function_195",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "f() { cd ../home/.aws; }; builtin eval f; head credentials"
+      }
+    },
+    {
+      "name": "H1_literal_196",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "builtin eval 'cd ../home/.kube'; cat config"
+      }
+    },
+    {
+      "name": "H1_public_197",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "builtin eval 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_function_198",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "f() { cd ../home/.aws; }; command eval f; head credentials"
+      }
+    },
+    {
+      "name": "H1_literal_199",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "command eval 'cd ../home/.kube'; cat config"
+      }
+    },
+    {
+      "name": "H1_public_200",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "command eval 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_function_201",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "f() { cd ../home/.aws; }; 'eval' f; head credentials"
+      }
+    },
+    {
+      "name": "H1_literal_202",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "'eval' 'cd ../home/.kube'; cat config"
+      }
+    },
+    {
+      "name": "H1_public_203",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "'eval' 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H3_name_204",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "pnpm --filter docs exec cat .env"
+      }
+    },
+    {
+      "name": "H3_name_205",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "pnpm -F docs exec cat .env.production"
+      }
+    },
+    {
+      "name": "H3_name_206",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "pnpm --filter=docs cat .env.local"
+      }
+    },
+    {
+      "name": "H3_name_207",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "npm -w docs exec cat .env"
+      }
+    },
+    {
+      "name": "H3_name_208",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "npm exec cat .env -w docs"
+      }
+    },
+    {
+      "name": "H3_name_209",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "pnpm -r exec cat .env"
+      }
+    },
+    {
+      "name": "H3_name_210",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "npm -ws exec cat .env"
+      }
+    },
+    {
+      "name": "H3_allow_211",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "pnpm --filter ./docs exec cat README.md"
+      }
+    },
+    {
+      "name": "H3_allow_212",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "pnpm --filter ../project/docs exec cat README.md"
+      }
+    },
+    {
+      "name": "H3_allow_213",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "npm -w web exec cat README.md"
+      }
+    },
+    {
+      "name": "H3_allow_214",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "pnpm --filter docs exec tsc --noEmit"
+      }
+    },
+    {
+      "name": "H3_allow_215",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "npm -w docs exec tsc --noEmit"
+      }
+    },
+    {
+      "name": "H3_allow_216",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "pnpm --filter docs exec cat @TMP@/project/README.md"
+      }
+    },
+    {
+      "name": "G4_template_.env.example",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat .env.example"
+      }
+    },
+    {
+      "name": "G4_template_read_.env.example",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "file_path": ".env.example"
+      }
+    },
+    {
+      "name": "G4_template_.env.sample",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat .env.sample"
+      }
+    },
+    {
+      "name": "G4_template_read_.env.sample",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "file_path": ".env.sample"
+      }
+    },
+    {
+      "name": "G4_template_.env.template",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat .env.template"
+      }
+    },
+    {
+      "name": "G4_template_read_.env.template",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "file_path": ".env.template"
+      }
+    },
+    {
+      "name": "G4_template_service.env.example",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "cat service.env.example"
+      }
+    },
+    {
+      "name": "G4_template_read_service.env.example",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "file_path": "service.env.example"
+      }
+    },
+    {
+      "name": "G3_0_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 aws ecr get-login-password"
+      }
+    },
+    {
+      "name": "G3_0_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic aws ecr get-login-password"
+      }
+    },
+    {
+      "name": "G3_1_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 aws sts get-session-token"
+      }
+    },
+    {
+      "name": "G3_1_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic aws sts get-session-token"
+      }
+    },
+    {
+      "name": "G3_2_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 aws sso get-role-credentials"
+      }
+    },
+    {
+      "name": "G3_2_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic aws sso get-role-credentials"
+      }
+    },
+    {
+      "name": "G3_3_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 aws configure export-credentials"
+      }
+    },
+    {
+      "name": "G3_3_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic aws configure export-credentials"
+      }
+    },
+    {
+      "name": "G3_4_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 gcloud config config-helper"
+      }
+    },
+    {
+      "name": "G3_4_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic gcloud config config-helper"
+      }
+    },
+    {
+      "name": "G3_5_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 gcloud auth application-default print-access-token"
+      }
+    },
+    {
+      "name": "G3_5_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic gcloud auth application-default print-access-token"
+      }
+    },
+    {
+      "name": "G3_6_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 az account get-access-token"
+      }
+    },
+    {
+      "name": "G3_6_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic az account get-access-token"
+      }
+    },
+    {
+      "name": "G3_7_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 az acr login --expose-token"
+      }
+    },
+    {
+      "name": "G3_7_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic az acr login --expose-token"
+      }
+    },
+    {
+      "name": "G3_8_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 heroku auth:token"
+      }
+    },
+    {
+      "name": "G3_8_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic heroku auth:token"
+      }
+    },
+    {
+      "name": "G3_9_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 vault print token"
+      }
+    },
+    {
+      "name": "G3_9_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic vault print token"
+      }
+    },
+    {
+      "name": "G3_10_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 vault token lookup"
+      }
+    },
+    {
+      "name": "G3_10_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic vault token lookup"
+      }
+    },
+    {
+      "name": "G3_11_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 doctl auth token"
+      }
+    },
+    {
+      "name": "G3_11_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic doctl auth token"
+      }
+    },
+    {
+      "name": "G3_12_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 glab auth status --show-token"
+      }
+    },
+    {
+      "name": "G3_12_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic glab auth status --show-token"
+      }
+    },
+    {
+      "name": "G3_13_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 kubectl create token synthetic"
+      }
+    },
+    {
+      "name": "G3_13_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic kubectl create token synthetic"
+      }
+    },
+    {
+      "name": "G3_14_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 direnv export json"
+      }
+    },
+    {
+      "name": "G3_14_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic direnv export json"
+      }
+    },
+    {
+      "name": "G3_15_printer_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "timeout 5 direnv export bash"
+      }
+    },
+    {
+      "name": "G3_15_printer_unknown_wrapper",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "chronic direnv export bash"
+      }
+    },
+    {
+      "name": "G1_kube_branch_union",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "if true; then KUBECONFIG=custom-kube.json; else KUBECONFIG=other-kube.json; fi; cat custom-kube.json"
+      }
+    },
+    {
+      "name": "G3_interspersed_aws",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr --region us-east-1 get-login-password"
+      }
+    },
+    {
+      "name": "G3_interspersed_gcloud",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "gcloud auth --project synthetic print-access-token"
+      }
+    },
+    {
+      "name": "G3_interspersed_kubectl",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "kubectl create --namespace default token synthetic"
+      }
+    },
+    {
+      "name": "G3_interspersed_gcloud_nested",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "gcloud auth --project=synthetic application-default --quiet print-access-token"
+      }
+    },
+    {
+      "name": "G3_interspersed_aws_sink",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr --region us-east-1 get-login-password | docker login --password-stdin"
+      }
+    },
+    {
+      "name": "G3_interspersed_gcloud_sink",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth --project synthetic print-access-token | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "G3_interspersed_kubectl_sink",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "kubectl create --namespace default token synthetic | helm registry login registry.invalid --password-stdin"
+      }
+    },
+    {
+      "name": "G3_interspersed_aws_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr --region us-east-1 describe-repositories"
+      }
+    },
+    {
+      "name": "G3_interspersed_gcloud_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth --project synthetic list"
+      }
+    },
+    {
+      "name": "G3_interspersed_kubectl_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "kubectl create --namespace default deployment synthetic --image=synthetic"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_find",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; find . -name \"*.yaml\" | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_find_iname",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; find . -iname \"*.YAML\" -print0 | xargs -0 head"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_find_wrapped",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; command find . -name \"*.yaml\" | command xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_fd",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -e yaml . | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_fd_exec",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -g '*.yaml' -x cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_fd_batch",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -e yaml . -X cat"
+      }
+    },
+    {
+      "name": "G1_kube_listing_ls",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; ls . | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_listing_rg",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; rg --files | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_branch",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "if true; then KUBECONFIG=kube.yaml; else KUBECONFIG=other.yaml; fi; find . -name '*.yaml' | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_find_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; find . -name '*.md' | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_fd_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -e md . | xargs cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_fd_exec_public",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -g '*.md' -x cat"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_metadata",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; find . -name '*.yaml' | xargs basename"
+      }
+    },
+    {
+      "name": "G1_kube_filtered_names",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; fd -e yaml ."
+      }
+    },
+    {
+      "name": "H1_public_eval_prefix_0",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "command eval 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_public_eval_prefix_1",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "builtin eval 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_public_eval_prefix_2",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "'eval' 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_public_eval_prefix_3",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "command 'eval' 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "H1_public_eval_prefix_4",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": false,
+      "fields": {
+        "command": "builtin \"eval\" 'echo ok'; cat README.md"
+      }
+    },
+    {
+      "name": "G1_kube_listing_git",
+      "tool": "Bash",
+      "cwd": "@TMP@/project/clean",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=kube.yaml; git ls-files -o | xargs cat"
+      }
+    }
+  ]
+}
