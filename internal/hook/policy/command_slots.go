@@ -8,36 +8,38 @@ import (
 	"github.com/avhn/secret/internal/hook/roles"
 )
 
+func (a *analyzer) strictCommandSlot(name, code string, depth int, cwd string) bool {
+	if hasProtectedLiteral(code) || a.inlineGitDir(code, cwd) {
+		a.reason = roles.FileInput
+		return true
+	}
+	if name == "make" {
+		if !strings.ContainsAny(code, ":=\n") {
+			a.reason = roles.Indeterminate
+			return true
+		}
+		for _, line := range strings.Split(code, "\n") {
+			recipe := line
+			if _, after, ok := strings.Cut(line, ";"); ok {
+				recipe = after
+			}
+			recipe = strings.TrimLeft(strings.TrimSpace(recipe), "@+- \t")
+			if recipe != "" && !strings.HasSuffix(recipe, ":") {
+				a.shellValue(recipe, depth, cwd)
+				if a.reason != "" {
+					return true
+				}
+			}
+		}
+	}
+	a.shellValue(code, depth, cwd)
+	return true
+}
+
 // commandSlot handles argv positions that an application executes as commands.
 // Unlike generic prose arguments, these must be certifiable shell text.
 func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string) bool {
-	strict := func(code string) bool {
-		if hasProtectedLiteral(code) || a.inlineGitDir(code, cwd) {
-			a.reason = roles.FileInput
-			return true
-		}
-		if name == "make" {
-			if !strings.ContainsAny(code, ":=\n") {
-				a.reason = roles.Indeterminate
-				return true
-			}
-			for _, line := range strings.Split(code, "\n") {
-				recipe := line
-				if _, after, ok := strings.Cut(line, ";"); ok {
-					recipe = after
-				}
-				recipe = strings.TrimLeft(strings.TrimSpace(recipe), "@+- \t")
-				if recipe != "" && !strings.HasSuffix(recipe, ":") {
-					a.shellValue(recipe, depth, cwd)
-					if a.reason != "" {
-						return true
-					}
-				}
-			}
-		}
-		a.shellValue(code, depth, cwd)
-		return true
-	}
+	strict := func(code string) bool { return a.strictCommandSlot(name, code, depth, cwd) }
 	if name == "yarn" || name == "pnpm" {
 		leading := args
 		for len(leading) > 0 && strings.HasPrefix(leading[0], "-") {

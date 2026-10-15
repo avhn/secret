@@ -271,6 +271,7 @@ func launcherShellOption(args []string) bool {
 
 func launcherStdinStatement(stmt *syntax.Stmt) bool {
 	if call, ok := stmt.Cmd.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+		call = unwrapCall(call)
 		return optionIn("doas run0 pkexec su runuser machinectl sudo script expect systemd-run", strings.ToLower(path.Base(literal(call.Args[0]))))
 	}
 	return false

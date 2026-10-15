@@ -13,7 +13,8 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 PASSED=0 FAILED=0
 read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$ROOT/hooks/guard-secrets}"
-mkdir -p "$TMP/work" "$TMP/elsewhere"
+export HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/home/.config" GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$TMP/work" "$TMP/elsewhere" "$HOME"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.env"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.envrc"
 ln -s .env "$TMP/work/alias.txt"
@@ -298,5 +299,58 @@ if command -v git >/dev/null 2>&1; then
         rm "$TMP/audit17-ignore/$ignore"
     done
 fi
+# Audit 18 covers path, runner, function and workspace roles in Codex envelopes.
+mkdir -p "$TMP/work/src" "$TMP/work/web" "$TMP/work/packages/app" "$TMP/work/sub"
+printf '%s\n' code >"$TMP/work/src/a.ts"
+printf '%s\n' synthetic >"$TMP/work/web/.env.production"
+printf '%s\n' synthetic >"$TMP/work/packages/app/.env.production"
+ln -s .env.production "$TMP/work/web/config.txt"
+ln -s .env.production "$TMP/work/packages/app/config.txt"
+# shellcheck disable=SC2088  # literal home spellings are command input
+for cmd in 'cd ~/.aws/ && cat credentials' 'cat ~/.aws//credentials'; do
+    shell_case audit18_e1_path deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'yarn exec cat .env' 'yarn exec -- cat .env'; do
+    shell_case audit18_e2_yarn deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'pnpm -c exec cat .env' "pnpm -c exec 'cat .env'" \
+    "pnpm exec --shell-mode 'cat .env'" 'pnpm exec -c cat .env'; do
+    shell_case audit18_e3_e9_shell deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'npm --loglevel silent run env' 'npm run --workspaces env' \
+    'npm --if-present run env' 'npm run env --silent' 'npm run-script env --silent' \
+    'npm run printenv' 'npm run cat .env'; do
+    shell_case audit18_e4_npm deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'yarn dlx -p dotenvx dotenvx get K' 'yarn dlx -q dotenvx get K' \
+    'yarn dlx --quiet dotenvx get K' 'pnpm --silent dlx dotenvx get K'; do
+    shell_case audit18_e5_dlx deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+if command -v git >/dev/null 2>&1; then
+    git -C "$TMP/work" init -q
+    shell_case audit18_e6_git_parent deny '"git ls-files -o .. | xargs cat"' "$TMP/work/sub"
+    shell_case audit18_e6_git_safe allow '"git ls-files -o . | xargs cat"' "$TMP/work/sub"
+fi
+shell_case audit18_e7_function deny '"f() { cd src; }; cat .env"'
+shell_case audit18_e7_brace_data deny '"f() { printf \"%s\" \"}\"; cd src; }; cat .env"'
+for cmd in 'npm -w web exec cat .env.production' 'npm --workspace=web exec cat config.txt' \
+    'npm exec -w web cat config.txt' 'pnpm --filter web exec cat config.txt' \
+    'pnpm -F web exec cat config.txt' 'pnpm --filter=web exec cat config.txt' \
+    'npm -w app exec cat config.txt' 'pnpm --filter app -c exec cat config.txt'; do
+    shell_case audit18_e8_workspace deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'keyring -b keyring.backends.SecretService.Keyring get svc user' \
+    'keyring --keyring-backend=backend get svc user' 'keyring -p src get svc user' \
+    'python3 -m keyring --keyring-path src get svc user'; do
+    shell_case audit18_e10_keyring deny "$(jq -cn --arg c "$cmd" '$c')"
+done
+for cmd in 'cd src/ && cat a.ts' 'npm -w web test' 'pnpm --filter web build' \
+    'keyring --help' 'yarn exec tsc' 'npm run lint --loglevel env' \
+    'npm -w web exec true; cat config.txt' 'f() { cd web; }; cat config.txt'; do
+    shell_case audit18_safe allow "$(jq -cn --arg c "$cmd" '$c')"
+done
+shell_case audit18_argv_yarn deny '["yarn","exec","cat",".env"]'
+shell_case audit18_argv_shell deny '["pnpm","-c","exec","cat .env"]'
+shell_case audit18_argv_workspace deny '["npm","exec","-w","web","cat","config.txt"]'
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

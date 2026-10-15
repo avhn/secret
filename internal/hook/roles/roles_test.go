@@ -34,6 +34,50 @@ func TestPrinterTable(t *testing.T) {
 		})
 	}
 }
+func TestKeyringGlobalOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		get  bool
+	}{
+		{"backend short", []string{"-b", "synthetic.Backend", "get", "service", "user"}, true},
+		{"backend short attached", []string{"-bsynthetic.Backend", "get", "service", "user"}, true},
+		{"backend short equals", []string{"-b=synthetic.Backend", "get", "service", "user"}, true},
+		{"backend long", []string{"--keyring-backend", "synthetic.Backend", "get", "service", "user"}, true},
+		{"backend long equals", []string{"--keyring-backend=synthetic.Backend", "get", "service", "user"}, true},
+		{"path short", []string{"-p", "synthetic", "get", "service", "user"}, true},
+		{"path short attached", []string{"-psynthetic", "get", "service", "user"}, true},
+		{"path short equals", []string{"-p=synthetic", "get", "service", "user"}, true},
+		{"path long", []string{"--keyring-path", "synthetic", "get", "service", "user"}, true},
+		{"path long equals", []string{"--keyring-path=synthetic", "get", "service", "user"}, true},
+		{"combined", []string{"-b", "synthetic.Backend", "--keyring-path=synthetic", "get", "service", "user"}, true},
+		{"separator", []string{"-psynthetic", "--", "get", "service", "user"}, true},
+		{"help", []string{"--help"}, false},
+		{"backend help", []string{"-b", "synthetic.Backend", "--help"}, false},
+		{"path help", []string{"--keyring-path=synthetic", "-h"}, false},
+		{"help before get", []string{"-h", "get", "service", "user"}, false},
+		{"set value", []string{"-psynthetic", "set", "service", "get"}, false},
+		{"get as backend", []string{"-b", "get", "set", "service", "user"}, false},
+		{"get as path", []string{"--keyring-path", "get", "--help"}, false},
+		{"missing backend", []string{"-b"}, false},
+		{"missing path", []string{"--keyring-path"}, false},
+		{"no action", []string{"-p", "synthetic"}, false},
+		{"no arguments", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, direct := range []bool{false, true} {
+				want := ""
+				if tc.get && !direct {
+					want = Printer
+				}
+				if got := PrinterReason("keyring", tc.args, direct); got != want {
+					t.Errorf("direct=%v: got %q, want %q", direct, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestOperandTable(t *testing.T) {
 	protected := func(s string) bool { return s == ".env" }
 	cases := []struct {

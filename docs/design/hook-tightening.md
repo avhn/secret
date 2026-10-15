@@ -419,3 +419,36 @@ with a shell-realistic missing-bare-operand callback. Dedicated physical-root
 and ancestor-ignore tests use disposable metadata only. No probed command is
 executed and these checks do not establish installed-host containment or native
 macOS/Windows runtime behavior.
+
+## Audit 18 Go package execution and keyring options
+
+pnpm `-c` and `--shell-mode` around `exec` analyze the joined child words as
+bounded strict shell source, rather than an executable name. Yarn exec uses
+that same joined-source check. npm exec/x and pnpm exec retain workspace
+selectors before and after the action, including npm options after child
+positionals until `--`. pnpm implicit local-binary execution shares shell-mode
+handling, and its workspace-root option resolves ancestor project metadata.
+Literal existing workspace directories
+are analyzed alongside the invocation directory. Unresolved package names and
+filter expressions inspect every possible project directory under the existing
+32-cwd, 4096-entry and analysis-deadline bounds. Workspace-root discovery checks
+only ancestor marker existence, never manifest contents. Git internals and
+installed node_modules trees are not implicit workspace candidates; explicit
+path selectors still check them. Unreadable scopes, directory symlinks and
+exhausted bounds deny rather than certify an incomplete scan. npm prefix checks
+both the selected directory and the invocation directory. Child cwd alternatives
+do not flow into subsequent sibling statements. Function definitions check their
+bodies without exporting their cwd or nested definitions. Known calls replay
+the body with bounded directory alternatives and recursion.
+
+npm script arguments retain their data role after the script name, so a literal
+`env` option value is not an environment-printing command. The env script itself
+still denies. Keyring consumes backend/path options with their documented arity,
+including attached and equals forms, before classifying get. Mode/output
+selectors also consume their values without obscuring the action. Python module
+execution shares those roles; help and direct-to-stash transport remain allowed.
+
+The retained Bash denial corpus and exact guard/Codex inventories include audit
+18, with Linux and Darwin guard inventories updated together. No denial case or
+expectation was removed, and no new acceptable divergence was added. The new Go
+tests use fabricated paths and values and never execute the probed commands.

@@ -29,7 +29,7 @@ func packageRunnerOptions(args []string) []string {
 }
 
 func packageCallOption(arg string) bool {
-	return arg == "--call" || strings.HasPrefix(arg, "--call=") || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--")
+	return arg == "--call" || arg == "--shell-mode" || strings.HasPrefix(arg, "--call=") || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--")
 }
 
 // listingWords applies the same bounded static expansion as command dispatch.

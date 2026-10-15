@@ -16,13 +16,16 @@ import (
 
 // Unresolved operands are not file reads for commands with a classified
 // non-reader role. Nested substitutions are still walked independently.
-func nonReaderUnknown(name string, words []*syntax.Word) bool {
+func (a *analyzer) nonReaderUnknown(name string, operands []expandedOperand, cwd string) bool {
 	if !optionIn("docker docker-compose psql curl npm pnpm yarn bunx npx uv poetry pipx kill git", name) {
 		return false
 	}
+	if (name == "docker" || name == "docker-compose") && uncertainDockerMount(operands, cwd != "" && !strings.Contains(a.source, "PWD=") && !a.inputProtected(cwd, cwd)) {
+		return false
+	}
 	if name == "curl" {
-		for _, w := range words {
-			if strings.Contains(literal(w), "file://") {
+		for _, operand := range operands {
+			if strings.Contains(literal(operand.source), "file://") {
 				return false
 			}
 		}

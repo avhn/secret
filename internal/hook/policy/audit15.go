@@ -12,14 +12,14 @@ import (
 func packageLeadingOptions(args []string) []string {
 	for len(args) > 0 {
 		v := args[0]
-		if optionIn("-C --dir --filter", v) {
+		if optionIn("-C --dir --filter -F", v) {
 			if len(args) < 2 {
 				return nil
 			}
 			args = args[2:]
 			continue
 		}
-		if optionIn("-r --recursive -w --workspace-root", v) || strings.HasPrefix(v, "--dir=") || strings.HasPrefix(v, "--filter=") || strings.HasPrefix(v, "--recursive=") || strings.HasPrefix(v, "--workspace-root=") || strings.HasPrefix(v, "-C") && len(v) > 2 {
+		if optionIn("-r --recursive -w --workspace-root -s --silent -q --quiet", v) || strings.HasPrefix(v, "--dir=") || strings.HasPrefix(v, "--filter=") || strings.HasPrefix(v, "--recursive=") || strings.HasPrefix(v, "--workspace-root=") || strings.HasPrefix(v, "-C") && len(v) > 2 || strings.HasPrefix(v, "-F") && len(v) > 2 {
 			args = args[1:]
 			continue
 		}
@@ -72,8 +72,16 @@ func kubernetesSecretResource(value string) bool {
 
 // These commands give env a documented data role, not a launcher slot. Keep
 // inspecting their other opaque arguments without recasting that data as code.
-func environmentDataArgs(name string, args []string) []string {
+func (a *analyzer) environmentDataArgs(name string, args []string) []string {
 	data := optionIn("jest vitest pytest venv grep egrep fgrep", name) || name == "python3" && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" || name == "go" && len(args) > 0 && args[0] == "env" || name == "vercel" && len(args) > 1 && args[0] == "env" && args[1] == "ls" || name == "npm" && len(args) > 0 && args[0] == "test"
+	if name == "npm" {
+		options := packageExecOptions{}
+		leading := a.packageExecOptions(name, args, &options)
+		if len(leading) > 0 && optionIn("run run-script rum urn", leading[0]) {
+			script := a.packageExecOptions(name, leading[1:], &options)
+			data = data || !options.bad && len(script) > 0 && !optionIn("env printenv", script[0])
+		}
+	}
 	if !data {
 		return args
 	}

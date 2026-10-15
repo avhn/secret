@@ -8,7 +8,110 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/hook/paths"
+	"mvdan.cc/sh/v3/syntax"
 )
+
+// These ten corpus variants preserve the original audit11 denial. The three
+// quoted -vd options exposed a Go/Bash split; the other seven are shared Bash
+// normalization gaps, not safe commands or reasons to weaken the Go expectation.
+func TestAuditElevenNormalizedDenials(t *testing.T) {
+	root := t.TempDir()
+	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	for _, tc := range []struct{ name, command string }{
+		{"22_single_command", `d=build;'printf' -vd x;echo x > $d/pre-commit`},
+		{"22_double_command", `d=build;"printf" -vd x;echo x > $d/pre-commit`},
+		{"22_ansi_command", `d=build;$'printf' -vd x;echo x > $d/pre-commit`},
+		{"22_single_option", `d=build;printf '-vd' x;echo x > $d/pre-commit`},
+		{"22_double_option", `d=build;printf "-vd" x;echo x > $d/pre-commit`},
+		{"22_ansi_option", `d=build;printf $'-vd' x;echo x > $d/pre-commit`},
+		{"43_command_run0", `echo printenv | command run0 -u root`},
+		{"44_command_runuser", `echo printenv | command runuser -u root`},
+		{"45_command_runuser_login", `echo printenv | command runuser -l root`},
+		{"47_command_pkexec", `echo printenv | command pkexec --user root`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Analyze(tc.command, root, root, check); got == "" {
+				t.Fatalf("normalized audit11 denial allowed: %s", tc.command)
+			}
+		})
+	}
+}
+
+func TestAuditElevenIndirectStaticAssignments(t *testing.T) {
+	root := t.TempDir()
+	check := func(name, cwd string) bool { return paths.Protected(name, cwd, "", root) }
+	for _, tc := range []struct {
+		command string
+		deny    bool
+	}{
+		{`d=build; command printf '-vd' x; echo x > "$d/pre-commit"`, true},
+		{`d=build; builtin printf "-v" other x; echo x > $d/pre-commit`, true},
+		{`d=build; p'r'intf -vd x; echo x > $d/pre-commit`, true},
+		{`d=build; printf -vd x; echo x > $d/pre-commit`, true},
+		{`d=build; declare '-n' ref=other; echo x > $d/pre-commit`, true},
+		{`d=build; 'declare' '-n' ref=other; echo x > $d/pre-commit`, true},
+		{`d=build; "typeset" "-n" ref=other; echo x > $d/pre-commit`, true},
+		{`d=build; builtin local $'-n' ref=other; echo x > $d/pre-commit`, true},
+		{`d=build; command unset '-n' ref; echo x > $d/pre-commit`, true},
+		{`'printf' '-vd' x`, false},
+		{`"printf" "-v" ordinary x`, false},
+		{`builtin printf $'-vordinary' x`, false},
+		{`d=build; printf -- '-vd'; echo x > $d/output.txt`, false},
+		{`d=build; printf '%s' '-vd'; echo x > $d/output.txt`, false},
+		{`d=build; printf '%s' 'declare -n ref=other'; echo x > $d/output.txt`, false},
+		{`d=build; echo 'printf -vd x'; echo x > $d/output.txt`, false},
+		{`d=build; printf -vd x; echo x > output.txt`, false},
+		{`d=build; 'declare' '-n' ref=other; echo x > output.txt`, false},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			if got := Analyze(tc.command, root, root, check); (got != "") != tc.deny {
+				t.Errorf("denial=%q, want deny=%v", got, tc.deny)
+			}
+		})
+	}
+}
+
+func TestAuditElevenWrappedLauncherStdin(t *testing.T) {
+	root := t.TempDir()
+	check := func(string, string) bool { return false }
+	for _, launcher := range []string{"run0 -u root", "runuser -u root", "runuser -l root", "pkexec --user root"} {
+		for _, prefix := range []string{"command ", "command -p ", "builtin ", "builtin -- command ", "command builtin ", "'command' "} {
+			command := "echo printenv | " + prefix + launcher
+			t.Run(command, func(t *testing.T) {
+				if got := Analyze(command, root, root, check); got == "" {
+					t.Fatal("wrapped stdin launcher allowed")
+				}
+			})
+		}
+	}
+	for _, command := range []string{
+		"echo text | command cat", "echo text | builtin printf '%s' text",
+		"command run0 /bin/true", "command runuser -u root -- /bin/true",
+		"command pkexec --user root /bin/true",
+	} {
+		t.Run(command, func(t *testing.T) {
+			if got := Analyze(command, root, root, check); got != "" {
+				t.Fatalf("safe wrapper control denied: %s", got)
+			}
+		})
+	}
+}
+
+// Query options are not transparent command prefixes. The launcher classifier
+// must leave them intact even though the wider policy may deny unmodeled queries.
+func TestAuditElevenLauncherQueries(t *testing.T) {
+	for _, command := range []string{"command -v run0", "command -V pkexec", "command -v runuser"} {
+		t.Run(command, func(t *testing.T) {
+			file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(command), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if launcherStdinStatement(file.Stmts[0]) {
+				t.Fatal("command query classified as a stdin launcher")
+			}
+		})
+	}
+}
 
 // Future Git directories must retain their protection when cwd flow resolves
 // a symlinked root between repository creation and a subsequent write.

@@ -25,6 +25,9 @@ func TestDecide(t *testing.T) {
 		{"patch workdir", "codex", `{"tool_name":"apply_patch","cwd":"/synthetic","tool_input":{"workdir":"nested","command":"*** Begin Patch\n*** Add File: ../.netrc\n*** End Patch"}}`, "patch targets a protected store"},
 		{"invalid cwd", "codex", `{"tool_name":"apply_patch","cwd":"relative","tool_input":{"command":"*** Begin Patch\n*** Add File: safe.go\n*** End Patch"}}`, "command too complex to analyse for secret access; split it or use secret run"},
 		{"malformed", "claude", "bad", "command too complex to analyse for secret access; split it or use secret run"},
+		{"malformed argv", "claude", `{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":["cat",1]}}`, "command too complex to analyse for secret access; split it or use secret run"},
+		{"safe argv", "claude", `{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":["cat","src/a.go"]}}`, ""},
+		{"literal shell-looking argv", "claude", `{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":["printf","%s","$(cat .env); cat .env"]}}`, ""},
 		{"empty", "claude", "", ""},
 	}
 	for _, tc := range cases {

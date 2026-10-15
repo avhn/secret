@@ -17,14 +17,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 def capture(row=None):
-    """Record one deny envelope and metadata, reading only synthetic rg configs."""
+    """Record deny metadata and bounded synthetic config and gitfile contents."""
     tmp, output = map(pathlib.Path, sys.argv[2:4])
     if row is None:
         row = json.load(sys.stdin)
     if row["want"] != "deny" or row["tool"] != "Bash":
         return
     fixtures = []
-    config = row["config"]
     for directory, dirs, files in os.walk(tmp, followlinks=False):
         dirs.sort()
         for name in sorted(dirs + files):
@@ -40,7 +39,7 @@ def capture(row=None):
                 fixtures.append([relative, "dir" if item.stat().st_mode & 0o500 else "unreadable-dir", ""])
             else:
                 data = ""
-                if "config" in name and item.stat().st_size <= 9000:
+                if ("config" in name or name == ".git") and item.stat().st_size <= 9000:
                     try:
                         data = item.read_bytes().decode()
                     except PermissionError:

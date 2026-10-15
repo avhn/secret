@@ -67,16 +67,30 @@ Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded B
 - [ ] test(hook): classify every bash differential and fuzz seeds
 
 Variant extraction streams command text through stdin to handle 1 MiB synthetic
-cases without argv limits. Focused coverage runs with
-`python3 -I tests/test-hook-variants.py`; corpus refreshes still require review.
+cases without argv limits. The full denied-command variant corpus is regenerated
+from every Bash-deny case (2,028 cases and 41,793 variants, including audit 18),
+and Go must deny all of them. Focused coverage runs with `python3 -I tests/test-hook-variants.py`;
+corpus refreshes still require review.
 
 Ready for review (not ticked): envelope/path roles, bounded Bash AST, command/printer roles, search certification, Codex argv/workdir and bounded patch-header handling (including moves, aliases and malformed-header denial), exact differential classification, and fuzz/variant coverage. The default Go build now uses the AST policy with 64 KiB envelopes and 40 KiB fragments; the deferral and `hooktrial` split are removed. The installed Bash guard and plugin manifests are unchanged.
 
-Audit history: eight read-only differential audit rounds ran synthetic envelopes through both guards and proved leaks at runtime. Each round closed its findings and the regression rerun at 05c7524 confirmed all 1,505 earlier reproducers still deny. The recurring lesson is that modelling a tool's full grammar leaks through every parser difference, so the policy now removes inputs instead of modelling them: git aliases and git config are never resolved (non-built-in subcommands deny), git -c keys and editor or pager values use allowlists, sed passes only a safe command subset, shells reading a script from stdin deny, writes into .git deny, and the Bash guard runs its own git probe isolated from repository config. Audits 9 to 12 split each round into a regression rerun and a new-code review and moved more rules from spellings to structure: wrapper-agnostic nested command analysis, a git token rule and git directory detection for every write target, strict command slots, budgets that deny on overflow, and a raw-text backstop for heredoc bodies, inline code and unmodelled arguments that leaves role-classified operands alone. Because an adversarial auditor always finds another shell spelling, findings from audit 12 on are triaged (policy P19): accidental ordinary-tool leaks, Go looser than Bash, over-denial of everyday commands and fail-open paths block the merge; constructions that need deliberate evasion are documented in SECURITY.md as non-goals. The audit 12 fixes are in progress; a final audit limited to those blocking classes and green CI on all runners gate the merge.
+Audit history: eight read-only differential audit rounds ran synthetic envelopes through both guards and proved leaks at runtime. Each round closed its findings and the regression rerun at 05c7524 confirmed all 1,505 earlier reproducers still deny. The recurring lesson is that modelling a tool's full grammar leaks through every parser difference, so the policy now removes inputs instead of modelling them: git aliases and git config are never resolved (non-built-in subcommands deny), git -c keys and editor or pager values use allowlists, sed passes only a safe command subset, shells reading a script from stdin deny, writes into .git deny, and the Bash guard runs its own git probe isolated from repository config. Audits 9 to 12 split each round into a regression rerun and a new-code review and moved more rules from spellings to structure: wrapper-agnostic nested command analysis, a git token rule and git directory detection for every write target, strict command slots, budgets that deny on overflow, and a raw-text backstop for heredoc bodies, inline code and unmodelled arguments that leaves role-classified operands alone. Because an adversarial auditor always finds another shell spelling, findings from audit 12 on are triaged (policy P19): accidental ordinary-tool leaks, Go looser than Bash, over-denial of everyday commands and fail-open paths block the merge; constructions that need deliberate evasion are documented in SECURITY.md as non-goals. Audit 13 covered command and environment printers plus precise search scope; audit 14 covered message inputs, runner peeling and the Bash performance limit; audit 15 covered launcher environment commands, runner peeling, fd exec, kubectl formats, grep names-only forms and Grep filters; audit 16 covered negative globs, .ignore/.rgignore, fd roots and CI path drift; audit 17 covered producer roots for xargs, call strings, fdfind and keyring.
+
+Merge rule P21: M2 merges when every CI job is green and a confirmation audit finds no accidental leak, no Go-looser split and no crash or fail-open. Over-denials found from then on go to the follow-up list below.
 
 Last green suites before policy v2: Bash guard 1496/1496, Codex 48/48, CLI 201/201, backends 63/63, Bash 3.2 1478/1478; Go guard exact parity with 25 reviewed divergences, Codex with 2; process-inclusive p99 about 5 ms. See `docs/design/hook-tightening.md` for deliberate tightenings and scope exclusions.
 
 Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s host timeout; cross-platform Go and race tests green. Bash guard stays active.
+
+### M2 follow-ups (over-denials, non-blocking)
+
+- [ ] `git grep --no-index -q T .env`
+- [ ] Go: `python3 -m env`
+- [ ] Go: `rg --passthru -q` and `rg -l --passthru` on an explicit `.env`
+- [ ] Go: `rg -g '{!*.md,*.secret}'` under the protective config
+- [ ] `kubectl -o custom-columns` and curl uploads of unresolved variables (documented limits, P8)
+- [ ] Bash two-second budget on long chains (P20, documented)
+- [ ] Go denies long conditional-cd chains past the cwd-set cap
 
 ## M3: Operator workflow
 

@@ -2763,5 +2763,103 @@ for cmd in 'pnpm dlx --silent jest -t env' 'yarn dlx --package=jest jest -t env'
     secrets audit17_d10_package_options_safe allow Bash "$cmd"
 done
 
+# Confirmation audit 18: synthetic source only, never execute these commands.
+mkdir -p "$HOME/.aws" "$TMP/audit18/sub" "$TMP/audit18/web" "$TMP/audit18/packages/app"
+printf '%s\n' synthetic >"$HOME/.aws/credentials"
+printf '%s\n' synthetic >"$TMP/audit18/.env"
+printf '%s\n' synthetic >"$TMP/audit18/web/.env.production"
+printf '%s\n' synthetic >"$TMP/audit18/packages/app/.env.production"
+ln -s .env.production "$TMP/audit18/web/config.txt"
+ln -s .env.production "$TMP/audit18/packages/app/config.txt"
+# shellcheck disable=SC2088  # home spellings are guard input, not shell paths
+for cmd in 'cd ~/.aws/ && cat credentials' 'cat ~/.aws//credentials' \
+    'cat ~/.aws///./credentials' 'cd ~/.aws//; cat credentials'; do
+    secrets audit18_e1_path deny Bash "$cmd"
+done
+secrets audit18_e1_read deny Read "$HOME/.aws//credentials"
+secrets audit18_e1_read_trailing deny Read "$HOME/.aws/credentials/"
+secrets audit18_e1_cd_safe allow Bash 'cd src/ && cat a.ts'
+for cmd in 'yarn exec cat .env' 'yarn exec -- cat .env' \
+    "yarn exec 'cat .env'" 'yarn exec cat web/.env'; do
+    secrets audit18_e2_yarn_exec deny Bash "$cmd"
+done
+for cmd in 'yarn exec tsc' 'yarn exec -- tsc --noEmit' 'yarn exec cat src/a.ts'; do
+    secrets audit18_e2_yarn_safe allow Bash "$cmd"
+done
+for cmd in 'pnpm -c exec cat .env' "pnpm -c exec 'cat .env'" \
+    'pnpm --shell-mode exec cat .env' "pnpm exec --shell-mode 'cat .env'" \
+    'pnpm exec -c cat .env' "pnpm --shell-mode exec 'cat .env'"; do
+    secrets audit18_e3_e9_shell_mode deny Bash "$cmd"
+done
+for cmd in 'pnpm -c exec tsc' 'pnpm exec --shell-mode tsc --noEmit'; do
+    secrets audit18_e3_e9_shell_safe allow Bash "$cmd"
+done
+for cmd in 'npm --loglevel silent run env' 'npm run --loglevel silent env' \
+    'npm --loglevel=silent run env' 'npm -ws run env' 'npm --workspaces run env' \
+    'npm --if-present run env' 'npm run --if-present env' 'npm run -ws env' \
+    'npm run --workspaces env' 'npm run env --silent' 'npm run env --loglevel silent' \
+    'npm run-script env --silent' 'npm run --prefix src env' \
+    'npm --prefix=src run --silent env' 'npm run -w web env' \
+    'npm run printenv' 'npm run cat .env'; do
+    secrets audit18_e4_npm_globals deny Bash "$cmd"
+done
+for cmd in 'npm -w web test' 'npm --loglevel silent run lint' \
+    'npm --workspaces --if-present run lint --silent' 'npm run lint --loglevel env'; do
+    secrets audit18_e4_npm_safe allow Bash "$cmd"
+done
+for cmd in 'yarn dlx -p dotenvx dotenvx get K' 'yarn dlx -q dotenvx get K' \
+    'yarn dlx --quiet dotenvx get K' 'pnpm --silent dlx dotenvx get K' \
+    'pnpm -s dlx dotenvx get K'; do
+    secrets audit18_e5_dlx deny Bash "$cmd"
+done
+for cmd in 'yarn dlx -p typescript tsc --noEmit' 'yarn dlx -q jest -t env' \
+    'pnpm --silent dlx jest -t env'; do
+    secrets audit18_e5_dlx_safe allow Bash "$cmd"
+done
+if command -v git >/dev/null 2>&1; then
+    git -C "$TMP/audit18" init -q
+    for pathspec in '..' '../..' 'src/../..' ':/' ':(top)**' "$TMP/audit18"; do
+        secrets audit18_e6_git_roots deny Bash "git ls-files -o '$pathspec' | xargs cat" "{\"workdir\":\"$TMP/audit18/sub\"}"
+    done
+    secrets audit18_e6_git_roots_safe allow Bash 'git ls-files -o . | xargs cat' "{\"workdir\":\"$TMP/audit18/sub\"}"
+fi
+for cmd in 'f() { cd src; }; cat .env' 'function f() { cd src; }; cat .env' \
+    'function f { cd src; }; cat .env' 'f() { { cd src; }; }; cat .env' \
+    'f() { cd src; }; find . | xargs cat'; do
+    secrets audit18_e7_function_cd deny Bash "$cmd"
+done
+for cmd in 'f() { cd src; }; cat README.md' 'f() { cd src; }; npm test'; do
+    secrets audit18_e7_function_safe allow Bash "$cmd"
+done
+for cmd in 'npm -w web exec cat .env.production' 'npm --workspace web exec cat config.txt' \
+    'npm --workspace=web exec cat config.txt' 'npm exec -w web cat config.txt' \
+    'npm exec --workspace=web -- cat config.txt' 'npm exec -wweb cat config.txt' \
+    'pnpm --filter web exec cat config.txt' 'pnpm -F web exec cat config.txt' \
+    'pnpm --filter=web exec cat config.txt' 'pnpm --filter app exec cat config.txt' \
+    'npm -w app exec cat config.txt' 'pnpm --filter app -c exec cat config.txt'; do
+    secrets audit18_e8_workspace deny Bash "$cmd" "{\"workdir\":\"$TMP/audit18\"}"
+done
+for cmd in 'npm -w web test' 'pnpm --filter web build' 'npm -w web exec tsc' \
+    'pnpm --filter app exec tsc'; do
+    secrets audit18_e8_workspace_safe allow Bash "$cmd" "{\"workdir\":\"$TMP/audit18\"}"
+done
+secrets audit18_e8_sibling_cwd allow Bash 'npm -w web exec true; cat config.txt' "{\"workdir\":\"$TMP/audit18\"}"
+secrets audit18_e7_outer_cwd allow Bash 'f() { cd web; }; cat config.txt' "{\"workdir\":\"$TMP/audit18\"}"
+secrets audit18_e7_invoked_cwd deny Bash 'f() { cd web; }; f; cat config.txt' "{\"workdir\":\"$TMP/audit18\"}"
+secrets audit18_e7_invoked_safe allow Bash 'f() { cd src; }; f; cat README.md'
+secrets audit18_e7_nested_functions deny Bash 'f() { g() { cd web; }; cd src; }; cat .env'
+secrets audit18_e7_brace_data deny Bash 'f() { printf "%s" "}"; cd src; }; cat .env'
+for cmd in 'keyring -b keyring.backends.SecretService.Keyring get svc user' \
+    'keyring --keyring-backend keyring.backends.SecretService.Keyring get svc user' \
+    'keyring --keyring-backend=keyring.backends.SecretService.Keyring get svc user' \
+    'keyring -p src get svc user' 'keyring --keyring-path src get svc user' \
+    'keyring --keyring-path=src get svc user' 'python3 -m keyring -b backend get svc user' \
+    'keyring -b backend -p src get svc user'; do
+    secrets audit18_e10_keyring deny Bash "$cmd"
+done
+for cmd in 'keyring --help' 'keyring -b backend --help'; do
+    secrets audit18_e10_keyring_help allow Bash "$cmd"
+done
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
