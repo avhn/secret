@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
@@ -11,7 +12,14 @@ import (
 type utilityOptions struct{ values, flags, longValues, longFlags, optional string }
 
 var utilityTable = map[string]utilityOptions{
-	"time":       {"", "p", "", "", ""},
+	"time":       {"fo", "pavq", "format output", "portability append verbose quiet help version", ""},
+	"ionice":     {"cnpPu", "t", "class classdata pid pgid uid", "ignore help version", ""},
+	"chrt":       {"PTD", "afmorRbiIpv", "sched-runtime sched-period sched-deadline", "all-tasks fifo max other pid rr reset-on-fork batch idle verbose help version", ""},
+	"taskset":    {"", "acp", "", "all-tasks cpu-list pid help version", ""},
+	"doas":       {"uC", "Lns", "", "", ""},
+	"watch":      {"n", "bcdetpxw", "interval", "beep color errexit precise exec no-title no-wrap help version", "differences"},
+	"flock":      {"wE", "suxnFo", "timeout conflict-exit-code", "shared exclusive unlock nonblock no-fork close verbose help version", ""},
+	"unbuffer":   {"", "p", "", "", ""},
 	"timeout":    {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
 	"gtimeout":   {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
 	"nice":       {"n", "", "adjustment", "help version", ""},
@@ -32,7 +40,8 @@ func optionIn(list, name string) bool {
 // checks xargs input lists and propagates sudo's scoped directory and shell mode.
 func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]string, string, bool) {
 	table := utilityTable[name]
-	shell := false
+	base := cwd
+	shell, watchExec := false, false
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
 		arg := args[0]
 		args = args[1:]
@@ -47,9 +56,6 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 			if optionIn(table.longValues, key) {
 				if !attached {
 					if len(args) == 0 {
-						if name == "sudo" {
-							return nil, cwd, shell
-						}
 						a.reason = roles.Indeterminate
 						return nil, cwd, shell
 					}
@@ -59,13 +65,16 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 					a.reason = "xargs arg-file reads a protected store"
 				}
 				if name == "sudo" && key == "chdir" {
-					cwd = a.resolve(value, cwd)
+					cwd = a.resolve(value, base)
 				}
 			} else if optionIn(table.optional, key) {
 				// GNU optional long arguments attach with = only.
 			} else if !optionIn(table.longFlags, key) || attached {
 				a.reason = roles.Indeterminate
 				return nil, cwd, shell
+			}
+			if name == "watch" && key == "exec" {
+				watchExec = true
 			}
 			if name == "sudo" && (key == "shell" || key == "login") {
 				shell = true
@@ -78,9 +87,6 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 				value := arg[i+1:]
 				if value == "" {
 					if len(args) == 0 {
-						if name == "sudo" {
-							return nil, cwd, shell
-						}
 						a.reason = roles.Indeterminate
 						return nil, cwd, shell
 					}
@@ -90,7 +96,7 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 					a.reason = "xargs arg-file reads a protected store"
 				}
 				if name == "sudo" && flag == 'D' {
-					cwd = a.resolve(value, cwd)
+					cwd = a.resolve(value, base)
 				}
 				break
 			}
@@ -98,10 +104,37 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 				a.reason = roles.Indeterminate
 				return nil, cwd, shell
 			}
+			if name == "watch" && flag == 'x' {
+				watchExec = true
+			}
 			if name == "sudo" && (flag == 's' || flag == 'i') {
 				shell = true
 			}
 		}
+	}
+	if name == "watch" {
+		// watch normally joins argv into a shell command; --exec/-x opts out.
+		if watchExec {
+			return args, cwd, false
+		}
+		shell = true
+		// The literal child is still classified by the ordinary dispatcher.
+		if len(args) > 0 {
+			return args, cwd, shell
+		}
+	}
+	if name == "chrt" || name == "taskset" || name == "flock" {
+		if len(args) == 0 {
+			a.reason = roles.Indeterminate
+			return nil, cwd, shell
+		}
+		if name == "chrt" {
+			if _, err := strconv.Atoi(args[0]); err != nil {
+				a.reason = roles.Indeterminate
+				return nil, cwd, shell
+			}
+		}
+		args = args[1:] // scheduling priority, CPU mask/list, or lock file/fd
 	}
 	if name == "timeout" || name == "gtimeout" {
 		if len(args) == 0 {

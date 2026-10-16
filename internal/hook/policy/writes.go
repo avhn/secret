@@ -87,7 +87,21 @@ func (a *analyzer) configPath(name, cwd string) bool {
 			}
 		}
 	}
-	return paths.ConfigWriteProtected(name, cwd, "", a.home, xdg, global)
+	// Keep live Git roots above the cache: a later assignment can add a
+	// protected root. The underlying metadata proof also depends on the
+	// effective XDG/global paths and the uncollapsed input spelling.
+	key := [4]string{name, cwd, xdg, global}
+	if protected, ok := a.configWrites[key]; ok {
+		return protected
+	}
+	protected := paths.ConfigWriteProtected(name, cwd, "", a.home, xdg, global)
+	if a.configWrites == nil {
+		a.configWrites = make(map[[4]string]bool)
+	}
+	if len(a.configWrites) < 4096 {
+		a.configWrites[key] = protected
+	}
+	return protected
 }
 
 func readOnlyConfigCommand(name string, args []string) bool {

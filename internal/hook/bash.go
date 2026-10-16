@@ -13,6 +13,7 @@ import (
 // bashDecision applies the bounded AST policy for supported host shell calls.
 func bashDecision(e input.Envelope, cwd string, _ func(string) bool) string {
 	home := os.Getenv("HOME")
+	metadata := new(paths.Metadata)
 	check := func(name, dir string) bool {
 		// Bare shell operands match the legacy metadata existence check. Paths
 		// containing a slash and unresolved aliases retain lexical protection.
@@ -21,7 +22,7 @@ func bashDecision(e input.Envelope, cwd string, _ func(string) bool) string {
 				return false
 			}
 		}
-		return paths.Protected(name, dir, "", home)
+		return metadata.Protected(name, dir, "", home)
 	}
 	if raw := e.Fields["command"]; len(raw) != 0 && raw[0] == '[' {
 		var argv []string

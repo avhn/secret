@@ -750,5 +750,190 @@ for cmd in "python3 <<< 'print(\"$public_prose\")'" \
 done
 }
 
+audit21_case() { shell_case "$1" "$2" "$(jq -cn --arg c "$3" '$c')"; }
+
+# Audit 21: launcher roles, printer options and effective cwd are shared paths.
+# These are synthetic guard inputs only, never commands executed by the suite.
+# shellcheck disable=SC2016,SC2088
+{
+for cmd in "parallel --nonall 'aws ecr get-login-password'" \
+    "parallel -N0 'aws ecr get-login-password' ::: 1" \
+    "parallel --nonall 'printf public'" "parallel -N0 'printf public' ::: 1"; do
+    audit21_case audit21_m1_failure deny "$cmd"
+done
+for cmd in 'parallel -j 2 printf public ::: 1' 'printf public' \
+    'echo $'"'"'\cA'"'" 'echo $'"'"'\x'"'" 'echo $'"'"'\q'"'"; do
+    audit21_case audit21_m1_ordinary allow "$cmd"
+done
+for cmd in 'op --account synthetic read op://synthetic/item/password' \
+    'op --account=synthetic read op://synthetic/item/password' \
+    'op --session synthetic read op://synthetic/item/password' \
+    'op --vault synthetic item get item --reveal' \
+    'op item --vault=synthetic get item --fields=password' \
+    'security -q find-generic-password -s synthetic -w' \
+    'security -v find-generic-password -s synthetic -w' \
+    'security -- find-generic-password -s synthetic -w' \
+    'security find-generic-password -wa synthetic' \
+    'security find-internet-password -ws synthetic' \
+    'security find-generic-password -ga synthetic' \
+    'security find-generic-password -ag synthetic -w' \
+    'docker --context synthetic inspect app' \
+    'docker --host unix:///synthetic inspect app' \
+    'env docker --host unix:///synthetic container inspect app' \
+    'docker compose --project-directory src config' \
+    'gh config --host synthetic.invalid get oauth_token' \
+    'gh --host=synthetic.invalid config get oauth_token' \
+    'xsel -ob' 'xsel -bo' 'kwallet-query -rsynthetic wallet' \
+    'kwallet-query --read-password=synthetic wallet' \
+    'npm --global config list --long'; do
+    audit21_case audit21_m2_options deny "$cmd"
+done
+for cmd in 'op --account read whoami' 'op --session read --version' \
+    'op --vault synthetic item list' 'op --vault synthetic item get item' \
+    'security -q find-generic-password -s synthetic' \
+    'security find-internet-password -s synthetic' \
+    'docker --context synthetic ps' 'docker --host unix:///synthetic image inspect image' \
+    "docker --context synthetic inspect --format '{{.Id}}' app" \
+    "docker --context synthetic inspect -f'{{.Id}}' app" \
+    'gh config --host synthetic.invalid get editor' 'xsel -ib' 'kwallet-query -l wallet' \
+    'aws --profile ecr get-login-password' 'npm --global config get registry'; do
+    audit21_case audit21_m2_metadata allow "$cmd"
+done
+for cmd in 'op read op://synthetic/item/password' 'pass show synthetic' \
+    'secret-tool lookup service synthetic' 'secret-tool search service synthetic' \
+    'security find-generic-password -s synthetic -w' 'keyring get service synthetic' \
+    'ps e' 'php -i' 'pbpaste' 'wl-paste' 'xclip -o' 'xsel --output' \
+    'kwallet-query -r synthetic wallet' 'envsubst <<< '\''$TOKEN'\''' \
+    'kubectl create token synthetic' 'kubectl get secret synthetic -o yaml' \
+    'dotenv list' 'dotenvx get TOKEN' 'pnpm config list' 'yarn config list'; do
+    audit21_case audit21_m3_roles deny "ionice -c 3 $cmd"
+done
+for launcher in 'ionice -c 3' 'nice -n 1' 'chrt -f 1' 'taskset -c 0' \
+    'timeout 2' 'stdbuf -o L' nohup 'setsid -w' 'env FOO=1' 'sudo -u synthetic' \
+    'doas -u synthetic' 'time -p' 'time -f public' command exec 'xargs -n 1' 'parallel -j 2' \
+    'watch -n 1' 'watch --exec nice -n 1' 'flock synthetic.lock' unbuffer; do
+    audit21_case audit21_m3_launcher deny "$launcher op --account synthetic read op://synthetic/item/password"
+    audit21_case audit21_m3_environment deny "$launcher envsubst"
+    audit21_case audit21_m3_ordinary allow "$launcher printf public"
+    audit21_case audit21_m3_metadata allow "$launcher secret show .env"
+done
+for cmd in "parallel -j 2 'xsel -bo' ::: public" \
+    "parallel -j 2 'op --account synthetic read op://synthetic/item/password' ::: public"; do
+    audit21_case audit21_m3_shell_child deny "$cmd"
+done
+ln -s "$HOME/.aws/credentials" "$TMP/audit21-parallel-alias"
+for cmd in "parallel -j 2 'cat {}' ::: ~/.aws/credentials" \
+    "parallel -j 2 'cat {}' ::: '$TMP/audit21-parallel-alias'"; do
+    audit21_case audit21_m3_source deny "$cmd"
+done
+audit21_case audit21_m3_shell_public allow "parallel -j 2 'printf public' ::: 1"
+for cmd in 'yarn --cwd ~/.aws exec cat credentials' \
+    'yarn --cwd=~/.aws exec cat credentials' \
+    'sudo -D ~/.aws cat credentials' 'sudo -D~/.aws cat credentials' \
+    'sudo --chdir ~/.aws cat credentials' 'sudo --chdir=~/.aws cat credentials' \
+    'env -C ~/.aws cat credentials' 'env --chdir ~/.aws cat credentials' \
+    'pnpm -C ~/.aws exec cat credentials' 'pnpm --dir ~/.aws exec cat credentials' \
+    'make -C ~/.aws -f credentials' 'make --directory=~/.aws -f credentials' \
+    'docker compose --project-directory ~/.aws config' \
+    'docker compose --project-directory ~/.aws run app cat credentials' \
+    'docker compose --project-directory=~/.aws exec app cat credentials'; do
+    audit21_case audit21_m4_cwd deny "$cmd"
+done
+for cmd in 'yarn --cwd src exec cat public.txt' 'yarn --cwd=src exec cat public.txt' \
+    'sudo -D src cat public.txt' 'sudo --chdir=src cat public.txt' \
+    'env -C src cat public.txt' 'pnpm --dir src exec cat public.txt' \
+    'make -C src -f public.mk' 'docker compose --project-directory src ps' \
+    'docker compose --project-directory src run app cat public.txt' \
+    'sudo -D ~/.aws true; cat credentials' 'env -C ~/.aws true; cat credentials' \
+    'yarn --cwd ~/.aws exec true; cat credentials'; do
+    audit21_case audit21_m4_public allow "$cmd"
+done
+for cmd in 'lua -e '\''print(os.getenv("TOKEN"))'\''' \
+    'lua -e '\''print(os.getenv("PATH"))'\''' \
+    'Rscript -e '\''print(Sys.getenv())'\''' 'Rscript -e '\''Sys.getenv()'\''' \
+    $'lua <<\'CODE\'\nprint(os.getenv("PATH"))\nCODE' \
+    $'Rscript <<\'CODE\'\nprint(Sys.getenv())\nCODE' \
+    'printf '\''print(Sys.getenv())'\'' | Rscript -' \
+    'ionice -c 3 Rscript -e '\''Sys.getenv()'\'''; do
+    audit21_case audit21_m6_environment deny "$cmd"
+done
+for cmd in 'lua -e '\''print("public")'\''' 'Rscript -e '\''print("public")'\''' \
+    $'lua <<\'CODE\'\nprint("public")\nCODE' $'Rscript <<\'CODE\'\nprint("public")\nCODE'; do
+    audit21_case audit21_m6_public allow "$cmd"
+done
+for archive in tar bsdtar 'busybox tar'; do
+    for options in xOf Oxvf fxO; do
+        audit21_case audit21_m7_stdout deny "$archive $options synthetic.tar"
+    done
+    for options in tf xf; do
+        audit21_case audit21_m7_ordinary allow "$archive $options synthetic.tar public.txt"
+    done
+    audit21_case audit21_m7_create allow "$archive cf synthetic.tar src/a.ts"
+done
+# Audit 21 review: full templates, operand arities and resolved action positions.
+for cmd in "parallel 'true;printenv' ::: TOKEN" "parallel echo ';' printenv ::: TOKEN" \
+    "parallel -j2 'true;printenv' ::: TOKEN" \
+    'taskset 0x1 xsel -bo' 'taskset 0x1 kubectl create token synthetic' \
+    'taskset -ac 0 xsel -bo' 'taskset -ac 0 kubectl create token synthetic' \
+    'taskset -ac 0-4:2,6 xsel -bo'; do
+    audit21_case audit21_review_launcher_deny deny "$cmd"
+done
+for cmd in 'parallel echo ::: a b' "parallel 'printf public' ::: a b" \
+    "parallel echo ';' printf public ::: a b" 'parallel -j2 echo ::: a b' \
+    'parallel --jobs=2 echo ::: a b' 'parallel -P2 echo ::: a b' \
+    'taskset 0x1 printf public' 'taskset -ac 0 git status' \
+    'taskset -ac 0-4:2,6 printf public'; do
+    audit21_case audit21_review_launcher_public allow "$cmd"
+done
+for interpreter in lua5.4 lua-5.4 luajit luajit-2.1; do
+    audit21_case audit21_review_lua_inline deny "$interpreter -e 'print(os.getenv(\"TOKEN\"))'"
+    audit21_case audit21_review_lua_stdin deny "$interpreter <<'CODE'
+print(os.getenv(\"TOKEN\"))
+CODE"
+    audit21_case audit21_review_lua_pipe deny "printf 'print(os.getenv(\"TOKEN\"))' | $interpreter -"
+    audit21_case audit21_review_lua_public allow "$interpreter -e 'print(\"public\")'"
+    audit21_case audit21_review_lua_stdin_public allow "$interpreter <<'CODE'
+print(\"public\")
+CODE"
+done
+for cmd in 'make -sC ~/.aws -f credentials' 'make -sC~/.aws -f credentials' \
+    'make -ksC ~/.aws -fcredentials' 'make -sC ~/.aws -sf credentials'; do
+    audit21_case audit21_review_make_cwd deny "$cmd"
+done
+for cmd in 'make -sC src -f public.mk' 'make -sCsrc -fpublic.mk' \
+    'make -ksC src -sf public.mk' 'make -sj2 -C src -f public.mk' \
+    'make -f -C public' 'make --file -C public' 'make -h'; do
+    audit21_case audit21_review_make_public allow "$cmd"
+done
+for cmd in 'docker build .' 'docker pull alpine' 'docker stop app' 'docker volume ls' \
+    'docker --context synthetic build .' 'docker container stop app'; do
+    audit21_case audit21_review_docker_public allow "$cmd"
+done
+for cmd in 'docker build -f .env .' 'docker build --file=.env .' \
+    'docker load -i ~/.aws/credentials' 'docker load --input=~/.aws/credentials'; do
+    audit21_case audit21_review_docker_files deny "$cmd"
+done
+for cmd in 'docker run alpine printenv' 'docker exec app xsel -bo' \
+    'docker --context synthetic inspect app'; do
+    audit21_case audit21_review_docker_deny deny "$cmd"
+done
+for cmd in 'secret-tool clear service lookup' \
+    'secret-tool store --label=public service search' \
+    'secret-tool --label public store service lookup' \
+    'keyring set get user' 'keyring -b synthetic set get user'; do
+    audit21_case audit21_review_action_data allow "$cmd"
+done
+for cmd in 'secret-tool --unknown synthetic lookup service public' \
+    'secret-tool lookup --unknown synthetic service public' \
+    'keyring -b synthetic get service user' 'keyring --unknown synthetic get service user'; do
+    audit21_case audit21_review_action_printer deny "$cmd"
+done
+for cmd in "echo hello '" 'sudo -u' 'sudo -D' 'echo {1..65}' \
+    "echo \$'\000'" "echo \$'\036'" "echo \$'\x1f'"; do
+    audit21_case audit21_review_m1_parity deny "$cmd"
+done
+
+}
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

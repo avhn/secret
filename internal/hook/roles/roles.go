@@ -43,7 +43,8 @@ func Reading(name string) bool {
 // PrinterReason identifies output which cannot enter agent context. A direct
 // stdout pipe is permitted only for a validated stash or password-stdin login.
 func PrinterReason(name string, args []string, direct bool) string {
-	commands := printerArguments(name, args)
+	options := normalizePrinter(name, args)
+	commands := options.words
 	contains := func(words ...string) bool { return orderedWords(commands, words...) }
 	arg := func(n int) string {
 		if n < len(args) {
@@ -51,55 +52,37 @@ func PrinterReason(name string, args []string, direct bool) string {
 		}
 		return ""
 	}
-	printValue := false
+	printValue, always := false, false
 	switch name {
 	case "env", "printenv", "pbpaste", "wl-paste", "envsubst":
 		printValue = true
 	case "xclip", "xsel":
-		for _, a := range args {
-			if a == "-o" || a == "--output" || a == "-out" {
-				printValue = true
-			}
-		}
+		printValue = options.flags["-o"] || options.flags["--output"] || options.flags["-out"] || options.flags["-output"]
 	case "keyring":
-		// Backend and path options precede the action and consume one value,
-		// including attached short and equals forms. Do not scan their values
-		// for actions or skip help to find a later get operand.
-		for len(args) > 0 {
-			a := args[0]
-			if a == "-b" || a == "--keyring-backend" || a == "-p" || a == "--keyring-path" || a == "--mode" || a == "--output" {
-				if len(args) < 2 {
-					break
-				}
-				args = args[2:]
-				continue
-			}
-			if strings.HasPrefix(a, "-b") || strings.HasPrefix(a, "-p") || strings.HasPrefix(a, "--keyring-backend=") || strings.HasPrefix(a, "--keyring-path=") || strings.HasPrefix(a, "--mode=") || strings.HasPrefix(a, "--output=") {
-				args = args[1:]
-				continue
-			}
-			if a == "--" {
-				args = args[1:]
-			}
-			break
-		}
-		printValue = arg(0) == "get"
+		printValue = printerAction(commands, "get set del diagnose") == "get" && !options.flags["--help"] && !options.flags["-h"]
 	case "gh", "glab":
-		printValue = contains("auth", "token") || contains("auth", "status") && (hasOption(args, "--show-token") || hasOption(args, "-t"))
+		always = name == "gh" && contains("config", "get", "oauth_token")
+		printValue = contains("auth", "token") || contains("auth", "status") && (options.flags["--show-token"] || options.flags["-t"]) || always
 	case "make":
-		for _, v := range args {
-			if v == "--print-data-base" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "p") {
-				printValue = true
+		printValue = makePrintsDatabase(args)
+	case "npm", "pnpm", "yarn":
+		lower := strings.ToLower(strings.Join(commands, " "))
+		key := strings.Contains(lower, "token") || strings.Contains(lower, "auth") || strings.Contains(lower, "password") || strings.Contains(lower, "credential") || strings.Contains(lower, "secret")
+		printValue = contains("config", "get") && key || contains("config", "list") && (name != "npm" || key || options.flags["--json"] || options.flags["-l"] || options.flags["--long"]) || name != "npm" && contains("config", "ls")
+		always = name != "npm" && printValue
+	case "kubectl":
+		printValue = contains("create", "token") || contains("config", "view") && options.flags["--raw"]
+		for _, resource := range commands {
+			for _, kind := range strings.Split(resource, ",") {
+				kind, _, _ = strings.Cut(kind, "/")
+				for _, output := range options.outputs {
+					format, _, _ := strings.Cut(output, "=")
+					if (kind == "secret" || kind == "secrets") && contains("get") && (format == "yaml" || format == "json" || format == "jsonpath" || format == "go-template") {
+						printValue, always = true, true
+					}
+				}
 			}
 		}
-	case "npm":
-		if arg(0) == "config" {
-			lower := strings.ToLower(strings.Join(args[2:], " "))
-			key := strings.Contains(lower, "token") || strings.Contains(lower, "auth") || strings.Contains(lower, "password")
-			printValue = arg(1) == "get" && key || arg(1) == "list" && (key || strings.Contains(lower, "--json") || strings.Contains(" "+lower+" ", " -l "))
-		}
-	case "kubectl":
-		printValue = contains("create", "token") || contains("config", "view") && hasOption(args, "--raw")
 	case "gcloud":
 		printValue = contains("config", "config-helper") || contains("auth", "print-access-token") || contains("auth", "print-identity-token")
 	case "az":
@@ -125,14 +108,8 @@ func PrinterReason(name string, args []string, direct bool) string {
 			printValue = printValue || orderedWords(lower, "configure", "get", key)
 		}
 	case "op":
-		printValue = arg(0) == "read"
-		if arg(0) == "item" && arg(1) == "get" {
-			for _, a := range args[2:] {
-				if a == "--reveal" || a == "--fields" || strings.HasPrefix(a, "--fields=") {
-					printValue = true
-				}
-			}
-		}
+		_, fields := options.values["--fields"]
+		printValue = contains("read") || contains("item", "get") && (options.flags["--reveal"] || fields)
 	case "pass":
 		if len(args) > 0 {
 			switch arg(0) {
@@ -142,27 +119,39 @@ func PrinterReason(name string, args []string, direct bool) string {
 			}
 		}
 	case "secret-tool":
-		if arg(0) == "search" {
+		action := printerAction(commands, "lookup search store clear lock")
+		if action == "search" {
 			return "secret-tool search prints secrets and is always denied"
 		}
-		printValue = arg(0) == "lookup"
+		printValue = action == "lookup"
 	case "security":
-		if arg(0) == "find-generic-password" || arg(0) == "find-internet-password" {
-			for _, a := range args[1:] {
-				if a == "-g" {
-					return "security -g prints passwords to stderr and is always denied"
-				}
-				if a == "-w" {
-					printValue = true
-				}
+		if contains("find-generic-password") || contains("find-internet-password") {
+			if options.flags["-g"] {
+				return "security -g prints passwords to stderr and is always denied"
 			}
+			printValue = options.flags["-w"]
 		}
 	case "kwallet-query":
-		for _, a := range args {
-			if a == "-r" || a == "--read-password" || strings.HasPrefix(a, "--read-password=") {
-				printValue = true
+		_, short := options.values["-r"]
+		_, long := options.values["--read-password"]
+		printValue = short || long
+	case "docker", "docker-compose":
+		if (name == "docker-compose" || contains("compose")) && (contains("config") || contains("convert")) {
+			return "compose config prints env-file values"
+		}
+		if contains("inspect") && !(len(commands) > 0 && commands[0] == "image" && !options.unknownPrefix) {
+			printValue = len(options.outputs) == 0
+			for _, format := range options.outputs {
+				printValue = printValue || format == "" || strings.EqualFold(format, "json") || strings.Contains(format, "Env") || strings.Contains(format, ".Config") || strings.Contains(format, "json .")
 			}
 		}
+	case "php":
+		printValue = options.flags["-i"] || options.flags["--info"]
+		for _, option := range []string{"-r", "--run"} {
+			code := options.values[option]
+			printValue = printValue || strings.Contains(code, "phpinfo(") || (strings.Contains(code, "print_r(") || strings.Contains(code, "var_dump(")) && (strings.Contains(code, "$_SERVER") || strings.Contains(code, "$_ENV") || strings.Contains(code, "getenv("))
+		}
+		always = printValue // Keep the pre-normalizer PHP transport policy.
 	case "ps":
 		skip := false
 		for _, a := range args {
@@ -215,7 +204,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 		}
 
 	}
-	if printValue && !direct {
+	if printValue && (!direct || always) {
 		return Printer
 	}
 	return ""

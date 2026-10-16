@@ -14,6 +14,8 @@ import (
 // Keep directory alternatives local to that child, never the following statement.
 type packageExecOptions struct {
 	cwd        string
+	base       string
+	baseSet    bool
 	workspaces []string
 	shell      bool
 	prefix     bool
@@ -22,12 +24,15 @@ type packageExecOptions struct {
 }
 
 func (a *analyzer) packageExecOptions(name string, args []string, options *packageExecOptions) []string {
+	if !options.baseSet {
+		options.base, options.baseSet = options.cwd, true
+	}
 	for len(args) > 0 {
 		arg := args[0]
 		key, value, attached := strings.Cut(arg, "=")
 		kind := ""
 		switch {
-		case name == "npm" && key == "--prefix", name != "npm" && optionIn("-C --dir", key):
+		case name == "npm" && key == "--prefix", name != "npm" && optionIn("-C --dir", key), name == "yarn" && key == "--cwd":
 			kind = "directory"
 		case name == "npm" && optionIn("-w --workspace", key), name == "pnpm" && optionIn("-F --filter", key):
 			kind = "workspace"
@@ -63,7 +68,7 @@ func (a *analyzer) packageExecOptions(name string, args []string, options *packa
 		}
 		switch kind {
 		case "directory":
-			options.cwd = a.resolve(value, options.cwd)
+			options.cwd = a.resolve(value, options.base)
 			options.prefix = name == "npm"
 		case "workspace":
 			options.workspaces = append(options.workspaces, value)

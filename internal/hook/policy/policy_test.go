@@ -75,8 +75,8 @@ func TestIndeterminateRisk(t *testing.T) {
 			t.Fatalf("allowed uncertain protected operation %q", src)
 		}
 	}
-	if got := Analyze("echo harmless '", "/synthetic", "/synthetic", protected); got != "" {
-		t.Fatalf("inert parse failure denied: %q", got)
+	if got := Analyze("echo harmless '", "/synthetic", "/synthetic", protected); got == "" {
+		t.Fatal("inert parse failure must deny without a raw-scan allow fallback")
 	}
 }
 

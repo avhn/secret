@@ -159,11 +159,11 @@ jobs:
       - name: Test Windows policy package
         if: runner.os == 'Windows'
         shell: bash
-        timeout-minutes: 30
+        timeout-minutes: 45
         env:
           GOTRACEBACK: all
         # Stream subtest names and timeout stacks instead of buffering a hung package.
-        run: go test -v -timeout 25m ./internal/hook/policy/
+        run: go test -v -timeout 40m ./internal/hook/policy/
       - name: Test Go packages
         shell: bash
         # The denied-command corpus replays about 2000 fixture trees; Windows needs more than the default.

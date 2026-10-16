@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -25,7 +24,7 @@ func (a *analyzer) nonReaderUnknown(name string, operands []expandedOperand, cwd
 	}
 	if name == "curl" {
 		for _, operand := range operands {
-			if strings.Contains(literal(operand.source), "file://") {
+			if strings.Contains(a.raw(operand.source), "file://") {
 				return false
 			}
 		}
@@ -113,10 +112,6 @@ func recursiveGrepSafe(args []string, cwd string, a *analyzer) bool {
 func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 	deny := func() bool { a.reason = roles.Printer; return true }
 	switch name {
-	case "gh":
-		if len(args) >= 3 && args[0] == "config" && args[1] == "get" && slices.Contains(args[2:], "oauth_token") {
-			return deny()
-		}
 	case "npm", "npx":
 		if name == "npm" && len(args) > 1 && args[0] == "run" && args[1] == "env" {
 			return deny()
@@ -126,7 +121,7 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 				return deny()
 			}
 		}
-	case "unshare", "chrt":
+	case "unshare":
 		for _, arg := range args {
 			if optionIn("env printenv", arg) {
 				return deny()
@@ -136,59 +131,10 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 		if len(args) > 0 && args[0] == "env" {
 			return deny()
 		}
-	case "php":
-		for i, v := range args {
-			if v == "-i" || v == "--info" {
-				return deny()
-			}
-			if (v == "-r" || v == "--run") && i+1 < len(args) {
-				code := args[i+1]
-				if strings.Contains(code, "phpinfo(") || (strings.Contains(code, "print_r(") || strings.Contains(code, "var_dump(")) && (strings.Contains(code, "$_SERVER") || strings.Contains(code, "$_ENV") || strings.Contains(code, "getenv(")) {
-					return deny()
-				}
-			}
-		}
-	case "pnpm", "yarn":
-		args = packageLeadingOptions(args)
-		for i := 0; i < len(args); i++ {
-			if optionIn("-C --dir --filter", args[i]) {
-				i++
-				continue
-			}
-			if strings.HasPrefix(args[i], "--dir=") || strings.HasPrefix(args[i], "--filter=") {
-				continue
-			}
-			if args[i] == "config" && i+1 < len(args) {
-				if optionIn("list ls", args[i+1]) || args[i+1] == "get" && i+2 < len(args) && credentialConfigKey(args[i+2]) {
-					return deny()
-				}
-			}
-			break
-		}
 	case "kubectl":
 		if len(args) >= 3 && args[0] == "exec" {
 			for _, v := range args[2:] {
 				if optionIn("env printenv", v) {
-					return deny()
-				}
-			}
-		}
-		for i, v := range args {
-			if v != "get" || i+1 >= len(args) || !kubernetesSecretResource(args[i+1]) {
-				continue
-			}
-			for j, v := range args {
-				output := ""
-				if (v == "-o" || v == "--output") && j+1 < len(args) {
-					output = args[j+1]
-				}
-				if strings.HasPrefix(v, "-o=") || strings.HasPrefix(v, "--output=") {
-					_, output, _ = strings.Cut(v, "=")
-				}
-				if strings.HasPrefix(v, "-o") && len(v) > 2 && !strings.HasPrefix(v, "--") {
-					output = strings.TrimPrefix(v[2:], "=")
-				}
-				if optionIn("yaml json jsonpath go-template", strings.SplitN(output, "=", 2)[0]) {
 					return deny()
 				}
 			}

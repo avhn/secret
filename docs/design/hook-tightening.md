@@ -113,7 +113,6 @@ indeterminate-input or audited input/output policy tightening.
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `audit-arithmetic-unknown`                                                                                                                                                         | deliberate-tightening | `(( $(cat file) ))` contains a content-producing substitution and cannot be certified from arithmetic syntax.                                                                                |
 | `audit-cases5-6`                                                                                                                                                                   | deliberate-tightening | Ripgrep names mode with `--pre cat` invokes a content-producing child and cannot use the names-only shortcut.                                                                                |
-| `audit-cases6-7`                                                                                                                                                                   | deliberate-tightening | Clustered xargs `-0a` consumes a protected argument-list file before invoking its child.                                                                                                     |
 | `audit-cases7-2`                                                                                                                                                                   | deliberate-tightening | A symlinked ancestor can reach an actual credential file before `..`; a final-symlink alias exception cannot certify that input.                                                             |
 | `malformed_safe`, `oversized_safe`                                                                                                                                                 | deliberate-tightening | An absent framing pair, ambiguous header, or patch above the 40 KiB limit cannot certify safe target paths. Recognized protected headers deny even without framing.                          |
 | `active_safe_command`                                                                                                                                                              | deliberate-tightening | `$c package.json` does not establish the executable or its input and output roles.                                                                                                           |
@@ -699,3 +698,132 @@ to ancestor traversal or a child process. Windows policy tests now run separatel
 with verbose subtest output, all-goroutine timeout diagnostics and a 25-minute
 test deadline, within a 60-minute Go job bound. Native Windows CI evidence is
 still required; Linux tests do not establish that the runner hang is resolved.
+
+### Audit 21 printer grammar and child roles (M2, M3)
+
+Go printer roles share one option normalizer for global and interleaved options,
+long equals forms, attached short values and short flag clusters. Known option
+values are data; unknown option values remain possible action words. Security
+password flags and clipboard output flags use cluster membership, not whole-argv
+spelling. Security -g remains an unconditional stderr denial. Docker inspect and
+Compose config, gh oauth_token, op, wallet and npm global config output use the
+same roles through launchers and literal interpreter command strings. Repeated
+output-option aliases cannot erase an earlier credential-output witness. The
+explicit Docker image-inspect and public-format controls remain readable; an
+unknown global option cannot supply the image-only proof. The boolean op --cache
+flag cannot consume an action word. A global -- cannot hide later positional
+actions or subcommand flags; harmless post-terminator operations remain allowed.
+
+Launchers consume their own option grammar and dispatch the actual child through
+ordinary command analysis, rather than a partial printer-name list. Scheduling
+priority, CPU mask, timeout duration and flock lock operands are not children.
+Malformed scheduling syntax denies instead of discarding a possible printer.
+Watch checks both literal child argv and joined shell source; --exec retains argv
+semantics. Watch --differences accepts its optional attached value without
+consuming the child command. Generic unknown execution derives printer witnesses from the shared
+role classifier. Classified reader operands and documented test/script data are
+not recast as launcher commands. Direct credential sink validation is unchanged;
+PHP, package config output, gh oauth_token and Kubernetes secret-object output
+retain their pre-existing unconditional denials when moved into shared roles.
+
+### Audit 21 command directories and curl inputs (M4, M5)
+
+Yarn --cwd joins the existing package directory model. Sudo chdir and env chdir
+continue to scope their child; make directory options and Compose project
+options now anchor their own reader/command analysis. A command's directory does
+not change the next shell statement. Repeated package, env, sudo and Compose
+directory options stay anchored at the original process cwd; make applies its
+-C options sequentially, including -sC and attached cluster values. Required and
+optional make option arities prevent letters inside file, include and scheduling
+values from becoming directory switches. Sudo retains its conservative
+original-cwd alternative. Tests cover HOME credential basenames, repeated options
+and public siblings.
+
+Curl file-input syntax is normalized before shared credential metadata checks:
+@ data and JSON inputs, --write-out/-w @ format files, form uploads/content
+files, upload/config options and local file URLs (including URL decoding and
+native drive paths). Quoted form filenames retain commas and semicolons;
+headers=@ is another file input even on a literal-valued field, while filename=
+remains metadata. Literal format strings are data. Known payloads,
+form-string literals and output destinations retain their data roles. Physical
+credential aliases and HOME paths use the ordinary resolver. Unknown curl
+options retain generic positive-witness checks; unsupported command-like syntax
+cannot become an allow merely because curl's known inputs have a grammar.
+
+### Audit 21 executable interpreter bodies (M6)
+
+Lua and Rscript join the interpreter stdin and inline-code paths, including
+os.getenv and Sys.getenv witnesses. Executable bodies inspect independently
+quoted literal strings and backticks with the same credential-printer roles as
+shell calls, including declare -p. Modeled literal launchers use the ordinary
+bounded child dispatcher with isolated command state. Indeterminate probes of
+incomplete launcher text such as "timeout" are not positive printer witnesses.
+The probe's recursion limit likewise supplies no witness on its own. Actual
+credential-printing children remain denied. These probes never launch source or
+a candidate command. File-only programs such as sed keep their file-literal
+classifier, without treating an ordinary process.env search pattern as an
+environment dump.
+Public interpreter-output controls and configured-path cache-scope tests remain.
+
+### Audit 21 per-analysis metadata and Windows CI (M8)
+
+Physical resolution caches Lstat, readlink, canonical-existing-prefix results,
+returned errors and raw-path resolution only within an analysis. Raw keys retain
+link/.. semantics. Each metadata map has a 4096-entry cap; a full cache resolves
+normally rather than certifying a miss. Interpreter filename decisions include
+cwd and the accumulated configured-credential path set in their key. Caller
+metadata callbacks are memoized only within the same bounded analysis. Git
+configuration-target metadata proofs also cache raw name, cwd and effective
+XDG/global config paths; live Git roots and directory assignments are checked
+before consulting this cache. No cache survives the next host envelope, and this
+metadata snapshot does not provide
+filesystem race containment or sandbox protection.
+
+Synthetic tests compare cached and uncached classification, retain errors,
+exercise physical aliases and a fresh analysis, and ensure later configured-path
+assignments cannot reuse a public-file result. Linux CPU profiles identify
+ConfiguredProtected -> physicalOrClean -> physical/Lstat as the producer hot
+path (4.30 seconds cumulative in ConfiguredProtected, 57.10% of sampled CPU).
+A serial Linux rerun against HEAD 8dcb901 and the revised tree reduced
+TestAudit20DecodedInterpreterProducers from 6.877 to 3.125 seconds (both CPU
+profiled), and TestGuardDeniedCorpus from 99.604 to 63.950 seconds (uncached test
+runs). The revised corpus covered 48,017 variants from 2,461 Bash-deny cases
+with zero allows. Native Windows runtime and speedup still require CI evidence;
+cross-vet is not a Windows runtime test. The Windows policy step temporarily has a
+45-minute step limit and a 40-minute Go test deadline inside the existing
+60-minute job bound.
+
+Permanent regressions are in internal/hook/policy/audit21_test.go,
+internal/hook/roles/audit21_test.go and internal/hook/paths/metadata_test.go.
+The internal/hook/audit21_test.go replay uses testdata/hook/audit21.json for both
+host decisions with a disposable HOME. These tests do not install a guard or
+establish installed-host protection. Existing corpus expectations are retained.
+
+### Audit 21 integration parity (M1 to M6)
+
+Failed Go shell parses now deny regardless of raw risk substrings. Missing sudo
+option values, oversized brace alternatives and reserved ANSI-C separator bytes
+also deny before inert-output exemptions. Supported literal ANSI-C escapes keep
+their data role, including unknown escapes whose backslash remains literal.
+
+GNU Parallel distinguishes complete joined shell templates from explicit input
+lists and accepts attached job counts. Source filenames still receive protected
+metadata checks for reading templates; ordinary printf, echo and secret show
+children retain their data/metadata roles through xargs and Parallel. Find's
+existing protected-name metadata proof remains narrower. External
+time options parsed as a shell time clause use the utility's normal child grammar.
+Make's option-value boundaries keep letters in attached filenames from becoming
+printer flags, while attached makefile inputs are checked at the effective cwd.
+Docker build/load file operands use shared protected-path checks. Docker
+--env-file consumers keep their documented non-printing exemption. Single-action
+keyring and secret-tool commands stop resolving actions before data operands,
+without letting an unknown global option hide lookup/get. Versioned and hyphenated
+Lua/LuaJIT names share inline, stdin and producer checks.
+
+These groups resolve to the retained Bash decisions, not new deliberate Go-stricter
+rows. The historical `audit-cases6-7` clustered-xargs protected argument-list
+case now denies in both guards, so its measured divergence row is removed.
+Existing deny expectations are preserved. The M1 inert parse-failure Go
+unit expectation is intentionally tightened to match the fail-closed policy.
+Integration regressions are in internal/hook/policy/audit21_test.go,
+internal/hook/roles/audit21_test.go and testdata/hook/audit21.json.

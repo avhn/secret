@@ -10,19 +10,29 @@ import (
 // metadataChild is an allowlist, not a list of known readers. Wrappers do not
 // change whether the underlying child consumes the supplied file contents.
 func (a *analyzer) metadataChild(words []string, depth int, cwd string) bool {
+	return a.nonReadingChild(words, depth, cwd, false)
+}
+
+// xargs and Parallel also retain explicit output-data roles. Find's existing
+// metadata-only proof remains narrower, including its protected-name witness.
+func (a *analyzer) dataChild(words []string, depth int, cwd string) bool {
+	return a.nonReadingChild(words, depth, cwd, true)
+}
+
+func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data bool) bool {
 	if depth > 4 || len(words) == 0 {
 		return false
 	}
 	name, args := path.Base(words[0]), words[1:]
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		return !shell && a.metadataChild(child, depth+1, dir)
+		return !shell && a.nonReadingChild(child, depth+1, dir, data)
 	}
 	if name == "command" || name == "builtin" {
 		if len(args) > 0 && args[0] == "--" {
 			args = args[1:]
 		}
-		return a.metadataChild(args, depth+1, cwd)
+		return a.nonReadingChild(args, depth+1, cwd, data)
 	}
 	if name == "env" {
 		for len(args) > 0 {
@@ -50,16 +60,26 @@ func (a *analyzer) metadataChild(words []string, depth int, cwd string) bool {
 			}
 			break
 		}
-		return a.metadataChild(args, depth+1, cwd)
+		return a.nonReadingChild(args, depth+1, cwd, data)
 	}
-	return optionIn("ls stat chmod chown rm rmdir touch mkdir test true false basename dirname realpath readlink file", name)
+	if data && name == "secret" && len(args) > 0 && optionIn("list show help --help -h", args[0]) {
+		return true
+	}
+	return data && !roles.Reading(name) || optionIn("ls stat chmod chown rm rmdir touch mkdir test true false basename dirname realpath readlink file", name)
 }
 
 func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
-		key, _, attached := strings.Cut(args[0], "=")
+		arg := args[0]
+		key, _, attached := strings.Cut(arg, "=")
 		args = args[1:]
-		if optionIn("-j --jobs -a --arg-file -I --replace --delimiter", key) {
+		if arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-j") && len(arg) > 2 || strings.HasPrefix(arg, "-P") && len(arg) > 2 {
+			continue
+		}
+		if optionIn("-j -P --jobs -a --arg-file -I --replace --delimiter", key) {
 			if key == "-a" || key == "--arg-file" {
 				a.reason = roles.Indeterminate
 				return
@@ -71,26 +91,58 @@ func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
 				}
 				args = args[1:]
 			}
-		} else if !optionIn("-0 --null --no-run-if-empty --keep-order -k --verbose -v --will-cite --", key) || attached {
+		} else if !optionIn("-0 --null --no-run-if-empty --keep-order -k --verbose -v --will-cite", key) || attached {
 			a.reason = roles.Indeterminate
 			return
+		}
+	}
+	var inputs []string
+	explicit := false
+	for i, arg := range args {
+		if arg == "::::" {
+			a.reason = roles.Indeterminate
+			return
+		}
+		if arg == ":::" {
+			args, inputs, explicit = args[:i], args[i+1:], true
+			break
 		}
 	}
 	if len(args) == 0 {
 		a.reason = roles.Indeterminate
 		return
 	}
-	if !a.metadataChild(args, depth+1, cwd) && a.treeProtectedAll(".", cwd) {
+	// Parallel joins its template words into shell source. Analyze the whole
+	// template before treating any explicit input operands as data.
+	template := strings.Join(args, " ")
+	a.fragmentAt(template, depth+1, cwd)
+	if a.reason != "" {
+		return
+	}
+	metadata := a.dataChild(strings.Fields(template), depth+1, cwd)
+	if !explicit && !metadata && a.treeProtectedAll(".", cwd) {
 		a.reason = roles.FileInput
 		return
 	}
-	for _, arg := range args {
-		if arg == ":::" || arg == "::::" {
+	for _, input := range inputs {
+		if input == ":::" || input == "::::" {
 			a.reason = roles.Indeterminate
 			return
 		}
+		if !metadata && a.inputProtected(input, cwd) {
+			a.reason = roles.FileInput
+			return
+		}
+		quoted := "'" + strings.ReplaceAll(input, "'", "'\\''") + "'"
+		code := strings.ReplaceAll(template, "{}", quoted)
+		if code == template {
+			code += " " + quoted
+		}
+		a.fragmentAt(code, depth+1, cwd)
+		if a.reason != "" {
+			return
+		}
 	}
-	a.command(args, depth+1, cwd, false)
 }
 
 // jq's -f is a flag. Its first positional is the program file, even when

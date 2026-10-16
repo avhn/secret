@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ func (a *analyzer) inputProtected(name, cwd string) bool {
 	if cwd == "" && !filepath.IsAbs(name) {
 		return true
 	}
-	return paths.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) || a.protected(name, cwd)
+	return a.metadata.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) || a.protected(name, cwd)
 }
 
 func (a *analyzer) treeProtected(root, cwd string) bool {
@@ -124,21 +125,23 @@ func splitEnv(s string) string {
 	return strings.NewReplacer(`\_`, " ", `\t`, "\t", `\n`, "\n", `\r`, "\r").Replace(s)
 }
 
+var luaVersion = regexp.MustCompile(`^lua(?:jit)?(?:[0-9._-][a-z0-9._-]*)?$`)
+
 func interpreter(name string) bool {
-	return strings.HasPrefix(name, "python") || strings.Contains(" perl ruby node nodejs php awk gawk jq yq ", " "+name+" ")
+	return strings.HasPrefix(name, "python") || luaVersion.MatchString(name) || strings.Contains(" perl ruby node nodejs php rscript awk gawk jq yq ", " "+name+" ")
 }
 
 // Interpreter literals share the shell/file credential classifier, including
 // bare configured names and HOME/cwd-relative paths. Inspect names only; never
 // evaluate source or open a credential to determine whether it is protected.
 func (a *analyzer) interpreterProtected(code, cwd string) bool {
-	for _, match := range inlinePath.FindAllStringSubmatch(code, -1) {
-		if a.interpreterNameProtected(match[1], cwd) {
+	for _, value := range sourceLiterals(code) {
+		if a.interpreterNameProtected(value, cwd) {
 			return true
 		}
 	}
 	for _, token := range strings.FieldsFunc(code, func(r rune) bool { return strings.ContainsRune(" \t\r\n\"'`(){}[];<>=,+", r) }) {
-		if (strings.ContainsAny(token, "/\\") || paths.LexicalProtected(token, cwd, a.home) || paths.ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig())) && a.interpreterNameProtected(token, cwd) {
+		if (strings.ContainsAny(token, "/\\") || a.metadata.LexicalProtected(token, cwd, a.home) || a.metadata.ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig())) && a.interpreterNameProtected(token, cwd) {
 			return true
 		}
 	}
@@ -149,7 +152,22 @@ func (a *analyzer) interpreterProtected(code, cwd string) bool {
 // configured witnesses even for impossible names, but do not turn ENAMETOOLONG
 // from ordinary text into a credential read. Plausible paths still fail closed.
 func (a *analyzer) interpreterNameProtected(name, cwd string) bool {
-	if paths.LexicalProtected(name, cwd, a.home) || paths.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) {
+	key := interpreterName{name, cwd, a.credentialConfig()}
+	if protected, ok := a.interpreterNames[key]; ok {
+		return protected
+	}
+	protected := a.checkInterpreterName(name, cwd)
+	if a.interpreterNames == nil {
+		a.interpreterNames = make(map[interpreterName]bool)
+	}
+	if len(a.interpreterNames) < 4096 {
+		a.interpreterNames[key] = protected
+	}
+	return protected
+}
+
+func (a *analyzer) checkInterpreterName(name, cwd string) bool {
+	if a.metadata.LexicalProtected(name, cwd, a.home) || a.metadata.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) {
 		return true
 	}
 	for _, component := range strings.FieldsFunc(name, func(r rune) bool { return r == '/' || r == '\\' }) {
@@ -165,7 +183,7 @@ func (a *analyzer) interpreterNameProtected(name, cwd string) bool {
 func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd string) bool {
 	var source strings.Builder
 	syntax.NewPrinter().Print(&source, left)
-	if a.interpreterProtected(source.String(), cwd) {
+	if a.executableInterpreterProtected(source.String(), cwd) {
 		return true
 	}
 	// Serialized shell source retains escapes around the interpreter's own
@@ -177,7 +195,7 @@ func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd strin
 		values, known := a.expandWord(word, producerCWD)
 		if known {
 			for _, value := range values {
-				protected = protected || a.interpreterProtected(value, cwd)
+				protected = protected || a.executableInterpreterProtected(value, cwd)
 			}
 		}
 	}
@@ -200,7 +218,7 @@ func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd strin
 					a.reason = roles.Indeterminate
 					protected = true
 				} else {
-					protected = protected || a.interpreterProtected(body, cwd)
+					protected = protected || a.executableInterpreterProtected(body, cwd)
 				}
 			}
 		}
@@ -245,7 +263,7 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 				a.reason = roles.Printer
 				return true
 			}
-			if name != "jq" && name != "yq" && a.interpreterProtected(code, cwd) {
+			if name != "jq" && name != "yq" && (a.interpreterProtected(code, cwd) || interpreter(name) && a.executableInterpreterProtected(code, cwd)) {
 				a.reason = roles.FileInput
 				return true
 			}

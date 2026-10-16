@@ -56,6 +56,10 @@ func Protected(name, cwd, workdir, home string) bool {
 // Cleaning the full string first would turn link/../credentials into the wrong
 // file when link points into a protected directory outside the lexical parent.
 func physical(raw string) (string, error) {
+	return physicalWith(raw, os.Lstat, os.Readlink, filepath.EvalSymlinks)
+}
+
+func physicalWith(raw string, lstat func(string) (os.FileInfo, error), readlink, canonical func(string) (string, error)) (string, error) {
 	volume := filepath.VolumeName(raw)
 	root := volume + string(os.PathSeparator)
 	current := root
@@ -72,7 +76,7 @@ func physical(raw string) (string, error) {
 			continue
 		}
 		next := filepath.Join(current, part)
-		info, err := os.Lstat(next)
+		info, err := lstat(next)
 		if err != nil {
 			if !missingOperand(err) {
 				return next, err
@@ -88,7 +92,7 @@ func physical(raw string) (string, error) {
 		if hops > 32 {
 			return next, fs.ErrInvalid
 		}
-		target, err := os.Readlink(next)
+		target, err := readlink(next)
 		if err != nil {
 			return next, err
 		}
@@ -104,7 +108,7 @@ func physical(raw string) (string, error) {
 		// EvalSymlinks also expands 8.3 aliases on Windows. The component
 		// walk above preserves link/.. semantics; canonicalize its result,
 		// including the existing prefix of a not-yet-created target.
-		return canonicalExisting(current, filepath.EvalSymlinks)
+		return canonicalExisting(current, canonical)
 	}
 	return current, nil
 }
