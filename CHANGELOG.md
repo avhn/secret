@@ -13,8 +13,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
   protect AWS configuration and configured credential paths, and share reader
   metadata checks with interpreter literals and oversized heredocs. Resolve
   missing configured targets through aliased ancestors on both configured and
-  reader paths. Add permanent Claude/Codex regressions, must-allow cases and
-  exact platform inventories.
+  reader paths. Expand bounded static variables in executable here-strings and
+  unquoted heredocs without running source; preserve quoted-heredoc literals
+  and deny indeterminate interpreter stdin. Add permanent Claude/Codex
+  regressions, must-allow cases and exact platform inventories.
 
 - Classify Go token printers through unknown and interleaved options without
   widening direct login/stash transports. Track literal reader aliases and
