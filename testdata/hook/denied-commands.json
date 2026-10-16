@@ -23926,6 +23926,446 @@
       "snapshot": 121
     },
     {
+      "command": "F=custom.cfg; python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; python3 <<CODE\nprint(open('$F').read())\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#2",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; python3 <<CODE\nprint(open('$F').read())\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#2",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#3",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; python3 <<CODE\nprint(open('$F').read())\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#3",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#4",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; python3 <<CODE\nprint(open('$F').read())\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#4",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; node <<< \"console.log(require('fs').readFileSync('$F','utf8'))\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#5",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; node <<CODE\nconsole.log(require('fs').readFileSync('$F','utf8'))\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#5",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; node <<< \"console.log(require('fs').readFileSync('$F','utf8'))\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#6",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; node <<CODE\nconsole.log(require('fs').readFileSync('$F','utf8'))\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#6",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; node <<< \"console.log(require('fs').readFileSync('$F','utf8'))\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#7",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; node <<CODE\nconsole.log(require('fs').readFileSync('$F','utf8'))\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#7",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; node <<< \"console.log(require('fs').readFileSync('$F','utf8'))\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#8",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; node <<CODE\nconsole.log(require('fs').readFileSync('$F','utf8'))\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#8",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; ruby <<< \"puts File.read('$F')\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#9",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; ruby <<CODE\nputs File.read('$F')\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#9",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; ruby <<< \"puts File.read('$F')\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#10",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; ruby <<CODE\nputs File.read('$F')\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#10",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; ruby <<< \"puts File.read('$F')\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#11",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; ruby <<CODE\nputs File.read('$F')\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#11",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; ruby <<< \"puts File.read('$F')\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#12",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; ruby <<CODE\nputs File.read('$F')\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#12",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; perl <<< \"print do { local(@ARGV) = ('$F'); <> }\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#13",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; perl <<CODE\nprint do { local(@ARGV) = ('$F'); <> }\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#13",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; perl <<< \"print do { local(@ARGV) = ('$F'); <> }\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#14",
+      "snapshot": 121
+    },
+    {
+      "command": "F=~/.aws/config; perl <<CODE\nprint do { local(@ARGV) = ('$F'); <> }\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#14",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; perl <<< \"print do { local(@ARGV) = ('$F'); <> }\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#15",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.env; perl <<CODE\nprint do { local(@ARGV) = ('$F'); <> }\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#15",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; perl <<< \"print do { local(@ARGV) = ('$F'); <> }\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_here_string#16",
+      "snapshot": 121
+    },
+    {
+      "command": "F=.netrc; perl <<CODE\nprint do { local(@ARGV) = ('$F'); <> }\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_heredoc#16",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; python3 <<< \"print(open('${F}').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<< \"$(printf public)\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#2",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<< \"`printf public`\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#3",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<< \"print(open('$UNKNOWN').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#4",
+      "snapshot": 121
+    },
+    {
+      "command": "F=src/a.py; python3 <<< \"print(open('${F:-public}').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#5",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<CODE\n$(printf public)\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#6",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<CODE\n`printf public`\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#7",
+      "snapshot": 121
+    },
+    {
+      "command": "python3 <<CODE\nprint(open('$UNKNOWN').read())\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#8",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; F=src/a.py; python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#9",
+      "snapshot": 121
+    },
+    {
+      "command": "F=src/a.py python3 <<< \"print(open('$F').read())\"",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_indeterminate#10",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; python3 <<-CODE\n\tprint(open('${F}').read())\n\tCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_document_metadata",
+      "snapshot": 121
+    },
+    {
+      "command": "F=custom.cfg; python3 <<CODE\nprint(open('$F').read())\nCODE\npython3 <<CODE\nprint(1)\nCODE",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "custom.cfg",
+      "name": "stdin_expand_document_metadata#2",
+      "snapshot": 121
+    },
+    {
       "command": "export RIPGREP_CONFIG_PATH=/dev/null; rg SYNTH",
       "config": "@ROOT@/examples/ripgreprc",
       "cwd": "@TMP@/w/dirty",

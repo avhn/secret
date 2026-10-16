@@ -3415,5 +3415,61 @@ for cmd in $'alias c=cd\n(alias c=\'ls -l\')\nc ~/.aws\ncat credentials' \
 done
 }
 
+# Executable stdin expands shell variables, except in quoted heredocs.
+# All source below is inspected as data and is never executed.
+# shellcheck disable=SC2016,SC2088
+{
+for interpreter in python3 node ruby perl; do
+    case "$interpreter" in
+        python3) body="print(open('\$F').read())" ;;
+        node) body="console.log(require('fs').readFileSync('\$F','utf8'))" ;;
+        ruby) body="puts File.read('\$F')" ;;
+        perl) body="print do { local(@ARGV) = ('\$F'); <> }" ;;
+    esac
+    for target in custom.cfg '~/.aws/config' .env .netrc; do
+        cmd="F=$target; $interpreter <<< \"$body\""
+        KUBECONFIG=custom.cfg secrets stdin_expand_here_string deny Bash "$cmd"
+        cmd="F=$target; $interpreter <<CODE"$'\n'"$body"$'\nCODE'
+        KUBECONFIG=custom.cfg secrets stdin_expand_heredoc deny Bash "$cmd"
+    done
+    cmd="F=custom.cfg; $interpreter <<'CODE'"$'\n'"$body"$'\nCODE'
+    KUBECONFIG=custom.cfg secrets stdin_expand_quoted allow Bash "$cmd"
+    cmd="F=src/a.py; $interpreter <<< \"$body\""
+    KUBECONFIG=custom.cfg secrets stdin_expand_public allow Bash "$cmd"
+    cmd="F=src/a.py; $interpreter <<CODE"$'\n'"$body"$'\nCODE'
+    KUBECONFIG=custom.cfg secrets stdin_expand_public_document allow Bash "$cmd"
+done
+for cmd in 'F=custom.cfg; python3 <<< "print(open('\''${F}'\'').read())"' \
+    'python3 <<< "$(printf public)"' 'python3 <<< "`printf public`"' \
+    'python3 <<< "print(open('\''$UNKNOWN'\'').read())"' \
+    'F=src/a.py; python3 <<< "print(open('\''${F:-public}'\'').read())"' \
+    $'python3 <<CODE\n$(printf public)\nCODE' \
+    $'python3 <<CODE\n`printf public`\nCODE' \
+    $'python3 <<CODE\nprint(open(\'$UNKNOWN\').read())\nCODE' \
+    'F=custom.cfg; F=src/a.py; python3 <<< "print(open('\''$F'\'').read())"' \
+    'F=src/a.py python3 <<< "print(open('\''$F'\'').read())"'; do
+    KUBECONFIG=custom.cfg secrets stdin_expand_indeterminate deny Bash "$cmd"
+done
+for cmd in $'F=custom.cfg; python3 <<-CODE\n\tprint(open(\'${F}\').read())\n\tCODE' \
+    $'F=custom.cfg; python3 <<CODE\nprint(open(\'$F\').read())\nCODE\npython3 <<CODE\nprint(1)\nCODE'; do
+    KUBECONFIG=custom.cfg secrets stdin_expand_document_metadata deny Bash "$cmd"
+done
+for cmd in 'python3 <<< "print(1)"' \
+    'python3 <<< '\''print("$UNKNOWN")'\''' \
+    'python3 <<< "print('\''\$UNKNOWN'\'')"' \
+    $'python3 <<\'CODE\'\nprint("$UNKNOWN $(printf public) `printf public`")\nCODE' \
+    $'python3 <<CODE\nprint("\\$UNKNOWN")\nCODE' \
+    $'F=src/a.py; python3 <<"CODE"\nprint(open(\'$F\').read())\nCODE' \
+    $'F=src/a.py; python3 <<\\CODE\nprint(open(\'$F\').read())\nCODE'; do
+    secrets stdin_expand_literal allow Bash "$cmd"
+done
+public_prose=''
+for ((n = 0; n < 30; n++)); do public_prose+='hello world '; done
+for cmd in "python3 <<< 'print(\"$public_prose\")'" \
+    "python3 <<'CODE'"$'\n'"print(\"$public_prose\")"$'\nCODE'; do
+    secrets stdin_expand_public_prose allow Bash "$cmd"
+done
+}
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]
