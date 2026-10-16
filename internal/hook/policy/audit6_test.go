@@ -89,7 +89,7 @@ func TestSixthAuditSedGNU(t *testing.T) {
 	check := func(name, dir string) bool { return paths.Protected(name, dir, "", root) }
 	t.Run("newline substitution delimiter", func(t *testing.T) {
 		script := "s\nx\ny\n;r app.env"
-		cmd := exec.Command("sed", "-n", script, "in.txt")
+		cmd := syntheticCommand(t, "sed", "-n", script, "in.txt")
 		cmd.Dir = root
 		if output, err := cmd.CombinedOutput(); err == nil || strings.Contains(string(output), "SYNTHETIC MARKER") {
 			t.Fatalf("GNU sed accepted newline delimiter: %v %q", err, output)
@@ -100,7 +100,7 @@ func TestSixthAuditSedGNU(t *testing.T) {
 	})
 	t.Run("substitution write", func(t *testing.T) {
 		out := filepath.Join(root, "written.env")
-		cmd := exec.Command("sed", "-n", "s|x|SYNTHETIC MARKER|w "+out, "in.txt")
+		cmd := syntheticCommand(t, "sed", "-n", "s|x|SYNTHETIC MARKER|w "+out, "in.txt")
 		cmd.Dir = root
 		if output, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("GNU sed failed to write marker: %v %q", err, output)
@@ -115,7 +115,7 @@ func TestSixthAuditSedGNU(t *testing.T) {
 	})
 	for _, script := range []string{"#n; r app.env", "a text; r app.env"} {
 		t.Run("text or comment "+script, func(t *testing.T) {
-			cmd := exec.Command("sed", "-n", script, "in.txt")
+			cmd := syntheticCommand(t, "sed", "-n", script, "in.txt")
 			cmd.Dir = root
 			out, err := cmd.CombinedOutput()
 			if err != nil || strings.Contains(string(out), "SYNTHETIC MARKER") {
@@ -147,7 +147,7 @@ func TestSixthAuditSedGNU(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			args := append(append([]string{}, tc.args...), "in.txt")
-			cmd := exec.Command("sed", args...)
+			cmd := syntheticCommand(t, "sed", args...)
 			cmd.Dir = root
 			out, err := cmd.CombinedOutput()
 			if err != nil || !strings.Contains(string(out), "SYNTHETIC MARKER") {

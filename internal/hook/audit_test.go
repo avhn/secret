@@ -2,12 +2,14 @@ package hook
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestAuditEnvelopes exercises every retained audit reproducer through the
@@ -124,10 +126,14 @@ func audit2Fixture(t *testing.T) (string, audit2Corpus) {
 		root := filepath.Join(dir, "w", repo)
 		run := func(args ...string) {
 			t.Helper()
-			cmd := exec.Command(git, args...)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, git, append([]string{"--no-pager"}, args...)...)
+			cmd.Stdin = nil
+			cmd.WaitDelay = time.Second
 			cmd.Dir = root
 			// Do not inherit git config, hooks, signing or real repository selectors.
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_AUTHOR_NAME=Synthetic", "GIT_AUTHOR_EMAIL=synthetic@example.invalid", "GIT_COMMITTER_NAME=Synthetic", "GIT_COMMITTER_EMAIL=synthetic@example.invalid"}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "PAGER=cat", "GIT_AUTHOR_NAME=Synthetic", "GIT_AUTHOR_EMAIL=synthetic@example.invalid", "GIT_COMMITTER_NAME=Synthetic", "GIT_COMMITTER_EMAIL=synthetic@example.invalid"}
 			if output, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("synthetic git %v: %v\n%s", args, err, output)
 			}

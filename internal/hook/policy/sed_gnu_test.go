@@ -2,7 +2,6 @@ package policy
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -16,7 +15,7 @@ func TestSedGNUGrammar(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("GNU sed evidence runs on Linux")
 	}
-	version, err := exec.Command("sed", "--version").Output()
+	version, err := syntheticCommand(t, "sed", "--version").CombinedOutput()
 	if err != nil || !strings.Contains(string(version), "GNU sed") {
 		t.Skip("GNU sed unavailable")
 	}
@@ -91,7 +90,7 @@ func TestSedGNUGrammar(t *testing.T) {
 			for _, arg := range tc.args {
 				args = append(args, replace.Replace(arg))
 			}
-			cmd := exec.Command("sed", append(args, "in.txt")...)
+			cmd := syntheticCommand(t, "sed", append(args, "in.txt")...)
 			cmd.Dir = root
 			if strings.Contains(tc.name, "stdin") {
 				cmd.Stdin = strings.NewReader(fileText + "\n")

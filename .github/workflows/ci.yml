@@ -137,6 +137,7 @@ jobs:
 
   go:
     name: go (${{ matrix.os }})
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -155,10 +156,23 @@ jobs:
       - name: Vet Go packages
         shell: bash
         run: go vet ./...
+      - name: Test Windows policy package
+        if: runner.os == 'Windows'
+        shell: bash
+        timeout-minutes: 30
+        env:
+          GOTRACEBACK: all
+        # Stream subtest names and timeout stacks instead of buffering a hung package.
+        run: go test -v -timeout 25m ./internal/hook/policy/
       - name: Test Go packages
         shell: bash
         # The denied-command corpus replays about 2000 fixture trees; Windows needs more than the default.
-        run: go test -timeout 30m ./...
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            go list ./... | grep -v '^github.com/avhn/secret/internal/hook/policy$' | xargs go test -timeout 30m
+          else
+            go test -timeout 30m ./...
+          fi
       - name: Compare Bash store goldens
         if: runner.os != 'Windows'
         shell: bash
