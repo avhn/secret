@@ -81,7 +81,8 @@ type analyzer struct {
 	metadata            paths.Metadata
 	interpreterNames    map[interpreterName]bool
 	configWrites        map[[4]string]bool
-	credentialConfigs   []string
+	credentialConfigs   []credentialConfig
+	credentialBranch    bool
 	interpreterInputs   []interpreterInput
 	protected           func(string, string) bool
 	cwd, home, reason   string
@@ -519,7 +520,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 						continue
 					}
-					if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+					if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd, name) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -690,7 +691,6 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				}
 				cwd = joinedCWD(cwd, a.stmts(item.Stmts, depth, cwd))
 			}
-			a.uncertain = true
 		case *syntax.DeclClause:
 			a.walkNode(cmd, depth, cwd)
 			args := make([]string, 0, len(cmd.Args))
@@ -982,7 +982,13 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	name := strings.ToLower(path.Base(words[0]))
-	if interpreter(name) && !optionIn("awk gawk jq yq", name) && a.interpreterInputProtected(cwd) {
+	if !optionIn("eval command builtin export declare typeset local readonly source .", name) {
+		// Application command strings run in children. Keep sequential changes
+		// precise inside them without replacing the parent's configured paths.
+		parentConfigs := slices.Clone(a.credentialConfigs)
+		defer func() { a.credentialConfigs = parentConfigs }()
+	}
+	if interpreter(name) && !optionIn("awk gawk jq yq", name) && a.interpreterInputProtected(cwd, name) {
 		if a.reason == "" {
 			a.reason = roles.FileInput
 		}
@@ -1115,6 +1121,21 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if a.reason != "" {
 		return
 	}
+	if name == "gh" {
+		for i, arg := range args {
+			key, value, attached := strings.Cut(arg, "=")
+			if key != "--input" {
+				continue
+			}
+			if !attached && i+1 < len(args) {
+				value = args[i+1]
+			}
+			if value != "" && value != "-" && a.inputProtected(value, cwd) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
+	}
 	if name == "gh" && len(args) > 0 && args[0] == "api" {
 		for i, arg := range args[1:] {
 			value := ""
@@ -1138,24 +1159,15 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if child, ok := safePackageChild(name, args); ok {
 		childCWD := cwd
 		if name == "pnpm" || name == "yarn" {
-			for i := 0; i < len(args) && strings.HasPrefix(args[i], "-"); i++ {
-				option, value, attached := strings.Cut(args[i], "=")
-				if optionIn("-C --dir", option) {
-					if !attached {
-						i++
-						if i >= len(args) {
-							a.reason = roles.Indeterminate
-							return
-						}
-						value = args[i]
-					}
-					childCWD = a.resolve(value, childCWD)
-				} else if strings.HasPrefix(option, "-C") && len(option) > 2 {
-					childCWD = a.resolve(option[2:], childCWD)
-				} else if optionIn("--filter", option) && !attached {
-					i++
-				}
+			// Implicit children use the same directory-option grammar and
+			// incoming-cwd anchor as explicit package exec children.
+			options := packageExecOptions{cwd: cwd}
+			a.packageExecOptions(name, args, &options)
+			if options.bad {
+				a.reason = roles.Indeterminate
+				return
 			}
+			childCWD = options.cwd
 		}
 		a.command(child, depth+1, childCWD, direct)
 		return
@@ -1300,7 +1312,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 				continue
 			}
-			if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+			if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd, name) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 				a.reason = "interpreter argument names a protected file or credential operation"
 				return
 			}
@@ -1610,13 +1622,13 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 	}
 	if name == "rg" {
-		if config := a.credentialConfig(); config != "" && !rgOutputOnly(args) {
+		if config := a.credentialConfig(); (config != "" || len(a.credentialPaths()) != 0) && !rgOutputOnly(args) {
 			roots := rgRoots(args)
 			if len(roots) == 0 {
 				roots = []string{"."}
 			}
 			for _, root := range roots {
-				if paths.ConfiguredTreeProtected(root, cwd, a.home, config) {
+				if paths.ConfiguredTreeProtected(root, cwd, a.home, config, a.credentialPaths()...) {
 					a.reason = roles.FileInput
 					return
 				}
@@ -1980,7 +1992,11 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				expanded = append(expanded, ".env")
 				continue
 			}
-			v = "__unmatched_glob__"
+			// An unmatched file URL stays literal in the shell. Preserve its
+			// query/fragment for curl to normalize, rather than losing the input.
+			if !strings.HasPrefix(strings.ToLower(v), "file:/") {
+				v = "__unmatched_glob__"
+			}
 		}
 		expanded = append(expanded, v)
 	}

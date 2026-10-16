@@ -17,11 +17,11 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 	return FilteredScopeConfigured(root, glob, typ, cwd, home, "")
 }
 
-// FilteredScopeConfigured also classifies literal KUBECONFIG alternatives known
-// to the shell analyzer, without changing or relying on the process environment.
-func FilteredScopeConfigured(root, glob, typ, cwd, home, config string) string {
+// FilteredScopeConfigured also classifies Kubernetes path lists and singular AWS
+// alternatives known to the analyzer, without changing the process environment.
+func FilteredScopeConfigured(root, glob, typ, cwd, home, config string, literals ...string) string {
 	protected := func(name string) bool {
-		return paths.ConfiguredProtected(name, cwd, "", home, config) || paths.Protected(name, cwd, "", home)
+		return paths.ConfiguredProtected(name, cwd, "", home, config, literals...) || paths.Protected(name, cwd, "", home)
 	}
 	if glob == "" {
 		glob = typeGlob(typ)
@@ -32,7 +32,7 @@ func FilteredScopeConfigured(root, glob, typ, cwd, home, config string) string {
 	root = paths.Resolve(root, cwd, "", home)
 	if dir, ok := globDirectory(glob); ok {
 		directory := filepath.Join(root, filepath.FromSlash(dir))
-		if paths.ConfiguredTreeProtected(directory, cwd, home, config) || paths.TreeProtectedScope(directory, cwd, home, true) {
+		if paths.ConfiguredTreeProtected(directory, cwd, home, config, literals...) || paths.TreeProtectedScope(directory, cwd, home, true) {
 			return ScopeReason
 		}
 		return ""

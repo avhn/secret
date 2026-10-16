@@ -166,7 +166,8 @@ def direct():
         capture(dict(name=name, want="deny", tool="Bash", command=command,
                      cwd=envelope.get("cwd", str(pathlib.Path(sys.argv[2]) / "search")),
                      config=os.environ.get("RIPGREP_CONFIG_PATH", ""),
-                     home=os.environ.get("HOME", ""), kubeconfig=os.environ.get("KUBECONFIG", ""), extra={}))
+                     home=os.environ.get("HOME", ""), kubeconfig=os.environ.get("KUBECONFIG", ""),
+                     extra={key: value for key, value in fields.items() if key != "command"}))
 
 
 if __name__ == "__main__":

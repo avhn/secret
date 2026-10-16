@@ -71,11 +71,17 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   options; an unknown option's argument cannot hide these printers. Printer
   options share a normalizer that removes known value operands and recognizes
   attached values and short-option clusters, including Keychain stdout/stderr
-  flags and clipboard output flags. Resolved keyring and secret-tool actions
+  flags and clipboard output flags. Boolean printer flags accept case-insensitive
+  true/false, yes/no, on/off and 1/0 values; false flags alone do not request
+  token output. Raw kubectl config views, secret content output formats, op OTP
+  retrieval and raw op signin output use the same normalized option roles.
+  Resolved keyring and secret-tool actions
   bound their data operands, so service names and attribute values are not
   mistaken for later retrieval verbs. Known launcher children re-enter the full
   command policy, preserving masked metadata and env-file consumer roles rather
-  than relying on a partial list of reader names. Directory options on env,
+  than relying on a partial list of reader names. Recognized children behind
+  otherwise unknown launchers receive the same reader and printer checks; the
+  unknown launcher's own protected-argument backstop remains conservative. Directory options on env,
   sudo, package runners, make and Docker Compose anchor reader operands at the
   child's cwd, including incoming cwd alternatives and make short-option
   clusters, without moving later shell siblings. Parallel templates are shell
@@ -95,13 +101,30 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   and uncalled function bodies do not publish their aliases to the caller.
   Bounded literal `eval` source can preserve the caller cwd when
   its directory changes stay inside subshells or command substitutions; protected
-  reads inside those scopes still deny.
+  reads inside those scopes still deny. Fully literal interpreter argv launches
+  and literal command strings re-enter reader and credential-printer analysis,
+  including global printer options and parenthesis-free Ruby/Perl argument
+  lists. Launch extraction skips interpreter comments and quoted call text.
+  Curl file URLs (including case-insensitive `file:/path` and percent-encoded
+  paths), upload/config/JSON/write-out/header input files, multipart file lists
+  and header files, and gh API input files use protected path checks. Curl
+  literal option values, `--data-raw`, `--form-string` and `name=content` URL-encoded
+  payloads remain data, not implicit file reads.
 - **Nonempty malformed envelopes deny explicitly.** Only zero-byte input has no
   tool call. Whitespace-only input, raw NUL, invalid UTF-8, duplicate JSON object
-  keys, and missing or mistyped shell commands deny before command analysis.
+  keys, missing or mistyped shell commands and workdirs, missing tool names,
+  whitespace-only tool names, mistyped file-tool paths and mistyped Grep
+  patterns/globs/types/paths/output modes deny before command analysis.
+  NotebookEdit requires `notebook_path` as its authoritative target; an extra
+  `file_path` cannot replace or override it. The Bash guard caps raw envelopes at
+  8 MiB before Unicode or JSON parsing; existing command and heredoc budgets
+  still apply.
 - **Credential filename coverage** also includes `.aws/config` as well as
   `.aws/credentials`, `.kube/config`, paths named by a literal `KUBECONFIG` path
-  list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE`,
+  list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE` (including alternatives
+  assigned along conditional branches in the same shell request). Only
+  `KUBECONFIG` is a colon-separated path list; each AWS variable names one file,
+  including literal colons in filenames. Coverage also includes
   `application_default_credentials.json`,
   `.config/gcloud/credentials.db`, `.config/gcloud/access_tokens.db`, files under
   `.config/gcloud/legacy_credentials/`, `.vault-token`,
@@ -199,9 +222,10 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   hook cannot enforce it.
   The interim Bash guard also denies requests it cannot analyse within its
   two-second budget, including very long `&&` chains. Split the command into
-  shorter calls. `kubectl get secret -o custom-columns=...` can select secret
-  data without using a standard printer format, and curl uploads of unresolved
-  shell variables may transmit sensitive values; avoid both with credentials.
+  shorter calls. Kubectl secret content formats, including inline
+  `custom-columns=...`, are credential output; pod output and secret names stay
+  metadata. Curl uploads of unresolved shell variables may still transmit
+  sensitive values; avoid them with credentials.
 - **Ignored dependency trees.** A content search over a tree skips `.git` and
   `node_modules` unless `--hidden`, a glob or an explicit path brings them
   into scope, so a protected file inside them is not detected.

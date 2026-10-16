@@ -92,7 +92,7 @@ func normalizePrinter(name string, args []string) printerOptions {
 			result.unknownPrefix = true
 		}
 		if strings.HasPrefix(arg, "--") || name == "xclip" && (arg == "-out" || arg == "-output") {
-			if !attached || value == "true" {
+			if !attached || printerFlag(value) {
 				result.flags[key] = true
 			}
 			continue
@@ -114,6 +114,14 @@ func normalizePrinter(name string, args []string) printerOptions {
 	return result
 }
 
+// Template and JSONPath variants (including file-backed templates) can expose
+// secret data just like JSON/YAML. Name and table output remain metadata roles.
+func kubectlContentFormat(format string) bool {
+	return format == "json" || format == "yaml" || strings.HasPrefix(format, "jsonpath") ||
+		strings.HasPrefix(format, "go-template") || strings.HasPrefix(format, "template") ||
+		strings.HasPrefix(format, "custom-columns")
+}
+
 func orderedWords(args []string, words ...string) bool {
 	for _, arg := range args {
 		if len(words) > 0 && arg == words[0] {
@@ -123,9 +131,21 @@ func orderedWords(args []string, words ...string) bool {
 	return len(words) == 0
 }
 
+// Explicit false spellings disable a boolean flag. True spellings are
+// case-insensitive; an unrecognized value cannot erase a printer witness.
+func printerFlag(value string) bool {
+	switch strings.ToLower(value) {
+	case "false", "0", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
 func hasOption(args []string, name string) bool {
 	for _, arg := range args {
-		if arg == name || arg == name+"=true" {
+		key, value, attached := strings.Cut(arg, "=")
+		if key == name && (!attached || printerFlag(value)) {
 			return true
 		}
 	}

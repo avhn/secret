@@ -237,6 +237,9 @@ func TestGuardDeniedCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Subtest names contain # for duplicate cases. A URL would interpret that
+	// byte as a fragment, changing a synthetic path before the policy sees it.
+	fixtureRoot := t.TempDir()
 	count, failures := 0, 0
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -252,7 +255,15 @@ func TestGuardDeniedCorpus(t *testing.T) {
 					t.Skip("host has no /proc")
 				}
 			}
-			tmp := t.TempDir()
+			tmp, err := os.MkdirTemp(fixtureRoot, "case-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := os.RemoveAll(tmp); err != nil {
+					t.Error(err)
+				}
+			})
 			replace := strings.NewReplacer("@TMP@", filepath.ToSlash(tmp), "@ROOT@", filepath.ToSlash(root))
 			for _, fixture := range corpus.Snapshots[tc.Snapshot] {
 				name := filepath.Join(tmp, filepath.FromSlash(fixture[0]))

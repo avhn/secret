@@ -48,14 +48,15 @@ func configuredEntries(config string) []string {
 }
 
 // ConfiguredProtected recognizes literal configured credential paths, including
-// physical aliases. Values are path metadata only, never opened or evaluated.
-func ConfiguredProtected(name, cwd, workdir, home, config string) bool {
-	return configuredProtected(name, cwd, workdir, home, config, physicalOrClean)
+// physical aliases. Config is a Kubernetes path list; literals are whole singular
+// AWS alternatives. Values are metadata only, never opened or evaluated.
+func ConfiguredProtected(name, cwd, workdir, home, config string, literals ...string) bool {
+	return configuredProtected(name, cwd, workdir, home, config, physicalOrClean, literals...)
 }
 
-func configuredProtected(name, cwd, workdir, home, config string, canonical func(string) string) bool {
+func configuredProtected(name, cwd, workdir, home, config string, canonical func(string) string, literals ...string) bool {
 	candidate := StreamBase(unresolved(name, cwd, workdir, home))
-	for _, entry := range configuredEntries(config) {
+	for _, entry := range append(configuredEntries(config), literals...) {
 		if entry == "" {
 			continue
 		}
@@ -69,9 +70,9 @@ func configuredProtected(name, cwd, workdir, home, config string, canonical func
 
 // ConfiguredTreeProtected conservatively checks whether a search root contains
 // any configured path, including a missing file that may be created later.
-func ConfiguredTreeProtected(root, cwd, home, config string) bool {
+func ConfiguredTreeProtected(root, cwd, home, config string, literals ...string) bool {
 	root = physicalOrClean(unresolved(root, cwd, "", home))
-	for _, entry := range configuredEntries(config) {
+	for _, entry := range append(configuredEntries(config), literals...) {
 		if entry == "" {
 			continue
 		}

@@ -115,7 +115,7 @@ func indexProtected(dir, home string, checks ...func(string) bool) bool {
 // in this per-command check, never a repository-only cached decision.
 func (a *analyzer) gitIndexProtected(dir, cwd, worktree string) bool {
 	config := a.credentialConfig()
-	if config == "" && os.Getenv("AWS_CONFIG_FILE") == "" && os.Getenv("AWS_SHARED_CREDENTIALS_FILE") == "" {
+	if config == "" && len(a.credentialPaths()) == 0 && os.Getenv("AWS_CONFIG_FILE") == "" && os.Getenv("AWS_SHARED_CREDENTIALS_FILE") == "" {
 		return indexProtected(dir, a.home)
 	}
 	root := ""
@@ -142,7 +142,7 @@ func (a *analyzer) gitIndexProtected(dir, cwd, worktree string) bool {
 	}
 	return indexProtected(dir, a.home, func(name string) bool {
 		target := filepath.Join(root, filepath.FromSlash(name))
-		return paths.ConfiguredProtected(target, cwd, "", a.home, config)
+		return paths.ConfiguredProtected(target, cwd, "", a.home, config, a.credentialPaths()...)
 	})
 }
 

@@ -71,8 +71,8 @@ func (m *Metadata) physicalOrClean(name string) string {
 }
 
 // ConfiguredProtected uses the same configured-path proof with cached metadata.
-func (m *Metadata) ConfiguredProtected(name, cwd, workdir, home, config string) bool {
-	return configuredProtected(name, cwd, workdir, home, config, m.physicalOrClean)
+func (m *Metadata) ConfiguredProtected(name, cwd, workdir, home, config string, literals ...string) bool {
+	return configuredProtected(name, cwd, workdir, home, config, m.physicalOrClean, literals...)
 }
 
 func (m *Metadata) homeCredential(name, home string) bool {

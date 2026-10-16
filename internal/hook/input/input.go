@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -24,7 +25,7 @@ type Envelope struct {
 // An empty or malformed request is reported as ErrInvalid without echoing its content.
 func Decode(r io.Reader) (Envelope, error) {
 	data, err := io.ReadAll(io.LimitReader(r, MaxBytes+1))
-	if err != nil || len(data) > MaxBytes || len(bytes.TrimSpace(data)) == 0 || !utf8.Valid(data) {
+	if err != nil || len(data) > MaxBytes || len(bytes.TrimSpace(data)) == 0 || !utf8.Valid(data) || !validSurrogates(data) {
 		return Envelope{}, ErrInvalid
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
@@ -39,7 +40,7 @@ func Decode(r io.Reader) (Envelope, error) {
 		return Envelope{}, ErrInvalid
 	}
 	tool, ok := text(root, "tool_name")
-	if !ok || tool == "" {
+	if !ok || strings.TrimSpace(tool) == "" {
 		return Envelope{}, ErrInvalid
 	}
 	cwd, ok := text(root, "cwd")
@@ -52,6 +53,18 @@ func Decode(r io.Reader) (Envelope, error) {
 	}
 	for _, key := range []string{"file_path", "notebook_path", "path", "glob", "type", "output_mode", "workdir", "pattern"} {
 		if _, ok := text(fields, key); !ok {
+			return Envelope{}, ErrInvalid
+		}
+	}
+	// File tools need an actual target. NotebookEdit uses the authoritative
+	// notebook_path field; an unrelated file_path cannot substitute for it.
+	switch tool {
+	case "Read", "Edit", "Write", "MultiEdit":
+		if value, ok := text(fields, "file_path"); !ok || value == "" {
+			return Envelope{}, ErrInvalid
+		}
+	case "NotebookEdit":
+		if notebook, ok := text(fields, "notebook_path"); !ok || notebook == "" {
 			return Envelope{}, ErrInvalid
 		}
 	}
@@ -98,8 +111,11 @@ func (e Envelope) String(key string) string {
 // text checks that an optional field is a string and excludes unsafe controls.
 func text(fields map[string]json.RawMessage, key string) (string, bool) {
 	raw, exists := fields[key]
-	if !exists || string(raw) == "null" {
+	if !exists {
 		return "", true
+	}
+	if len(raw) == 0 || raw[0] != '"' {
+		return "", false
 	}
 	var value string
 	if json.Unmarshal(raw, &value) != nil || bad(value) || strings.ContainsAny(value, "\n\t") {
@@ -111,6 +127,49 @@ func text(fields map[string]json.RawMessage, key string) (string, bool) {
 // bad rejects controls which can change host path or shell parsing.
 func bad(value string) bool {
 	return strings.IndexFunc(value, func(r rune) bool { return r < 0x20 && r != '\n' && r != '\t' || r == 0x7f }) >= 0
+}
+
+// encoding/json replaces unpaired UTF-16 escapes with U+FFFD. Reject them
+// before decoding so malformed keys and paths cannot acquire different names.
+// Escaped backslashes are skipped, and actual U+FFFD remains valid text.
+func validSurrogates(data []byte) bool {
+	quoted := false
+	for i := 0; i < len(data); i++ {
+		if data[i] == '"' {
+			quoted = !quoted
+			continue
+		}
+		if !quoted || data[i] != '\\' {
+			continue
+		}
+		i++
+		if i >= len(data) {
+			return false
+		}
+		if data[i] != 'u' {
+			continue
+		}
+		if i+4 >= len(data) {
+			return false
+		}
+		value, err := strconv.ParseUint(string(data[i+1:i+5]), 16, 16)
+		if err != nil {
+			return false
+		}
+		i += 4
+		if value < 0xd800 || value > 0xdfff {
+			continue
+		}
+		if value > 0xdbff || i+6 >= len(data) || data[i+1] != '\\' || data[i+2] != 'u' {
+			return false
+		}
+		low, err := strconv.ParseUint(string(data[i+3:i+7]), 16, 16)
+		if err != nil || low < 0xdc00 || low > 0xdfff {
+			return false
+		}
+		i += 6
+	}
+	return true
 }
 
 // validate walks tokens recursively so json.Unmarshal cannot silently accept duplicate keys.

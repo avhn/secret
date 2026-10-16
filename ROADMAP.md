@@ -68,7 +68,7 @@ Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded B
 
 Variant extraction streams command text through stdin to handle 1 MiB synthetic
 cases without argv limits. The full denied-command variant corpus is regenerated
-from every Bash-deny case (2,643 cases and 50,768 variants after audit 21
+from every Bash-deny case (2,902 cases after audit 22
 integration), and Go must deny every variant. Focused coverage runs with `python3 -I tests/test-hook-variants.py`;
 corpus refreshes still require review. Audit 19 integration also retains literal
 KUBECONFIG and per-case HOME metadata, checks inert eval parity, and exercises
@@ -86,11 +86,25 @@ Exact inventories, regenerated deny variants and directional host-envelope tests
 remain required. Windows cache performance and cross-platform runner outcomes
 still require CI evidence; local cross-vet is not a Windows runtime check.
 
-Merge rule P21: M2 merges when every CI job is green and a confirmation audit finds no accidental leak, no Go-looser split and no crash or fail-open. Over-denials found from then on go to the follow-up list below.
+Audit 22 adds literal interpreter argv launches and argv-label controls,
+normalized boolean printer flags and curl file inputs, configured-path branch
+unions, authoritative NotebookEdit fields and bounded malformed-envelope checks.
+The Windows makefile-arity control retains denial for an invalid embedded drive
+colon; cross-vet does not establish a native runtime result.
+
+Merge rule P22: M2 merges when every applicable CI job is green and a full
+three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
+hang past budget, fail-open or malformed-input allow (class iv). Shared or
+Bash-only coverage gaps (class i) go to the coverage backlog; ordinary-syntax
+over-denials (class iii) remain follow-ups. This supersedes P21.
 
 Last green suites before policy v2: Bash guard 1496/1496, Codex 48/48, CLI 201/201, backends 63/63, Bash 3.2 1478/1478; Go guard exact parity with 25 reviewed divergences, Codex with 2; process-inclusive p99 about 5 ms. See `docs/design/hook-tightening.md` for deliberate tightenings and scope exclusions.
 
 Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s host timeout; cross-platform Go and race tests green. Bash guard stays active.
+
+### M2 coverage backlog (class i, non-blocking under P22)
+
+- [ ] Track future shared or Bash-only coverage findings under the P22 class (i) rule
 
 ### M2 follow-ups (over-denials, non-blocking)
 

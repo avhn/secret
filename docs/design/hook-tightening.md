@@ -528,7 +528,8 @@ so replay uses the same credential witnesses as the synthetic shell suite.
 The directional inventory generator rejects
 any Bash-deny/Go-allow outcome rather than recording that split as tightening.
 
-Reviewed audit 19 directional tightening rows:
+Historical audit 19 directional tightening rows (both now deny in Bash as well;
+audit 22 regeneration removes their measured divergence rows):
 
 | Case                                    | Go difference                                                       | Reason                                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -827,3 +828,110 @@ Existing deny expectations are preserved. The M1 inert parse-failure Go
 unit expectation is intentionally tightened to match the fail-closed policy.
 Integration regressions are in internal/hook/policy/audit21_test.go,
 internal/hook/roles/audit21_test.go and testdata/hook/audit21.json.
+
+### Audit 22 shared Go classification and schema (N1 to N6, N8, N13)
+
+Implicit yarn children inherit --cwd through the same fallback directory model
+as -C/--dir. Repeated directory options remain relative to the incoming cwd, and
+none changes the next shell statement. Explicit exec and implicit child forms
+therefore check the same credential basenames and public-file controls.
+
+The shared printer normalizer accepts case-insensitive true/1/yes/on and
+false/0/no/off boolean values. Only an explicit false spelling removes that
+option's witness; invalid values and another enabled occurrence cannot establish
+a non-printing proof. Kubectl secret output covers JSON/YAML, JSONPath, template
+and custom-column families, including file-backed and as-JSON variants. Resource
+names and table output remain metadata, and public resources are not credential
+printers solely because of their output format. Op item get --otp and signin
+--raw use the ordinary account-option and launcher classification. Existing
+single-direct-pipe stash/login allowances are unchanged; kubectl secret content
+keeps its pre-existing always-deny transport policy.
+
+Executable interpreter bodies recognize complete literal argv launch signatures
+for Python subprocess and os.execv/execvp families, Node spawn/execFile families,
+and Ruby/Perl system or exec calls. Literal elements retain argv boundaries and
+use the ordinary isolated child dispatcher, including printer options, launchers,
+reader operands, configured paths and cwd. Python exec's selected executable is
+not confused with its argv[0] label. The bounded lexical scan does not execute or
+evaluate language source, infer variable lists or concatenations, or treat an
+ordinary standalone array as a launch. Existing shell-string, file-literal and
+environment witnesses continue independently. Public child argv and non-printing
+options remain readable. This positive-witness coverage is not general language
+containment or a sandbox.
+
+The audit 22 review carries the recipient interpreter identity through inline,
+heredoc and literal-producer stdin paths. Comment syntax is language-specific:
+Python floor division and Perl defined-or cannot truncate executable source, and
+Node regex literals containing # remain data rather than hash comments. Bounded
+slash-regex scanning retains escaped delimiters and character classes; genuine
+line/block comments and public-command controls remain non-witnesses. Positively
+identified argv calls retain indeterminate or structurally uncertain child
+results and deny at the dispatch recursion bound. Arbitrary standalone strings
+still require concrete role witnesses, so incomplete launcher prose stays allowed.
+
+Named tightening `audit22-bare-interpreter-argv`: Go also recognizes bounded,
+parenthesis-free Ruby/Perl system and exec literal lists ending at a semicolon,
+newline, closing brace or end of source. These were a shared class (i) N6 gap,
+not a directional-parity blocker under P22; Go now denies their credential
+children even if the retained Bash guard has not acquired this coverage. Public
+children, literal prose and unclassified concatenations keep their prior roles.
+Permanent review tests are internal/hook/policy/audit22_review_test.go and the
+N6 review cases in testdata/hook/audit22.json. No prior expectation is weakened.
+
+Curl's file-input normalizer accepts file:/ paths as well as file:// URLs,
+including --url and --url= operands, percent-decoded paths and physical aliases.
+Native drive URLs retain their Windows conversion. Payloads, --data-raw and
+public file URLs keep their data/public-input roles.
+
+Envelope validation rejects unpaired UTF-16 surrogate escapes before Go's JSON
+decoder can replace them with U+FFFD, including in unknown fields and keys. Valid
+surrogate pairs, literal replacement characters and escaped backslashes remain
+valid. Read/Edit/Write/MultiEdit require a nonempty string file_path;
+NotebookEdit requires a nonempty authoritative notebook_path; an unrelated
+file_path neither substitutes for it nor changes the selected target.
+Every supplied optional path, output_mode and workdir field must be a string,
+not null, an array or another JSON type. Missing optional Grep/Bash fields keep
+their prior defaults; missing or empty tool names still deny. Both host adapters
+emit explicit value-free denials for malformed supported envelopes.
+
+The audit 21 makefile arity control remains allowed on Unix. On Windows,
+`make -fC$HOME/.aws` names a makefile with an embedded drive colon after HOME
+expansion, not a directory option. The makefile metadata check cannot certify
+that invalid native path and retains its conservative denial; the test records
+this platform-specific outcome without weakening a credential read.
+
+Permanent tests are internal/hook/policy/audit22_test.go,
+internal/hook/roles/audit22_test.go, internal/hook/input/audit22_test.go and
+internal/hook/audit22_test.go. The last two replay
+testdata/hook/audit22-invalid.json; both host adapters also replay
+testdata/hook/audit22.json with disposable HOME fixtures. Candidate commands are
+never executed. The former file_path-only NotebookEdit allow is now a classified N13 malformed-
+envelope denial. The old unrelated-file_path denial becomes an allow because
+that field is not a host target; protected notebook_path targets still deny.
+Other existing expectations are unchanged. Except for the named
+parenthesis-free argv tightening above, these are parity fixes rather than new
+Go-stricter decisions. Cross-vet does not establish
+Windows or macOS runtime behavior, installed-hook protection, or host failure
+blocking; applicable CI and host gates remain required.
+
+The parity handoff keeps configured paths keyed by their environment variable:
+plain sequential assignment replaces that variable's prior target, while
+conditional, loop and scoped assignments retain alternatives. Application child
+analysis restores the parent's configured paths on return, including env and
+shell children, while allowing sequential replacement within the child itself. Case arms are all
+analysed without making an otherwise literal public reader indeterminate.
+Kubernetes values retain native path-list semantics; singular AWS paths stay
+whole even when a filename contains the native list separator. File, interpreter,
+search and Git-index checks receive those singular alternatives without joining
+or splitting them. Per-analysis interpreter cache keys retain both kinds.
+
+Unknown-launcher dispatch now includes every recognized interpreter alias,
+including Lua versions and LuaJIT. Attached GH --input operands use the shared
+file classifier. Curl preserves unmatched literal file URLs for query/fragment
+normalization, but --user-agent values remain data. These close measured
+Go-allow/Bash-deny splits or ordinary-syntax over-denials, not new tightenings.
+
+Corpus extraction retains direct-envelope optional fields and their original
+JSON types, including malformed workdir values. Corpus fixture directory names
+no longer inherit subtest # suffixes, which would turn URL path bytes into a
+fragment. Every original case and variant remains, with per-case fixture cleanup.

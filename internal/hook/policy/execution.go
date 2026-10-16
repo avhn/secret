@@ -3,6 +3,7 @@ package policy
 import (
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/paths"
@@ -183,7 +184,7 @@ func unmodelledCommand(name string) bool {
 
 func knownNested(name string) bool {
 	name = strings.ToLower(path.Base(name))
-	return shellName(name) || modelledCommand(name) || roles.KnownReader(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
+	return shellName(name) || interpreter(name) || modelledCommand(name) || roles.KnownReader(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
 }
 
 // genericShellText is best-effort: prose or invalid shell syntax in an
@@ -210,6 +211,7 @@ func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 		return
 	}
 	probe := *a
+	probe.credentialConfigs = slices.Clone(a.credentialConfigs)
 	probe.reason, probe.uncertain, probe.structuralUncertain = "", false, false
 	probe.env = make(map[string]string)
 	for key, val := range a.env {

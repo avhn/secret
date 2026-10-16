@@ -196,6 +196,18 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	if a.reason != "" || len(states) == 0 {
 		return cwdFlow{}
 	}
+	priorBranch := a.credentialBranch
+	switch cmd := stmt.Cmd.(type) {
+	case *syntax.IfClause, *syntax.CaseClause, *syntax.WhileClause, *syntax.ForClause, *syntax.Subshell, *syntax.FuncDecl:
+		a.credentialBranch = true
+	case *syntax.BinaryCmd:
+		a.credentialBranch = true
+	case *syntax.CallExpr:
+		if len(cmd.Args) > 0 && len(cmd.Assigns) > 0 {
+			a.credentialBranch = true
+		}
+	}
+	defer func() { a.credentialBranch = priorBranch }()
 	a.flowSteps++
 	if a.flowSteps > maxFlowSteps {
 		a.reason = roles.Indeterminate

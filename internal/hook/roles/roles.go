@@ -77,7 +77,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 				kind, _, _ = strings.Cut(kind, "/")
 				for _, output := range options.outputs {
 					format, _, _ := strings.Cut(output, "=")
-					if (kind == "secret" || kind == "secrets") && contains("get") && (format == "yaml" || format == "json" || format == "jsonpath" || format == "go-template") {
+					if (kind == "secret" || kind == "secrets") && contains("get") && kubectlContentFormat(format) {
 						printValue, always = true, true
 					}
 				}
@@ -109,7 +109,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 		}
 	case "op":
 		_, fields := options.values["--fields"]
-		printValue = contains("read") || contains("item", "get") && (options.flags["--reveal"] || fields)
+		printValue = contains("read") || contains("item", "get") && (options.flags["--reveal"] || options.flags["--otp"] || fields) || contains("signin") && options.flags["--raw"]
 	case "pass":
 		if len(args) > 0 {
 			switch arg(0) {

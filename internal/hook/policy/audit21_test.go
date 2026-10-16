@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -103,7 +104,9 @@ func TestAudit21ChildDirectories(t *testing.T) {
 		{"make -sC sub -sC ../../home/.aws --eval='all:;cat credentials'", true},
 		{"make -sC . --eval='all:;cat README.md'", false},
 		{"make -sCsub -sC.. --eval='all:;cat README.md'", false},
-		{"make -fC$HOME/.aws --eval='all:;cat README.md'", false},
+		// On Windows, C$HOME contains an embedded drive colon. Stat cannot
+		// certify that invalid makefile path, so the conservative denial stays.
+		{"make -fC$HOME/.aws --eval='all:;cat README.md'", runtime.GOOS == "windows"},
 		{"make -j2 -sC . --eval='all:;cat README.md'", false},
 		{"make -ICpublic --eval='all:;cat README.md'", false},
 		{"docker compose --project-directory ~/.aws exec service cat credentials", true},

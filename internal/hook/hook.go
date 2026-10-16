@@ -48,7 +48,7 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 	case "Read", "Edit", "Write", "MultiEdit", "NotebookEdit":
 		names := []string{e.String("file_path")}
 		if e.Tool == "NotebookEdit" {
-			names = append(names, e.String("notebook_path"))
+			names = []string{e.String("notebook_path")}
 		}
 		for _, name := range names {
 			if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", os.Getenv("HOME"), os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
