@@ -45,7 +45,7 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 		for len(leading) > 0 && strings.HasPrefix(leading[0], "-") {
 			key, value, attached := strings.Cut(leading[0], "=")
 			leading = leading[1:]
-			if optionIn("-C --dir --filter", key) {
+			if optionIn("-C --dir --cwd --filter", key) {
 				if !attached {
 					if len(leading) == 0 {
 						a.reason = roles.Indeterminate
@@ -145,6 +145,10 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 					a.reason = roles.Indeterminate
 					return true
 				}
+				if a.inputProtected(file, cwd) {
+					a.reason = roles.FileInput
+					return true
+				}
 				resolved := a.resolve(file, cwd)
 				info, err := os.Stat(filepath.Clean(resolved))
 				if err == nil && !info.Mode().IsRegular() {
@@ -157,7 +161,7 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 				}
 			}
 		}
-	case "watch", "tmux", "screen", "ssh":
+	case "tmux", "screen", "ssh":
 		start := 0
 		if name == "ssh" {
 			start = 1

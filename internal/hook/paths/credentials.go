@@ -24,10 +24,14 @@ func homeCredential(name, home string) bool {
 }
 
 func physicalOrClean(name string) string {
+	return physicalOrCleanWith(name, physical)
+}
+
+func physicalOrCleanWith(name string, resolve func(string) (string, error)) string {
 	// Configured names remain witnesses even when a suffix is too long to
 	// exist. Canonicalize its ancestor rather than losing a /var-style alias.
 	// physical and canonicalExisting retain their stricter error behavior.
-	resolved, err := canonicalPrefix(name, physical, func(err error) bool {
+	resolved, err := canonicalPrefix(name, resolve, func(err error) bool {
 		return missingOperand(err) || errors.Is(err, syscall.ENAMETOOLONG) ||
 			runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(206)) // ERROR_FILENAME_EXCED_RANGE
 	})
@@ -46,13 +50,17 @@ func configuredEntries(config string) []string {
 // ConfiguredProtected recognizes literal configured credential paths, including
 // physical aliases. Values are path metadata only, never opened or evaluated.
 func ConfiguredProtected(name, cwd, workdir, home, config string) bool {
+	return configuredProtected(name, cwd, workdir, home, config, physicalOrClean)
+}
+
+func configuredProtected(name, cwd, workdir, home, config string, canonical func(string) string) bool {
 	candidate := StreamBase(unresolved(name, cwd, workdir, home))
 	for _, entry := range configuredEntries(config) {
 		if entry == "" {
 			continue
 		}
 		target := unresolved(entry, cwd, "", home)
-		if sameCredentialPath(filepath.Clean(candidate), filepath.Clean(target)) || sameCredentialPath(physicalOrClean(candidate), physicalOrClean(target)) {
+		if sameCredentialPath(filepath.Clean(candidate), filepath.Clean(target)) || sameCredentialPath(canonical(candidate), canonical(target)) {
 			return true
 		}
 	}

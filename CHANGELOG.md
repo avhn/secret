@@ -15,8 +15,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
   missing configured targets through aliased ancestors on both configured and
   reader paths. Expand bounded static variables in executable here-strings and
   unquoted heredocs without running source; preserve quoted-heredoc literals
-  and deny indeterminate interpreter stdin. Add permanent Claude/Codex
-  regressions, must-allow cases and exact platform inventories.
+  and deny indeterminate interpreter stdin. Deny failed shell analysis without
+  a raw-scan allow fallback; normalize printer option operands and clusters,
+  derive launcher children through full command roles, and apply child cwd
+  options across incoming directory alternatives. Cover Lua/Rscript environment
+  access and legacy tar stdout bundles while preserving metadata, ordinary
+  launcher children and supported ANSI-C literals. Parse complete Parallel
+  templates, attached job counts, taskset hexadecimal masks and CPU-list flag
+  clusters, make directory-option clusters, and versioned Lua/LuaJIT input.
+  Preserve ordinary Docker actions and distinguish resolved credential actions
+  from printer-like data operands. Add permanent Claude/Codex regressions,
+  must-allow cases and exact platform inventories.
 
 - Classify Go token printers through unknown and interleaved options without
   widening direct login/stash transports. Track literal reader aliases and
@@ -35,6 +44,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
   ancestors for oversized configured filenames without relaxing metadata errors
   for ordinary readers. Bound ancestor canonicalization and synthetic subprocess
   lifetimes, and isolate verbose Windows policy CI with job and test deadlines.
+  Normalize global, interleaved and clustered printer options, boolean op cache
+  flags and post-terminator actions; reuse child roles through execution launchers
+  and honor command-scoped directory options, including clustered make options.
+  Check normalized curl file inputs, write-out format files and multipart header
+  files on literal fields. Check literal printer commands in interpreter bodies,
+  including Lua and Rscript environment access, without treating incomplete
+  launcher prose as a printer. Accept attached optional watch differences values.
+  Cache physical path metadata per
+  analysis without discarding configured witnesses or errors; give Windows policy
+  CI a 40-minute test deadline within a 45-minute step.
+  Resolve audit 21 parity for failed parses, reserved ANSI-C bytes, Parallel
+  templates and attached job counts, external time options, makefile input
+  boundaries, Docker file inputs, single-action printer options and versioned
+  Lua/LuaJIT. Preserve ordinary launcher and attached-makefile controls without
+  adding new reviewed divergences.
 
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty

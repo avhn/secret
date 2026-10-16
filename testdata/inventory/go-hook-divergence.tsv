@@ -1,6 +1,5 @@
 audit	audit-arithmetic-unknown	deliberate-tightening
 audit	audit-cases5-6	deliberate-tightening
-audit	audit-cases6-7	deliberate-tightening
 audit	audit-cases7-2	deliberate-tightening
 audit	audit19_G1_kube_branch_union	deliberate-tightening
 audit	audit19_G3_13_printer_unknown_wrapper	deliberate-tightening

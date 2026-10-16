@@ -12,14 +12,14 @@ import (
 func packageLeadingOptions(args []string) []string {
 	for len(args) > 0 {
 		v := args[0]
-		if optionIn("-C --dir --filter -F", v) {
+		if optionIn("-C --dir --cwd --filter -F", v) {
 			if len(args) < 2 {
 				return nil
 			}
 			args = args[2:]
 			continue
 		}
-		if optionIn("-r --recursive -w --workspace-root -s --silent -q --quiet", v) || strings.HasPrefix(v, "--dir=") || strings.HasPrefix(v, "--filter=") || strings.HasPrefix(v, "--recursive=") || strings.HasPrefix(v, "--workspace-root=") || strings.HasPrefix(v, "-C") && len(v) > 2 || strings.HasPrefix(v, "-F") && len(v) > 2 {
+		if optionIn("-r --recursive -w --workspace-root -s --silent -q --quiet", v) || strings.HasPrefix(v, "--cwd=") || strings.HasPrefix(v, "--dir=") || strings.HasPrefix(v, "--filter=") || strings.HasPrefix(v, "--recursive=") || strings.HasPrefix(v, "--workspace-root=") || strings.HasPrefix(v, "-C") && len(v) > 2 || strings.HasPrefix(v, "-F") && len(v) > 2 {
 			args = args[1:]
 			continue
 		}

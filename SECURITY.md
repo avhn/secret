@@ -68,8 +68,25 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   allowed, since the value goes directly to a store or login consumer instead
   of output. AWS, gcloud, Azure, Heroku, Vault, doctl, glab and direnv printer
   subcommands are recognized in order despite global, interleaved or unknown
-  options; an unknown option's argument cannot hide these printers. This includes
-  ECR/ECR Public passwords and authorization tokens,
+  options; an unknown option's argument cannot hide these printers. Printer
+  options share a normalizer that removes known value operands and recognizes
+  attached values and short-option clusters, including Keychain stdout/stderr
+  flags and clipboard output flags. Resolved keyring and secret-tool actions
+  bound their data operands, so service names and attribute values are not
+  mistaken for later retrieval verbs. Known launcher children re-enter the full
+  command policy, preserving masked metadata and env-file consumer roles rather
+  than relying on a partial list of reader names. Directory options on env,
+  sudo, package runners, make and Docker Compose anchor reader operands at the
+  child's cwd, including incoming cwd alternatives and make short-option
+  clusters, without moving later shell siblings. Parallel templates are shell
+  source regardless of whitespace in the first word; source-list operands retain
+  protected-path checks. Attached Parallel job counts and taskset boolean
+  clusters, hexadecimal masks and CPU lists retain full child classification.
+  Non-consumer Docker actions do not fail consumer-child parsing. Lua `os.getenv`
+  (including versioned Lua and LuaJIT executables) and Rscript `Sys.getenv` code
+  is treated as environment access for inline code and stdin. Legacy tar option
+  bundles are normalized before stdout extraction
+  checks. This includes ECR/ECR Public passwords and authorization tokens,
   STS session, assumed-role and federation credentials. An intermediate command
   such as `cat` is not that transport; only the single direct pipe is allowed.
   Literal reader aliases are inspected at their use sites. Alias definitions
@@ -173,8 +190,13 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   running are not supervised. Any process running as the same user can read
   the stores and, while a child runs, its environment.
 - **Visibility limits.** A nonempty malformed request or failed static analysis
-  denies instead of allowing the tool call. This is a hook decision, not a
-  sandbox guarantee: a disabled or missing host hook cannot enforce it.
+  denies instead of allowing the tool call. A raw substring scan cannot certify
+  an allow after static analysis fails, even when the incomplete input contains
+  no obvious secret name. This includes unclosed shell quotes, missing launcher
+  option values, unsupported ANSI-C NUL/internal marker bytes and exhausted
+  brace-expansion limits. Supported literal ANSI-C escapes remain analyzable.
+  This is a hook decision, not a sandbox guarantee: a disabled or missing host
+  hook cannot enforce it.
   The interim Bash guard also denies requests it cannot analyse within its
   two-second budget, including very long `&&` chains. Split the command into
   shorter calls. `kubectl get secret -o custom-columns=...` can select secret

@@ -68,8 +68,8 @@ Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded B
 
 Variant extraction streams command text through stdin to handle 1 MiB synthetic
 cases without argv limits. The full denied-command variant corpus is regenerated
-from every Bash-deny case (2,254 cases and 45,471 variants, including audit 19),
-and Go must deny all of them. Focused coverage runs with `python3 -I tests/test-hook-variants.py`;
+from every Bash-deny case (2,643 cases and 50,768 variants after audit 21
+integration), and Go must deny every variant. Focused coverage runs with `python3 -I tests/test-hook-variants.py`;
 corpus refreshes still require review. Audit 19 integration also retains literal
 KUBECONFIG and per-case HOME metadata, checks inert eval parity, and exercises
 Bash 3.2 empty-array paths. Local checks do not replace the CI runner gate.
@@ -77,6 +77,14 @@ Bash 3.2 empty-array paths. Local checks do not replace the CI runner gate.
 Ready for review (not ticked): envelope/path roles, bounded Bash AST, command/printer roles, search certification, Codex argv/workdir and bounded patch-header handling (including moves, aliases and malformed-header denial), exact differential classification, and fuzz/variant coverage. The default Go build now uses the AST policy with 64 KiB envelopes and 40 KiB fragments; the deferral and `hooktrial` split are removed. The installed Bash guard and plugin manifests are unchanged.
 
 Audit history: eight read-only differential audit rounds ran synthetic envelopes through both guards and proved leaks at runtime. Each round closed its findings and the regression rerun at 05c7524 confirmed all 1,505 earlier reproducers still deny. The recurring lesson is that modelling a tool's full grammar leaks through every parser difference, so the policy now removes inputs instead of modelling them: git aliases and git config are never resolved (non-built-in subcommands deny), git -c keys and editor or pager values use allowlists, sed passes only a safe command subset, shells reading a script from stdin deny, writes into .git deny, and the Bash guard runs its own git probe isolated from repository config. Audits 9 to 12 split each round into a regression rerun and a new-code review and moved more rules from spellings to structure: wrapper-agnostic nested command analysis, a git token rule and git directory detection for every write target, strict command slots, budgets that deny on overflow, and a raw-text backstop for heredoc bodies, inline code and unmodelled arguments that leaves role-classified operands alone. Because an adversarial auditor always finds another shell spelling, findings from audit 12 on are triaged (policy P19): accidental ordinary-tool leaks, Go looser than Bash, over-denial of everyday commands and fail-open paths block the merge; constructions that need deliberate evasion are documented in SECURITY.md as non-goals. Audit 13 covered command and environment printers plus precise search scope; audit 14 covered message inputs, runner peeling and the Bash performance limit; audit 15 covered launcher environment commands, runner peeling, fd exec, kubectl formats, grep names-only forms and Grep filters; audit 16 covered negative globs, .ignore/.rgignore, fd roots and CI path drift; audit 17 covered producer roots for xargs, call strings, fdfind and keyring.
+
+Audit 21 integration covers fail-closed parse/expansion boundaries, shared
+printer and launcher roles, command-scoped cwd options, normalized curl and
+Docker inputs, versioned Lua/LuaJIT and per-analysis path metadata. Ordinary
+Parallel templates, attached makefile names and metadata children retain parity.
+Exact inventories, regenerated deny variants and directional host-envelope tests
+remain required. Windows cache performance and cross-platform runner outcomes
+still require CI evidence; local cross-vet is not a Windows runtime check.
 
 Merge rule P21: M2 merges when every CI job is green and a confirmation audit finds no accidental leak, no Go-looser split and no crash or fail-open. Over-denials found from then on go to the follow-up list below.
 

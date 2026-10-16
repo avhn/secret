@@ -161,7 +161,7 @@ func (a *analyzer) shellCommand(name string, args []string, depth int, cwd strin
 // modelledCommand keeps opaque strings out of Git messages and other commands
 // whose operand grammar is already explicitly classified.
 func modelledCommand(name string) bool {
-	if optionIn("git gh kubectl secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh npx npm pnpm yarn pipx uvx dotenv dotenv-cli dotenvx", name) {
+	if optionIn("setsid curl git gh kubectl secret sed awk gawk jq yq find xargs parallel sudo su env command builtin exec timeout gtimeout nice time nohup sh npx npm pnpm yarn pipx uvx dotenv dotenv-cli dotenvx", name) {
 		return true
 	}
 	if _, ok := utilityTable[name]; ok {
@@ -183,7 +183,7 @@ func unmodelledCommand(name string) bool {
 
 func knownNested(name string) bool {
 	name = strings.ToLower(path.Base(name))
-	return shellName(name) || modelledCommand(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
+	return shellName(name) || modelledCommand(name) || roles.KnownReader(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
 }
 
 // genericShellText is best-effort: prose or invalid shell syntax in an
@@ -241,7 +241,7 @@ func (a *analyzer) unknownExecution(args []string, depth int, cwd string) {
 			a.reason = roles.Printer
 			return
 		}
-		if knownNested(value) || optionIn("aws gcloud az vault doctl heroku glab kubectl direnv", strings.ToLower(path.Base(value))) && roles.PrinterReason(strings.ToLower(path.Base(value)), args[i+1:], false) != "" {
+		if knownNested(value) || roles.PrinterReason(strings.ToLower(path.Base(value)), args[i+1:], false) != "" {
 			a.command(args[i:], depth+1, cwd, false)
 			if a.reason != "" {
 				return

@@ -45,7 +45,7 @@ func (a *analyzer) interpreterInputProtected(cwd string) bool {
 		}
 		// Retain raw witnesses, including literal quoted-heredoc bodies.
 		raw := a.raw(word)
-		if a.inlineGitDir(raw, cwd) || a.interpreterProtected(raw, cwd) {
+		if a.inlineGitDir(raw, cwd) || a.executableInterpreterProtected(raw, cwd) {
 			return true
 		}
 		body, known := a.expandInterpreterStdin(word, r.Hdoc != nil, input.cwd)
@@ -53,7 +53,7 @@ func (a *analyzer) interpreterInputProtected(cwd string) bool {
 			a.reason = roles.Indeterminate
 			return true
 		}
-		if a.inlineGitDir(body, cwd) || a.interpreterProtected(body, cwd) {
+		if a.inlineGitDir(body, cwd) || a.executableInterpreterProtected(body, cwd) {
 			return true
 		}
 	}

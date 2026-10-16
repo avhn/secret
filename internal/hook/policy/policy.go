@@ -38,7 +38,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	if strings.Count(source, "bash -c")+strings.Count(source, "sh -c") > 4 && (witness(source) || riskyRole(source)) {
 		return roles.Indeterminate
 	}
-	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(source, "RIPGREP_CONFIG_PATH"), source: source}
+	a := &analyzer{protected: cachedProtection(protected), cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(source, "RIPGREP_CONFIG_PATH"), source: source}
 	a.fragment(source, 0)
 	if a.reason != "" {
 		return a.reason
@@ -65,7 +65,7 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 			return roles.Indeterminate
 		}
 	}
-	a := &analyzer{protected: protected, cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(strings.Join(argv, " "), "RIPGREP_CONFIG_PATH")}
+	a := &analyzer{protected: cachedProtection(protected), cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(strings.Join(argv, " "), "RIPGREP_CONFIG_PATH")}
 	a.command(argv, 0, cwd, false)
 	if a.reason != "" {
 		return a.reason
@@ -77,6 +77,10 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 }
 
 type analyzer struct {
+	literalDepth        int
+	metadata            paths.Metadata
+	interpreterNames    map[interpreterName]bool
+	configWrites        map[[4]string]bool
 	credentialConfigs   []string
 	interpreterInputs   []interpreterInput
 	protected           func(string, string) bool
@@ -167,13 +171,8 @@ func (a *analyzer) fragment(source string, depth int) {
 	}
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
 	if err != nil {
-		a.uncertain = true
-		// Unparseable source has no classified operands to exempt from P18.
-		// Bash and the parser can disagree on arithmetic-looking command
-		// substitutions. Never certify opaque substitution-bearing source.
-		if hasProtectedLiteral(source) || gitToken.MatchString(source) || strings.Contains(source, "$(") || strings.Contains(source, "`") {
-			a.reason = roles.Indeterminate
-		}
+		// A failed parse has no operand roles that could certify an allow.
+		a.reason = roles.Indeterminate
 		return
 	}
 	if len(source) > 8192 {
@@ -520,7 +519,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 						continue
 					}
-					if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+					if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -743,7 +742,15 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			})
 		case *syntax.TimeClause:
 			if cmd.Stmt != nil {
-				cwd = a.stmts([]*syntax.Stmt{cmd.Stmt}, depth, cwd)
+				child := *cmd.Stmt
+				if call, ok := child.Cmd.(*syntax.CallExpr); ok && len(call.Args) > 0 && strings.HasPrefix(literal(call.Args[0]), "-") {
+					// Bash parses external time options as the timed command.
+					// Restore the utility prefix before consuming its grammar.
+					copy := *call
+					copy.Args = append([]*syntax.Word{{Parts: []syntax.WordPart{&syntax.Lit{Value: "time"}}}}, call.Args...)
+					child.Cmd = &copy
+				}
+				cwd = a.stmts([]*syntax.Stmt{&child}, depth, cwd)
 			}
 		case *syntax.CoprocClause:
 			a.walkWord(cmd.Name, depth, cwd)
@@ -994,6 +1001,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if declarationCommand(name) {
 		cwd = a.declarationAssignments(args, depth, cwd)
 	}
+	if name == "curl" {
+		if !a.configArgument(name, args, cwd) {
+			a.curlInputs(args, depth, cwd)
+		}
+		return
+	}
 	if unmodelledCommand(name) {
 		for _, arg := range args {
 			if hasProtectedLiteral(arg) {
@@ -1097,6 +1110,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if name == "gmake" {
 		name = "make"
+	}
+	cwd = a.commandCWD(name, args, cwd)
+	if a.reason != "" {
+		return
 	}
 	if name == "gh" && len(args) > 0 && args[0] == "api" {
 		for i, arg := range args[1:] {
@@ -1234,7 +1251,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		if a.reason == "" && name == "xargs" && !a.xargsIDs && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.metadataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
+		if a.reason == "" && name == "xargs" && !a.xargsIDs && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.dataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
 		if a.reason == "" && name == "xargs" && xargsHasArgFile(args) && len(child) > 0 && roles.KnownReader(strings.ToLower(path.Base(child[0]))) {
@@ -1247,7 +1264,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason != "" {
 			return
 		}
-		if shell && name == "sudo" {
+		if shell && name == "watch" {
+			a.command(child, depth+1, dir, false)
+			if a.reason == "" {
+				a.fragmentAt(strings.Join(child, " "), depth+1, dir)
+			}
+		} else if shell && name == "sudo" {
 			if len(child) == 0 {
 				a.reason = roles.Indeterminate
 			} else if len(child) == 1 {
@@ -1278,7 +1300,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 				continue
 			}
-			if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+			if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 				a.reason = "interpreter argument names a protected file or credential operation"
 				return
 			}
@@ -1424,6 +1446,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				return
 			}
 			// Strip only known option operands, then analyze the actual child.
+			envCWD := cwd
 			for len(args) > 0 {
 				switch args[0] {
 				case "-u", "--unset", "-C", "--chdir":
@@ -1432,7 +1455,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 						return
 					}
 					if args[0] == "-C" || args[0] == "--chdir" {
-						cwd = a.resolve(args[1], cwd)
+						cwd = a.resolve(args[1], envCWD)
 					}
 					args = args[2:]
 				case "-i", "--ignore-environment", "-0", "--null":
@@ -1443,7 +1466,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 						return
 					}
 					if strings.HasPrefix(args[0], "--chdir=") {
-						cwd = a.resolve(strings.TrimPrefix(args[0], "--chdir="), cwd)
+						cwd = a.resolve(strings.TrimPrefix(args[0], "--chdir="), envCWD)
 						args = args[1:]
 						continue
 					}
@@ -1489,6 +1512,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	case "docker", "docker-compose", "dotenv", "dotenv-cli", "dotenvx":
+		if reason := roles.PrinterReason(name, args, false); reason != "" {
+			a.reason = reason
+			return
+		}
 		if name == "dotenv" || name == "dotenv-cli" || name == "dotenvx" {
 			a.dotenvChild(args, depth, cwd)
 			return
@@ -1524,22 +1551,6 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 					return
 				}
 			}
-			inspect := len(args) > 0 && args[0] == "inspect" || len(args) > 1 && args[0] == "container" && args[1] == "inspect"
-			if inspect {
-				format := ""
-				for i, arg := range args {
-					if (arg == "--format" || arg == "-f") && i+1 < len(args) {
-						format = args[i+1]
-					}
-					if strings.HasPrefix(arg, "--format=") || strings.HasPrefix(arg, "-f=") {
-						_, format, _ = strings.Cut(arg, "=")
-					}
-				}
-				if format == "" || strings.EqualFold(format, "json") || strings.Contains(format, "Env") || strings.Contains(format, ".Config") || strings.Contains(format, "json .") {
-					a.reason = roles.Printer
-					return
-				}
-			}
 		}
 		// Docker's printer rules do not certify arbitrary command options.
 		// Its exec subcommand is not the shell builtin of the same name.
@@ -1550,6 +1561,19 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			dockerArgs = append([]string{"compose"}, args[2:]...)
 		}
 		for i, v := range args {
+			// Build/Compose file options and load's input option consume
+			// files, unlike inspect's format and run's interactive flags.
+			key, file, attached := strings.Cut(v, "=")
+			fileOption := optionIn("--file --input", key) || v == "-f" && (slices.Contains(args, "build") || slices.Contains(args, "compose") || name == "docker-compose") || v == "-i" && slices.Contains(args, "load")
+			if fileOption {
+				if !attached && i+1 < len(args) {
+					file = args[i+1]
+				}
+				if a.inputProtected(file, cwd) {
+					a.reason = roles.FileInput
+					return
+				}
+			}
 			src := ""
 			if (v == "-v" || v == "--volume" || v == "--mount") && i+1 < len(args) {
 				src = args[i+1]
@@ -1579,7 +1603,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.unknownExecution(dockerArgs, depth, cwd)
 		return
 	}
-	if !modelledCommand(name) && !shellName(name) && roles.PrinterReason(name, args, false) == "" && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
+	if !modelledCommand(name) && !roles.KnownReader(name) && !shellName(name) && roles.PrinterReason(name, args, false) == "" && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
 		a.unknownExecution(a.environmentDataArgs(name, args), depth, cwd)
 		if a.reason != "" {
 			return
@@ -1799,6 +1823,11 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 	syntax.SplitBraces(&copy)
 	// Never pass SplitBraces results to syntax.Walk: this parser version
 	// panics on BraceExp nodes, which are introduced by SplitBraces itself.
+	if _, ok := boundedBraceCount(&copy, true); !ok {
+		a.structuralUncertain = true
+		a.reason = roles.Indeterminate
+		return nil, false
+	}
 	if _, ok := braceWordCount(&copy); !ok {
 		a.uncertain = true
 		return nil, false
@@ -1853,10 +1882,10 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		case *syntax.SglQuoted:
 			piece = n.Value
 			if n.Dollar {
-				var err error
-				piece, err = strconv.Unquote("\"" + strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(n.Value, `\'`, `'`), `\e`, `\x1b`), "\"", "\\\"") + "\"")
-				if err != nil {
-					a.uncertain = true
+				var ok bool
+				piece, ok = ansiLiteral(n.Value)
+				if !ok {
+					a.reason = roles.Indeterminate
 					return nil, false
 				}
 			}
