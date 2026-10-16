@@ -453,7 +453,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 			a.reason = roles.FileInput
 			return
 		}
-		if _, member, ok := strings.Cut(arg, ":"); ok && paths.LexicalProtected(member, cwd, a.home) {
+		if _, member, ok := strings.Cut(arg, ":"); ok && (paths.LexicalProtected(member, cwd, a.home) || a.inputProtected(member, cwd) || a.inputProtected(member, operandCWD)) {
 			a.reason = roles.FileInput
 			return
 		}
@@ -609,8 +609,8 @@ func (a *analyzer) gitSafe(sub string, args []string, cwd string) bool {
 			// A safe formatting mode does not turn a protected historical
 			// blob into a public input. Pattern/message option values skip
 			// this operand branch and retain their inert data role.
-			if optionIn("log shortlog blame", sub) {
-				if _, member, ok := strings.Cut(arg, ":"); ok && paths.LexicalProtected(member, cwd, a.home) {
+			if optionIn("log shortlog blame diff", sub) {
+				if _, member, ok := strings.Cut(arg, ":"); ok && (paths.LexicalProtected(member, cwd, a.home) || a.inputProtected(member, cwd)) {
 					a.reason = roles.FileInput
 					return false
 				}

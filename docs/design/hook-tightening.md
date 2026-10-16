@@ -477,9 +477,8 @@ Their scopes get the conservative grep tree proof, without a Git-ignore
 exemption. Clean roots and names-only output remain allowed.
 
 G3 adds cloud, registry, Kubernetes and shell-environment token printers. Known
-global options are normalized throughout the applicable subcommand hierarchy,
-not merely before its first action; their values remain data, never actions.
-Unknown options and the option terminator retain their positional roles. A
+global option values remain data, never actions. J1/J2 below extend recognition
+to unknown and interleaved options without relying on an exhaustive option list. A
 literal direct pipe to `docker login --password-stdin`, `helm registry login
 --password-stdin`, or validated `secret stash FILE KEY` is allowed. A tee,
 intermediate command, alternate stdin, upstream stdout diversion or unsupported
@@ -532,7 +531,138 @@ any Bash-deny/Go-allow outcome rather than recording that split as tightening.
 
 Reviewed audit 19 directional tightening rows:
 
-| Case | Go difference | Reason |
-| --- | --- | --- |
-| `audit19_G3_13_printer_unknown_wrapper` | Deny an unknown launcher's Kubernetes token child | The recognized printer argv suffix is not ordinary data under an unmodeled launcher. |
-| `audit19_G1_kube_branch_union` | Deny a literal configured path after conflicting branch assignments | Branch merging must retain every possible configured credential path instead of clearing the proof. |
+| Case                                    | Go difference                                                       | Reason                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `audit19_G3_13_printer_unknown_wrapper` | Deny an unknown launcher's Kubernetes token child                   | The recognized printer argv suffix is not ordinary data under an unmodeled launcher.                |
+| `audit19_G1_kube_branch_union`          | Deny a literal configured path after conflicting branch assignments | Branch merging must retain every possible configured credential path instead of clearing the proof. |
+
+## Commit review J1-J4 printer options and shell aliases
+
+J1/J2 match cloud, registry and Kubernetes printer action words in order across
+option positions. Known value-taking options retain their data roles. Unknown
+option tokens are omitted but their possible values remain candidates, so both
+boolean and value-taking readings are covered by the ordered-word match. The
+option terminator ends subcommand recognition. This deliberately conservative
+classification does not certify arbitrary option values as harmless. Ordinary
+AWS S3 listings, gcloud auth listings, Azure account metadata and Kubernetes pod
+listings remain allowed. No exhaustive global-option allowlist is needed to
+recognize a later printer action.
+
+The J1 direct-pipe exception is unchanged: only a literal single pipe into the
+validated docker login, helm registry login or secret stash consumer qualifies.
+Intermediate commands, unrelated docker/helm subcommands, redirected stdin and
+upstream stdout diversion still deny. Alias printers do not acquire a new
+transport exception.
+
+J3 retains bounded literal alias definitions, including definitions replayed by
+eval. Definitions containing cd/pushd/popd, eval or unresolved command syntax
+make subsequent cwd uncertain. Reader aliases replay as bounded shell source at
+the use site with the caller's arguments, assignments and redirects; conditional
+redefinitions retain every literal alternative. Recursive alias expansion is
+suppressed, as in the shell, and nested alias chains share the existing depth,
+word, flow-step and deadline bounds. Definitions in uncalled functions, child
+shells, substitutions, background commands and pipelines do not affect the
+outer alias scope. Public aliases such as ll='ls -l' retain their allowance.
+
+The named J3 wrapper-cwd tightening (`audit20_j3_alias#6` and
+`audit20_j3_alias#7`) also invalidates cwd after `command NAME` or `builtin NAME`
+when the live alias has directory effects, including through later-defined
+functions or alias chains, or unresolved command syntax. These wrappers suppress
+real shell alias expansion; the conservative uncertainty preserves directional
+Bash parity rather than claiming the alias executes. Ordinary `command ls`,
+`command -v`/`-V` queries and public aliases remain allowed. Redirects and
+operands on the wrapped call still receive normal analysis.
+
+J4 preserves Go's precise existing eval cwd flow: a cd inside a subshell or
+command substitution cannot move the caller. A subsequent missing bare
+credentials operand in the public cwd remains allowed, but the same read inside
+the child after its cd denies. Unresolved current-shell eval variables and
+arithmetic shell-state mutations retain unknown cwd rather than borrowing the
+child-scope exception. Tests and Claude/Codex envelopes use a disposable
+HOME with synthetic AWS credentials, never real stores or executed probe code.
+These results establish analyzer behavior only, not installed-host containment.
+
+## Confirmation audit 20 envelope and credential follow-ups
+
+K1 requires native absolute envelope cwd and no longer substitutes the guard
+process cwd. K2 validates raw argv element types before decoding strings, so null
+cannot become an empty argument. K3 preserves the no-decision behavior only for
+zero input bytes; whitespace and NUL-only requests receive explicit JSON denial.
+K4 rejects invalid UTF-8, raw or command NULs, missing/null shell command fields,
+non-string/non-array commands, null argv elements and duplicate keys at every
+JSON depth. The existing duplicate-key scanner is retained. Shared malformed
+byte fixtures are in `testdata/hook/audit20-invalid.json`, tested through the
+input decoder and both Claude/Codex decision routes.
+
+K5 protects `.aws/config` exactly like `.aws/credentials`, including tree and
+filtered content searches. Literal inherited AWS_CONFIG_FILE and
+AWS_SHARED_CREDENTIALS_FILE paths are matched as singular names, with lexical
+and physical aliases. Shell assignments retain path alternatives through branch
+unions and share the existing configured-path checks with KUBECONFIG. Assigned
+AWS paths containing the native path-list separator deny as indeterminate rather
+than being incorrectly split. Static ripgrep certification requires the AWS
+config exclusion and cannot certify arbitrary inherited AWS path names. Ordinary
+AWS configure list, S3 listings and get-caller-identity remain allowed.
+
+L1 interpreter inline code, heredocs, here-strings and oversized heredoc bodies
+use the shared name/metadata classifier with the interpreter cwd, HOME and
+retained literal configured paths. Bare filename literals count, not only
+slash-qualified paths. Redirect bodies see literal credential-path assignments
+on their recipient before analysis. No source is evaluated and no credential is
+opened. Public source files and project Yarn configuration retain their rules.
+The L1 decoded-producer check also inspects shell quote/escape-decoded arguments
+and here-strings on the upstream AST, including command/builtin wrappers, before
+interpreter pipeline exceptions. It retains the raw-source check and shares the
+existing word and deadline budgets. These are positive credential-name witnesses,
+not execution of producers or a general stdout evaluator. Permanent tables cover
+Python, Node, Ruby and Perl, relative and `./` names, inherited and assigned
+Kubernetes/AWS paths, literal quoting variants and public source allowances.
+
+L2 historical revision-member checks use configured-path-aware classification
+before safe log/blame/diff formatting returns. Summary flags cannot turn a
+protected historical blob operand into metadata-only input. Pattern/message
+option values remain data, and public template member reads remain allowed.
+
+L3 adds ECR public login passwords, ECR authorization tokens and STS assume-role,
+assume-role-with-web-identity, assume-role-with-saml and get-federation-token.
+Their option-independent classification and direct transport rules are the same
+as J1/J2. Tests also cover color off, no-cli-auto-prompt, gcloud billing project,
+doctl -c and Kubernetes request timeout options. All evidence is synthetic
+analyzer input, not a claim of host containment or installed protection.
+
+Windows CI follow-ups keep native drive-qualified absolute paths independent of
+uncertain cwd. Configured-path comparison canonicalizes the existing physical
+prefix through EvalSymlinks on Windows, which expands 8.3 aliases consistently
+with cwd and search-root normalization. Missing final components retain that
+canonical anchor; metadata errors other than absence still deny. The shared
+helper has OS-independent injected-resolver tests. Sed file slots admit a
+forward-slash drive prefix and literal tilde characters (including 8.3 names),
+without accepting colon as a general script delimiter or changing backslash
+escape grammar. Existing strict Windows function/index/search/sed tests remain.
+
+### Audit 20 interpreter stdin and inherited-index review
+
+Interpreter stdin provenance now follows the normal bounded command dispatcher
+through execution wrappers, literal aliases, subshells and brace groups. It is
+scoped to the recipient, not later independent commands. Source expansion stays
+anchored at the producer or redirect cwd; filename classification uses the
+interpreter's effective cwd, including env chdir and grouped directory changes.
+Here-strings and expansion-enabled heredocs use bounded, non-executing scalar
+expansion before the shared classifier, while quoted heredocs stay literal.
+Raw-source witnesses remain checked. Unknown or unsupported executable redirect
+expansion denies as indeterminate rather than becoming an empty body.
+
+Interpreter prose with a component longer than 255 characters is not sent to
+filesystem metadata checks as a plausible filename. Lexical and configured
+credential witnesses still deny, even in oversized names, and metadata failures
+for plausible paths still fail closed. Public long-text controls cover inline,
+heredoc, here-string and decoded-producer forms.
+
+The Git index lexical-only shortcut also requires both inherited singular AWS
+credential variables to be empty. Configured-path callbacks retain singular AWS
+names (including literal colons on supporting filesystems), cwd/worktree anchors
+and protected-name checks. Synthetic v2/v3/v4 indexes cover configured entries
+and public-file controls for both AWS variables. Permanent table regressions are
+in `internal/hook/policy/audit20_stdin_review_test.go`; none execute the probed
+commands or read credential contents. The directional parity requirement still
+applies; these tests make no installed-host protection claim.

@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "name": "zero_bytes",
+      "payload": "",
+      "deny": false
+    },
+    {
+      "name": "K3_space",
+      "payload": " ",
+      "deny": true
+    },
+    {
+      "name": "K3_tab",
+      "payload": "\t",
+      "deny": true
+    },
+    {
+      "name": "K3_crlf",
+      "payload": "\r\n",
+      "deny": true
+    },
+    {
+      "name": "K3_mixed",
+      "payload": " \n\t ",
+      "deny": true
+    },
+    {
+      "name": "K3_newline",
+      "payload": "\n",
+      "deny": true
+    },
+    {
+      "name": "K3_nul_only",
+      "payload": "\u0000",
+      "deny": true
+    },
+    {
+      "name": "K1_null",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":null,\"tool_input\":{\"command\":\"echo ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "K1_empty",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"\",\"tool_input\":{\"command\":\"echo ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "K1_relative",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"relative\",\"tool_input\":{\"command\":\"echo ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "K1_absent",
+      "payload": "{\"tool_name\": \"Bash\", \"tool_input\": {\"command\": \"echo ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "K2_null_argv",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":[null]}}",
+      "deny": true
+    },
+    {
+      "name": "K2_echo_null",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":[\"echo\",null]}}",
+      "deny": true
+    },
+    {
+      "name": "K2_empty_argv",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "K4_missing_command",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "K4_null_input",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":null}",
+      "deny": true
+    },
+    {
+      "name": "K4_null_command",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":null}}",
+      "deny": true
+    },
+    {
+      "name": "K4_numeric",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":1}}",
+      "deny": true
+    },
+    {
+      "name": "K4_bool",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":true}}",
+      "deny": true
+    },
+    {
+      "name": "K4_object",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "K4_invalid_utf8",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo @INVALID_UTF8@\"}}",
+      "deny": true
+    },
+    {
+      "name": "K4_nul_suffix",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo ok\"}}\u0000",
+      "deny": true
+    },
+    {
+      "name": "K4_nul_inside",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \u0000ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "K4_duplicate",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"cat .env\",\"command\":\"echo ok\"}}",
+      "deny": true
+    },
+    {
+      "name": "valid_shell",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo ok\"}}",
+      "deny": false
+    },
+    {
+      "name": "valid_argv",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":[\"echo\",\"ok\"]}}",
+      "deny": false
+    }
+  ]
+}

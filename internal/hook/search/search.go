@@ -14,7 +14,7 @@ import (
 const ScopeReason = "search content/count scope contains protected names or is incomplete; narrow the path or use -l; install examples/ripgreprc for rg"
 const UncertainReason = "search scope is uncertain; narrow the path or use -l; install examples/ripgreprc for rg"
 
-var required = []string{".env", ".envrc", ".env.*", "*.env", "*.secret", ".secrets/", ".netrc", ".git-credentials", ".npmrc", ".pypirc", "**/.aws/credentials", "**/.docker/config.json", "**/gh/hosts.yml", "**/.ssh/id_*", "**/.kube/config", "application_default_credentials.json", "**/gcloud/credentials.db", "**/gcloud/access_tokens.db", "**/gcloud/legacy_credentials/", ".vault-token", "**/.terraform.d/credentials.tfrc.json", "**/.cargo/credentials.toml", "**/.cargo/credentials", ".pgpass", ".yarnrc.yml"}
+var required = []string{".env", ".envrc", ".env.*", "*.env", "*.secret", ".secrets/", ".netrc", ".git-credentials", ".npmrc", ".pypirc", "**/.aws/credentials", "**/.aws/config", "**/.docker/config.json", "**/gh/hosts.yml", "**/.ssh/id_*", "**/.kube/config", "application_default_credentials.json", "**/gcloud/credentials.db", "**/gcloud/access_tokens.db", "**/gcloud/legacy_credentials/", ".vault-token", "**/.terraform.d/credentials.tfrc.json", "**/.cargo/credentials.toml", "**/.cargo/credentials", ".pgpass", ".yarnrc.yml"}
 
 // Config returns 0 for certified, 1 for absent or partial, 2 for unsafe.
 func Config(file, cwd, home string) (int, bool) {
@@ -68,7 +68,7 @@ func Config(file, cwd, home string) (int, bool) {
 			return 1, hidden
 		}
 	}
-	if os.Getenv("KUBECONFIG") != "" {
+	if os.Getenv("KUBECONFIG") != "" || os.Getenv("AWS_CONFIG_FILE") != "" || os.Getenv("AWS_SHARED_CREDENTIALS_FILE") != "" {
 		// Arbitrary configured names are not covered by the static exclusions.
 		return 1, hidden
 	}
@@ -136,7 +136,7 @@ func Selector(glob string) bool {
 		return true
 	}
 	g := strings.ToLower(strings.TrimPrefix(glob, "!"))
-	for _, name := range []string{".env", ".envrc", ".env.production", "service.env", "service.secret", ".secrets.env", ".netrc", ".git-credentials", ".npmrc", ".pypirc", ".vault-token", ".pgpass", ".yarnrc.yml", ".kube/config", "application_default_credentials.json", ".config/gcloud/credentials.db", ".config/gcloud/access_tokens.db", ".config/gcloud/legacy_credentials/token", ".terraform.d/credentials.tfrc.json", ".cargo/credentials.toml", ".cargo/credentials", ".secrets/store", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".ssh/id_rsa", ".ssh/id_ed25519", "proc/self/environ", "proc/thread-self/environ", "proc/123/environ", "proc/123/task/456/environ", "proc/$$/environ", "proc/$ppid/environ"} {
+	for _, name := range []string{".env", ".envrc", ".env.production", "service.env", "service.secret", ".secrets.env", ".netrc", ".git-credentials", ".npmrc", ".pypirc", ".vault-token", ".pgpass", ".yarnrc.yml", ".kube/config", "application_default_credentials.json", ".config/gcloud/credentials.db", ".config/gcloud/access_tokens.db", ".config/gcloud/legacy_credentials/token", ".terraform.d/credentials.tfrc.json", ".cargo/credentials.toml", ".cargo/credentials", ".secrets/store", ".aws/credentials", ".aws/config", ".docker/config.json", ".config/gh/hosts.yml", ".ssh/id_rsa", ".ssh/id_ed25519", "proc/self/environ", "proc/thread-self/environ", "proc/123/environ", "proc/123/task/456/environ", "proc/$$/environ", "proc/$ppid/environ"} {
 		if strings.Contains(name, "/") && !strings.Contains(g, "/") {
 			continue
 		}

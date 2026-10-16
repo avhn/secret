@@ -22,7 +22,7 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 		}
 	}()
 	data, readErr := io.ReadAll(io.LimitReader(in, input.MaxBytes+1))
-	if readErr == nil && len(bytes.TrimSpace(data)) == 0 {
+	if readErr == nil && len(data) == 0 {
 		return nil
 	}
 	e, err := input.Decode(bytes.NewReader(data))
@@ -32,9 +32,6 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 		return err
 	}
 	cwd := e.CWD
-	if cwd == "" {
-		cwd, _ = os.Getwd()
-	}
 	// A relative host cwd cannot anchor a relative workdir or file operand.
 	// Native absolute only: on Windows a rooted slash path is drive-relative.
 	if !filepath.IsAbs(cwd) {

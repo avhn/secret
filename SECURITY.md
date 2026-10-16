@@ -21,7 +21,7 @@ deliberately trying to read a secret.
   store files and well-known credential files (cloud CLI credentials, Docker
   and gh config, npmrc, pypirc, SSH private keys, `/proc/*/environ`), dumping
   the environment, credential printers (`gh auth token`, `gcloud auth
-  print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
+print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   tokens, Heroku/Vault/doctl/glab tokens, `kubectl create token`, `direnv export`,
   `op read`, `pass`, `secret-tool`, `security -w`, clipboard readers), and
   content searches over trees that hold protected files, including `ack` and
@@ -66,23 +66,42 @@ deliberately trying to read a secret.
   protected files. A printer piped straight into `secret stash FILE KEY`,
   `docker login --password-stdin` or `helm registry login --password-stdin` is
   allowed, since the value goes directly to a store or login consumer instead
-  of output. Supported global options on AWS, gcloud and doctl printers do not
-  change this requirement, even when placed between subcommand words. An
-  intermediate command such as `cat` is not that transport.
-- **Credential filename coverage** also includes `.kube/config`, paths named by
-  a literal `KUBECONFIG` path list, `application_default_credentials.json`,
+  of output. AWS, gcloud, Azure, Heroku, Vault, doctl, glab and direnv printer
+  subcommands are recognized in order despite global, interleaved or unknown
+  options; an unknown option's argument cannot hide these printers. This includes
+  ECR/ECR Public passwords and authorization tokens,
+  STS session, assumed-role and federation credentials. An intermediate command
+  such as `cat` is not that transport; only the single direct pipe is allowed.
+  Literal reader aliases are inspected at their use sites. Alias definitions
+  with directory-changing or unresolved effects retain an uncertain cwd for
+  later readers. Subshells, command substitutions, non-final pipeline segments
+  and uncalled function bodies do not publish their aliases to the caller.
+  Bounded literal `eval` source can preserve the caller cwd when
+  its directory changes stay inside subshells or command substitutions; protected
+  reads inside those scopes still deny.
+- **Nonempty malformed envelopes deny explicitly.** Only zero-byte input has no
+  tool call. Whitespace-only input, raw NUL, invalid UTF-8, duplicate JSON object
+  keys, and missing or mistyped shell commands deny before command analysis.
+- **Credential filename coverage** also includes `.aws/config` as well as
+  `.aws/credentials`, `.kube/config`, paths named by a literal `KUBECONFIG` path
+  list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE`,
+  `application_default_credentials.json`,
   `.config/gcloud/credentials.db`, `.config/gcloud/access_tokens.db`, files under
   `.config/gcloud/legacy_credentials/`, `.vault-token`,
   `.terraform.d/credentials.tfrc.json`, `.cargo/credentials.toml`,
   `.cargo/credentials`, `.pgpass`, and the user's `~/.yarnrc.yml`. These are
   filename and metadata checks, never inspections of credential contents.
-  Relative `KUBECONFIG` entries are resolved at the reader's effective cwd,
+  Relative configured paths are resolved at the reader's effective cwd,
   including wrapper and workspace alternatives. Both lexical names and physical
   aliases of these paths and the home Yarn file are protected; missing targets
-  retain their lexical protection. An unresolved `$KUBECONFIG` reader operand
-  also denies. The example ripgrep config excludes the fixed names; arbitrary
-  `KUBECONFIG` paths require scope checks rather than certification from that
-  config alone.
+  retain their lexical protection. Missing suffixes on configured and reader
+  paths resolve through their deepest existing ancestor, so an aliased parent
+  such as macOS `/var` does not lose the physical witness. Unresolved reader
+  operands naming these credential-path variables also deny. Interpreter inline code, stdin and
+  eligible oversized heredocs check quoted filename literals with the same
+  credential classifier, including bare names relative to the effective cwd.
+  The example ripgrep config excludes the fixed names; arbitrary configured
+  paths require scope checks rather than certification from that config alone.
 - **Templates outside stores stay readable.** `.env.example`, `.env.sample`,
   `.env.template` and names ending in `.env.example`, `.env.sample` or
   `.env.template` are exempt outside `.secrets/` and other protected credential

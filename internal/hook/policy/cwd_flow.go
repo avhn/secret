@@ -37,10 +37,10 @@ func (a *analyzer) defineFunction(decl *syntax.FuncDecl, depth int, cwd string) 
 	} else if !exists {
 		a.functionRoots[decl.Body] = cwd
 	}
-	parent := a.functions
-	a.functions = maps.Clone(parent)
+	parent, aliases := a.functions, a.aliases
+	a.functions, a.aliases = maps.Clone(parent), maps.Clone(aliases)
 	a.functionStates(decl.Body, depth+1, []string{cwd})
-	a.functions = parent
+	a.functions, a.aliases = parent, aliases
 }
 
 // Match the policy's transparent command/builtin normalization, including its
@@ -209,9 +209,9 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 		childScope = childScope || cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll
 	}
 	if childScope {
-		parent := a.functions
-		a.functions = maps.Clone(parent)
-		defer func() { a.functions = parent }()
+		parent, aliases := a.functions, a.aliases
+		a.functions, a.aliases = maps.Clone(parent), maps.Clone(aliases)
+		defer func() { a.functions, a.aliases = parent, aliases }()
 	}
 	if stmt.Background {
 		// The asynchronous command still needs analysis, but its directory
@@ -263,6 +263,11 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	var result cwdFlow
 	name := flowCommandName(stmt)
 	for _, cwd := range states {
+		if dirs, aliased := a.aliasStates(stmt, depth, cwd); aliased {
+			result.success = append(result.success, dirs...)
+			result.failure = append(result.failure, dirs...)
+			continue
+		}
 		next := a.singleStmt([]*syntax.Stmt{stmt}, depth, cwd)
 		if name == "eval" && a.reason == "" {
 			dirs := a.evalStates(stmt, depth, cwd)
@@ -331,5 +336,24 @@ func (a *analyzer) evalStates(stmt *syntax.Stmt, depth int, cwd string) []string
 		a.reason = roles.Indeterminate
 		return nil
 	}
-	return a.cwdUnion([]string{cwd}, a.statementStates(file.Stmts, depth+1, []string{cwd}))
+	dirs := a.cwdUnion([]string{cwd}, a.statementStates(file.Stmts, depth+1, []string{cwd}))
+	// Dynamic current-shell eval source cannot certify retained state. Child
+	// substitutions and subshells still cannot move the caller's directory.
+	syntax.Walk(file, func(node syntax.Node) bool {
+		switch node := node.(type) {
+		case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
+			return false
+		case *syntax.ArithmExp:
+			// Arithmetic can assign shell variables such as CDPATH.
+			dirs = a.cwdUnion(dirs, []string{""})
+		case *syntax.ParamExp:
+			if node.Param == nil {
+				dirs = a.cwdUnion(dirs, []string{""})
+			} else if _, known := a.staticVariable(node.Param.Value); !known {
+				dirs = a.cwdUnion(dirs, []string{""})
+			}
+		}
+		return true
+	})
+	return dirs
 }

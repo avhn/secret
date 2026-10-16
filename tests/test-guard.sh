@@ -3159,5 +3159,261 @@ if command -v git >/dev/null 2>&1; then
     secrets audit19_review_git_template_diff allow Bash 'git diff HEAD~1:apps/api/.env.example HEAD:apps/api/.env.sample' "{\"workdir\":\"$TMP/audit19-git\"}"
 fi
 
+# Post-commit audit J1/J3/J4: source strings only, never execute printers or aliases.
+# shellcheck disable=SC2016,SC2088  # literal shell expansions and home paths are inputs
+{
+for cmd in 'aws --cli-binary-format raw-in-base64-out ecr get-login-password' \
+    'aws --cli-auto-prompt off ecr get-login-password' \
+    'aws ecr --unknown z get-login-password' \
+    'aws sts --cli-binary-format raw-in-base64-out get-session-token' \
+    'aws --color on ecr get-login-password' 'aws --no-sign-request ecr get-login-password' \
+    'aws --ca-bundle x ecr get-login-password' 'aws --profile=p ecr get-login-password' \
+    'aws --output text ecr get-login-password' \
+    'gcloud --unknownflag=1 auth print-access-token' \
+    'gcloud --verbosity debug auth print-access-token' \
+    'gcloud --impersonate-service-account x auth print-access-token' \
+    'gcloud config --verbosity debug config-helper' \
+    'gcloud auth --unknown x application-default print-access-token' \
+    'az --only-show-errors account get-access-token' \
+    'az account --subscription s get-access-token' \
+    'az acr --unknown x login --expose-token' \
+    'vault --unknown x print token' 'vault token --unknown x lookup' \
+    'heroku --unknown auth:token' 'glab --unknown auth status --show-token' \
+    'glab auth --unknown x status --show-token' 'doctl --trace auth token' \
+    'doctl auth --unknown x token' 'kubectl --context c create token sa' \
+    'kubectl -n ns create token sa' 'direnv --unknown x export json'; do
+    secrets audit20_j1_printer_options deny Bash "$cmd"
+    secrets audit20_j1_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+    secrets audit20_j1_docker allow Bash "$cmd | docker login --password-stdin r.example"
+    secrets audit20_j1_helm allow Bash "$cmd | helm registry login --password-stdin r.example"
+done
+for cmd in 'aws s3 ls' 'aws --profile p s3 ls' 'gcloud auth list' \
+    'az account show' 'kubectl get pods' \
+    'aws ecr get-login-password | docker login --password-stdin r.example' \
+    'aws ecr get-login-password | helm registry login --password-stdin r.example' \
+    $'alias ll=\'ls -l\'\nll src'; do
+    secrets audit20_j1_j3_metadata allow Bash "$cmd"
+done
+for cmd in 'aws ecr get-login-password | docker run -i alpine cat' \
+    'aws ecr get-login-password | docker --password-stdin run -i alpine cat' \
+    'aws ecr get-login-password | helm --password-stdin template x' \
+    'aws ecr get-login-password | cat | docker login --password-stdin r.example'; do
+    secrets audit20_j1_nonsink deny Bash "$cmd"
+done
+for cmd in $'alias c=cd\nc ~/.aws\ncat credentials' \
+    $'alias c=\'cd ~/.aws\'\nc\ncat credentials' \
+    $'alias c=\'echo ok; cd ~/.aws\'\nc\ncat credentials' \
+    $'alias c=pushd\nc ~/.aws\ncat credentials' \
+    $'alias c=popd\nc\ncat credentials' \
+    $'alias c=f\nf() { cd ~/.aws; }\nc\ncat credentials' \
+    $'alias c=\'echo ok; f\'\nf() { cd ~/.aws; }\nc\ncat credentials' \
+    $'alias c="$MOVE"\nc ~/.aws\ncat credentials' \
+    $'eval \'alias c=cd\'\nc ~/.aws\ncat credentials' \
+    $'eval "alias c=\'cd ~/.aws\'"\nc\ncat credentials' \
+    $'alias r=cat\nr .env' $'alias r=\'head -n 1\'\nr .env' \
+    $'alias r=\'echo ok; cat\'\nr .env' \
+    $'alias r=cat\nalias s=r\ns .env' \
+    $'eval \'alias r=cat\'\nr .env'; do
+    secrets audit20_j3_alias deny Bash "$cmd"
+done
+for prefix in eval 'command eval' 'builtin eval' "'eval'"; do
+    for code in '(cd ~/.aws)' '( (cd ~/.aws) )' 'echo $(cd ~/.aws)' \
+        'echo "$(cd ~/.aws)"' 'echo `cd ~/.aws`'; do
+        cmd="$prefix '$code'; cat credentials"
+    secrets audit20_j4_private_cwd allow Bash "$cmd"
+    done
+done
+for code in '(cd ~/.aws; cat credentials)' 'echo $(cd ~/.aws; cat credentials)' \
+    'echo `cd ~/.aws; cat credentials`' '(cd ~/.aws); cd ~/.aws' \
+    '(cd ~/.aws); $(echo cd) ~/.aws' 'echo $CODE' 'echo $((CDPATH=1))'; do
+    cmd="eval '$code'; cat credentials"
+    secrets audit20_j4_retained_deny deny Bash "$cmd"
+done
+}
+
+# Audit 20b K3/K4 and 20a L4 reject malformed bytes and shell schemas.
+# Raw payloads are synthetic and are never evaluated as shell source.
+audit20_raw() {
+    local name="$1" expected="$2" encoded="$3" got output
+    # shellcheck disable=SC2053  # same focused filter as secrets()
+    if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\t%s\tdecision\t%s\n' "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
+    printf '%b' "$encoded" >"$TMP/audit20-envelope"
+    output="$(invoke_guard <"$TMP/audit20-envelope")" || output=crash
+    got=deny
+    if [[ "$expected" == allow && -z "$output" ]]; then got=allow
+    elif ! printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=invalid
+    fi
+    if [[ "$got" == "$expected" ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
+    else
+        FAILED=$((FAILED + 1))
+        printf 'FAIL %s: got %s, expected %s\n' "$name" "$got" "$expected"
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
+    fi
+}
+audit20_raw audit20_k3_empty allow ''
+audit20_raw audit20_k4_valid_utf8 allow '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo café"}}'
+audit20_raw audit20_k3_space deny ' '
+audit20_raw audit20_k3_tab deny '\t'
+audit20_raw audit20_k3_newline deny '\n'
+audit20_raw audit20_k3_crlf deny '\r\n'
+audit20_raw audit20_k3_mixed deny ' \n\t '
+audit20_raw audit20_k3_raw_nul deny '\000'
+audit20_raw audit20_k4_invalid_utf8 deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo \377"}}'
+audit20_raw audit20_k4_trailing_nul deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo ok"}}\000'
+audit20_raw audit20_k4_embedded_nul deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo \000ok"}}'
+audit20_raw audit20_k4_duplicate deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"cat .env","command":"echo ok"}}'
+audit20_raw audit20_k4_duplicate_container deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":{},"command":"echo ok"}}'
+audit20_raw audit20_k4_duplicate_escaped deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"comm\\u0061nd":"cat .env","command":"echo ok"}}'
+audit20_raw audit20_k4_missing deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{}}'
+audit20_raw audit20_k4_null_input deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":null}'
+audit20_raw audit20_k4_null deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":null}}'
+audit20_raw audit20_k4_numeric deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":7}}'
+audit20_raw audit20_k4_boolean deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":true}}'
+audit20_raw audit20_k4_object deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":{}}}'
+audit20_raw audit20_k4_empty_argv deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":[]}}'
+audit20_raw audit20_k4_null_argv deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":[null]}}'
+audit20_raw audit20_k4_element_null deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":["echo",null]}}'
+
+# Names-only Grep still works without Perl, but malformed raw input cannot.
+mkdir -p "$TMP/audit20-parser-bin"
+for executable in bash jq tr; do
+    ln -s "$(command -v "$executable")" "$TMP/audit20-parser-bin/$executable"
+done
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit20-parser-bin" "$BASH" "$REPO_ROOT/hooks/guard-secrets" >"$TMP/audit20-parser-guard"
+SECRETS_GUARD="$TMP/audit20-parser-guard"
+audit20_raw audit20_k4_no_perl_duplicate deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"cat .env","command":"echo ok"}}'
+audit20_raw audit20_k4_no_perl_utf8 deny '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo \377"}}'
+audit20_raw audit20_k3_no_perl_nul deny '\000'
+audit20_raw audit20_k3_no_perl_newline deny '\n'
+SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
+
+# Cloud config metadata, interpreter literals and additional AWS printers.
+# shellcheck disable=SC2016,SC2088  # shell source is input only
+{
+mkdir -p "$HOME/.aws" "$HOME/.kube" "$TMP/audit20-config"
+printf '%s\n' synthetic-only >"$HOME/.aws/config"
+printf '%s\n' synthetic-only >"$HOME/.kube/config"
+printf '%s\n' synthetic-only >"$HOME/.yarnrc.yml"
+printf '%s\n' synthetic-only >"$TMP/audit20-config/custom.cfg"
+for tool in Read NotebookEdit; do
+    secrets "audit20_k5_aws_$tool" deny "$tool" "$HOME/.aws/config"
+done
+secrets audit20_k5_aws_grep deny Grep "$HOME/.aws" '{"output_mode":"content"}'
+secrets audit20_k5_aws_glob deny Grep "$TMP/empty-search" '{"glob":"**/.aws/config","output_mode":"content"}'
+    secrets audit20_k5_aws_reader deny Bash 'cat ~/.aws/config'
+    secrets audit20_k5_aws_reader deny Bash 'grep -n token ~/.aws/config'
+    secrets audit20_k5_aws_reader deny Bash 'rg token ~/.aws/config'
+    secrets audit20_k5_aws_reader deny Bash 'cd ~/.aws; cat config'
+for cmd in 'aws configure list' 'aws s3 ls' 'aws --profile p sts get-caller-identity'; do
+    secrets audit20_k5_aws_metadata allow Bash "$cmd"
+done
+AWS_CONFIG_FILE="$TMP/audit20-config/custom.cfg" secrets audit20_k5_AWS_CONFIG_FILE_read deny Read "$TMP/audit20-config/custom.cfg"
+AWS_CONFIG_FILE="$TMP/audit20-config/custom.cfg" secrets audit20_k5_AWS_CONFIG_FILE_grep deny Grep "$TMP/audit20-config" '{"output_mode":"content"}'
+for cmd in "AWS_CONFIG_FILE='$TMP/audit20-config/custom.cfg'; cat '$TMP/audit20-config/custom.cfg'" \
+    "AWS_CONFIG_FILE='$TMP/audit20-config/custom.cfg'; rg token '$TMP/audit20-config'" \
+    'cat $AWS_CONFIG_FILE'; do
+    secrets audit20_k5_AWS_CONFIG_FILE_shell deny Bash "$cmd"
+done
+AWS_SHARED_CREDENTIALS_FILE="$TMP/audit20-config/custom.cfg" secrets audit20_k5_AWS_SHARED_CREDENTIALS_FILE_read deny Read "$TMP/audit20-config/custom.cfg"
+AWS_SHARED_CREDENTIALS_FILE="$TMP/audit20-config/custom.cfg" secrets audit20_k5_AWS_SHARED_CREDENTIALS_FILE_grep deny Grep "$TMP/audit20-config" '{"output_mode":"content"}'
+for cmd in "AWS_SHARED_CREDENTIALS_FILE='$TMP/audit20-config/custom.cfg'; cat '$TMP/audit20-config/custom.cfg'" \
+    "AWS_SHARED_CREDENTIALS_FILE='$TMP/audit20-config/custom.cfg'; rg token '$TMP/audit20-config'" \
+    'cat $AWS_SHARED_CREDENTIALS_FILE'; do
+    secrets audit20_k5_AWS_SHARED_CREDENTIALS_FILE_shell deny Bash "$cmd"
+done
+for cmd in 'aws --color off ecr get-login-password' \
+    'aws --no-cli-auto-prompt ecr get-login-password' \
+    'gcloud --billing-project synthetic auth print-access-token' \
+    'doctl -c synthetic auth token' 'kubectl --request-timeout=30s create token sa' \
+    'aws ecr-public get-login-password --region us-east-1' \
+    'aws ecr get-authorization-token' 'aws sts assume-role' \
+    'aws sts assume-role-with-web-identity' 'aws sts assume-role-with-saml' \
+    'aws sts get-federation-token'; do
+    secrets audit20_l3_printer deny Bash "$cmd"
+    secrets audit20_l3_stash allow Bash "$cmd | secret stash synthetic TOKEN"
+    secrets audit20_l3_docker allow Bash "$cmd | docker login --password-stdin r.example"
+    secrets audit20_l3_helm allow Bash "$cmd | helm registry login --password-stdin r.example"
+done
+for interpreter in python3 node ruby perl; do
+    case "$interpreter" in python3) flag=-c ;; *) flag=-e ;; esac
+    for target in "$HOME/.yarnrc.yml" "$HOME/.kube/config" "$HOME/.aws/config"; do
+        cmd="$interpreter <<'CODE'"$'\n'"open('$target')"$'\nCODE'
+    secrets audit20_l1_heredoc deny Bash "$cmd"
+        cmd="$interpreter $flag \"open('$target')\""
+    secrets audit20_l1_inline deny Bash "$cmd"
+    done
+    cmd="cd ~/.kube; $interpreter $flag \"open('config')\""
+    secrets audit20_l1_cwd deny Bash "$cmd"
+    for name in custom.cfg ./custom.cfg; do
+        cmd="KUBECONFIG='$TMP/audit20-config/custom.cfg' $interpreter $flag \"open('$TMP/audit20-config/$name')\""
+    secrets audit20_l1_config_inline deny Bash "$cmd"
+        cmd="KUBECONFIG=custom.cfg; cd '$TMP/audit20-config'; $interpreter <<'CODE'"$'\n'"open('$name')"$'\nCODE'
+    secrets audit20_l1_config_heredoc deny Bash "$cmd"
+    done
+    for source in 'open("custom.cfg")' 'open("./custom.cfg")'; do
+        for form in herestring pipe; do
+            if [[ "$form" == herestring ]]; then cmd="$interpreter <<< '$source'"
+            else cmd="printf '%s' '$source' | $interpreter"; fi
+    KUBECONFIG="$TMP/search/custom.cfg" secrets audit20_l1_config_stdin deny Bash "$cmd"
+        done
+        cmd="$interpreter $flag '$source'"
+    KUBECONFIG="$TMP/search/custom.cfg" secrets audit20_l1_inherited_inline deny Bash "$cmd"
+    done
+    for name in custom.cfg ./custom.cfg; do
+        cmd="printf '%s' \"open(\\\"$name\\\")\" | $interpreter"
+    KUBECONFIG="$TMP/search/custom.cfg" secrets audit20_l1_quoted_producer deny Bash "$cmd"
+    done
+    cmd="$interpreter $flag \"open('public.txt')\""
+    secrets audit20_l1_public allow Bash "$cmd"
+done
+for producer in command builtin; do
+    cmd="$producer printf '%s' \"print(open(\\\"custom.cfg\\\").read())\" | python3"
+    KUBECONFIG="$TMP/search/custom.cfg" secrets audit20_l1_wrapped_producer deny Bash "$cmd"
+done
+large_source="$(printf '%9000s' '')"
+for target in "$HOME/.yarnrc.yml" "$HOME/.kube/config" "$HOME/.aws/config"; do
+    cmd="python3 <<'CODE'"$'\n'"#$large_source"$'\n'"open('$target')"$'\nCODE'
+    secrets audit20_l1_large_heredoc deny Bash "$cmd"
+done
+cmd="python3 <<'CODE'"$'\n'"#$large_source"$'\n'"open('custom.cfg')"$'\nCODE'
+    KUBECONFIG="$TMP/search/custom.cfg" secrets audit20_l1_large_config deny Bash "$cmd"
+}
+
+# Reproduce macOS /var aliases with synthetic ancestors on every platform.
+mkdir -p "$TMP/audit20-physical/target"
+ln -s "$TMP/audit20-physical" "$TMP/audit20-ancestor-link"
+ln -s "$TMP/audit20-physical/target" "$TMP/audit20-physical/config-link"
+for spelling in "$TMP/audit20-ancestor-link/target" "$TMP/audit20-physical/target"; do
+    KUBECONFIG="$TMP/audit20-ancestor-link/config-link/missing/deep.cfg" secrets audit20_missing_ancestor_read deny Read "$spelling/missing/deep.cfg"
+    KUBECONFIG="$TMP/audit20-ancestor-link/config-link/missing/deep.cfg" secrets audit20_missing_ancestor_cat deny Bash "cat '$spelling/missing/deep.cfg'"
+done
+KUBECONFIG="$TMP/audit20-ancestor-link/config-link/missing/deep.cfg" secrets audit20_missing_ancestor_public allow Read "$TMP/audit20-ancestor-link/target/missing/public.cfg"
+
+# Alias publication follows the shell scope, not definition text alone.
+# shellcheck disable=SC2016,SC2088  # synthetic source, never executed
+{
+for cmd in $'(alias c=cd)\ncat credentials' \
+    $'(alias c=\'cd ~/.aws\')\nc ~/.aws\ncat credentials' \
+    $'echo "$(alias c=cd)"\ncat credentials' \
+    $'alias c=cd | true\ncat credentials' \
+    $'alias c=cd &\ncat credentials' \
+    $'f() { alias c=cd; }; cat credentials' \
+    $'f() { alias r=cat; }; cat credentials' \
+    $'alias c=\'ls -l\'\n(alias c=cd)\nc src\ncat credentials' \
+    $'( (alias c=cd) )\ncat credentials'; do
+    secrets audit20_alias_child_scope allow Bash "$cmd"
+done
+for cmd in $'alias c=cd\n(alias c=\'ls -l\')\nc ~/.aws\ncat credentials' \
+    $'alias c=cd\ncat credentials' \
+    $'f() { alias c=cd; }; f; c ~/.aws; cat credentials' \
+    $'(alias r=cat; r .env)' \
+    $'eval \'alias c=cd\'\nc ~/.aws\ncat credentials'; do
+    secrets audit20_alias_outer_scope deny Bash "$cmd"
+done
+}
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

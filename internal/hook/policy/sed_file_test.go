@@ -24,6 +24,8 @@ func TestSedScriptSpecialFiles(t *testing.T) {
 		{"/proc/self/fd/0", true}, {"/proc/self/status", true}, {"/proc/version", true},
 		{"ordinary.txt", false}, {"dev/stdin", false}, {"proc/self/fd/0", false},
 		{filepath.ToSlash(filepath.Join(root, "ordinary.txt")), false},
+		{"C:/synthetic/ordinary.txt", false},
+		{"C:/Users/SYNTH~1/ordinary.txt", false},
 	}
 	for _, cmd := range []string{"r", "R", "w", "W"} {
 		for _, file := range files {

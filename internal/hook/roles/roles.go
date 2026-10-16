@@ -43,7 +43,8 @@ func Reading(name string) bool {
 // PrinterReason identifies output which cannot enter agent context. A direct
 // stdout pipe is permitted only for a validated stash or password-stdin login.
 func PrinterReason(name string, args []string, direct bool) string {
-	args = printerArguments(name, args)
+	commands := printerArguments(name, args)
+	contains := func(words ...string) bool { return orderedWords(commands, words...) }
 	arg := func(n int) string {
 		if n < len(args) {
 			return args[n]
@@ -84,14 +85,7 @@ func PrinterReason(name string, args []string, direct bool) string {
 		}
 		printValue = arg(0) == "get"
 	case "gh", "glab":
-		printValue = arg(0) == "auth" && arg(1) == "token"
-		if arg(0) == "auth" && arg(1) == "status" {
-			for _, v := range args[2:] {
-				if v == "--show-token" || v == "--show-token=true" || v == "-t" {
-					printValue = true
-				}
-			}
-		}
+		printValue = contains("auth", "token") || contains("auth", "status") && (hasOption(args, "--show-token") || hasOption(args, "-t"))
 	case "make":
 		for _, v := range args {
 			if v == "--print-data-base" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.Contains(v, "p") {
@@ -105,55 +99,30 @@ func PrinterReason(name string, args []string, direct bool) string {
 			printValue = arg(1) == "get" && key || arg(1) == "list" && (key || strings.Contains(lower, "--json") || strings.Contains(" "+lower+" ", " -l "))
 		}
 	case "kubectl":
-		printValue = arg(0) == "create" && arg(1) == "token"
-		if arg(0) == "config" && arg(1) == "view" {
-			for _, v := range args[2:] {
-				if v == "--raw" || v == "--raw=true" {
-					printValue = true
-				}
-			}
-		}
+		printValue = contains("create", "token") || contains("config", "view") && hasOption(args, "--raw")
 	case "gcloud":
-		printValue = arg(0) == "config" && arg(1) == "config-helper"
-		j := 0
-		if arg(j) == "auth" {
-			j++
-			if arg(j) == "application-default" {
-				j++
-			}
-			printValue = arg(j) == "print-access-token" || arg(j) == "print-identity-token"
-		}
+		printValue = contains("config", "config-helper") || contains("auth", "print-access-token") || contains("auth", "print-identity-token")
 	case "az":
-		printValue = arg(0) == "account" && arg(1) == "get-access-token" || arg(0) == "acr" && arg(1) == "login" && hasOption(args[2:], "--expose-token")
+		printValue = contains("account", "get-access-token") || contains("acr", "login") && hasOption(args, "--expose-token")
 	case "heroku":
-		printValue = arg(0) == "auth:token"
+		printValue = contains("auth:token")
 	case "vault":
-		printValue = arg(0) == "print" && arg(1) == "token" || arg(0) == "token" && arg(1) == "lookup"
+		printValue = contains("print", "token") || contains("token", "lookup")
 	case "doctl":
-		printValue = arg(0) == "auth" && arg(1) == "token"
+		printValue = contains("auth", "token")
 	case "direnv":
-		printValue = arg(0) == "export"
+		printValue = contains("export")
 	case "aws":
-		printValue = arg(0) == "ecr" && arg(1) == "get-login-password" || arg(0) == "sts" && arg(1) == "get-session-token" || arg(0) == "sso" && arg(1) == "get-role-credentials"
-		filtered := make([]string, 0, len(args))
-		for i := 0; i < len(args); i++ {
-			if args[i] == "--profile" {
-				i++
-				continue
-			}
-			if strings.HasPrefix(args[i], "--profile=") {
-				continue
-			}
-			filtered = append(filtered, args[i])
+		printValue = contains("ecr", "get-login-password") || contains("ecr-public", "get-login-password") || contains("ecr", "get-authorization-token") || contains("sso", "get-role-credentials") || contains("configure", "export-credentials")
+		for _, action := range []string{"get-session-token", "assume-role", "assume-role-with-web-identity", "assume-role-with-saml", "get-federation-token"} {
+			printValue = printValue || contains("sts", action)
 		}
-		if len(filtered) >= 2 && filtered[0] == "configure" {
-			printValue = filtered[1] == "export-credentials"
-			if filtered[1] == "get" && len(filtered) > 2 {
-				switch strings.ToLower(filtered[2]) {
-				case "aws_access_key_id", "aws_secret_access_key", "aws_session_token":
-					printValue = true
-				}
-			}
+		lower := make([]string, len(commands))
+		for i, word := range commands {
+			lower[i] = strings.ToLower(word)
+		}
+		for _, key := range []string{"aws_access_key_id", "aws_secret_access_key", "aws_session_token"} {
+			printValue = printValue || orderedWords(lower, "configure", "get", key)
 		}
 	case "op":
 		printValue = arg(0) == "read"

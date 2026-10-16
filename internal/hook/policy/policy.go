@@ -3,6 +3,7 @@ package policy
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -76,12 +77,15 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 }
 
 type analyzer struct {
-	kubeconfigs         []string
+	credentialConfigs   []string
+	interpreterInputs   []interpreterInput
 	protected           func(string, string) bool
 	cwd, home, reason   string
 	words, globs        int
 	countedWords        map[*syntax.Word]bool
 	flowSteps           int
+	aliases             map[string][]string
+	activeAliases       map[string]bool
 	functions           map[string][]*syntax.Stmt
 	functionRoots       map[*syntax.Stmt]string
 	uncertain           bool
@@ -103,7 +107,7 @@ type analyzer struct {
 
 func witness(source string) bool {
 	s := strings.ToLower(strings.ReplaceAll(source, `\`, ""))
-	for _, v := range []string{".vault-token", ".pgpass", "application_default_credentials.json", ".kube/config", ".terraform.d/credentials.tfrc.json", ".cargo/credentials", ".config/gcloud/credentials.db", ".config/gcloud/access_tokens.db", ".config/gcloud/legacy_credentials/", ".env", ".secret", ".secrets", ".netrc", ".npmrc", ".pypirc", ".aws/credentials", ".docker/config.json", ".config/gh/hosts.yml", ".git-credentials", ".ssh/id_", "/environ", "secret-tool", "printenv", "gh auth token", "$token", "$password", "$secret"} {
+	for _, v := range []string{".vault-token", ".pgpass", "application_default_credentials.json", ".kube/config", ".terraform.d/credentials.tfrc.json", ".cargo/credentials", ".config/gcloud/credentials.db", ".config/gcloud/access_tokens.db", ".config/gcloud/legacy_credentials/", ".env", ".secret", ".secrets", ".netrc", ".npmrc", ".pypirc", ".aws/credentials", ".aws/config", ".docker/config.json", ".config/gh/hosts.yml", ".git-credentials", ".ssh/id_", "/environ", "secret-tool", "printenv", "gh auth token", "$token", "$password", "$secret"} {
 		if strings.Contains(s, v) {
 			return true
 		}
@@ -196,7 +200,27 @@ func (a *analyzer) fragment(source string, depth int) {
 	}
 	a.stmts(file.Stmts, depth, a.cwd)
 }
+
+// Carry original stdin through the existing bounded wrapper, alias and group
+// analysis. Resolving a child must not discard its producer or redirect body.
 func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) string {
+	for _, stmt := range stmts {
+		prior := a.interpreterInputs
+		for _, redirect := range stmt.Redirs {
+			if redirect.Hdoc != nil || redirect.Op == syntax.WordHdoc {
+				a.interpreterInputs = append(a.interpreterInputs, interpreterInput{redirect: redirect, cwd: cwd})
+			}
+		}
+		cwd = a.singleStmtInput([]*syntax.Stmt{stmt}, depth, cwd)
+		a.interpreterInputs = prior
+		if a.reason != "" {
+			break
+		}
+	}
+	return cwd
+}
+
+func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) string {
 	if depth > 4 || time.Now().After(a.deadline) {
 		a.structuralUncertain = true
 		a.uncertain = true
@@ -208,6 +232,11 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		}
 		if call, ok := s.Cmd.(*syntax.CallExpr); ok && len(s.Redirs) > 0 {
 			for _, assign := range call.Assigns {
+				// Redirected interpreter bodies run with the call's literal
+				// credential-path assignments, not just inherited paths.
+				if assign.Name != nil && !assign.Append && optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE", assign.Name.Value) {
+					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+				}
 				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME GIT_DIR GIT_COMMON_DIR", assign.Name.Value) {
 					if a.env == nil {
 						a.env = make(map[string]string)
@@ -225,11 +254,11 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		for _, r := range s.Redirs {
 			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) && !inertMessageStdin(s) {
 				body := a.raw(r.Hdoc)
-				if hasProtectedLiteral(body) || gitToken.MatchString(body) || interpreter(recipient) && a.inlineGitDir(body, cwd) {
+				if hasProtectedLiteral(body) || gitToken.MatchString(body) {
 					a.reason = roles.FileInput
 				}
 			}
-			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word)) || interpreter(recipient) && a.inlineGitDir(literal(r.Word), cwd)) && !a.inertCatTeeBody(s, cwd) {
+			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word))) && !a.inertCatTeeBody(s, cwd) {
 				a.reason = roles.FileInput
 			}
 			a.walkWord(r.Word, depth, cwd)
@@ -415,6 +444,10 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.cdpath = true
 			}
 			a.recordIndirect(name, args, unknown)
+			if name == "alias" {
+				cwd = a.defineAliases(args, unknown, cwd)
+				continue
+			}
 			if name == "cd" || name == "pushd" || name == "popd" || name == "dirs" {
 				for len(args) > 0 && len(args[0]) > 1 && strings.HasPrefix(args[0], "-") {
 					option := args[0]
@@ -487,7 +520,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 						continue
 					}
-					if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+					if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -526,18 +559,18 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				prior := a.xargsIDs
 				a.xargsIDs = true
-				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.pipelineRecipient(cmd, depth, cwd)
 				a.xargsIDs = prior
 				break
 			}
 			if cmd.Op.String() == "|" && inertMessageStdin(cmd.Y) && inertMessagePipe(cmd.X) {
-				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.pipelineRecipient(cmd, depth, cwd)
 				break
 			}
 			if cmd.Op.String() == "|" && dockerPIDPipe(cmd.X, cmd.Y) {
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				a.xargsIDs = true
-				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.pipelineRecipient(cmd, depth, cwd)
 				a.xargsIDs = false
 				break
 			}
@@ -547,7 +580,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 			}
 			if a.inRun && cmd.Op.String() == "|" && commandName(cmd.X) == "printf" && commandName(cmd.Y) == "curl" && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
-				a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+				a.pipelineRecipient(cmd, depth, cwd)
 				break
 			}
 			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
@@ -561,7 +594,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 					if reason := roles.PrinterReason(decl.Variant.Value, nil, true); reason != "" {
 						a.reason = reason
 					}
-					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+					a.pipelineRecipient(cmd, depth, cwd)
 					break
 				}
 			}
@@ -572,7 +605,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
 				if a.reason == "" {
-					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+					a.pipelineRecipient(cmd, depth, cwd)
 				}
 			} else {
 				leftCWD := a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
@@ -581,16 +614,16 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 						leftCWD = joinedCWD(cwd, leftCWD)
 					}
 					if cmd.Op.String() == "||" && leftCWD != cwd && cwd != "" {
-						a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+						a.pipelineRecipient(cmd, depth, cwd)
 					}
-					rightCWD := a.stmts([]*syntax.Stmt{cmd.Y}, depth, leftCWD)
+					rightCWD := a.pipelineRecipient(cmd, depth, leftCWD)
 					if cmd.Op.String() == "&&" {
 						cwd = rightCWD
 					} else {
 						cwd = joinedCWD(cwd, rightCWD)
 					}
 				} else {
-					a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
+					a.pipelineRecipient(cmd, depth, cwd)
 				}
 			}
 		case *syntax.Subshell:
@@ -886,6 +919,11 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 		a.stmts([]*syntax.Stmt{s}, depth, cwd)
 		return
 	}
+	if len(call.Args) > 0 && len(a.aliases[literal(call.Args[0])]) > 0 {
+		// The direct transport proof covers literal printer argv only.
+		a.stmts([]*syntax.Stmt{s}, depth, cwd)
+		return
+	}
 	for _, assign := range call.Assigns {
 		if assign.Name != nil {
 			if assign.Name.Value == "CDPATH" {
@@ -937,6 +975,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	name := strings.ToLower(path.Base(words[0]))
+	if interpreter(name) && !optionIn("awk gawk jq yq", name) && a.interpreterInputProtected(cwd) {
+		if a.reason == "" {
+			a.reason = roles.FileInput
+		}
+		return
+	}
 	if name == "fdfind" {
 		name = "fd"
 	}
@@ -1234,7 +1278,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 				continue
 			}
-			if witness(code) || a.inlineGitDir(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+			if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterProtected(code, cwd) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 				a.reason = "interpreter argument names a protected file or credential operation"
 				return
 			}
@@ -1347,6 +1391,16 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.shellCommand(dialect, args, depth, cwd)
 		return
 	case "env", "command", "builtin":
+		if name == "command" {
+			for _, option := range args {
+				if option == "--" || !strings.HasPrefix(option, "-") {
+					break
+				}
+				if strings.Trim(option[1:], "pvV") == "" && strings.ContainsAny(option[1:], "vV") {
+					return // A command query does not pass stdin to an interpreter.
+				}
+			}
+		}
 		if name == "env" {
 			// Split-string supplies child words, not an environment dump.
 			if len(args) >= 2 && (args[0] == "-S" || args[0] == "--split-string") {
@@ -1532,7 +1586,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 	}
 	if name == "rg" {
-		if config := a.kubeconfig(); config != "" && !rgOutputOnly(args) {
+		if config := a.credentialConfig(); config != "" && !rgOutputOnly(args) {
 			roots := rgRoots(args)
 			if len(roots) == 0 {
 				roots = []string{"."}
@@ -1617,18 +1671,23 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	} // File names are metadata; execution slots were analyzed above.
 
-	if reason := roles.OperandReason(name, operands, func(path string) bool { return a.inputProtected(path, cwd) }); reason != "" {
+	if reason := roles.OperandReason(name, operands, func(path string) bool {
+		if interpreter(name) {
+			return a.interpreterNameProtected(path, cwd)
+		}
+		return a.inputProtected(path, cwd)
+	}); reason != "" {
 		a.reason = reason
 	}
 }
 func (a *analyzer) resolve(name, cwd string) string {
-	if cwd == "" && !path.IsAbs(name) {
+	if cwd == "" && !filepath.IsAbs(name) {
 		return ""
 	}
 	if strings.HasPrefix(name, "~/") {
 		name = a.home + "/" + name[2:]
 	}
-	if path.IsAbs(name) {
+	if filepath.IsAbs(name) {
 		return name
 	}
 	return cwd + "/" + name
@@ -1682,10 +1741,16 @@ func (a *analyzer) walkNode(node syntax.Node, depth int, cwd string) {
 	syntax.Walk(node, func(node syntax.Node) bool {
 		switch n := node.(type) {
 		case *syntax.CmdSubst:
+			parent := a.aliases
+			a.aliases = maps.Clone(parent)
 			a.stmts(n.Stmts, depth+1, cwd)
+			a.aliases = parent
 			return false
 		case *syntax.ProcSubst:
+			parent := a.aliases
+			a.aliases = maps.Clone(parent)
 			a.stmts(n.Stmts, depth+1, cwd)
+			a.aliases = parent
 			return false
 		}
 		return true
