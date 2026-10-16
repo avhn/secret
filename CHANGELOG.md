@@ -24,7 +24,24 @@ All notable changes to this project are documented here. Format follows [Keep a 
   templates, attached job counts, taskset hexadecimal masks and CPU-list flag
   clusters, make directory-option clusters, and versioned Lua/LuaJIT input.
   Preserve ordinary Docker actions and distinguish resolved credential actions
-  from printer-like data operands. Add permanent Claude/Codex regressions,
+  from printer-like data operands. Normalize boolean printer flags and kubectl
+  content formats, cover op OTP/raw signin, and classify literal interpreter argv
+  launches and normalized command strings. Check curl file URLs and JSON/config/
+  write-out inputs plus gh API input files while preserving literal curl payloads.
+  Union configured credential paths at branch joins, share recognized child roles
+  through unknown launchers, and reject mistyped file/search/workdir envelopes.
+  Require NotebookEdit's authoritative notebook_path and ignore unrelated
+  file_path values when selecting its target. Preserve sequential configured-path
+  replacement and singular AWS filenames across branch alternatives. Cover GH
+  attached inputs, unknown-launcher Lua aliases and curl URL queries without
+  treating user-agent strings as file inputs.
+  Cap raw envelopes before expensive parsing. Skip inert interpreter comments
+  and quoted calls, cover parenthesis-free Ruby/Perl launches and inline kubectl
+  custom columns, and retain whole AWS paths containing colons at branch joins.
+  Normalize curl option clusters, multipart/header readers and escaped file URLs
+  without treating literal option values or name=content payloads as inputs.
+  Validate Grep field types and require the authoritative NotebookEdit target.
+  Add permanent Claude/Codex regressions,
   must-allow cases and exact platform inventories.
 
 - Classify Go token printers through unknown and interleaved options without
@@ -58,7 +75,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
   templates and attached job counts, external time options, makefile input
   boundaries, Docker file inputs, single-action printer options and versioned
   Lua/LuaJIT. Preserve ordinary launcher and attached-makefile controls without
-  adding new reviewed divergences.
+  adding new reviewed divergences. Honor yarn --cwd for implicit children,
+  normalize case-insensitive boolean printer flags, cover secret-bearing kubectl
+  output variants and op OTP/raw sign-in output, and classify fully literal
+  interpreter argv launches with shared child roles. Check one-slash file URLs
+  and --url curl inputs. Reject unpaired JSON surrogate escapes and malformed
+  file-tool targets or optional path/output/workdir field types, retaining
+  public-file, non-printing and direct-transport controls. Keep interpreter
+  comments and regex literals language-aware across inline and stdin source,
+  retain uncertain decisions for identified literal argv launches, and recognize
+  bounded parenthesis-free Ruby/Perl system and exec lists. Preserve genuine
+  comments, ordinary launcher prose and public-child controls.
 
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty

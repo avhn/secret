@@ -20,26 +20,33 @@ with mock.patch.object(sys, "dont_write_bytecode", True):
 
 
 class VariantExtractionTests(unittest.TestCase):
-    def test_direct_responses_keep_extraction_suite_running(self):
+    def test_direct_capture_leaves_real_guard_decisions_unchanged(self):
         envelope = dict(tool_name="Bash", tool_input=dict(command="true"))
-        for payload, phrase in [
-            ("", None),
-            ("malformed", "split it"),
-            (json.dumps(envelope) + "\n" + json.dumps(envelope), "split it"),
-            (json.dumps(dict(tool_name="Bash", tool_input=dict(command="x" * 8200))), "split the command"),
-            (json.dumps(dict(tool_name="Bash", tool_input=dict(command="cat .env '"))), "split it"),
+        for payload, captured in [
+            ("", False),
+            ("malformed", False),
+            (json.dumps(envelope) + "\n" + json.dumps(envelope), False),
+            (json.dumps(envelope), True),
+            (json.dumps(dict(tool_name="Bash", tool_input=dict(command="x" * 8200))), True),
+            (json.dumps(dict(tool_name="Bash", tool_input=dict(command="cat .env '"))), True),
         ]:
-            with self.subTest(phrase=phrase, length=len(payload)):
+            with self.subTest(captured=captured, length=len(payload)):
                 output = io.StringIO()
+                stdin = io.TextIOWrapper(io.BytesIO(payload.encode()))
                 with mock.patch.object(sys, "argv", [str(GENERATOR), "--direct", "/synthetic", "/synthetic/rows"]):
-                    with mock.patch.object(sys, "stdin", io.StringIO(payload)), mock.patch.object(sys, "stdout", output), mock.patch.object(variants, "capture"):
+                    with mock.patch.object(sys, "stdin", stdin), mock.patch.object(sys, "stdout", output), mock.patch.object(variants, "capture") as capture:
                         variants.direct()
-                if phrase is None:
-                    self.assertEqual(output.getvalue(), "")
-                else:
-                    response = json.loads(output.getvalue())["hookSpecificOutput"]
-                    self.assertEqual(response["permissionDecision"], "deny")
-                    self.assertIn(phrase, response["permissionDecisionReason"])
+                self.assertEqual(output.getvalue(), "")
+                self.assertEqual(capture.call_count, int(captured))
+
+    def test_direct_preserves_malformed_field_types(self):
+        for value in [None, 1, True, {}, []]:
+            envelope = dict(tool_name="Bash", cwd="/synthetic", tool_input=dict(command="true", workdir=value))
+            stdin = io.TextIOWrapper(io.BytesIO(json.dumps(envelope).encode()))
+            with mock.patch.object(sys, "argv", [str(GENERATOR), "--direct", "/synthetic", "/synthetic/rows"]):
+                with mock.patch.object(sys, "stdin", stdin), mock.patch.object(variants, "capture") as capture:
+                    variants.direct()
+            self.assertEqual(capture.call_args.args[0]["extra"], {"workdir": value})
 
     def test_capture_preserves_only_bounded_synthetic_metadata_contents(self):
         with tempfile.TemporaryDirectory(prefix="hook-variant-test-") as directory:
@@ -80,7 +87,7 @@ class VariantExtractionTests(unittest.TestCase):
         env = dict(HOME="/synthetic/home-alias", RIPGREP_CONFIG_PATH="/synthetic/rg-config",
                    KUBECONFIG="/synthetic/custom.cfg:/synthetic/second.cfg")
         with mock.patch.object(sys, "argv", [str(GENERATOR), "--direct", "/synthetic", "/synthetic/rows"]):
-            with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(envelope))), mock.patch.object(sys, "stdout", io.StringIO()):
+            with mock.patch.object(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(envelope).encode()))), mock.patch.object(sys, "stdout", io.StringIO()):
                 with mock.patch.dict(variants.os.environ, env), mock.patch.object(variants, "capture") as capture:
                     variants.direct()
         row = capture.call_args.args[0]

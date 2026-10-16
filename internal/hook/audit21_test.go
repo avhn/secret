@@ -12,17 +12,29 @@ import (
 // Replay only guard envelopes. Fixture files are synthetic, and candidate
 // readers, credential printers and interpreters are never launched.
 func TestAudit21Envelopes(t *testing.T) {
-	data, err := os.ReadFile("../../testdata/hook/audit21.json")
+	testAuditEnvelopes(t, "../../testdata/hook/audit21.json")
+}
+
+func testAuditEnvelopes(t *testing.T, filename string) {
+	t.Helper()
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
 	data = bytes.ReplaceAll(data, []byte("@TMP@"), []byte(filepath.ToSlash(root)))
+	fileRoot := filepath.ToSlash(root)
+	if !strings.HasPrefix(fileRoot, "/") {
+		fileRoot = "/" + fileRoot
+	}
+	data = bytes.ReplaceAll(data, []byte("@FILE_TMP@"), []byte(fileRoot))
 	var corpus struct {
 		Fixtures [][3]string
 		Cases    []struct {
 			Name    string
 			Command string
+			Tool    string
+			Fields  map[string]string
 			Deny    bool
 		}
 	}
@@ -45,7 +57,11 @@ func TestAudit21Envelopes(t *testing.T) {
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			for _, host := range []string{"claude", "codex"} {
-				body, err := json.Marshal(map[string]any{"tool_name": "Bash", "cwd": filepath.Join(root, "work"), "tool_input": map[string]string{"command": tc.Command}})
+				tool, fields := tc.Tool, tc.Fields
+				if tool == "" {
+					tool, fields = "Bash", map[string]string{"command": tc.Command}
+				}
+				body, err := json.Marshal(map[string]any{"tool_name": tool, "cwd": filepath.Join(root, "work"), "tool_input": fields})
 				if err != nil {
 					t.Fatal(err)
 				}

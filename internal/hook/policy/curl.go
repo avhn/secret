@@ -21,7 +21,7 @@ func (a *analyzer) curlInputs(args []string, depth int, cwd string) bool {
 		return false
 	}
 	fileURL := func(value string) bool {
-		if !strings.HasPrefix(strings.ToLower(value), "file://") {
+		if !strings.HasPrefix(strings.ToLower(value), "file:/") {
 			return false
 		}
 		u, err := url.Parse(value)
@@ -53,7 +53,7 @@ func (a *analyzer) curlInputs(args []string, depth int, cwd string) bool {
 			kind = "file"
 		case "--url":
 			kind = "url"
-		case "--output", "--data-raw", "--form-string", "--user", "--proxy", "--request":
+		case "--output", "--data-raw", "--form-string", "--user", "--user-agent", "--proxy", "--request":
 			kind = "data"
 		}
 		if kind == "" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {

@@ -26,14 +26,14 @@ func (a *analyzer) pipelineRecipient(cmd *syntax.BinaryCmd, depth int, cwd strin
 	return a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 }
 
-func (a *analyzer) interpreterInputProtected(cwd string) bool {
+func (a *analyzer) interpreterInputProtected(cwd, name string) bool {
 	for _, input := range a.interpreterInputs {
 		if time.Now().After(a.deadline) {
 			a.reason = roles.Indeterminate
 			return true
 		}
 		if input.producer != nil {
-			if a.interpreterProducer(input.producer, input.cwd, cwd) {
+			if a.interpreterProducer(input.producer, input.cwd, cwd, name) {
 				return true
 			}
 			continue
@@ -45,7 +45,7 @@ func (a *analyzer) interpreterInputProtected(cwd string) bool {
 		}
 		// Retain raw witnesses, including literal quoted-heredoc bodies.
 		raw := a.raw(word)
-		if a.inlineGitDir(raw, cwd) || a.executableInterpreterProtected(raw, cwd) {
+		if a.inlineGitDir(raw, cwd) || a.executableInterpreterProtected(raw, cwd, name) {
 			return true
 		}
 		body, known := a.expandInterpreterStdin(word, r.Hdoc != nil, input.cwd)
@@ -53,7 +53,7 @@ func (a *analyzer) interpreterInputProtected(cwd string) bool {
 			a.reason = roles.Indeterminate
 			return true
 		}
-		if a.inlineGitDir(body, cwd) || a.executableInterpreterProtected(body, cwd) {
+		if a.inlineGitDir(body, cwd) || a.executableInterpreterProtected(body, cwd, name) {
 			return true
 		}
 	}

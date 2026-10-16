@@ -93,14 +93,7 @@ func (a *analyzer) literalPrinter(code, cwd string) bool {
 				if !printer && a.literalDepth < 4 && (utility || shellName(name) || optionIn("env command builtin setsid parallel", name)) {
 					// Reuse the actual child-role dispatcher, but isolate command
 					// state from the enclosing interpreter and outer shell.
-					probe := analyzer{protected: a.protected, cwd: cwd, home: a.home,
-						deadline: a.deadline, metadata: a.metadata, source: code,
-						credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
-						interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
-					probe.command(words, probe.literalDepth, cwd, false)
-					// An unsupported or incomplete launcher is not a positive
-					// witness in ordinary language text such as "timeout".
-					printer = probe.reason != "" && probe.reason != roles.Indeterminate && !probe.structuralUncertain
+					printer = a.literalCommandProtected(words, cwd, false)
 				}
 			}
 		case *syntax.DeclClause:
@@ -120,7 +113,7 @@ func (a *analyzer) literalPrinter(code, cwd string) bool {
 // Executable interpreter bodies have environment and literal-command roles in
 // addition to file literals. Reader programs such as sed do not execute these
 // strings and continue to use the file-only classifier.
-func (a *analyzer) executableInterpreterProtected(code, cwd string) bool {
+func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	if environmentCode(code) {
 		return true
 	}
@@ -129,5 +122,28 @@ func (a *analyzer) executableInterpreterProtected(code, cwd string) bool {
 			return true
 		}
 	}
-	return a.interpreterProtected(code, cwd)
+	return a.interpreterArgvProtected(code, cwd, name) || a.interpreterProtected(code, cwd)
+}
+
+// Literal argv launches and shell-string witnesses share the real dispatcher,
+// but cannot mutate the interpreter's surrounding shell state. An identified
+// executable launch must retain uncertain child results; arbitrary prose needs
+// a concrete role witness, not an incomplete launcher or recursion limit.
+func (a *analyzer) literalCommandProtected(words []string, cwd string, executable bool) bool {
+	if len(words) == 0 {
+		return false
+	}
+	if a.literalDepth >= 4 {
+		return executable
+	}
+	probe := analyzer{protected: a.protected, cwd: cwd, home: a.home,
+		deadline: a.deadline, metadata: a.metadata,
+		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
+		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
+	probe.command(words, probe.literalDepth, cwd, false)
+	if executable {
+		source := strings.Join(words, " ")
+		return probe.reason != "" || probe.structuralUncertain || probe.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source))
+	}
+	return probe.reason != "" && probe.reason != roles.Indeterminate && !probe.structuralUncertain
 }

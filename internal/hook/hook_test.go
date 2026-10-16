@@ -50,7 +50,8 @@ func TestDecide(t *testing.T) {
 	}
 }
 
-// TestNotebookEditPaths checks both fields against a separate Git directory.
+// TestNotebookEditPaths checks the authoritative notebook target against a
+// separate Git directory. An unrelated file_path is not an additional target.
 func TestNotebookEditPaths(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("cases use Unix host cwds; the Windows hook adapter is M5e")
@@ -69,7 +70,7 @@ func TestNotebookEditPaths(t *testing.T) {
 		name, notebook, file string
 		deny                 bool
 	}{
-		{"file path protected", "safe.ipynb", filepath.Join(gitdir, "hooks/pre-commit"), true},
+		{"unrelated file path protected", "safe.ipynb", filepath.Join(gitdir, "hooks/pre-commit"), false},
 		{"notebook path protected", filepath.Join(gitdir, "hooks/pre-commit"), "safe.ipynb", true},
 		{"both paths safe", "safe.ipynb", "safe.go", false},
 	} {
