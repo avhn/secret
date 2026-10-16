@@ -94,8 +94,9 @@ func sedLabelChar(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.'
 }
 func sedFileChar(c byte) bool {
-	return sedLabelChar(c) || strings.ContainsRune("/@+-", rune(c))
+	return sedLabelChar(c) || strings.ContainsRune("/@+-~", rune(c))
 }
+func asciiDrive(c byte) bool   { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 func sedSeparator(c byte) bool { return c == ';' || c == '\n' || c == '}' }
 
 func (a *analyzer) parseSedScript(code string, _ int, cwd string) {
@@ -210,6 +211,12 @@ func (a *analyzer) parseSedScript(code string, _ int, cwd string) {
 		case 'r', 'R', 'w', 'W':
 			p.spaces()
 			start := p.pos
+			// A drive-qualified filename is not a sed label or command.
+			// Backslashes retain their script-escape meaning; native callers
+			// can use the equivalent forward-slash path.
+			if len(code)-p.pos >= 3 && asciiDrive(code[p.pos]) && code[p.pos+1] == ':' && code[p.pos+2] == '/' {
+				p.pos += 2
+			}
 			for p.pos < len(code) && code[p.pos] != '\n' {
 				if !sedFileChar(code[p.pos]) {
 					invalid()

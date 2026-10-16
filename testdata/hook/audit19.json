@@ -179,6 +179,16 @@
       "project/clean/other.yaml",
       "file",
       "synthetic"
+    ],
+    [
+      "home/.aws/config",
+      "file",
+      "synthetic"
+    ],
+    [
+      "project/custom.cfg",
+      "file",
+      "synthetic"
     ]
   ],
   "cases": [
@@ -2797,6 +2807,791 @@
       "deny": true,
       "fields": {
         "command": "KUBECONFIG=kube.yaml; git ls-files -o | xargs cat"
+      }
+    },
+    {
+      "name": "J1_aws_binary_format",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password"
+      }
+    },
+    {
+      "name": "J1_aws_auto_prompt",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-auto-prompt off ecr get-login-password"
+      }
+    },
+    {
+      "name": "J1_aws_interleaved",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr --unknown z get-login-password"
+      }
+    },
+    {
+      "name": "J1_aws_sts",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts --cli-binary-format raw-in-base64-out get-session-token"
+      }
+    },
+    {
+      "name": "J1_gcloud",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud --unknownflag=1 auth print-access-token"
+      }
+    },
+    {
+      "name": "J1_vault",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "vault --unknown x print token"
+      }
+    },
+    {
+      "name": "J1_heroku",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "heroku --unknown auth:token"
+      }
+    },
+    {
+      "name": "J1_glab",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "glab --unknown auth status --show-token"
+      }
+    },
+    {
+      "name": "J1_az",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "az account --subscription s get-access-token"
+      }
+    },
+    {
+      "name": "J2_aws_color",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --color on ecr get-login-password"
+      }
+    },
+    {
+      "name": "J2_aws_no_sign",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --no-sign-request ecr get-login-password"
+      }
+    },
+    {
+      "name": "J2_doctl_trace",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "doctl --trace auth token"
+      }
+    },
+    {
+      "name": "J1_allow_aws_s3",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws s3 ls"
+      }
+    },
+    {
+      "name": "J1_allow_aws_profile_s3",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws --profile p s3 ls"
+      }
+    },
+    {
+      "name": "J1_allow_gcloud_list",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "gcloud auth list"
+      }
+    },
+    {
+      "name": "J1_allow_az_show",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "az account show"
+      }
+    },
+    {
+      "name": "J1_allow_kubectl_pods",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "kubectl get pods"
+      }
+    },
+    {
+      "name": "J1_allow_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-login-password | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J1_allow_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-login-password | helm registry login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J1_allow_unknown_docker",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J1_allow_unknown_helm",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | helm registry login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J1_allow_unknown_stash",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | secret stash synthetic TOKEN"
+      }
+    },
+    {
+      "name": "J1_docker_run",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | docker --password-stdin run -i alpine cat"
+      }
+    },
+    {
+      "name": "J1_helm_template",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | helm --password-stdin template x"
+      }
+    },
+    {
+      "name": "J1_indirect_pipe",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password | cat | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J1_stdout_diversion",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --cli-binary-format raw-in-base64-out ecr get-login-password > capture | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "J3_alias_cd",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias c=cd\nc ~/.aws\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_eval_alias_cd",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval 'alias c=cd'\nc ~/.aws\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_eval_alias_literal",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval \"alias c='cd ~/.aws'\"\nc\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_alias_pushd",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias c=pushd\nc ~/.aws\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_alias_popd",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias c=popd\nc\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_alias_body",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias c='echo ok; cd ~/.aws'\nc\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_alias_dynamic",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias c=\"$D\"\nc ~/.aws\ncat credentials"
+      }
+    },
+    {
+      "name": "J3_alias_reader",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias r=cat\nr ~/.aws/credentials"
+      }
+    },
+    {
+      "name": "J3_alias_reader_body",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "alias r='cat ~/.aws/credentials'\nr"
+      }
+    },
+    {
+      "name": "J3_eval_alias_reader",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval \"alias r='head ~/.aws/credentials'\"\nr"
+      }
+    },
+    {
+      "name": "J3_allow_public_alias",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "alias ll='ls -l'\nll docs"
+      }
+    },
+    {
+      "name": "J3_allow_child_alias",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "(alias c=cd)\ncat credentials"
+      }
+    },
+    {
+      "name": "J4_allow_eval_subshell",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "eval '(cd ~/.aws)'; cat credentials"
+      }
+    },
+    {
+      "name": "J4_allow_eval_substitution",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "eval 'echo $(cd ~/.aws)'; cat credentials"
+      }
+    },
+    {
+      "name": "J4_deny_subshell_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval '(cd ~/.aws; cat credentials)'"
+      }
+    },
+    {
+      "name": "J4_deny_substitution_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval 'echo $(cd ~/.aws; cat credentials)'"
+      }
+    },
+    {
+      "name": "K5_aws_config_Read",
+      "tool": "Read",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "file_path": "@TMP@/home/.aws/config"
+      }
+    },
+    {
+      "name": "K5_aws_config_Grep",
+      "tool": "Grep",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "path": "@TMP@/home/.aws/config",
+        "pattern": "TOKEN",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "K5_aws_cat",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cat ~/.aws/config"
+      }
+    },
+    {
+      "name": "K5_aws_grep",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep TOKEN ~/.aws/config"
+      }
+    },
+    {
+      "name": "K5_aws_tree",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "grep -r TOKEN ~/.aws"
+      }
+    },
+    {
+      "name": "K5_config_assignment",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "AWS_CONFIG_FILE=custom.cfg; cat custom.cfg"
+      }
+    },
+    {
+      "name": "K5_credentials_assignment",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "AWS_SHARED_CREDENTIALS_FILE=custom.cfg; rg -g \"*.cfg\" TOKEN"
+      }
+    },
+    {
+      "name": "K5_allow_config_list",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws configure list"
+      }
+    },
+    {
+      "name": "K5_allow_identity",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws --profile p sts get-caller-identity"
+      }
+    },
+    {
+      "name": "L1_yarn_heredoc",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "python3 <<'BODY'\nprint(open('$HOME/.yarnrc.yml').read())\nBODY"
+      }
+    },
+    {
+      "name": "L1_kube_heredoc",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "python3 <<'BODY'\nprint(open('$HOME/.kube/config').read())\nBODY"
+      }
+    },
+    {
+      "name": "L1_config_heredoc",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg python3 <<'BODY'\nprint(open('custom.cfg').read())\nBODY"
+      }
+    },
+    {
+      "name": "L1_config_inline",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg python3 -c 'print(open(\"custom.cfg\").read())'"
+      }
+    },
+    {
+      "name": "L1_config_dot_inline",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg python3 -c 'print(open(\"./custom.cfg\").read())'"
+      }
+    },
+    {
+      "name": "L1_cwd_inline",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "cd ~/.kube; python3 -c 'print(open(\"config\").read())'"
+      }
+    },
+    {
+      "name": "L1_allow_project_yarn",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "python3 -c 'print(open(\".yarnrc.yml\").read())'"
+      }
+    },
+    {
+      "name": "L1_allow_public_body",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "python3 <<'BODY'\nprint(open('README.md').read())\nBODY"
+      }
+    },
+    {
+      "name": "L2_show_config",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg; git show HEAD~1:custom.cfg"
+      }
+    },
+    {
+      "name": "L2_cat_file_config",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg; git cat-file -p HEAD~1:custom.cfg"
+      }
+    },
+    {
+      "name": "L2_log_config",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg; git log -p HEAD~1:custom.cfg"
+      }
+    },
+    {
+      "name": "L2_summary_history",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "git diff --stat HEAD~1:.env.production HEAD:README.md"
+      }
+    },
+    {
+      "name": "J1_overlap_aws_color",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --color off ecr get-login-password"
+      }
+    },
+    {
+      "name": "J1_overlap_aws_prompt",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws --no-cli-auto-prompt ecr get-login-password"
+      }
+    },
+    {
+      "name": "J1_overlap_billing",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "gcloud --billing-project X auth print-access-token"
+      }
+    },
+    {
+      "name": "J1_overlap_doctl",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "doctl -c X auth token"
+      }
+    },
+    {
+      "name": "J1_overlap_kubectl",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "kubectl --request-timeout=30s create token synthetic"
+      }
+    },
+    {
+      "name": "L3_printer_0",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr-public get-login-password"
+      }
+    },
+    {
+      "name": "L3_allow_sink_0",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr-public get-login-password | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L3_printer_1",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws ecr get-authorization-token"
+      }
+    },
+    {
+      "name": "L3_allow_sink_1",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws ecr get-authorization-token | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L3_printer_2",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts assume-role"
+      }
+    },
+    {
+      "name": "L3_allow_sink_2",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts assume-role | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L3_printer_3",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts assume-role-with-web-identity"
+      }
+    },
+    {
+      "name": "L3_allow_sink_3",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts assume-role-with-web-identity | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L3_printer_4",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts assume-role-with-saml"
+      }
+    },
+    {
+      "name": "L3_allow_sink_4",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts assume-role-with-saml | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L3_printer_5",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "aws sts get-federation-token"
+      }
+    },
+    {
+      "name": "L3_allow_sink_5",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": false,
+      "fields": {
+        "command": "aws sts get-federation-token | docker login --password-stdin r.example"
+      }
+    },
+    {
+      "name": "L1_stdin_source",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg; printf '%s' 'print(open(\"custom.cfg\").read())' | python3"
+      }
+    },
+    {
+      "name": "L1_stdin_heredoc",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "KUBECONFIG=custom.cfg; cat <<'BODY' | command python3\nprint(open('custom.cfg').read())\nBODY"
+      }
+    },
+    {
+      "name": "J4_retained_dynamic_eval",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "fields": {
+        "command": "eval 'echo $CODE'; cat credentials"
+      }
+    },
+    {
+      "name": "L1_inherited_missing_inline",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "env": {
+        "KUBECONFIG": "@TMP@/project/uncreated.cfg"
+      },
+      "fields": {
+        "command": "python3 -c 'open(\"uncreated.cfg\")'"
+      }
+    },
+    {
+      "name": "L1_inherited_missing_herestring",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "env": {
+        "KUBECONFIG": "@TMP@/project/uncreated.cfg"
+      },
+      "fields": {
+        "command": "python3 <<< 'open(\"uncreated.cfg\")'"
+      }
+    },
+    {
+      "name": "L1_inherited_missing_pipe",
+      "tool": "Bash",
+      "cwd": "@TMP@/project",
+      "deny": true,
+      "env": {
+        "KUBECONFIG": "@TMP@/project/uncreated.cfg"
+      },
+      "fields": {
+        "command": "printf '%s' 'open(\"uncreated.cfg\")' | python3"
       }
     }
   ]

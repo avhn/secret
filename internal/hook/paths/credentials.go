@@ -28,14 +28,17 @@ func physicalOrClean(name string) string {
 	return filepath.Clean(name)
 }
 
-// ConfiguredProtected recognizes literal KUBECONFIG path lists, including
+// configuredEntries combines Kubernetes path lists with the two singular AWS
+// config paths. AWS paths are not split: a literal colon can be part of a name.
+func configuredEntries(config string) []string {
+	return append(filepath.SplitList(config), os.Getenv("AWS_CONFIG_FILE"), os.Getenv("AWS_SHARED_CREDENTIALS_FILE"))
+}
+
+// ConfiguredProtected recognizes literal configured credential paths, including
 // physical aliases. Values are path metadata only, never opened or evaluated.
 func ConfiguredProtected(name, cwd, workdir, home, config string) bool {
-	if config == "" {
-		return false
-	}
 	candidate := StreamBase(unresolved(name, cwd, workdir, home))
-	for _, entry := range filepath.SplitList(config) {
+	for _, entry := range configuredEntries(config) {
 		if entry == "" {
 			continue
 		}
@@ -51,7 +54,7 @@ func ConfiguredProtected(name, cwd, workdir, home, config string) bool {
 // any configured path, including a missing file that may be created later.
 func ConfiguredTreeProtected(root, cwd, home, config string) bool {
 	root = physicalOrClean(unresolved(root, cwd, "", home))
-	for _, entry := range filepath.SplitList(config) {
+	for _, entry := range configuredEntries(config) {
 		if entry == "" {
 			continue
 		}

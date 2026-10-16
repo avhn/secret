@@ -32,6 +32,7 @@
 --iglob=!.npmrc
 --iglob=!.pypirc
 --iglob=!**/.aws/credentials
+--iglob=!**/.aws/config
 --iglob=!**/.docker/config.json
 --iglob=!**/gh/hosts.yml
 --iglob=!**/.ssh/id_*

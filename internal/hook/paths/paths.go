@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -98,7 +99,28 @@ func physical(raw string) (string, error) {
 		}
 		pending = append(strings.Split(filepath.ToSlash(target), "/"), pending...)
 	}
-	return filepath.Clean(current), nil
+	current = filepath.Clean(current)
+	if runtime.GOOS == "windows" {
+		// EvalSymlinks also expands 8.3 aliases on Windows. The component
+		// walk above preserves link/.. semantics; canonicalize its result,
+		// including the existing prefix of a not-yet-created target.
+		return canonicalExisting(current, filepath.EvalSymlinks)
+	}
+	return current, nil
+}
+
+func canonicalExisting(name string, resolve func(string) (string, error)) (string, error) {
+	tail := ""
+	for candidate := name; ; candidate = filepath.Dir(candidate) {
+		resolved, err := resolve(candidate)
+		if err == nil {
+			return filepath.Join(resolved, tail), nil
+		}
+		if !missingOperand(err) || filepath.Dir(candidate) == candidate {
+			return name, err
+		}
+		tail = filepath.Join(filepath.Base(candidate), tail)
+	}
 }
 
 // lexical recognises store directories, credentials and protected basenames.
@@ -117,7 +139,7 @@ func lexical(p string) bool {
 	if strings.HasSuffix(p, "/.kube/config") || strings.HasSuffix(p, "/.terraform.d/credentials.tfrc.json") || strings.HasSuffix(p, "/.cargo/credentials.toml") || strings.HasSuffix(p, "/.cargo/credentials") || strings.HasSuffix(p, "/.config/gcloud/credentials.db") || strings.HasSuffix(p, "/.config/gcloud/access_tokens.db") || strings.Contains(p, "/.config/gcloud/legacy_credentials/") || strings.HasSuffix(p, "/.config/gcloud/legacy_credentials") {
 		return true
 	}
-	if strings.HasSuffix(p, "/.aws/credentials") || strings.HasSuffix(p, "/.docker/config.json") || strings.HasSuffix(p, "/.config/gh/hosts.yml") {
+	if strings.HasSuffix(p, "/.aws/credentials") || strings.HasSuffix(p, "/.aws/config") || strings.HasSuffix(p, "/.docker/config.json") || strings.HasSuffix(p, "/.config/gh/hosts.yml") {
 		return true
 	}
 	if strings.Contains(p, "/.ssh/id_") && strings.HasPrefix(base, "id_") && !strings.HasSuffix(base, ".pub") {

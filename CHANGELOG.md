@@ -4,6 +4,33 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Harden Bash printer detection across unknown and interleaved options, cover
+  ECR Public and STS role/federation output, and retain only direct stash/login
+  sinks. Track reader aliases and uncertain directory effects while preserving
+  private eval subshell cwd and child/function alias scopes. Keep corpus capture
+  separate from real direct-envelope guard decisions. Deny malformed nonempty
+  envelopes before byte loss,
+  protect AWS configuration and configured credential paths, and share reader
+  metadata checks with interpreter literals and oversized heredocs. Resolve
+  missing configured targets through aliased ancestors on both configured and
+  reader paths. Add permanent Claude/Codex regressions, must-allow cases and
+  exact platform inventories.
+
+- Classify Go token printers through unknown and interleaved options without
+  widening direct login/stash transports. Track literal reader aliases and
+  uncertain alias directory effects, including eval definitions, while retaining
+  precise subshell and command-substitution cwd semantics. Deny malformed
+  nonempty envelopes, protect AWS configuration and configured credential paths,
+  and share credential checks across interpreter literals, decoded stdin producer
+  arguments and historical Git operands. Keep cwd uncertain for wrapped uses of
+  directory-changing aliases; recognize additional ECR and STS credential printers.
+  Preserve stdin source checks through wrapped, grouped and aliased interpreters,
+  expand bounded static here-string/heredoc variables without executing source,
+  and protect inherited AWS credential entries in Git indexes. Keep long public
+  interpreter prose readable without weakening plausible-path metadata checks.
+  Preserve native Windows absolute reads, canonicalize short-name configured paths, and accept
+  drive-qualified sed filenames without relaxing script grammar.
+
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty
   array expansions. Preserve literal Kubernetes and HOME metadata in generated

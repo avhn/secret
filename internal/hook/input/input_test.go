@@ -1,19 +1,21 @@
 package input
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
 
 // TestDecode covers supported field types, byte budgets, duplicates and suffixes.
 func TestDecode(t *testing.T) {
+	cwd, _ := json.Marshal(t.TempDir())
 	cases := []struct {
 		name, body string
 		valid      bool
 	}{
 		{"simple", `{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":".env"}}`, true},
-		{"array", `{"tool_name":"Bash","tool_input":{"command":["cat",".env"]}}`, true},
-		{"long safe shell envelope", `{"tool_name":"Bash","tool_input":{"command":"echo ` + strings.Repeat("a", 33000) + `"}}`, MaxBytes >= 64<<10},
+		{"array", `{"tool_name":"Bash","cwd":` + string(cwd) + `,"tool_input":{"command":["cat",".env"]}}`, true},
+		{"long safe shell envelope", `{"tool_name":"Bash","cwd":` + string(cwd) + `,"tool_input":{"command":"echo ` + strings.Repeat("a", 33000) + `"}}`, MaxBytes >= 64<<10},
 		{"empty", "", false},
 		{"missing tool", `{"tool_input":{}}`, false},
 		{"trailing", `{"tool_name":"Read"}{}`, false},

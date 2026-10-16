@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Extract synthetic Bash-deny commands without changing the retained suite.
 
-The disposable suite copy replaces only its secrets() assertion function. Setup
-still constructs the same fixtures; inspected command strings are never run.
+The disposable suite copy captures secrets() assertions and direct envelopes.
+Direct envelopes still run the real guard, including dependency-fault wrappers;
+inspected command strings are never run.
 """
 import collections
 import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +29,8 @@ def capture(row=None):
     for directory, dirs, files in os.walk(tmp, followlinks=False):
         dirs.sort()
         for name in sorted(dirs + files):
+            if name.startswith(".variant-direct."):
+                continue  # ephemeral envelope capture is not a fixture
             item = pathlib.Path(directory) / name
             relative = item.relative_to(tmp).as_posix()
             if item.is_symlink():
@@ -64,7 +68,18 @@ def generate():
     first = source.index("invoke_guard() {")
     last = source.index("\n}", first) + 2
     source = source[:first] + '''invoke_guard() {
-    "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --direct "$TMP" "$VARIANT_ROWS"
+    local input_file capture_expected=deny status=0
+    input_file="$("$VARIANT_MKTEMP" "$TMP/.variant-direct.XXXXXX")" || return 1
+    "$VARIANT_CAT" >"$input_file" || return 1
+    if [[ "${FUNCNAME[1]:-}" == audit20_raw ]]; then capture_expected="$expected"; fi
+    "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --direct "$TMP" "$VARIANT_ROWS" "$capture_expected" <"$input_file" || return 1
+    if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
+        "$BASH" "$SECRETS_GUARD" <"$input_file" || status=$?
+    else
+        "${GUARD_ARGS[@]}" <"$input_file" || status=$?
+    fi
+    "$VARIANT_RM" -f "$input_file"
+    return "$status"
 }''' + source[last:]
     start = source.index("secrets() {")
     end = source.index("\n}", start) + 2
@@ -84,7 +99,9 @@ def generate():
         script, rows = tmp / "suite.sh", tmp / "rows.jsonl"
         script.write_text(source)
         env = os.environ.copy()
-        env.update(VARIANT_PYTHON=sys.executable, VARIANT_GENERATOR=str(pathlib.Path(__file__).resolve()), VARIANT_ROWS=str(rows))
+        env.update(VARIANT_PYTHON=sys.executable, VARIANT_GENERATOR=str(pathlib.Path(__file__).resolve()), VARIANT_ROWS=str(rows),
+                   VARIANT_CAT=shutil.which("cat"), VARIANT_MKTEMP=shutil.which("mktemp"),
+                   VARIANT_RM=shutil.which("rm"))
         run = subprocess.run(["bash", str(script)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=900)
         if run.returncode or not rows.exists():
             raise SystemExit(run.stderr + run.stdout[-2000:])
@@ -123,24 +140,33 @@ def generate():
 
 def direct():
     """Extract direct JSON assertions omitted by the suite's secrets() helper."""
-    raw = sys.stdin.read()
-    if not raw:
+    raw = sys.stdin.buffer.read()
+    if not raw or b"\0" in raw:
         return
     try:
-        envelope = json.loads(raw)
-    except (ValueError, TypeError):
-        envelope = {}
-    command = envelope.get("tool_input", {}).get("command")
+        text = raw.decode("utf-8", errors="strict")
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate JSON key")
+                result[key] = value
+            return result
+        envelope = json.loads(text, object_pairs_hook=unique_object)
+    except (UnicodeDecodeError, ValueError, TypeError):
+        return
+    if not isinstance(envelope, dict) or (len(sys.argv) > 4 and sys.argv[4] == "allow"):
+        return
+    fields = envelope.get("tool_input")
+    if not isinstance(fields, dict):
+        return
+    command = fields.get("command")
     if envelope.get("tool_name") == "Bash" and isinstance(command, str):
         name = "fixed_complexity_reason" if command == "cat .env '" else "control_byte_" + json.dumps(command, separators=(",", ":"))
         capture(dict(name=name, want="deny", tool="Bash", command=command,
                      cwd=envelope.get("cwd", str(pathlib.Path(sys.argv[2]) / "search")),
                      config=os.environ.get("RIPGREP_CONFIG_PATH", ""),
                      home=os.environ.get("HOME", ""), kubeconfig=os.environ.get("KUBECONFIG", ""), extra={}))
-    reason = "command too complex to analyse for secret access; split it or use secret run"
-    if isinstance(command, str) and len(command) > 8192:
-        reason = "command too complex to analyse for secret access; split the command or use secret run"
-    print(json.dumps({"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}}))
 
 
 if __name__ == "__main__":

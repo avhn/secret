@@ -3,12 +3,15 @@ package policy
 import (
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/avhn/secret/internal/hook/paths"
 	"github.com/avhn/secret/internal/hook/roles"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // inputProtected keeps unknown shell directories and process-relative aliases
@@ -28,17 +31,17 @@ func (a *analyzer) inputProtected(name, cwd string) bool {
 	if paths.ProcessAlias(p) {
 		return true
 	}
-	if cwd == "" && !path.IsAbs(name) {
+	if cwd == "" && !filepath.IsAbs(name) {
 		return true
 	}
-	return paths.ConfiguredProtected(name, cwd, "", a.home, a.kubeconfig()) || a.protected(name, cwd)
+	return paths.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) || a.protected(name, cwd)
 }
 
 func (a *analyzer) treeProtected(root, cwd string) bool {
-	if time.Now().After(a.deadline) || cwd == "" && !path.IsAbs(root) {
+	if time.Now().After(a.deadline) || cwd == "" && !filepath.IsAbs(root) {
 		return true
 	}
-	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.kubeconfig()) || paths.TreeProtected(root, cwd, a.home)
+	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.credentialConfig()) || paths.TreeProtected(root, cwd, a.home)
 }
 
 // Append requires a known prior value for environment-sensitive names.
@@ -55,8 +58,16 @@ func (a *analyzer) hookAppend(key, value string, depth int, cwd string) {
 // assignment data. No assignment value is evaluated to determine its contents.
 func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 	// Branches and scoped assignments cannot erase a possible credential path.
-	if key == "KUBECONFIG" && value != "" && !slices.Contains(a.kubeconfigs, value) {
-		a.kubeconfigs = append(a.kubeconfigs, value)
+	if key == "KUBECONFIG" || key == "AWS_CONFIG_FILE" || key == "AWS_SHARED_CREDENTIALS_FILE" {
+		// The retained representation is a native path list. Singular AWS
+		// names containing its separator cannot be represented exactly.
+		if key != "KUBECONFIG" && strings.ContainsRune(value, os.PathListSeparator) {
+			a.reason = roles.Indeterminate
+			return
+		}
+		if value != "" && !slices.Contains(a.credentialConfigs, value) {
+			a.credentialConfigs = append(a.credentialConfigs, value)
+		}
 	}
 	if a.env == nil {
 		a.env = make(map[string]string)
@@ -117,6 +128,87 @@ func interpreter(name string) bool {
 	return strings.HasPrefix(name, "python") || strings.Contains(" perl ruby node nodejs php awk gawk jq yq ", " "+name+" ")
 }
 
+// Interpreter literals share the shell/file credential classifier, including
+// bare configured names and HOME/cwd-relative paths. Inspect names only; never
+// evaluate source or open a credential to determine whether it is protected.
+func (a *analyzer) interpreterProtected(code, cwd string) bool {
+	for _, match := range inlinePath.FindAllStringSubmatch(code, -1) {
+		if a.interpreterNameProtected(match[1], cwd) {
+			return true
+		}
+	}
+	for _, token := range strings.FieldsFunc(code, func(r rune) bool { return strings.ContainsRune(" \t\r\n\"'`(){}[];<>=,+", r) }) {
+		if (strings.ContainsAny(token, "/\\") || paths.LexicalProtected(token, cwd, a.home) || paths.ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig())) && a.interpreterNameProtected(token, cwd) {
+			return true
+		}
+	}
+	return false
+}
+
+// Long prose literals cannot be filesystem components. Keep lexical and
+// configured witnesses even for impossible names, but do not turn ENAMETOOLONG
+// from ordinary text into a credential read. Plausible paths still fail closed.
+func (a *analyzer) interpreterNameProtected(name, cwd string) bool {
+	if paths.LexicalProtected(name, cwd, a.home) || paths.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig()) {
+		return true
+	}
+	for _, component := range strings.FieldsFunc(name, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if utf8.RuneCountInString(component) > 255 {
+			return false
+		}
+	}
+	return a.inputProtected(name, cwd)
+}
+
+// Literal producers may supply interpreter source through stdin instead of an
+// attached heredoc. Inspect names only, never execute or certify producer output.
+func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd string) bool {
+	var source strings.Builder
+	syntax.NewPrinter().Print(&source, left)
+	if a.interpreterProtected(source.String(), cwd) {
+		return true
+	}
+	// Serialized shell source retains escapes around the interpreter's own
+	// filename quotes. Inspect decoded producer words as positive witnesses,
+	// not as certification of stdout or execution of printf/echo/cat. The
+	// shared expander enforces word and deadline bounds without running code.
+	protected := false
+	inspect := func(word *syntax.Word) {
+		values, known := a.expandWord(word, producerCWD)
+		if known {
+			for _, value := range values {
+				protected = protected || a.interpreterProtected(value, cwd)
+			}
+		}
+	}
+	syntax.Walk(left, func(node syntax.Node) bool {
+		if protected {
+			return false
+		}
+		switch node := node.(type) {
+		case *syntax.CallExpr:
+			for _, word := range node.Args {
+				inspect(word)
+			}
+		case *syntax.Redirect:
+			if node.Op == syntax.WordHdoc {
+				inspect(node.Word)
+			}
+			if node.Hdoc != nil {
+				body, known := a.expandInterpreterStdin(node.Hdoc, true, producerCWD)
+				if !known {
+					a.reason = roles.Indeterminate
+					protected = true
+				} else {
+					protected = protected || a.interpreterProtected(body, cwd)
+				}
+			}
+		}
+		return true
+	})
+	return protected
+}
+
 func environmentCode(code string) bool {
 	lower := strings.ToLower(code)
 	return strings.Contains(lower, "environ") || strings.Contains(code, "ENV") || strings.Contains(lower, "getenv") || strings.Contains(lower, "strenv") || strings.Contains(lower, "process") && strings.Contains(lower, "env") || strings.Contains(code, "-MEnv")
@@ -153,12 +245,9 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 				a.reason = roles.Printer
 				return true
 			}
-			// Path-like script literals resolve through symlinks, matching the Bash guard.
-			for _, token := range strings.FieldsFunc(code, func(r rune) bool { return strings.ContainsRune(" \t\n\"'`(){}[];<>=,+", r) }) {
-				if name != "jq" && name != "yq" && (paths.LexicalProtected(token, cwd, a.home) || strings.Contains(token, "/") && paths.Protected(token, cwd, "", a.home)) {
-					a.reason = roles.FileInput
-					return true
-				}
+			if name != "jq" && name != "yq" && a.interpreterProtected(code, cwd) {
+				a.reason = roles.FileInput
+				return true
 			}
 			if name == "sed" {
 				for j, r := range code {
@@ -245,17 +334,21 @@ func joinedCWD(before, after string) string {
 }
 
 func (a *analyzer) treeProtectedAll(root, cwd string) bool {
-	if time.Now().After(a.deadline) || cwd == "" && !path.IsAbs(root) {
+	if time.Now().After(a.deadline) || cwd == "" && !filepath.IsAbs(root) {
 		return true
 	}
-	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.kubeconfig()) || paths.TreeProtectedScope(root, cwd, a.home, true)
+	return paths.ConfiguredTreeProtected(root, cwd, a.home, a.credentialConfig()) || paths.TreeProtectedScope(root, cwd, a.home, true)
 }
 
 func invalidControls(source string) bool {
 	return strings.IndexFunc(source, func(r rune) bool { return r < 32 && r != '\n' && r != '\t' || r == 127 }) >= 0
 }
 
-// Keep every literal configured path as an alternative across shell branches.
-func (a *analyzer) kubeconfig() string {
-	return strings.Join(a.kubeconfigs, string(os.PathListSeparator))
+// Keep every literal credential config path across shell branches.
+func (a *analyzer) credentialConfig() string {
+	config := strings.Join(a.credentialConfigs, string(os.PathListSeparator))
+	if inherited := os.Getenv("KUBECONFIG"); inherited != "" {
+		config = inherited + string(os.PathListSeparator) + config
+	}
+	return config
 }

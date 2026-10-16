@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 var ErrInvalid = errors.New("invalid hook envelope")
@@ -22,7 +24,7 @@ type Envelope struct {
 // An empty or malformed request is reported as ErrInvalid without echoing its content.
 func Decode(r io.Reader) (Envelope, error) {
 	data, err := io.ReadAll(io.LimitReader(r, MaxBytes+1))
-	if err != nil || len(data) > MaxBytes || len(bytes.TrimSpace(data)) == 0 {
+	if err != nil || len(data) > MaxBytes || len(bytes.TrimSpace(data)) == 0 || !utf8.Valid(data) {
 		return Envelope{}, ErrInvalid
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
@@ -41,36 +43,41 @@ func Decode(r io.Reader) (Envelope, error) {
 		return Envelope{}, ErrInvalid
 	}
 	cwd, ok := text(root, "cwd")
-	if !ok {
+	if !ok || tool == "Bash" && !filepath.IsAbs(cwd) {
 		return Envelope{}, ErrInvalid
 	}
 	var fields map[string]json.RawMessage
-	if raw, exists := root["tool_input"]; exists && string(raw) != "null" {
-		if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
-			return Envelope{}, ErrInvalid
-		}
-	}
-	if fields == nil {
-		fields = map[string]json.RawMessage{}
+	if raw := root["tool_input"]; len(raw) == 0 || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return Envelope{}, ErrInvalid
 	}
 	for _, key := range []string{"file_path", "notebook_path", "path", "glob", "type", "output_mode", "workdir", "pattern"} {
 		if _, ok := text(fields, key); !ok {
 			return Envelope{}, ErrInvalid
 		}
 	}
-	if raw, exists := fields["command"]; exists && string(raw) != "null" {
-		var cmd string
-		if err := json.Unmarshal(raw, &cmd); err != nil {
-			var argv []string
-			if err := json.Unmarshal(raw, &argv); err != nil || len(argv) == 0 {
+	raw, exists := fields["command"]
+	if (tool == "Bash" || tool == "apply_patch") && !exists {
+		return Envelope{}, ErrInvalid
+	}
+	if exists {
+		switch {
+		case len(raw) > 0 && raw[0] == '"':
+			var cmd string
+			if json.Unmarshal(raw, &cmd) != nil || strings.ContainsRune(cmd, 0) {
 				return Envelope{}, ErrInvalid
 			}
-			for _, arg := range argv {
-				if strings.ContainsRune(arg, 0) {
+		case len(raw) > 0 && raw[0] == '[':
+			var argv []json.RawMessage
+			if json.Unmarshal(raw, &argv) != nil || len(argv) == 0 {
+				return Envelope{}, ErrInvalid
+			}
+			for _, rawArg := range argv {
+				var arg string
+				if len(rawArg) == 0 || rawArg[0] != '"' || json.Unmarshal(rawArg, &arg) != nil || strings.ContainsRune(arg, 0) {
 					return Envelope{}, ErrInvalid
 				}
 			}
-		} else if strings.ContainsRune(cmd, 0) {
+		default:
 			return Envelope{}, ErrInvalid
 		}
 	}

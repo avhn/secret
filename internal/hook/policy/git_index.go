@@ -114,11 +114,8 @@ func indexProtected(dir, home string, checks ...func(string) bool) bool {
 // relative to the worktree root. Keep both anchors and the current alternatives
 // in this per-command check, never a repository-only cached decision.
 func (a *analyzer) gitIndexProtected(dir, cwd, worktree string) bool {
-	config := a.kubeconfig()
-	if inherited := os.Getenv("KUBECONFIG"); inherited != "" {
-		config = inherited + string(os.PathListSeparator) + config
-	}
-	if config == "" {
+	config := a.credentialConfig()
+	if config == "" && os.Getenv("AWS_CONFIG_FILE") == "" && os.Getenv("AWS_SHARED_CREDENTIALS_FILE") == "" {
 		return indexProtected(dir, a.home)
 	}
 	root := ""

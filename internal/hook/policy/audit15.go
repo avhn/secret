@@ -159,7 +159,7 @@ func (a *analyzer) fdScope(args []string, cwd string) (child []string, dir strin
 			protected = true
 		}
 		for _, filter := range filters {
-			if a.protectedGlob(strings.ToLower(filter), dir) || search.FilteredScopeConfigured(root, filter, "", dir, a.home, a.kubeconfig()) != "" {
+			if a.protectedGlob(strings.ToLower(filter), dir) || search.FilteredScopeConfigured(root, filter, "", dir, a.home, a.credentialConfig()) != "" {
 				protected = true
 			}
 		}
@@ -293,7 +293,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 		roots = []string{"."}
 	}
 	for _, root := range roots {
-		if selector == "" && a.treeProtectedAll(root, cwd) || selector != "" && search.FilteredScopeConfigured(root, selector, "", cwd, a.home, a.kubeconfig()) != "" {
+		if selector == "" && a.treeProtectedAll(root, cwd) || selector != "" && search.FilteredScopeConfigured(root, selector, "", cwd, a.home, a.credentialConfig()) != "" {
 			a.protectedXargsPipe(downstream, depth, cwd)
 			return false
 		}
