@@ -666,3 +666,36 @@ and public-file controls for both AWS variables. Permanent table regressions are
 in `internal/hook/policy/audit20_stdin_review_test.go`; none execute the probed
 commands or read credential contents. The directional parity requirement still
 applies; these tests make no installed-host protection claim.
+
+### Audit 20 cross-platform CI follow-ups
+
+Configured-name comparison retains the deepest resolvable physical ancestor when
+an oversized suffix cannot be looked up (ENAMETOOLONG, or Windows
+ERROR_FILENAME_EXCED_RANGE). This preserves configured witnesses across symlinked
+ancestors such as macOS /var and /private/var even when a component exceeds the
+filesystem limit. Ordinary physical resolution and the Windows existing-prefix
+resolver still return these errors to their fail-closed callers. Linux-runnable
+regressions use a disposable symlink and 300-byte components, check both alias
+directions and subtree coverage, and retain unrelated public-file controls.
+
+Existing-prefix canonicalization has a 128-attempt bound to limit metadata work
+independently of path depth and spelling. Exhaustion returns an error, not an
+allow. Injected-resolver tests cover relative parents, deep suffixes, drive roots,
+volume-relative names, UNC and extended-length paths without contacting shares.
+Relative-parent inputs converge under filepath.Dir in the baseline tests too;
+these tests do not demonstrate a Windows ancestor loop. The existing symlink-hop
+limit and strict metadata errors remain unchanged.
+
+All hook subprocess launches are synthetic test evidence, not analyzer behavior.
+GNU sed evidence and disposable Git fixture creation use context deadlines, empty
+stdin unless a test explicitly supplies synthetic sed source, captured output and
+a bounded inherited-pipe wait. Git fixtures also disable terminal prompts, pagers
+and optional locks, retaining isolated config, hooks and signing. A self-test
+checks synthetic stdin EOF, stdout/stderr capture and deadline termination. The
+GNU sed tests are Linux-only, so their previously unbounded commands do not
+establish the cause of the Windows stall. The retained Windows CI log contains
+no active test name or timeout stack; it is insufficient to attribute that stall
+to ancestor traversal or a child process. Windows policy tests now run separately
+with verbose subtest output, all-goroutine timeout diagnostics and a 25-minute
+test deadline, within a 60-minute Go job bound. Native Windows CI evidence is
+still required; Linux tests do not establish that the runner hang is resolved.

@@ -31,7 +31,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
   and protect inherited AWS credential entries in Git indexes. Keep long public
   interpreter prose readable without weakening plausible-path metadata checks.
   Preserve native Windows absolute reads, canonicalize short-name configured paths, and accept
-  drive-qualified sed filenames without relaxing script grammar.
+  drive-qualified sed filenames without relaxing script grammar. Retain canonical
+  ancestors for oversized configured filenames without relaxing metadata errors
+  for ordinary readers. Bound ancestor canonicalization and synthetic subprocess
+  lifetimes, and isolate verbose Windows policy CI with job and test deadlines.
 
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty

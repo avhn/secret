@@ -1,10 +1,12 @@
 package paths
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 )
 
 // Yarn's user configuration may contain npmAuthToken; project configuration
@@ -22,7 +24,14 @@ func homeCredential(name, home string) bool {
 }
 
 func physicalOrClean(name string) string {
-	if resolved, err := physical(name); err == nil {
+	// Configured names remain witnesses even when a suffix is too long to
+	// exist. Canonicalize its ancestor rather than losing a /var-style alias.
+	// physical and canonicalExisting retain their stricter error behavior.
+	resolved, err := canonicalPrefix(name, physical, func(err error) bool {
+		return missingOperand(err) || errors.Is(err, syscall.ENAMETOOLONG) ||
+			runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(206)) // ERROR_FILENAME_EXCED_RANGE
+	})
+	if err == nil {
 		return resolved
 	}
 	return filepath.Clean(name)

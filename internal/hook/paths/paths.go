@@ -110,17 +110,27 @@ func physical(raw string) (string, error) {
 }
 
 func canonicalExisting(name string, resolve func(string) (string, error)) (string, error) {
+	return canonicalPrefix(name, resolve, missingOperand)
+}
+
+// canonicalPrefix retains a resolvable ancestor when the remaining suffix cannot
+// be looked up. Bound metadata work independently of path depth and spelling.
+// Exhaustion remains an error for fail-closed callers.
+func canonicalPrefix(name string, resolve func(string) (string, error), unresolvedError func(error) bool) (string, error) {
 	tail := ""
-	for candidate := name; ; candidate = filepath.Dir(candidate) {
+	for candidate, count := name, 0; count < 128; count++ {
 		resolved, err := resolve(candidate)
 		if err == nil {
 			return filepath.Join(resolved, tail), nil
 		}
-		if !missingOperand(err) || filepath.Dir(candidate) == candidate {
+		parent := filepath.Dir(candidate)
+		if !unresolvedError(err) || parent == candidate {
 			return name, err
 		}
 		tail = filepath.Join(filepath.Base(candidate), tail)
+		candidate = parent
 	}
+	return name, fs.ErrInvalid
 }
 
 // lexical recognises store directories, credentials and protected basenames.
