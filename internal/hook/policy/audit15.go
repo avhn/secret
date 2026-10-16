@@ -73,7 +73,7 @@ func kubernetesSecretResource(value string) bool {
 // These commands give env a documented data role, not a launcher slot. Keep
 // inspecting their other opaque arguments without recasting that data as code.
 func (a *analyzer) environmentDataArgs(name string, args []string) []string {
-	data := optionIn("jest vitest pytest venv grep egrep fgrep", name) || name == "python3" && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" || name == "go" && len(args) > 0 && args[0] == "env" || name == "vercel" && len(args) > 1 && args[0] == "env" && args[1] == "ls" || name == "npm" && len(args) > 0 && args[0] == "test"
+	data := optionIn("jest vitest pytest venv grep egrep fgrep", name) || pythonInterpreter(name) && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" || name == "go" && len(args) > 0 && args[0] == "env" || name == "vercel" && len(args) > 1 && args[0] == "env" && args[1] == "ls" || name == "npm" && len(args) > 0 && args[0] == "test"
 	if name == "npm" {
 		options := packageExecOptions{}
 		leading := a.packageExecOptions(name, args, &options)

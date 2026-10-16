@@ -117,8 +117,25 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   patterns/globs/types/paths/output modes deny before command analysis.
   NotebookEdit requires `notebook_path` as its authoritative target; an extra
   `file_path` cannot replace or override it. The Bash guard caps raw envelopes at
-  8 MiB before Unicode or JSON parsing; existing command and heredoc budgets
-  still apply.
+  1 MiB plus 64 KiB, matching Go, before Unicode or JSON parsing. Its bounded
+  Perl validator rejects non-JSON number syntax and unmatched escaped surrogates
+  throughout keys and values, retaining raw NUL, UTF-8 and duplicate-key checks.
+  Both validators permit at most 4,096 object keys, 32,768 JSON tokens (including
+  punctuation), and 128 container levels. Go also bounds unnormalized envelope
+  paths to 4,096 slash separators before redundant components are removed.
+  Without Perl, only bounded 8 KiB,
+  unescaped ASCII JSON retains the dependency-light names-only path, with strict
+  number syntax checked before jq, independently of scalar delimiters and JSON
+  whitespace. Workdir controls deny before extraction.
+  Envelope preparation and analysis each have a two-second budget (with one
+  phase tick of rounding tolerance for Bash 3.2's integer clock), and a
+  four-second overall decision deadline starting before reads and preprocessing.
+  Bounded reads time out and every otherwise-allowing exit checks both its phase
+  budget and that overall deadline. Shared path normalization checks the budget
+  while removing and rebuilding components, including envelope cwd components;
+  normalization failure cannot certify a safe file target. Synthetic deadline
+  tests do not establish installed-host timeout behavior. Existing command and
+  heredoc budgets still apply.
 - **Credential filename coverage** also includes `.aws/config` as well as
   `.aws/credentials`, `.kube/config`, paths named by a literal `KUBECONFIG` path
   list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE` (including alternatives

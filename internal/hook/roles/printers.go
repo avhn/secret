@@ -114,6 +114,16 @@ func normalizePrinter(name string, args []string) printerOptions {
 	return result
 }
 
+// CommandAction resolves the first positional action using the same option
+// roles as printer classification. Known option values cannot become actions.
+func CommandAction(name string, args []string) string {
+	words := normalizePrinter(name, args).words
+	if len(words) == 0 {
+		return ""
+	}
+	return words[0]
+}
+
 // Template and JSONPath variants (including file-backed templates) can expose
 // secret data just like JSON/YAML. Name and table output remain metadata roles.
 func kubectlContentFormat(format string) bool {

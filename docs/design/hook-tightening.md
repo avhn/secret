@@ -935,3 +935,89 @@ Corpus extraction retains direct-envelope optional fields and their original
 JSON types, including malformed workdir values. Corpus fixture directory names
 no longer inherit subtest # suffixes, which would turn URL path bytes into a
 fragment. Every original case and variant remains, with per-case fixture cleanup.
+
+## Confirmation audit 23: Go directional parity (O1-O5)
+
+These changes close measured Go-allow/Bash-deny decisions from snapshot
+7535c5c. They do not weaken an existing denial or introduce a reviewed
+Go-stricter divergence. The retained Bash CLI and installed hooks are unchanged
+by the Go implementation; synthetic decisions are not host protection evidence.
+
+- O1: Python triple-single and triple-double quoted strings are one opaque
+  tokenizer token, including embedded matching quotes, escapes and newlines.
+  Subsequent literal argv launches still reach the shared child dispatcher;
+  quoted launch text remains data. Static Python prefixes are normalized with
+  Python escape rules; unsupported escapes and dynamic replacement fields do
+  not supply a fully literal argv witness.
+- O2: gh API field-file checks resolve the action through the printer option
+  normalizer rather than requiring api at argv position zero. Known global
+  option values remain data. Separate and attached -F/-f, --field and
+  --raw-field operands retain their protected-file checks with leading hostname
+  and repository options. Public fields and non-API commands remain allowed.
+- O3: curl file-URL paths reject decoded C0 controls and DEL before metadata
+  classification, including tab, LF, CR and NUL. Percent-encoded spaces,
+  once-decoded percent signs, HTTP URL paths and literal request data retain
+  their public-input or data roles.
+- O4: identified literal shell-launch calls and Ruby/Perl backticks use the full
+  bounded shell AST policy, not a single argv word or a printer/wrapper subset.
+  This includes dotenvx readers, package environment commands and Python module
+  printers, as well as shell cwd changes and compound statements. Literal argv
+  lists keep argv semantics. Both launch forms share isolated child analysis,
+  configured-path metadata, recursion limits and uncertain-decision handling.
+  Python os.popen shares os.system's full shell-child dispatch, including
+  optional later arguments. Raw, bytes, Unicode and interpolation-free formatted
+  Python literals (including supported combined and case-insensitive prefixes)
+  supply static arguments with Python-correct escape handling. Raw escapes stay
+  raw, bytes retain Unicode escape spellings, and doubled formatted braces are
+  literal braces; genuine replacement fields remain unknown. Python/PyPy exec
+  evaluates interpreter source, not shell source, so it retains existing source
+  checks without supplying a shell-launch witness. Ruby/Perl/Node exec launches
+  retain their shell roles. Arbitrary prose retains positive-witness scanning
+  rather than full command dispatch; public literal children, ordinary Python
+  exec source and child-local cwd changes remain allowed.
+- O5: PyPy executable aliases, including versioned names, share Python's inline,
+  argv, heredoc, producer, module, comment and literal-token roles. Existing
+  Python aliases keep their recognition. Public code and venv creation remain
+  allowed while environment dumps and credential-printer children deny.
+
+Permanent tests are internal/hook/policy/audit23_test.go,
+internal/hook/policy/audit23_review_test.go, internal/hook/roles/audit23_test.go
+and internal/hook/audit23_test.go.
+Both adapters replay all 282 cases in testdata/hook/audit23.json with a disposable
+HOME and synthetic files. Candidate commands are never executed. Native checks
+and cross-vet do not replace applicable macOS/Windows runtime CI or host failure
+checks.
+
+### Confirmation audit 23: envelope integration (O6-O9)
+
+Bash validates complete JSON before jq, rejects malformed surrogate escapes and
+non-JSON scalar grammar, and checks workdir controls before extraction. Envelope
+preprocessing and every successful file-tool exit count against its four-second
+decision budget. Shared path normalization stops on budget exhaustion and cannot
+certify a public file after normalization fails. The dependency-light no-Perl
+path retains strict bounded ASCII JSON with ordinary scalar and whitespace
+controls.
+
+Both validators cap raw envelopes at 1 MiB plus 64 KiB, with at most 4,096 keys
+globally, 32,768 JSON tokens (including punctuation) and 128 nested containers.
+Go counts these before unmarshaling; root objects count as one container and
+object keys, colons and commas count as individual tokens. Exact limits allow;
+under-byte-cap structural overflows deny. Go also rejects more than 4,096 slash
+separators in cwd, file_path, notebook_path, path and workdir before cleaning
+redundant components. This deterministic tightening covers excessive-component
+paths that exhaust Bash's wall-clock normalizer; ordinary redundant paths allow.
+It is not a claim that Go reproduces every host-dependent Bash timing decision.
+
+Permanent boundary and public-path controls are in
+internal/hook/input/audit23_test.go and internal/hook/audit23_test.go. The shell
+suites retain audit23_o6 through audit23_o9 deny and must-allow controls, including
+keys_limit/over, tokens_limit/over, depth_limit/over and both excessive-component
+file_path/cwd reproducers. Synthetic dependency delays test Bash's deadline, not
+installed host behavior.
+
+The existing Go text-field validator still rejects LF and tab in path fields;
+Bash permits those valid filename characters. The new shell public controls
+`audit23_o8_workdir_newline` and `audit23_o8_cwd_newline` therefore record a
+retained Go-stricter decision in each suite. These four deliberate-tightening
+rows do not represent Go allows or newly weakened Bash expectations. The
+regressions in internal/hook/input/audit23_test.go keep the Go decision explicit.

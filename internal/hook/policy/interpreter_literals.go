@@ -136,14 +136,33 @@ func (a *analyzer) literalCommandProtected(words []string, cwd string, executabl
 	if a.literalDepth >= 4 {
 		return executable
 	}
-	probe := analyzer{protected: a.protected, cwd: cwd, home: a.home,
+	probe := a.literalChild(cwd)
+	probe.command(words, probe.literalDepth, cwd, false)
+	if executable {
+		return probe.literalExecutionProtected(strings.Join(words, " "))
+	}
+	return probe.reason != "" && probe.reason != roles.Indeterminate && !probe.structuralUncertain
+}
+
+// An identified shell-string launch is shell source, not a one-word argv.
+// Reuse the complete AST policy, including child roles, cwd flow and limits.
+// Arbitrary source literals still require literalPrinter's positive witnesses.
+func (a *analyzer) literalShellProtected(source, cwd string) bool {
+	if a.literalDepth >= 4 {
+		return true
+	}
+	probe := a.literalChild(cwd)
+	probe.fragmentAt(source, probe.literalDepth, cwd)
+	return probe.literalExecutionProtected(source)
+}
+
+func (a *analyzer) literalChild(cwd string) *analyzer {
+	return &analyzer{protected: a.protected, cwd: cwd, home: a.home,
 		deadline: a.deadline, metadata: a.metadata,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
-	probe.command(words, probe.literalDepth, cwd, false)
-	if executable {
-		source := strings.Join(words, " ")
-		return probe.reason != "" || probe.structuralUncertain || probe.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source))
-	}
-	return probe.reason != "" && probe.reason != roles.Indeterminate && !probe.structuralUncertain
+}
+
+func (a *analyzer) literalExecutionProtected(source string) bool {
+	return a.reason != "" || a.structuralUncertain || a.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source))
 }

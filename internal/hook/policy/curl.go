@@ -2,8 +2,8 @@ package policy
 
 import (
 	"net/url"
+	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
@@ -21,19 +21,15 @@ func (a *analyzer) curlInputs(args []string, depth int, cwd string) bool {
 		return false
 	}
 	fileURL := func(value string) bool {
-		if !strings.HasPrefix(strings.ToLower(value), "file:/") {
+		name, local, valid := curlFileURLPath(value)
+		if !local {
 			return false
 		}
-		u, err := url.Parse(value)
-		if err != nil || u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		if !valid {
 			a.reason = roles.Indeterminate
 			return true
 		}
-		name := u.Path
-		if runtime.GOOS == "windows" && len(name) >= 3 && name[0] == '/' && name[2] == ':' {
-			name = name[1:]
-		}
-		return input(filepath.FromSlash(name))
+		return input(name)
 	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -129,6 +125,39 @@ func (a *analyzer) curlInputs(args []string, depth int, cwd string) bool {
 	}
 	a.unknownExecution(unknown, depth, cwd)
 	return a.reason != ""
+}
+
+// curlFileURLPath removes URL query/fragment syntax before classifying a local
+// path. Drive-letter URLs without a slash after file: are opaque to net/url,
+// so their path needs the same unescaping as an ordinary hierarchical URL.
+func curlFileURLPath(value string) (name string, local, valid bool) {
+	if !strings.HasPrefix(strings.ToLower(value), "file:") {
+		return "", false, true
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		return "", true, false
+	}
+	name = u.Path
+	if u.Opaque != "" {
+		name, err = url.PathUnescape(u.Opaque)
+		if err != nil {
+			return "", true, false
+		}
+	}
+	for _, ch := range name {
+		if ch < 0x20 || ch == 0x7f {
+			return "", true, false
+		}
+	}
+	name = filepath.FromSlash(name)
+	// A URL's leading slash is not part of a Windows drive volume. Let the
+	// host's filepath rules identify volumes rather than treating /C:/ as a
+	// drive path on Unix, where it names an ordinary absolute directory.
+	if len(name) > 1 && os.IsPathSeparator(name[0]) && filepath.VolumeName(name[1:]) != "" {
+		name = name[1:]
+	}
+	return name, true, true
 }
 
 // Curl quotes commas and semicolons inside form filenames independently of the

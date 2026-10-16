@@ -127,10 +127,17 @@ func splitEnv(s string) string {
 	return strings.NewReplacer(`\_`, " ", `\t`, "\t", `\n`, "\n", `\r`, "\r").Replace(s)
 }
 
+var pypyVersion = regexp.MustCompile(`^pypy(?:[0-9][a-z0-9._-]*)?$`)
+
+// Python-compatible executable names share every interpreter and module role.
+func pythonInterpreter(name string) bool {
+	return strings.HasPrefix(name, "python") || pypyVersion.MatchString(name)
+}
+
 var luaVersion = regexp.MustCompile(`^lua(?:jit)?(?:[0-9._-][a-z0-9._-]*)?$`)
 
 func interpreter(name string) bool {
-	return strings.HasPrefix(name, "python") || luaVersion.MatchString(name) || strings.Contains(" perl ruby node nodejs php rscript awk gawk jq yq ", " "+name+" ")
+	return pythonInterpreter(name) || luaVersion.MatchString(name) || strings.Contains(" perl ruby node nodejs php rscript awk gawk jq yq ", " "+name+" ")
 }
 
 // Interpreter literals share the shell/file credential classifier, including
@@ -243,7 +250,7 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 	if a.reason != "" {
 		return true
 	}
-	if strings.HasPrefix(name, "python") && len(args) >= 3 && args[0] == "-m" && args[1] == "dotenv" && optionIn("list get", args[2]) {
+	if pythonInterpreter(name) && len(args) >= 3 && args[0] == "-m" && args[1] == "dotenv" && optionIn("list get", args[2]) {
 		a.reason = roles.Printer
 		return true
 	}

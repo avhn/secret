@@ -18,6 +18,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FIND_SHIMS = {"grep_find_exit", "grep_find_exit_count", "rg_find_exit", "grep_timeout", "grep_timeout_count", "rg_timeout", "git_grep_timeout"}
 CODEX_TIGHTENING = {"malformed_safe", "oversized_safe"}
+# Existing Go path-field controls remain stricter than Bash's valid LF paths.
+ENVELOPE_TIGHTENING = {"audit23_o8_workdir_newline", "audit23_o8_cwd_newline"}
 TIGHTENING = {"malformed_json", "malformed_sensitive", "active_safe_command", "unresolved_file_safe", "unresolved_positional_safe", "unresolved_listing_safe", "unresolved_wc_safe", "unresolved_redirect_safe", "unresolved_xargs_safe", "unresolved_literal_safe", "unresolved_no_eval", "unknown_timeout_safe", "unknown_nice_safe", "unknown_stdbuf_safe", "unknown_caffeinate_safe", "unknown_xargs_safe", "unknown_exec_safe", "sudo_unknown_safe", "audit6_sed_comment", "audit6_sed_text_line", "audit6_sed_insert_line", "audit6_sed_change_line", "policy_v2_sed_script_clean"}
 
 
@@ -44,7 +46,8 @@ def suite_rows(suite, binary, host, tmp):
         if status == "fail":
             if suite == "guard" and key in FIND_SHIMS and expected[key] == "deny":
                 category = "deliberate-find-shim"
-            elif expected[key] == "allow" and ((suite == "guard" and key in TIGHTENING) or
+            elif expected[key] == "allow" and (key in ENVELOPE_TIGHTENING or
+                                                (suite == "guard" and key in TIGHTENING) or
                                                 (suite == "codex" and key in CODEX_TIGHTENING)):
                 category = "deliberate-tightening"
             else:

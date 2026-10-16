@@ -29,7 +29,8 @@ func Decode(r io.Reader) (Envelope, error) {
 		return Envelope{}, ErrInvalid
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
-	if err := validate(d); err != nil {
+	budget := validationBudget{}
+	if err := budget.validate(d, 0); err != nil {
 		return Envelope{}, ErrInvalid
 	}
 	if err := d.Decode(new(any)); err != io.EOF {
@@ -121,6 +122,14 @@ func text(fields map[string]json.RawMessage, key string) (string, bool) {
 	if json.Unmarshal(raw, &value) != nil || bad(value) || strings.ContainsAny(value, "\n\t") {
 		return "", false
 	}
+	// Bound path normalization before filepath.Clean can hide excessive redundant
+	// components. Bash's deadline also denies these under-cap envelope paths.
+	switch key {
+	case "cwd", "file_path", "notebook_path", "path", "workdir":
+		if strings.Count(value, "/") > MaxPathSeparators {
+			return "", false
+		}
+	}
 	return value, true
 }
 
@@ -172,36 +181,69 @@ func validSurrogates(data []byte) bool {
 	return true
 }
 
-// validate walks tokens recursively so json.Unmarshal cannot silently accept duplicate keys.
-func validate(d *json.Decoder) error {
+// validationBudget counts keys globally and includes JSON punctuation in the
+// token count, matching the retained Bash envelope scanner rather than only
+// the scalar/container tokens exposed by encoding/json.
+type validationBudget struct {
+	keys, tokens int
+}
+
+func (b *validationBudget) consume(n int) error {
+	b.tokens += n
+	if b.tokens > MaxTokens {
+		return ErrInvalid
+	}
+	return nil
+}
+
+// validate rejects duplicate keys and structural overflows before unmarshaling.
+func (b *validationBudget) validate(d *json.Decoder, depth int) error {
+	if err := b.consume(1); err != nil {
+		return err
+	}
 	token, err := d.Token()
 	if err != nil {
 		return err
 	}
 	switch token {
-	case json.Delim('{'):
+	case json.Delim('{'), json.Delim('['):
+		if depth >= MaxDepth {
+			return ErrInvalid
+		}
+		object := token == json.Delim('{')
 		seen := map[string]bool{}
+		first := true
 		for d.More() {
-			key, err := d.Token()
-			if err != nil {
-				return err
+			if !first {
+				if err := b.consume(1); err != nil { // comma
+					return err
+				}
 			}
-			name, ok := key.(string)
-			if !ok || seen[name] {
-				return ErrInvalid
+			first = false
+			if object {
+				b.keys++
+				if b.keys > MaxKeys {
+					return ErrInvalid
+				}
+				if err := b.consume(2); err != nil { // key and colon
+					return err
+				}
+				key, err := d.Token()
+				if err != nil {
+					return err
+				}
+				name, ok := key.(string)
+				if !ok || seen[name] {
+					return ErrInvalid
+				}
+				seen[name] = true
 			}
-			seen[name] = true
-			if err := validate(d); err != nil {
+			if err := b.validate(d, depth+1); err != nil {
 				return err
 			}
 		}
-		_, err = d.Token()
-		return err
-	case json.Delim('['):
-		for d.More() {
-			if err := validate(d); err != nil {
-				return err
-			}
+		if err := b.consume(1); err != nil { // closing delimiter
+			return err
 		}
 		_, err = d.Token()
 		return err

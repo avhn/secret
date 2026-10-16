@@ -1258,5 +1258,183 @@ audit22_large() {
 }
 audit22_large
 
+
+# Audit 23 O6-O9: strict whole-envelope validation, path controls and bounded
+# preprocessing. Every candidate below is JSON data, never a command to execute.
+audit23_envelope() {
+    local name="$1" expected="$2" output got=invalid
+    local guard_cmd=("${GUARD_ARGS[@]}")
+    [[ -z "${3:-}" ]] || guard_cmd=("$BASH" "$3")
+    # shellcheck disable=SC2053  # same focused filter as ordinary cases
+    if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
+    output="$(perl -e 'alarm 4; exec @ARGV' "${guard_cmd[@]}" <"$TMP/audit23-envelope" 2>"$TMP/audit23-error")" || output=invalid
+    if [[ ! -s "$TMP/audit23-error" ]]; then
+        if [[ -z "$output" ]]; then got=allow
+        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        fi
+    fi
+    if [[ "$got" == "$expected" ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tpass\n' codex "$name" >>"$SECRET_TEST_RESULTS"
+    else
+        FAILED=$((FAILED + 1))
+        printf 'FAIL %s: got %s, expected %s within four seconds without stderr\n' "$name" "$got" "$expected"
+        printf '%s\n' "$output"
+        cat "$TMP/audit23-error"
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' codex "$name" >>"$SECRET_TEST_RESULTS"
+    fi
+}
+audit23_raw() {
+    printf '%s' "$3" >"$TMP/audit23-envelope"
+    audit23_envelope "$1" "$2" "${4:-}"
+}
+for escape in '\udc00' '\udfff' '\ud800' '\udbff' '\ud800x' '\ud800\ud800' '\udc00\ud800'; do
+    case "$escape" in
+        '\udc00') label=low_first ;; '\udfff') label=low_last ;;
+        '\ud800') label=high_first ;; '\udbff') label=high_last ;;
+        '\ud800x') label=high_text ;; '\ud800\ud800') label=high_high ;;
+        *) label=low_high ;;
+    esac
+    audit23_raw "audit23_o6_${label}_command" deny "{\"tool_name\":\"Bash\",\"cwd\":\"/synthetic\",\"tool_input\":{\"command\":\"echo $escape\"}}"
+    audit23_raw "audit23_o6_${label}_path" deny "{\"tool_name\":\"Read\",\"cwd\":\"/synthetic\",\"tool_input\":{\"file_path\":\"public$escape\"}}"
+    audit23_raw "audit23_o6_${label}_notebook" deny "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"/synthetic\",\"tool_input\":{\"notebook_path\":\"public$escape\"}}"
+    audit23_raw "audit23_o6_${label}_metadata" deny "{\"tool_name\":\"Read\",\"cwd\":\"/synthetic\",\"tool_input\":{\"file_path\":\"public.txt\"},\"metadata\":[{\"value\":\"$escape\"}]}"
+    audit23_raw "audit23_o6_${label}_key" deny "{\"tool_name\":\"Read\",\"cwd\":\"/synthetic\",\"tool_input\":{\"file_path\":\"public.txt\"},\"$escape\":0}"
+done
+audit23_raw audit23_o6_pair_command allow '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo \ud801\udc00"}}'
+audit23_raw audit23_o6_pair_path allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public\ud801\udc00.txt"}}'
+audit23_raw audit23_o6_pair_metadata allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"\ud800\udc00":["\udbff\udfff"]}'
+audit23_raw audit23_o6_literal_escape allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":"\\udc00"}'
+audit23_raw audit23_o6_duplicate_unicode deny '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":{"\ud801\udc00":0,"𐐀":1}}'
+audit23_raw audit23_o6_scoped_keys allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":[{"key":0},{"key":1}]}'
+for number in NaN Infinity -Infinity 01 +1 .1 1. 1e 0x10; do
+    case "$number" in
+        NaN) label=nan ;; Infinity) label=infinity ;; -Infinity) label=negative_infinity ;;
+        01) label=leading_zero ;; +1) label=plus ;; .1) label=leading_dot ;;
+        1.) label=trailing_dot ;; 1e) label=exponent ;; *) label=hex ;;
+    esac
+    audit23_raw "audit23_o7_$label" deny "{\"tool_name\":\"Read\",\"cwd\":\"/synthetic\",\"tool_input\":{\"file_path\":\"public.txt\"},\"metadata\":$number}"
+done
+audit23_raw audit23_o7_valid_numbers allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":[0,-0,1,-1,0.1,1.25,1e2,-1.5E-2,1E+2]}'
+audit23_raw audit23_o7_number_text allow '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":"NaN Infinity 01 +1 .1"}'
+audit23_raw audit23_o7_trailing_comma deny '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":[0,]}'
+audit23_raw audit23_o7_comment deny '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":/*public*/0}'
+for control in 0000 000d 001b 007f; do
+    audit23_raw "audit23_o8_workdir_$control" deny "{\"tool_name\":\"Bash\",\"cwd\":\"/synthetic\",\"tool_input\":{\"command\":\"true\",\"workdir\":\"public\\u$control\"}}"
+done
+audit23_raw audit23_o8_workdir_public allow '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"true","workdir":"public directory"}}'
+audit23_raw audit23_o8_workdir_pair allow '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"true","workdir":"public\ud801\udc00"}}'
+
+
+
+audit23_raw audit23_o8_workdir_newline allow '{"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"true","workdir":"public\nsubdirectory"}}'
+audit23_raw audit23_o8_cwd_newline allow '{"tool_name":"Read","cwd":"/synthetic/public\nsubdirectory","tool_input":{"file_path":"public.txt"}}'
+
+# Keep the dependency-light names-only path strict even without Perl.
+mkdir -p "$TMP/audit23-no-perl-bin"
+for executable in bash jq tr; do
+    ln -s "$(command -v "$executable")" "$TMP/audit23-no-perl-bin/$executable"
+done
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit23-no-perl-bin" "$BASH" "$ROOT/hooks/guard-secrets" >"$TMP/audit23-no-perl-guard"
+for number in NaN Infinity 01 +1 .1; do
+    case "$number" in
+        NaN) label=nan ;; Infinity) label=infinity ;; 01) label=leading_zero ;;
+        +1) label=plus ;; *) label=leading_dot ;;
+    esac
+    audit23_raw "audit23_o7_no_perl_$label" deny "{\"tool_name\":\"Grep\",\"cwd\":\"/synthetic\",\"tool_input\":{\"path\":\"public.txt\",\"output_mode\":\"files_with_matches\"},\"metadata\":$number}" "$TMP/audit23-no-perl-guard"
+done
+audit23_raw audit23_o7_no_perl_valid allow '{"tool_name":"Grep","cwd":"/synthetic","tool_input":{"path":"public.txt","output_mode":"files_with_matches"},"metadata":[0,-1,1.25,1e2,-1.5E-2,1E+2,true,false,null,"NaN"]}' "$TMP/audit23-no-perl-guard"
+
+
+# Scalar boundaries must not consume punctuation or ordinary JSON whitespace.
+for scalar in decimal:1.5 exponent:-1.5E-2 true:true false:false null:null; do
+    label="${scalar%%:*}" number="${scalar#*:}"
+    audit23_raw "audit23_o7_no_perl_scalar_$label" allow "{\"tool_name\":\"Grep\",\"cwd\":\"/synthetic\",\"tool_input\":{\"path\":\"public.txt\",\"output_mode\":\"files_with_matches\"},\"metadata\":$number}" "$TMP/audit23-no-perl-guard"
+done
+audit23_raw audit23_o7_no_perl_spaced_array allow '{"tool_name":"Grep","cwd":"/synthetic","tool_input":{"path":"public.txt","output_mode":"files_with_matches"},"metadata": [0, 1, -1.5, 1e2, true, false, null, "public"] }' "$TMP/audit23-no-perl-guard"
+audit23_raw audit23_o7_no_perl_pretty_array allow '{
+    "tool_name": "Grep", "cwd": "/synthetic",
+    "tool_input": {"path": "public.txt", "output_mode": "files_with_matches"},
+    "metadata": [0,
+        1, 1.5, true, null]
+}' "$TMP/audit23-no-perl-guard"
+
+# Under-cap paths with redundant components must stop inside normalization,
+# not wait for an EXIT deadline check. Small equivalent paths still allow.
+for location in file_path cwd; do
+    for size in ordinary excessive; do
+        perl -e '
+            my ($location, $size) = @ARGV;
+            my $dots = "./" x ($size eq "ordinary" ? 32 : 20000);
+            my $cwd = "/synthetic/" . ($location eq "cwd" ? $dots : "");
+            my $file = ($location eq "file_path" ? $dots : "") . "public.txt";
+            print qq({"tool_name":"Read","cwd":"$cwd","tool_input":{"file_path":"$file"}});
+        ' "$location" "$size" >"$TMP/audit23-envelope"
+        expected=deny
+        [[ "$size" != ordinary ]] || expected=allow
+        audit23_envelope "audit23_o9_components_${location}_$size" "$expected"
+    done
+done
+
+# Exercise both oversized audit reproducers and under-cap structural bounds.
+# Boundary allows keep ordinary metadata from becoming a blanket denial.
+for shape in byte_limit byte_over wide numeric keys_limit keys_over tokens_limit tokens_over depth_limit depth_over; do
+    perl -e '
+        my $shape = shift;
+        my $head = q({"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"},"metadata":);
+        if ($shape =~ /^byte_/) {
+            my $bytes = 1114112 + ($shape eq "byte_over");
+            print $head, q("), "x" x ($bytes - length($head) - 3), qq("});
+        } elsif ($shape eq "numeric") {
+            my $bytes = 8388607;
+            my $items = int(($bytes - length($head) - 4) / 2);
+            my $body = "[" . ("0," x $items) . "0]}";
+            print $head, $body, " " x ($bytes - length($head) - length($body));
+        } elsif ($shape =~ /^(wide|keys_)/) {
+            my $keys = $shape eq "wide" ? 300000 : 4091 + ($shape eq "keys_over");
+            print $head, "{";
+            for my $i (1 .. $keys) { print $i == 1 ? "" : ",", qq("k$i":0); }
+            print "}}";
+        } elsif ($shape =~ /^tokens_/) {
+            # The fixed envelope has 20 tokens. Array delimiters plus N
+            # values and N-1 commas contribute 2*N+1 more tokens.
+            my $items = 16373 + ($shape eq "tokens_over");
+            if ($shape eq "tokens_limit") {
+                print $head, "[{},", "0," x ($items - 2), "0]}";
+            } else {
+                print $head, "[", "0," x ($items - 1), "0]}";
+            }
+        } else {
+            my $depth = 127 + ($shape eq "depth_over");
+            print $head, "[" x $depth, "0", "]" x $depth, "}";
+        }
+    ' "$shape" >"$TMP/audit23-envelope"
+    expected=deny
+    case "$shape" in *_limit) expected=allow ;; esac
+    audit23_envelope "audit23_o9_$shape" "$expected"
+done
+
+# A delayed preprocessing dependency must use up the same budget as analysis,
+# even on a Read path that used to exit without checking the analysis clock.
+mkdir -p "$TMP/audit23-bin"
+printf '#!%s\nselect undef, undef, undef, 3.1;\nexec {%s} %s, @ARGV or die "exec failed";\n' \
+    "$(command -v perl)" "'$(command -v perl)'" "'$(command -v perl)'" >"$TMP/audit23-bin/perl"
+chmod +x "$TMP/audit23-bin/perl"
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit23-bin:$PATH" "$BASH" "$ROOT/hooks/guard-secrets" >"$TMP/audit23-guard"
+printf '%s' '{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":"public.txt"}}' >"$TMP/audit23-envelope"
+audit23_envelope audit23_o9_preprocessing_deadline deny "$TMP/audit23-guard"
+
+# Delay only the first metadata resolver after validation. Read must not return
+# an allow after its analysis phase expires, even while the total budget remains.
+mkdir -p "$TMP/audit23-analysis-bin"
+# shellcheck disable=SC2016  # Perl variables belong to the synthetic wrapper.
+printf '#!%s\nmy $first = q{%s}; my $delayed = q{%s};\nif (!-e $first) { open my $f, ">", $first or die "fixture failed"; close $f; }\nelsif (!-e $delayed) { open my $f, ">", $delayed or die "fixture failed"; close $f; select undef, undef, undef, 3.1; }\nexec {%s} %s, @ARGV or die "exec failed";\n' \
+    "$(command -v perl)" "$TMP/audit23-first" "$TMP/audit23-delayed" \
+    "'$(command -v perl)'" "'$(command -v perl)'" >"$TMP/audit23-analysis-bin/perl"
+chmod +x "$TMP/audit23-analysis-bin/perl"
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit23-analysis-bin:$PATH" "$BASH" "$ROOT/hooks/guard-secrets" >"$TMP/audit23-analysis-guard"
+audit23_envelope audit23_o9_analysis_deadline deny "$TMP/audit23-analysis-guard"
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

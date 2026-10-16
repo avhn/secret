@@ -92,6 +92,14 @@ unions, authoritative NotebookEdit fields and bounded malformed-envelope checks.
 The Windows makefile-arity control retains denial for an invalid embedded drive
 colon; cross-vet does not establish a native runtime result.
 
+Audit 23 closes Python triple-quote and prefixed-literal launch gaps, leading gh
+API options, decoded curl controls, full literal shell-child dispatch and PyPy
+aliases. Bash strictly validates complete envelopes before jq, including workdir
+controls and surrogate pairs, and bounds preprocessing and path normalization.
+Go mirrors the 4,096-key, 32,768-token and 128-container envelope limits and
+bounds unnormalized path components. Permanent deny and must-allow controls
+cover both adapters; applicable runtime CI remains the milestone gate.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

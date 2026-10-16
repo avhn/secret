@@ -41,6 +41,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
   Normalize curl option clusters, multipart/header readers and escaped file URLs
   without treating literal option values or name=content payloads as inputs.
   Validate Grep field types and require the authoritative NotebookEdit target.
+  Strictly validate complete envelopes, rejecting non-JSON numbers and unpaired
+  escaped surrogates in keys and values before jq. Reject workdir controls before
+  extraction. Match Go's 1 MiB plus 64 KiB envelope cap, bound validation keys,
+  tokens and nesting, and include preprocessing and file-tool exits in the
+  decision budget while retaining bounded names-only operation without Perl.
+  Stop shared path normalization on budget exhaustion, propagate failures to
+  file-target checks, and preserve valid numeric/scalar metadata and spaced JSON
+  arrays in the no-Perl path.
   Add permanent Claude/Codex regressions,
   must-allow cases and exact platform inventories.
 
@@ -85,7 +93,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
   comments and regex literals language-aware across inline and stdin source,
   retain uncertain decisions for identified literal argv launches, and recognize
   bounded parenthesis-free Ruby/Perl system and exec lists. Preserve genuine
-  comments, ordinary launcher prose and public-child controls.
+  comments, ordinary launcher prose and public-child controls. Tokenize Python
+  triple-quoted strings atomically, normalize PyPy aliases across interpreter
+  roles, and send identified literal shell launches through full child policy
+  without reclassifying arbitrary prose. Resolve gh API field-file actions after
+  global options and deny control bytes in decoded curl file-URL paths. Add
+  synthetic Claude/Codex deny and must-allow regressions for confirmation audit 23.
+  Classify Python os.popen shell children and normalize static Python raw, bytes,
+  Unicode and formatted literal prefixes with Python escape rules. Keep dynamic
+  interpolation unknown and Python/PyPy exec source out of shell-child analysis
+  while preserving interpreter-source checks and Ruby/Perl/Node shell launches.
+  Match Bash's global envelope key, punctuation-token and container-depth bounds
+  before unmarshaling. Bound unnormalized path separators before redundant
+  components disappear, retaining ordinary public-path and metadata controls.
 
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty

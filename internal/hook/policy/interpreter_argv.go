@@ -11,10 +11,11 @@ import (
 type interpreterToken struct {
 	text    string
 	literal bool
+	shell   bool
 }
 
 func interpreterTokens(code, name string) []interpreterToken {
-	hashComments := strings.HasPrefix(name, "python") || optionIn("ruby perl php rscript", name)
+	hashComments := pythonInterpreter(name) || optionIn("ruby perl php rscript", name)
 	slashComments := optionIn("node nodejs php", name)
 	statementLines := optionIn("ruby perl", name)
 	var tokens []interpreterToken
@@ -50,14 +51,23 @@ func interpreterTokens(code, name string) []interpreterToken {
 				continue
 			}
 		}
+		if pythonInterpreter(name) {
+			if token, end, ok := pythonLiteralToken(code, i); ok {
+				tokens = append(tokens, token)
+				i = end
+				continue
+			}
+		}
 		if ch == '\'' || ch == '"' || ch == '`' {
 			start := i
-			i++
+			delimiter := string(ch)
+			i += len(delimiter)
 			var value strings.Builder
-			known, closed := ch != '`', false
+			shell := ch == '`' && optionIn("ruby perl", name)
+			known, closed := ch != '`' || shell, false
 			for i < len(code) {
-				if code[i] == ch {
-					i++
+				if strings.HasPrefix(code[i:], delimiter) {
+					i += len(delimiter)
 					closed = true
 					break
 				}
@@ -75,12 +85,12 @@ func interpreterTokens(code, name string) []interpreterToken {
 				value.WriteRune(r)
 				i = len(code) - len(tail)
 			}
-			// Python prefixes and double-quoted Ruby/Perl interpolation need
-			// language evaluation and are not fully literal argv elements.
+			// Identifier-adjacent literals and double-quoted interpolation do
+			// not supply a fully literal argv element.
 			if start > 0 && interpreterIdentifier(code[start-1]) || ch == '"' && (strings.Contains(value.String(), "$") || strings.Contains(value.String(), "#{")) {
 				known = false
 			}
-			tokens = append(tokens, interpreterToken{value.String(), known && closed})
+			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, shell: shell})
 			continue
 		}
 		start := i
@@ -193,8 +203,14 @@ func literalStatementArguments(tokens []interpreterToken, start int) ([]string, 
 
 func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 	tokens := interpreterTokens(code, language)
-	for i := 0; i+1 < len(tokens); i++ {
+	for i := 0; i < len(tokens); i++ {
 		if tokens[i].literal {
+			if tokens[i].shell && a.literalShellProtected(tokens[i].text, cwd) {
+				return true
+			}
+			continue
+		}
+		if i+1 >= len(tokens) {
 			continue
 		}
 		name := tokens[i].text
@@ -208,13 +224,28 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			if optionIn("ruby perl", language) && optionIn("system exec", name) {
 				words, known = literalStatementArguments(tokens, i+1)
 			}
-			if known && a.literalCommandProtected(words, cwd, true) {
-				return true
+			if known {
+				if len(words) == 1 && a.literalShellProtected(words[0], cwd) || len(words) > 1 && a.literalCommandProtected(words, cwd, true) {
+					return true
+				}
 			}
 			continue
 		}
 		if start >= len(tokens) {
 			continue
+		}
+		// These APIs accept a shell-command literal as their first argument.
+		// Later options or callbacks do not change that literal witness.
+		shellAPI := optionIn("run call check_call check_output Popen system exec execSync", name)
+		if pythonInterpreter(language) {
+			// Python exec evaluates Python source; os.popen launches a shell.
+			shellAPI = name != "exec" && (shellAPI || name == "popen")
+		}
+		if shellAPI && tokens[start].literal && start+1 < len(tokens) && !tokens[start+1].literal && optionIn(", )", tokens[start+1].text) {
+			shell := !optionIn("system exec", name) || optionIn("node nodejs", language) || tokens[start+1].text == ")"
+			if shell && a.literalShellProtected(tokens[start].text, cwd) {
+				return true
+			}
 		}
 		switch name {
 		case "run", "call", "check_call", "check_output", "Popen":
@@ -235,7 +266,9 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 				words = append([]string{tokens[start].text}, words...)
 			}
 		case "system", "exec":
-			words, _, known = literalArguments(tokens, start, ")")
+			if name != "exec" || !pythonInterpreter(language) {
+				words, _, known = literalArguments(tokens, start, ")")
+			}
 		}
 		if known && a.literalCommandProtected(words, cwd, true) {
 			return true

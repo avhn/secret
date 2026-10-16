@@ -153,6 +153,9 @@ func (a *analyzer) audit13Printer(name string, args []string, cwd string) bool {
 }
 
 func safePackageChild(name string, args []string) ([]string, bool) {
+	if pythonInterpreter(name) {
+		name = "python"
+	}
 	// Call values are shell programs, not executable names. Leave them for
 	// commandSlot instead of hiding them behind a peeled package child.
 	if optionIn("npx npm pnpm yarn", name) {

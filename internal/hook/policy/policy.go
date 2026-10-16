@@ -494,7 +494,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			}
 			direct := false
 			// Pipe validation is handled by the containing binary command.
-			if strings.HasPrefix(name, "python") || name == "perl" || name == "ruby" || name == "node" {
+			if pythonInterpreter(name) || name == "perl" || name == "ruby" || name == "node" {
 				skip := false
 				for _, w := range cmd.Args[1:] {
 					code := a.raw(w)
@@ -511,7 +511,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 							continue
 						}
 					}
-					if strings.HasPrefix(name, "python") && len(cmd.Args) >= 4 && literal(cmd.Args[1]) == "-m" && literal(cmd.Args[2]) == "venv" {
+					if pythonInterpreter(name) && len(cmd.Args) >= 4 && literal(cmd.Args[1]) == "-m" && literal(cmd.Args[2]) == "venv" {
 						break
 					}
 					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
@@ -1136,12 +1136,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 	}
-	if name == "gh" && len(args) > 0 && args[0] == "api" {
-		for i, arg := range args[1:] {
+	if name == "gh" && roles.CommandAction(name, args) == "api" {
+		for i, arg := range args {
 			value := ""
 			switch {
-			case optionIn("-F -f --field --raw-field", arg) && i+2 < len(args):
-				value = args[i+2]
+			case optionIn("-F -f --field --raw-field", arg) && i+1 < len(args):
+				value = args[i+1]
 			case strings.HasPrefix(arg, "-F") || strings.HasPrefix(arg, "-f"):
 				value = arg[2:]
 			case strings.HasPrefix(arg, "--field=") || strings.HasPrefix(arg, "--raw-field="):
@@ -1296,9 +1296,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 		return
 	}
-	if strings.HasPrefix(name, "python") || name == "perl" || name == "ruby" || name == "node" {
+	if pythonInterpreter(name) || name == "perl" || name == "ruby" || name == "node" {
 		for i := 0; i < len(args); i++ {
-			if strings.HasPrefix(name, "python") && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" {
+			if pythonInterpreter(name) && len(args) >= 2 && args[0] == "-m" && args[1] == "venv" {
 				break
 			}
 			code := args[i]
@@ -1994,7 +1994,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			}
 			// An unmatched file URL stays literal in the shell. Preserve its
 			// query/fragment for curl to normalize, rather than losing the input.
-			if !strings.HasPrefix(strings.ToLower(v), "file:/") {
+			if !strings.HasPrefix(strings.ToLower(v), "file:") {
 				v = "__unmatched_glob__"
 			}
 		}
