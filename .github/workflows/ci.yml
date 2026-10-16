@@ -6,7 +6,7 @@ permissions:
 jobs:
   win-fuzz:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -15,4 +15,4 @@ jobs:
       - name: Seed hang stack dump
         env:
           GOTRACEBACK: all
-        run: go test -v -count=1 -run 'FuzzAnalyze' -timeout 4m ./internal/hook/policy/
+        run: go test -v -count=1 -timeout 30m ./internal/hook/policy/
