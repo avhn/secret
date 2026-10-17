@@ -77,6 +77,7 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 }
 
 type analyzer struct {
+	regexBody           bool
 	literalDepth        int
 	metadata            paths.Metadata
 	interpreterNames    map[interpreterName]bool

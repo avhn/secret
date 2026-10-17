@@ -3,6 +3,7 @@ package policy
 import (
 	"maps"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -111,6 +112,22 @@ func (a *analyzer) literalPrinter(code, cwd string) bool {
 	return printer
 }
 
+// Unextracted source retains the Bash raw recursive-search witness. Complete
+// literals use their real search output roles instead, preserving names/count
+// controls. Token boundaries can separate option dashes from their letters.
+var interpreterRecursiveGrep = regexp.MustCompile(`(?i)(?:^|[^a-z0-9_])(?:grep|egrep|fgrep)\s+(?:[^;|]*\s)?(?:-\s*[a-z]*r[a-z]*|-\s*-\s*(?:dereference\s*-\s*)?recursive)(?:[^a-z0-9_]|$)`)
+
+func unextractedRecursiveGrep(tokens []interpreterToken) bool {
+	var residual strings.Builder
+	for _, token := range tokens {
+		if !token.literal && !token.witness && !token.opaque && !token.regexCode {
+			residual.WriteString(token.text)
+		}
+		residual.WriteByte(' ')
+	}
+	return interpreterRecursiveGrep.MatchString(residual.String())
+}
+
 // Executable interpreter bodies have environment and literal-command roles in
 // addition to file literals. Reader programs such as sed do not execute these
 // strings and continue to use the file-only classifier.
@@ -121,9 +138,33 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	if len(code) > 1<<20 || strings.Count(code, ";")+strings.Count(code, "|") > 128 {
 		return true
 	}
-	tokens := interpreterTokens(code, name)
+	tokens := interpreterBodyTokens(code, name, a.regexBody)
 	literals := 0
 	for _, token := range tokens {
+		if token.indeterminate {
+			a.reason = roles.Indeterminate
+			return true
+		}
+		// The retained Bash search gate also denies raw recursive-grep text
+		// inside inert regex data. Keep that conservative parity witness;
+		// opacity only prevents treating its contents as nested launch code.
+		if token.opaque && interpreterRecursiveGrep.MatchString(token.text) {
+			return true
+		}
+		if token.regexCode {
+			if a.literalDepth >= 4 {
+				return true
+			}
+			// A regex body is not opaque when it can interpolate code. Scan
+			// it under the existing child-depth/deadline limits, without
+			// treating interpolation's # as a source comment. No regex runs.
+			end := strings.LastIndexByte(token.text, '/')
+			probe := a.literalChild(cwd)
+			probe.regexBody = true
+			if probe.executableInterpreterProtected(token.text[1:end], cwd, name) {
+				return true
+			}
+		}
 		// Numeric data words consume work too, without certifying them as
 		// string argv elements for the precise launch recognizers.
 		numeric := token.text != "" && token.text[0] >= '0' && token.text[0] <= '9'
@@ -134,7 +175,7 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 			}
 		}
 	}
-	if environmentCode(code) {
+	if environmentCode(code) || unextractedRecursiveGrep(tokens) {
 		return true
 	}
 	for _, value := range sourceLiterals(code) {

@@ -4282,5 +4282,14 @@ for shape in argv triple print paths inline herestring inline_parameters herestr
     done
 done
 
+# Audit 25 replays interpreter extraction, quote boundaries and producer inputs.
+# Commands remain JSON data; fixture metadata comes from the disposable search tree.
+while IFS= read -r row; do
+    NAME="$(jq -r '.name' <<<"$row")"
+    expected="$(jq -r 'if .deny then "deny" else "allow" end' <<<"$row")"
+    command_text="$(jq -r '.command' <<<"$row")"
+    audit21_case "$NAME" "$expected" "$command_text"
+done < <(jq -c '.cases[]' "$REPO_ROOT/testdata/hook/audit25.json")
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

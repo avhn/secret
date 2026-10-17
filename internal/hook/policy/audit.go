@@ -208,10 +208,15 @@ func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd, name
 	protected := false
 	inspect := func(word *syntax.Word) {
 		values, known := a.expandWord(word, producerCWD)
-		if known {
-			for _, value := range values {
-				protected = protected || a.executableInterpreterProtected(value, cwd, name)
-			}
+		if !known {
+			// Producer uncertainty is executable-input uncertainty, just like
+			// a here-string. Retain it here, not only in the final shell check.
+			a.reason = roles.Indeterminate
+			protected = true
+			return
+		}
+		for _, value := range values {
+			protected = protected || a.executableInterpreterProtected(value, cwd, name)
 		}
 	}
 	syntax.Walk(left, func(node syntax.Node) bool {

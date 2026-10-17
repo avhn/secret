@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Restore recursive-search protection in Bash interpreter backticks and Lua long
+  strings, retaining conservative witnesses for unextracted source and allowing
+  literal names/count/quiet searches. Give Go the same Lua literal boundaries.
+  Resume scanning after Lua block comments, including same-line code, and deny
+  unterminated block comments. Distinguish Perl quote operators from autoquoted
+  keys and method names, keep later launches visible, and deny unterminated
+  operators in both guards. Skip whitespace-separated Perl comments to the real
+  quote delimiter without treating hashes inside that literal as comments.
+  Scan interpolating Ruby/Perl regex bodies for nested launches under existing
+  depth/deadline limits and a cumulative regex-work bound. Retain Bash's raw
+  recursive-search denial for inert regex data in Go, while preserving ordinary
+  regex controls and avoiding false shell-path and glob interpretations
+  of interpreter syntax. Make indeterminate Go producer input deny locally as
+  well as at the final shell uncertainty check. Add synthetic deny and must-allow
+  envelope coverage for both adapters, without executing candidate source or
+  reading real stores.
+
 - Reuse immutable denied-command fixture snapshots within a corpus run, with
   separate trees for case-specific search inputs. Check unsupported Windows
   fixture names before creating partial trees, preserving existing skips and

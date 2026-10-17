@@ -1147,3 +1147,84 @@ internal/hook/audit24_test.go, plus both-adapter testdata/hook/audit24.json.
 All candidate commands remain JSON/analyzer inputs only, with disposable HOME
 and synthetic fixtures. Native checks and cross-vet do not substitute for
 applicable macOS/Windows runtime CI or installed-host evidence.
+
+## Confirmation audit 25: interpreter extraction and quote boundaries
+
+Replays compare cf6e337 with 008f53c using JSON envelopes, a disposable HOME,
+synthetic `.aws/credentials` and `.env` names, and both Go adapters. Candidate
+commands are data only. The installed hook and plugin manifests are unchanged.
+
+- Bash changed ``perl -e 'print `grep -r TOKEN .`'`` and the equivalent Ruby
+  backtick command from deny to allow. Lua `os.execute([[grep -r TOKEN .]])`
+  also changed from deny to allow inline. Go already denied the Perl/Ruby
+  backticks, but allowed the Lua body before and after the commit. Bash Lua
+  heredocs remained denied by raw bracket/redirect recovery, not complete
+  literal extraction. Both guards now classify the complete literal through
+  the real child search roles. Names/count/quiet controls remain allowed.
+- The mode-2 raw recursive-search exemption now has an extraction fallback:
+  recursive witnesses left outside recognized strings still deny. Ruby/Perl
+  backticks and Lua equals-delimited long strings are extracted atomically;
+  Bash does not mistake a heredoc header plus Lua brackets for a file redirect.
+  PHP backticks retain the same shell-literal treatment and names-only control.
+- Go newly allowed later `system("dotenvx","get")` launches after Perl `q=>`,
+  `{q}` and `->q` identifiers. Bash still denied the launches but also newly
+  denied the ordinary `my %h=(q=>1); print $h{q}` control. Both scanners now
+  preserve these identifier positions instead of consuming following code as
+  a quote-like operator. This is a false-allow repair and a false-denial repair,
+  not a weakened existing deny expectation.
+- Unterminated Perl `q`, `qq`, `qw` and `qx` constructs were allowed by both
+  guards at cf6e337; 008f53c made Bash deny while Go still allowed. Go now marks
+  an unterminated recognized construct indeterminate, matching Bash. Complete
+  balanced quote operators and autoquoted keys remain allowed.
+- The reported unknown-producer local skip is real, but the replayed commands
+  already denied in both Go revisions through the final shell uncertainty
+  check. It is not an observed end-to-end regression. Producer expansion now
+  records `Indeterminate` immediately, like executable here-strings and heredocs;
+  a focused test checks this local invariant independently of the final check.
+  Known literal public producers still allow. No new deliberate Go/Bash
+  divergence is intended by these repairs.
+- Lua block comments were mistaken for line comments in both scanners. The
+  suggested `--[[x]] os.execute("gh auth token")` already denied through raw
+  string witnesses, but replacing that body with `[[grep -r TOKEN .]]`
+  reproduces an allow in both guards at 008f53c. At cf6e337 Bash denied it and
+  Go allowed it. Both scanners now resume at the matching long-comment close,
+  including equals-delimited blocks on the same line. Incomplete blocks now
+  deny rather than allow in both guards. Plain line comments, public block
+  comments and literal names-only searches remain allowed.
+- Perl `q # comment` followed on the next line by
+  `{public}; system("dotenvx","get"); # closing hash #` changed from deny in
+  both guards at cf6e337 to allow in both at 008f53c. `qq` and `qw` behave the
+  same; the `qx` variant regressed in Bash, while Go retained a denial. A
+  whitespace-separated hash now starts a comment, not the quote delimiter.
+  Both scanners find the actual delimiter after the comment. Merely abandoning
+  the operator is insufficient: a hash inside the eventual literal could then
+  hide a later launch, and delayed `qx` source would lose its execution role.
+  Adjacent `q#public#`, comment-delayed public literals and `qx` date controls
+  still allow. No old denied expectation changes to an allow.
+
+- The reported regex backtick examples already denied in both guards at both
+  revisions through independent literal witnesses. Ruby
+  `p /#{system("dotenvx","get")}/` did allow in both guards at both revisions:
+  it is a confirmed pre-existing shared interpolation gap, not an 008f53c
+  regression. Interpolating regex bodies now receive bounded nested scanning,
+  including Perl quote-like argv inside the interpolation. A cumulative scan
+  budget denies overlapping malformed slash candidates before quadratic work
+  can outlive the analyzer deadline. Only regexes without
+  interpolation witnesses remain opaque. A separate existing split also showed
+  Bash denying inert `x = /grep -r TOKEN ./` regex data while Go allowed it at
+  both revisions. Go now retains that conservative raw recursive-search witness
+  even in opaque regex data, closing the observed Go-looser split without
+  claiming that non-interpolating regex data executes. Public interpolated commands and
+  names-only searches still allow. The required ordinary `=~ /a+/` and `=~ /x/`
+  controls already allowed in Go but denied in Bash because generic attached
+  option probing mistook the source suffix for a `~user` path. Bash no longer
+  splits that Ruby/Perl operator, or treats interpreter brackets after a heredoc
+  header as shell glob operands. Decoded literal reader arguments still receive
+  the normal path and search classification. These false-denial repairs add
+  must-allow cases without changing an existing denied expectation.
+
+Permanent coverage is the 306 cases in `testdata/hook/audit25.json`, replayed by
+both retained shell suites and `internal/hook/audit25_test.go`, plus lexer, argv and local
+producer tests in `internal/hook/policy/audit25_test.go`. Every fixture is
+synthetic. Applicable native CI and installed-host failure testing remain
+separate requirements; these tests establish no host sandbox guarantee.

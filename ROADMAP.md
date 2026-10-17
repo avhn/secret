@@ -113,6 +113,17 @@ Bash scanners count preprocessing against the decision budget, and Go requires
 stdin EOF within two seconds. Integration preserves public declaration and
 interpreter metadata controls in both adapters; runtime CI remains required.
 
+Audit 25 repairs the audit 24 Bash recursive-search fallback regression and Go
+Perl key-position regression, closes pre-existing Go Lua-long-string gaps, and
+matches Bash denial of unterminated Perl quote operators. Both scanners resume
+following same-line Lua block comments and deny incomplete blocks, and Perl
+quote operators retain real delimiters after whitespace-separated comments.
+Interpolating Ruby/Perl regex bodies retain nested launch analysis, with public
+regex and non-content search controls. Unknown Go producer words now deny
+locally instead of relying on the final uncertainty check. Permanent envelopes
+retain public hash, Lua, backtick and non-content search
+controls. These are synthetic results, not installed-host or runtime CI evidence.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

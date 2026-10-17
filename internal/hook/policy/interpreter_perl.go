@@ -15,10 +15,30 @@ func perlLiteralTokens(code string, start int) ([]interpreterToken, int, bool) {
 		kind += string(code[i])
 		i++
 	}
-	for i < len(code) && strings.ContainsRune(" \t\r\n", rune(code[i])) {
-		i++
+	for {
+		delimiterStart := i
+		for i < len(code) && strings.ContainsRune(" \t\r\n", rune(code[i])) {
+			i++
+		}
+		// After whitespace, # begins a comment rather than a delimiter.
+		// Find the real delimiter after it, keeping hashes inside the eventual
+		// literal from becoming comments that could hide subsequent launches.
+		if i < len(code) && i > delimiterStart && code[i] == '#' {
+			if end := strings.IndexByte(code[i:], '\n'); end >= 0 {
+				i += end
+				continue
+			}
+			return nil, start, false
+		}
+		break
 	}
 	if i >= len(code) || interpreterIdentifier(code[i]) || code[i] == '\\' {
+		return nil, start, false
+	}
+	// Fat-comma keys, single bare hash subscripts and method names are
+	// autoquoted identifiers, not quote operators. Do not consume later code.
+	prefix := strings.TrimSpace(code[:start])
+	if strings.HasPrefix(code[i:], "=>") || strings.HasSuffix(prefix, "->") || strings.HasSuffix(prefix, "{") && code[i] == '}' {
 		return nil, start, false
 	}
 	open, close := code[i], code[i]
@@ -64,5 +84,5 @@ func perlLiteralTokens(code string, start int) ([]interpreterToken, int, bool) {
 		}
 		value.WriteByte(ch)
 	}
-	return []interpreterToken{{text: value.String()}}, i, true
+	return []interpreterToken{{text: value.String(), indeterminate: true}}, i, true
 }

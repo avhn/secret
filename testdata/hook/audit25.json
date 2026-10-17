@@ -1,0 +1,1551 @@
+{
+  "fixtures": [
+    [
+      "home/.aws/credentials",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "work/.env",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "work/README.md",
+      "file",
+      "public\n"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "audit25_perl_backtick_r_inline",
+      "command": "perl -e 'print `grep -r TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_r_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep -r TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_r_herestring",
+      "command": "perl <<< 'print `grep -r TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_r_producer",
+      "command": "printf '%s\\n' 'print `grep -r TOKEN .`' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_R_inline",
+      "command": "perl -e 'print `grep -R TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_R_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep -R TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_R_herestring",
+      "command": "perl <<< 'print `grep -R TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_R_producer",
+      "command": "printf '%s\\n' 'print `grep -R TOKEN .`' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_recursive_inline",
+      "command": "perl -e 'print `grep --recursive TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_recursive_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep --recursive TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_recursive_herestring",
+      "command": "perl <<< 'print `grep --recursive TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_recursive_producer",
+      "command": "printf '%s\\n' 'print `grep --recursive TOKEN .`' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_backtick_rl_inline",
+      "command": "perl -e 'print `grep -rl TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rl_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep -rl TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rl_herestring",
+      "command": "perl <<< 'print `grep -rl TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rl_producer",
+      "command": "printf '%s\\n' 'print `grep -rl TOKEN .`' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rc_inline",
+      "command": "perl -e 'print `grep -rc TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rc_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep -rc TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rc_herestring",
+      "command": "perl <<< 'print `grep -rc TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rc_producer",
+      "command": "printf '%s\\n' 'print `grep -rc TOKEN .`' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rq_inline",
+      "command": "perl -e 'print `grep -rq TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rq_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `grep -rq TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rq_herestring",
+      "command": "perl <<< 'print `grep -rq TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_rq_producer",
+      "command": "printf '%s\\n' 'print `grep -rq TOKEN .`' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_date_inline",
+      "command": "perl -e 'print `date`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_date_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint `date`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_date_herestring",
+      "command": "perl <<< 'print `date`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_backtick_date_producer",
+      "command": "printf '%s\\n' 'print `date`' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_r_inline",
+      "command": "ruby -e 'puts `grep -r TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_r_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep -r TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_r_herestring",
+      "command": "ruby <<< 'puts `grep -r TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_r_producer",
+      "command": "printf '%s\\n' 'puts `grep -r TOKEN .`' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_R_inline",
+      "command": "ruby -e 'puts `grep -R TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_R_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep -R TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_R_herestring",
+      "command": "ruby <<< 'puts `grep -R TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_R_producer",
+      "command": "printf '%s\\n' 'puts `grep -R TOKEN .`' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_recursive_inline",
+      "command": "ruby -e 'puts `grep --recursive TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_recursive_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep --recursive TOKEN .`\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_recursive_herestring",
+      "command": "ruby <<< 'puts `grep --recursive TOKEN .`'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_recursive_producer",
+      "command": "printf '%s\\n' 'puts `grep --recursive TOKEN .`' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_backtick_rl_inline",
+      "command": "ruby -e 'puts `grep -rl TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rl_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep -rl TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rl_herestring",
+      "command": "ruby <<< 'puts `grep -rl TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rl_producer",
+      "command": "printf '%s\\n' 'puts `grep -rl TOKEN .`' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rc_inline",
+      "command": "ruby -e 'puts `grep -rc TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rc_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep -rc TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rc_herestring",
+      "command": "ruby <<< 'puts `grep -rc TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rc_producer",
+      "command": "printf '%s\\n' 'puts `grep -rc TOKEN .`' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rq_inline",
+      "command": "ruby -e 'puts `grep -rq TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rq_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `grep -rq TOKEN .`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rq_herestring",
+      "command": "ruby <<< 'puts `grep -rq TOKEN .`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_rq_producer",
+      "command": "printf '%s\\n' 'puts `grep -rq TOKEN .`' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_date_inline",
+      "command": "ruby -e 'puts `date`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_date_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nputs `date`\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_date_herestring",
+      "command": "ruby <<< 'puts `date`'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_backtick_date_producer",
+      "command": "printf '%s\\n' 'puts `date`' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_r_inline",
+      "command": "lua -e 'os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_r_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[grep -r TOKEN .]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_r_herestring",
+      "command": "lua <<< 'os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_r_producer",
+      "command": "printf '%s\\n' 'os.execute([[grep -r TOKEN .]])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_dereference-recursive_inline",
+      "command": "lua -e 'os.execute([[grep --dereference-recursive TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_dereference-recursive_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[grep --dereference-recursive TOKEN .]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_dereference-recursive_herestring",
+      "command": "lua <<< 'os.execute([[grep --dereference-recursive TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_dereference-recursive_producer",
+      "command": "printf '%s\\n' 'os.execute([[grep --dereference-recursive TOKEN .]])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_rl_inline",
+      "command": "lua -e 'os.execute([[grep -rl TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rl_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[grep -rl TOKEN .]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rl_herestring",
+      "command": "lua <<< 'os.execute([[grep -rl TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rl_producer",
+      "command": "printf '%s\\n' 'os.execute([[grep -rl TOKEN .]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rc_inline",
+      "command": "lua -e 'os.execute([[grep -rc TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rc_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[grep -rc TOKEN .]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rc_herestring",
+      "command": "lua <<< 'os.execute([[grep -rc TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rc_producer",
+      "command": "printf '%s\\n' 'os.execute([[grep -rc TOKEN .]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rq_inline",
+      "command": "lua -e 'os.execute([[grep -rq TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rq_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[grep -rq TOKEN .]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rq_herestring",
+      "command": "lua <<< 'os.execute([[grep -rq TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_rq_producer",
+      "command": "printf '%s\\n' 'os.execute([[grep -rq TOKEN .]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_equals_inline",
+      "command": "lua -e 'os.execute([==[grep -r TOKEN .]==])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_equals_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([==[grep -r TOKEN .]==])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_equals_herestring",
+      "command": "lua <<< 'os.execute([==[grep -r TOKEN .]==])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_equals_producer",
+      "command": "printf '%s\\n' 'os.execute([==[grep -r TOKEN .]==])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_long_public_inline",
+      "command": "lua -e 'print([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_public_heredoc",
+      "command": "lua <<'SYNTHETIC'\nprint([[hi]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_public_herestring",
+      "command": "lua <<< 'print([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_public_producer",
+      "command": "printf '%s\\n' 'print([[hi]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_delimiters_inline",
+      "command": "lua -e 'print([=[hi [[ public ]] bye]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_delimiters_heredoc",
+      "command": "lua <<'SYNTHETIC'\nprint([=[hi [[ public ]] bye]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_delimiters_herestring",
+      "command": "lua <<< 'print([=[hi [[ public ]] bye]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_long_delimiters_producer",
+      "command": "printf '%s\\n' 'print([=[hi [[ public ]] bye]=])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_unextracted_inline",
+      "command": "ruby -e '%x[grep -r TOKEN .]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_unextracted_heredoc",
+      "command": "ruby <<'SYNTHETIC'\n%x[grep -r TOKEN .]\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_unextracted_herestring",
+      "command": "ruby <<< '%x[grep -r TOKEN .]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_unextracted_producer",
+      "command": "printf '%s\\n' '%x[grep -r TOKEN .]' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_php_backtick",
+      "command": "php -r 'echo `grep -r TOKEN .`;'",
+      "deny": true
+    },
+    {
+      "name": "audit25_php_backtick_names",
+      "command": "php -r 'echo `grep -rl TOKEN .`;'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_unterminated_q_inline",
+      "command": "perl -e 'print q{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_q_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint q{public\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_q_herestring",
+      "command": "perl <<< 'print q{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_q_producer",
+      "command": "printf '%s\\n' 'print q{public' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qq_inline",
+      "command": "perl -e 'print qq{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qq_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint qq{public\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qq_herestring",
+      "command": "perl <<< 'print qq{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qq_producer",
+      "command": "printf '%s\\n' 'print qq{public' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qw_inline",
+      "command": "perl -e 'print qw{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qw_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint qw{public\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qw_herestring",
+      "command": "perl <<< 'print qw{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qw_producer",
+      "command": "printf '%s\\n' 'print qw{public' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qx_inline",
+      "command": "perl -e 'print qx{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qx_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint qx{public\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qx_herestring",
+      "command": "perl <<< 'print qx{public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_qx_producer",
+      "command": "printf '%s\\n' 'print qx{public' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_escape_inline",
+      "command": "perl -e 'print q{public\\}'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_escape_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint q{public\\}\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_escape_herestring",
+      "command": "perl <<< 'print q{public\\}'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_unterminated_escape_producer",
+      "command": "printf '%s\\n' 'print q{public\\}' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_unterminated_inline",
+      "command": "lua -e 'print([=[public]]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_unterminated_heredoc",
+      "command": "lua <<'SYNTHETIC'\nprint([=[public]]\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_unterminated_herestring",
+      "command": "lua <<< 'print([=[public]]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_unterminated_producer",
+      "command": "printf '%s\\n' 'print([=[public]]' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_fatcomma_inline",
+      "command": "perl -e 'my %h=(q=>1); system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_fatcomma_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy %h=(q=>1); system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_fatcomma_herestring",
+      "command": "perl <<< 'my %h=(q=>1); system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_fatcomma_producer",
+      "command": "printf '%s\\n' 'my %h=(q=>1); system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_subscript_inline",
+      "command": "perl -e 'print $h{q}; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_subscript_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint $h{q}; system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_subscript_herestring",
+      "command": "perl <<< 'print $h{q}; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_subscript_producer",
+      "command": "printf '%s\\n' 'print $h{q}; system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_method_inline",
+      "command": "perl -e '$o->q; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_method_heredoc",
+      "command": "perl <<'SYNTHETIC'\n$o->q; system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_method_herestring",
+      "command": "perl <<< '$o->q; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_method_producer",
+      "command": "printf '%s\\n' '$o->q; system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_spaced_key_inline",
+      "command": "perl -e 'print $h{ q }; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_spaced_key_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint $h{ q }; system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_spaced_key_herestring",
+      "command": "perl <<< 'print $h{ q }; system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_spaced_key_producer",
+      "command": "printf '%s\\n' 'print $h{ q }; system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_qq_key_inline",
+      "command": "perl -e 'my %h=(qq=>1); system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_qq_key_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy %h=(qq=>1); system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_qq_key_herestring",
+      "command": "perl <<< 'my %h=(qq=>1); system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_qq_key_producer",
+      "command": "printf '%s\\n' 'my %h=(qq=>1); system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_key_control_inline",
+      "command": "perl -e 'my %h=(q=>1); print $h{q}'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_key_control_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy %h=(q=>1); print $h{q}\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_key_control_herestring",
+      "command": "perl <<< 'my %h=(q=>1); print $h{q}'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_key_control_producer",
+      "command": "printf '%s\\n' 'my %h=(q=>1); print $h{q}' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_spaced_key_control_inline",
+      "command": "perl -e 'my %h=(q => 1); print $h{ q }'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_spaced_key_control_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy %h=(q => 1); print $h{ q }\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_spaced_key_control_herestring",
+      "command": "perl <<< 'my %h=(q => 1); print $h{ q }'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_spaced_key_control_producer",
+      "command": "printf '%s\\n' 'my %h=(q => 1); print $h{ q }' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_method_control_inline",
+      "command": "perl -e '$o->q; print 1'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_method_control_heredoc",
+      "command": "perl <<'SYNTHETIC'\n$o->q; print 1\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_method_control_herestring",
+      "command": "perl <<< '$o->q; print 1'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_method_control_producer",
+      "command": "printf '%s\\n' '$o->q; print 1' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_quote_control_inline",
+      "command": "perl -e 'print q{public {nested} prose}'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_quote_control_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint q{public {nested} prose}\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_quote_control_herestring",
+      "command": "perl <<< 'print q{public {nested} prose}'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_quote_control_producer",
+      "command": "printf '%s\\n' 'print q{public {nested} prose}' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comparison_quote_inline",
+      "command": "perl -e 'my $x=1 > q{public}; print $x'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comparison_quote_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x=1 > q{public}; print $x\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comparison_quote_herestring",
+      "command": "perl <<< 'my $x=1 > q{public}; print $x'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comparison_quote_producer",
+      "command": "printf '%s\\n' 'my $x=1 > q{public}; print $x' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_producer_unknown_scalar",
+      "command": "printf '%s\\n' 'system(\"dotenvx\",\"get\")'\"${unknown}\" | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_producer_unknown_sequence",
+      "command": "printf '%s\\n' 'system(\"dotenvx\",\"get\")'{1..2} | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_producer_known",
+      "command": "prefix=''; printf '%s\\n' \"${prefix}\"'system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_producer_public",
+      "command": "printf '%s\\n' 'print(1)' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_launch_inline",
+      "command": "lua -e '--[[x]] os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_launch_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[[x]] os.execute([[grep -r TOKEN .]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_launch_herestring",
+      "command": "lua <<< '--[[x]] os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_launch_producer",
+      "command": "printf '%s\\n' '--[[x]] os.execute([[grep -r TOKEN .]])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_launch_inline",
+      "command": "lua -e '--[==[x]==] os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_launch_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[==[x]==] os.execute([[grep -r TOKEN .]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_launch_herestring",
+      "command": "lua <<< '--[==[x]==] os.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_launch_producer",
+      "command": "printf '%s\\n' '--[==[x]==] os.execute([[grep -r TOKEN .]])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_unterminated_inline",
+      "command": "lua -e '--[[public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_unterminated_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[[public\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_unterminated_herestring",
+      "command": "lua <<< '--[[public'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_unterminated_producer",
+      "command": "printf '%s\\n' '--[[public' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_unterminated_inline",
+      "command": "lua -e '--[==[public]=]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_unterminated_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[==[public]=]\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_unterminated_herestring",
+      "command": "lua <<< '--[==[public]=]'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_equals_unterminated_producer",
+      "command": "printf '%s\\n' '--[==[public]=]' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_block_public_inline",
+      "command": "lua -e '--[[x]] print([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_public_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[[x]] print([[hi]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_public_herestring",
+      "command": "lua <<< '--[[x]] print([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_public_producer",
+      "command": "printf '%s\\n' '--[[x]] print([[hi]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_names_inline",
+      "command": "lua -e '--[==[x]==] os.execute([[grep -rl TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_names_heredoc",
+      "command": "lua <<'SYNTHETIC'\n--[==[x]==] os.execute([[grep -rl TOKEN .]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_names_herestring",
+      "command": "lua <<< '--[==[x]==] os.execute([[grep -rl TOKEN .]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_block_names_producer",
+      "command": "printf '%s\\n' '--[==[x]==] os.execute([[grep -rl TOKEN .]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_line_public_inline",
+      "command": "lua -e '-- ordinary\nprint([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_line_public_heredoc",
+      "command": "lua <<'SYNTHETIC'\n-- ordinary\nprint([[hi]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_line_public_herestring",
+      "command": "lua <<< '-- ordinary\nprint([[hi]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_line_public_producer",
+      "command": "printf '%s\\n' '-- ordinary\nprint([[hi]])' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_line_launch_inline",
+      "command": "lua -e '-- ordinary\nos.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_line_launch_heredoc",
+      "command": "lua <<'SYNTHETIC'\n-- ordinary\nos.execute([[grep -r TOKEN .]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_line_launch_herestring",
+      "command": "lua <<< '-- ordinary\nos.execute([[grep -r TOKEN .]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_line_launch_producer",
+      "command": "printf '%s\\n' '-- ordinary\nos.execute([[grep -r TOKEN .]])' | lua",
+      "deny": true
+    },
+    {
+      "name": "audit25_lua_plain_dash_comment_inline",
+      "command": "lua -e '-- public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_plain_dash_comment_heredoc",
+      "command": "lua <<'SYNTHETIC'\n-- public\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_plain_dash_comment_herestring",
+      "command": "lua <<< '-- public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_lua_plain_dash_comment_producer",
+      "command": "printf '%s\\n' '-- public' | lua",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_launch_inline",
+      "command": "perl -e 'my $x = q # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = q # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_launch_herestring",
+      "command": "perl <<< 'my $x = q # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_launch_producer",
+      "command": "printf '%s\\n' 'my $x = q # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_public_inline",
+      "command": "perl -e 'my $x = q # comment\n{public}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = q # comment\n{public}; print 1; # closing hash #\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_public_herestring",
+      "command": "perl <<< 'my $x = q # comment\n{public}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_q_spaced_comment_public_producer",
+      "command": "printf '%s\\n' 'my $x = q # comment\n{public}; print 1; # closing hash #' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_launch_inline",
+      "command": "perl -e 'my $x = qq # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = qq # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_launch_herestring",
+      "command": "perl <<< 'my $x = qq # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_launch_producer",
+      "command": "printf '%s\\n' 'my $x = qq # comment\n{public}; system(\"dotenvx\",\"get\"); # closing hash #' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_public_inline",
+      "command": "perl -e 'my $x = qq # comment\n{public}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = qq # comment\n{public}; print 1; # closing hash #\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_public_herestring",
+      "command": "perl <<< 'my $x = qq # comment\n{public}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qq_spaced_comment_public_producer",
+      "command": "printf '%s\\n' 'my $x = qq # comment\n{public}; print 1; # closing hash #' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_launch_inline",
+      "command": "perl -e 'my @x = qw # comment\n(public); system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy @x = qw # comment\n(public); system(\"dotenvx\",\"get\"); # closing hash #\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_launch_herestring",
+      "command": "perl <<< 'my @x = qw # comment\n(public); system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_launch_producer",
+      "command": "printf '%s\\n' 'my @x = qw # comment\n(public); system(\"dotenvx\",\"get\"); # closing hash #' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_public_inline",
+      "command": "perl -e 'my @x = qw # comment\n(public); print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy @x = qw # comment\n(public); print 1; # closing hash #\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_public_herestring",
+      "command": "perl <<< 'my @x = qw # comment\n(public); print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qw_spaced_comment_public_producer",
+      "command": "printf '%s\\n' 'my @x = qw # comment\n(public); print 1; # closing hash #' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_launch_inline",
+      "command": "perl -e 'my $x = qx # comment\n{date}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = qx # comment\n{date}; system(\"dotenvx\",\"get\"); # closing hash #\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_launch_herestring",
+      "command": "perl <<< 'my $x = qx # comment\n{date}; system(\"dotenvx\",\"get\"); # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_launch_producer",
+      "command": "printf '%s\\n' 'my $x = qx # comment\n{date}; system(\"dotenvx\",\"get\"); # closing hash #' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_public_inline",
+      "command": "perl -e 'my $x = qx # comment\n{date}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = qx # comment\n{date}; print 1; # closing hash #\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_public_herestring",
+      "command": "perl <<< 'my $x = qx # comment\n{date}; print 1; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_qx_spaced_comment_public_producer",
+      "command": "printf '%s\\n' 'my $x = qx # comment\n{date}; print 1; # closing hash #' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_adjacent_hash_inline",
+      "command": "perl -e 'print q#public#'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_adjacent_hash_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint q#public#\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_adjacent_hash_herestring",
+      "command": "perl <<< 'print q#public#'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_adjacent_hash_producer",
+      "command": "printf '%s\\n' 'print q#public#' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_launch_inline",
+      "command": "perl -e 'my $x=q # comment\n{has#hash};system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x=q # comment\n{has#hash};system(\"dotenvx\",\"get\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_launch_herestring",
+      "command": "perl <<< 'my $x=q # comment\n{has#hash};system(\"dotenvx\",\"get\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_launch_producer",
+      "command": "printf '%s\\n' 'my $x=q # comment\n{has#hash};system(\"dotenvx\",\"get\")' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_public_inline",
+      "command": "perl -e 'my $x=q # comment\n{has#hash};print 1'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x=q # comment\n{has#hash};print 1\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_public_herestring",
+      "command": "perl <<< 'my $x=q # comment\n{has#hash};print 1'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_literal_hash_public_producer",
+      "command": "printf '%s\\n' 'my $x=q # comment\n{has#hash};print 1' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_qx_launch_inline",
+      "command": "perl -e 'print qx # comment\n{dotenvx get}; # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_qx_launch_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint qx # comment\n{dotenvx get}; # closing hash #\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_qx_launch_herestring",
+      "command": "perl <<< 'print qx # comment\n{dotenvx get}; # closing hash #'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_qx_launch_producer",
+      "command": "printf '%s\\n' 'print qx # comment\n{dotenvx get}; # closing hash #' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_comment_qx_public_inline",
+      "command": "perl -e 'print qx # comment\n{date}; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_qx_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint qx # comment\n{date}; # closing hash #\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_qx_public_herestring",
+      "command": "perl <<< 'print qx # comment\n{date}; # closing hash #'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_comment_qx_public_producer",
+      "command": "printf '%s\\n' 'print qx # comment\n{date}; # closing hash #' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_backtick_inline",
+      "command": "ruby -e 'p /#{`gh auth token`}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_backtick_heredoc",
+      "command": "ruby <<'SYNTHETIC'\np /#{`gh auth token`}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_backtick_herestring",
+      "command": "ruby <<< 'p /#{`gh auth token`}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_backtick_producer",
+      "command": "printf '%s\\n' 'p /#{`gh auth token`}/' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_backtick_inline",
+      "command": "perl -e 'print /@{[`gh auth token`]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_backtick_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint /@{[`gh auth token`]}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_backtick_herestring",
+      "command": "perl <<< 'print /@{[`gh auth token`]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_backtick_producer",
+      "command": "printf '%s\\n' 'print /@{[`gh auth token`]}/' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_scalar_backtick_inline",
+      "command": "perl -e 'print /${\\ `gh auth token`}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_scalar_backtick_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint /${\\ `gh auth token`}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_scalar_backtick_herestring",
+      "command": "perl <<< 'print /${\\ `gh auth token`}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_scalar_backtick_producer",
+      "command": "printf '%s\\n' 'print /${\\ `gh auth token`}/' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_argv_inline",
+      "command": "ruby -e 'p /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_argv_heredoc",
+      "command": "ruby <<'SYNTHETIC'\np /#{system(\"dotenvx\",\"get\")}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_argv_herestring",
+      "command": "ruby <<< 'p /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_argv_producer",
+      "command": "printf '%s\\n' 'p /#{system(\"dotenvx\",\"get\")}/' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_bare_call_inline",
+      "command": "ruby -e 'unfamiliar /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_bare_call_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nunfamiliar /#{system(\"dotenvx\",\"get\")}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_bare_call_herestring",
+      "command": "ruby <<< 'unfamiliar /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_bare_call_producer",
+      "command": "printf '%s\\n' 'unfamiliar /#{system(\"dotenvx\",\"get\")}/' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_assignment_inline",
+      "command": "ruby -e 'x = /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_assignment_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nx = /#{system(\"dotenvx\",\"get\")}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_assignment_herestring",
+      "command": "ruby <<< 'x = /#{system(\"dotenvx\",\"get\")}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_assignment_producer",
+      "command": "printf '%s\\n' 'x = /#{system(\"dotenvx\",\"get\")}/' | ruby",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_argv_inline",
+      "command": "perl -e 'my $x = /@{[system(\"dotenvx\",\"get\")]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_argv_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = /@{[system(\"dotenvx\",\"get\")]}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_argv_herestring",
+      "command": "perl <<< 'my $x = /@{[system(\"dotenvx\",\"get\")]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_argv_producer",
+      "command": "printf '%s\\n' 'my $x = /@{[system(\"dotenvx\",\"get\")]}/' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_qw_inline",
+      "command": "perl -e 'my $x = /@{[system(qw(dotenvx get))]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_qw_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = /@{[system(qw(dotenvx get))]}/\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_qw_herestring",
+      "command": "perl <<< 'my $x = /@{[system(qw(dotenvx get))]}/'",
+      "deny": true
+    },
+    {
+      "name": "audit25_perl_regex_qw_producer",
+      "command": "printf '%s\\n' 'my $x = /@{[system(qw(dotenvx get))]}/' | perl",
+      "deny": true
+    },
+    {
+      "name": "audit25_ruby_regex_public_inline",
+      "command": "ruby -e 'p \"a\" =~ /a+/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_public_heredoc",
+      "command": "ruby <<'SYNTHETIC'\np \"a\" =~ /a+/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_public_herestring",
+      "command": "ruby <<< 'p \"a\" =~ /a+/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_public_producer",
+      "command": "printf '%s\\n' 'p \"a\" =~ /a+/' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_public_inline",
+      "command": "perl -e 'print \"x\" =~ /x/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nprint \"x\" =~ /x/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_public_herestring",
+      "command": "perl <<< 'print \"x\" =~ /x/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_public_producer",
+      "command": "printf '%s\\n' 'print \"x\" =~ /x/' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_public_inline",
+      "command": "ruby -e 'p /#{system(\"echo\",\"public\")}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_public_heredoc",
+      "command": "ruby <<'SYNTHETIC'\np /#{system(\"echo\",\"public\")}/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_public_herestring",
+      "command": "ruby <<< 'p /#{system(\"echo\",\"public\")}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_public_producer",
+      "command": "printf '%s\\n' 'p /#{system(\"echo\",\"public\")}/' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_public_inline",
+      "command": "perl -e 'my $x = /@{[system(qw(echo public))]}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_public_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = /@{[system(qw(echo public))]}/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_public_herestring",
+      "command": "perl <<< 'my $x = /@{[system(qw(echo public))]}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_public_producer",
+      "command": "printf '%s\\n' 'my $x = /@{[system(qw(echo public))]}/' | perl",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_names_inline",
+      "command": "ruby -e 'x = /#{system(\"grep\",\"-rl\",\"TOKEN\",\".\")}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_names_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nx = /#{system(\"grep\",\"-rl\",\"TOKEN\",\".\")}/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_names_herestring",
+      "command": "ruby <<< 'x = /#{system(\"grep\",\"-rl\",\"TOKEN\",\".\")}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_ruby_regex_interpolated_names_producer",
+      "command": "printf '%s\\n' 'x = /#{system(\"grep\",\"-rl\",\"TOKEN\",\".\")}/' | ruby",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_names_inline",
+      "command": "perl -e 'my $x = /@{[system(qw(grep -rl TOKEN .))]}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_names_heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = /@{[system(qw(grep -rl TOKEN .))]}/\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_names_herestring",
+      "command": "perl <<< 'my $x = /@{[system(qw(grep -rl TOKEN .))]}/'",
+      "deny": false
+    },
+    {
+      "name": "audit25_perl_regex_interpolated_names_producer",
+      "command": "printf '%s\\n' 'my $x = /@{[system(qw(grep -rl TOKEN .))]}/' | perl",
+      "deny": false
+    }
+  ]
+}

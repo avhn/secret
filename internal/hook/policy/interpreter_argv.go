@@ -9,16 +9,24 @@ import (
 // Unknown expressions, interpolation and unsupported escapes never supply an
 // argv witness. Existing file/environment/string witnesses still run separately.
 type interpreterToken struct {
-	text    string
-	literal bool // Fully static argv element.
-	witness bool // Closed source literal, even when interpolation is unresolved.
-	shell   bool
+	text          string
+	literal       bool // Fully static argv element.
+	witness       bool // Closed source literal, even when interpolation is unresolved.
+	shell         bool
+	indeterminate bool // A recognized literal did not terminate.
+	opaque        bool // Inert regex syntax, not unextracted executable source.
+	regexCode     bool // Ruby/Perl regex interpolation needs a bounded code scan.
 }
 
 func interpreterTokens(code, name string) []interpreterToken {
-	hashComments := pythonInterpreter(name) || optionIn("ruby perl php rscript", name)
+	return interpreterBodyTokens(code, name, false)
+}
+
+func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken {
+	hashComments := !regexBody && (pythonInterpreter(name) || optionIn("ruby perl php rscript", name))
 	slashComments := javascriptInterpreter(name) || name == "php"
 	statementLines := optionIn("ruby perl", name)
+	regexWork := 0
 	var tokens []interpreterToken
 	for i := 0; i < len(code); {
 		ch := code[i]
@@ -32,6 +40,15 @@ func interpreterTokens(code, name string) []interpreterToken {
 		// Python floor division and Perl's defined-or operator are not
 		// comments. Node's # is data (except for an initial hashbang).
 		if luaVersion.MatchString(name) && strings.HasPrefix(code[i:], "--") {
+			// Long comments can close before executable code on this line.
+			// Reuse the exact long-string delimiter and incomplete-input rules.
+			if token, end, ok := luaLiteralToken(code, i+2); ok {
+				if token.indeterminate {
+					tokens = append(tokens, token)
+				}
+				i = end
+				continue
+			}
 			if end := strings.IndexByte(code[i:], '\n'); end >= 0 {
 				i += end
 				continue
@@ -52,9 +69,26 @@ func interpreterTokens(code, name string) []interpreterToken {
 			}
 			break
 		}
-		if ch == '/' && (javascriptInterpreter(name) || optionIn("ruby perl", name)) && interpreterRegexStart(tokens) {
-			if end := interpreterRegexEnd(code, i); end > i {
-				tokens = append(tokens, interpreterToken{text: code[i:end]})
+		if ch == '/' && (javascriptInterpreter(name) || optionIn("ruby perl", name)) {
+			end, known := interpreterRegexEnd(code, i, &regexWork)
+			if !known {
+				return append(tokens, interpreterToken{indeterminate: true})
+			}
+			if end > i {
+				text := code[i:end]
+				interpolated := optionIn("ruby perl", name) && (strings.Contains(text, "#{") || strings.ContainsAny(text, "$@`"))
+				// Bare Ruby/Perl calls can take an interpolating regex without
+				// parentheses. Never let its # become a source line comment.
+				if interpreterRegexStart(tokens) || interpolated {
+					tokens = append(tokens, interpreterToken{text: text, opaque: !interpolated, regexCode: interpolated})
+					i = end
+					continue
+				}
+			}
+		}
+		if luaVersion.MatchString(name) {
+			if token, end, ok := luaLiteralToken(code, i); ok {
+				tokens = append(tokens, token)
 				i = end
 				continue
 			}
@@ -78,7 +112,7 @@ func interpreterTokens(code, name string) []interpreterToken {
 			delimiter := string(ch)
 			i += len(delimiter)
 			var value strings.Builder
-			shell := ch == '`' && optionIn("ruby perl", name)
+			shell := ch == '`' && optionIn("ruby perl php", name)
 			known, closed := ch != '`' || shell || javascriptInterpreter(name), false
 			for i < len(code) {
 				if strings.HasPrefix(code[i:], delimiter) {
@@ -136,9 +170,15 @@ func interpreterRegexStart(tokens []interpreterToken) bool {
 	return !prior.literal && (optionIn("= ( [ { , : ; ! ? & | ~ return throw case", prior.text) || prior.text == "\n")
 }
 
-func interpreterRegexEnd(code string, start int) int {
+func interpreterRegexEnd(code string, start int, work *int) (int, bool) {
 	class := false
 	for i := start + 1; i < len(code) && code[i] != '\n'; i++ {
+		// Failed slash candidates can overlap. Bound total scanning across
+		// the source, rather than allowing quadratic malformed-regex work.
+		*work += 1
+		if *work > 1<<20 {
+			return start, false
+		}
 		switch code[i] {
 		case '\\':
 			i++
@@ -152,11 +192,11 @@ func interpreterRegexEnd(code string, start int) int {
 				for i < len(code) && interpreterIdentifier(code[i]) {
 					i++
 				}
-				return i
+				return i, true
 			}
 		}
 	}
-	return start
+	return start, true
 }
 
 func interpreterIdentifier(ch byte) bool {
@@ -221,7 +261,7 @@ func literalStatementArguments(tokens []interpreterToken, start int) ([]string, 
 }
 
 func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
-	tokens := interpreterTokens(code, language)
+	tokens := interpreterBodyTokens(code, language, a.regexBody)
 	for i := 0; i < len(tokens); i++ {
 		if tokens[i].literal {
 			if tokens[i].shell && a.literalShellProtected(tokens[i].text, cwd) {
