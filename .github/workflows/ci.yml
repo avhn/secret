@@ -12,7 +12,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Seed hang stack dump
+      - name: Full Windows policy package
         env:
           GOTRACEBACK: all
-        run: go test -v -count=1 -timeout 30m ./internal/hook/policy/
+        run: go test -v -count=1 -timeout 40m -cpuprofile policy.cpu -o policy.test.exe ./internal/hook/policy/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-policy-profile
+          path: |
+            policy.cpu
+            policy.test.exe

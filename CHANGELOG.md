@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Reuse immutable denied-command fixture snapshots within a corpus run, with
+  separate trees for case-specific search inputs. Check unsupported Windows
+  fixture names before creating partial trees, preserving existing skips and
+  variant expectations. Disable result caching for the Windows policy CI step
+  so cmd/go does not recheck disposable filesystem inputs after reporting test
+  success. Exercise fuzz seeds with a native absolute cwd on every platform and
+  check nested analysis after sequential metadata and configured-path changes.
+  Production policy decisions are unchanged; Windows runtime validation remains
+  a separate runner gate.
+
 - Harden Bash printer detection across unknown and interleaved options, cover
   ECR Public and STS role/federation output, and retain only direct stash/login
   sinks. Track reader aliases and uncertain directory effects while preserving

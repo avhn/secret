@@ -205,6 +205,9 @@ func TestBudgets(t *testing.T) {
 }
 
 func FuzzAnalyze(f *testing.F) {
+	// A volume-less /synthetic cwd is rejected before parsing on Windows.
+	// Use a native absolute fixture path so every platform exercises the seeds.
+	cwd := f.TempDir()
 	for _, seed := range []string{"cat .env", "cat {a,b}", "$(cat .env)", "echo 'x'", strings.Repeat("x", 40<<10+1), "bash -c 'bash -c \"cat .env\"'"} {
 		f.Add(seed)
 	}
@@ -213,7 +216,7 @@ func FuzzAnalyze(f *testing.F) {
 			t.Skip()
 		}
 		start := time.Now()
-		_ = Analyze(src, "/synthetic", "/synthetic", protected)
+		_ = Analyze(src, cwd, cwd, protected)
 		if time.Since(start) > 5*time.Second {
 			t.Fatal("analysis exceeded hook deadline")
 		}
