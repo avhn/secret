@@ -1,0 +1,374 @@
+{
+  "cases": [
+    {
+      "name": "Read missing path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "Read null path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "Read number path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "Read boolean path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "Read object path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "Read array path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "Read empty path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"\"}}",
+      "deny": true
+    },
+    {
+      "name": "Read public path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"README.md\"}}",
+      "deny": false
+    },
+    {
+      "name": "Edit missing path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "Edit null path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "Edit number path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "Edit boolean path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "Edit object path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "Edit array path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "Edit empty path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"\"}}",
+      "deny": true
+    },
+    {
+      "name": "Edit public path",
+      "payload": "{\"tool_name\":\"Edit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"README.md\"}}",
+      "deny": false
+    },
+    {
+      "name": "Write missing path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "Write null path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "Write number path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "Write boolean path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "Write object path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "Write array path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "Write empty path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"\"}}",
+      "deny": true
+    },
+    {
+      "name": "Write public path",
+      "payload": "{\"tool_name\":\"Write\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"README.md\"}}",
+      "deny": false
+    },
+    {
+      "name": "MultiEdit missing path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit null path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit number path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit boolean path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit object path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit array path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit empty path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"\"}}",
+      "deny": true
+    },
+    {
+      "name": "MultiEdit public path",
+      "payload": "{\"tool_name\":\"MultiEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"README.md\"}}",
+      "deny": false
+    },
+    {
+      "name": "NotebookEdit missing path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit null path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit number path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit boolean path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit object path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit array path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit empty path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":\"\"}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit public path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"notebook_path\":\"README.md\"}}",
+      "deny": false
+    },
+    {
+      "name": "notebook alternate path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"README.md\"}}",
+      "deny": true
+    },
+    {
+      "name": "grep path null",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"path\":null}}",
+      "deny": true
+    },
+    {
+      "name": "grep path number",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"path\":1}}",
+      "deny": true
+    },
+    {
+      "name": "grep path boolean",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"path\":true}}",
+      "deny": true
+    },
+    {
+      "name": "grep path object",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"path\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "grep path array",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"path\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "grep output_mode null",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":null}}",
+      "deny": true
+    },
+    {
+      "name": "grep output_mode number",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":1}}",
+      "deny": true
+    },
+    {
+      "name": "grep output_mode boolean",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":true}}",
+      "deny": true
+    },
+    {
+      "name": "grep output_mode object",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "grep output_mode array",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "grep optional fields",
+      "payload": "{\"tool_name\":\"Grep\",\"cwd\":\"@CWD@\",\"tool_input\":{\"output_mode\":\"files_with_matches\"}}",
+      "deny": false
+    },
+    {
+      "name": "bash workdir null",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"workdir\":null}}",
+      "deny": true
+    },
+    {
+      "name": "bash workdir number",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"workdir\":1}}",
+      "deny": true
+    },
+    {
+      "name": "bash workdir boolean",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"workdir\":true}}",
+      "deny": true
+    },
+    {
+      "name": "bash workdir object",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"workdir\":{}}}",
+      "deny": true
+    },
+    {
+      "name": "bash workdir array",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"workdir\":[]}}",
+      "deny": true
+    },
+    {
+      "name": "bash optional workdir",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\"}}",
+      "deny": false
+    },
+    {
+      "name": "empty tool",
+      "payload": "{\"tool_name\":\"\",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "missing tool",
+      "payload": "{\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "high surrogate",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \\ud800\"}}",
+      "deny": true
+    },
+    {
+      "name": "low surrogate",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \\udc00\"}}",
+      "deny": true
+    },
+    {
+      "name": "reversed pair",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \\udc00\\ud800\"}}",
+      "deny": true
+    },
+    {
+      "name": "high then ascii",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \\ud800a\"}}",
+      "deny": true
+    },
+    {
+      "name": "surrogate pair",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \ud83d\ude00\"}}",
+      "deny": false
+    },
+    {
+      "name": "replacement",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \ufffd\"}}",
+      "deny": false
+    },
+    {
+      "name": "escaped backslash",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \\\\ud800\"}}",
+      "deny": false
+    },
+    {
+      "name": "surrogate key",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo public\",\"\\ud800\":\"public\"}}",
+      "deny": true
+    },
+    {
+      "name": "surrogate path",
+      "payload": "{\"tool_name\":\"Read\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"public\\ud800\"}}",
+      "deny": true
+    },
+    {
+      "name": "surrogate argv",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":[\"echo\",\"\\ud800\"]}}",
+      "deny": true
+    },
+    {
+      "name": "blank tool",
+      "payload": "{\"tool_name\":\"   \",\"cwd\":\"@CWD@\",\"tool_input\":{}}",
+      "deny": true
+    },
+    {
+      "name": "literal replacement character",
+      "payload": "{\"tool_name\":\"Bash\",\"cwd\":\"@CWD@\",\"tool_input\":{\"command\":\"echo \ufffd\"}}",
+      "deny": false
+    },
+    {
+      "name": "NotebookEdit file_path cannot replace notebook_path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"public.ipynb\"}}",
+      "deny": true
+    },
+    {
+      "name": "NotebookEdit empty notebook_path with file_path",
+      "payload": "{\"tool_name\":\"NotebookEdit\",\"cwd\":\"@CWD@\",\"tool_input\":{\"file_path\":\"public.ipynb\",\"notebook_path\":\"\"}}",
+      "deny": true
+    }
+  ]
+}

@@ -1,0 +1,492 @@
+{
+  "fixtures": [
+    [
+      "home/.aws/credentials",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "work/README.md",
+      "file",
+      "public\n"
+    ],
+    [
+      "work/.env",
+      "file",
+      "synthetic\n"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "N1 implicit yarn cwd",
+      "command": "yarn --cwd ~/.aws node -e 'console.log(require(\"fs\").readFileSync(\"credentials\",\"utf8\"))'",
+      "deny": true
+    },
+    {
+      "name": "N1 implicit public child",
+      "command": "yarn --cwd . node -e 'console.log(\"public\")'",
+      "deny": false
+    },
+    {
+      "name": "N1 cwd scope",
+      "command": "yarn --cwd ~/.aws node -e 'console.log(\"public\")'; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "N2 truthy gh",
+      "command": "gh auth status --show-token=TRUE",
+      "deny": true
+    },
+    {
+      "name": "N2 truthy op",
+      "command": "op item get synthetic --reveal=yes",
+      "deny": true
+    },
+    {
+      "name": "N2 truthy kubectl",
+      "command": "kubectl config view --raw=1",
+      "deny": true
+    },
+    {
+      "name": "N2 false gh",
+      "command": "gh auth status --show-token=off",
+      "deny": false
+    },
+    {
+      "name": "N2 false op",
+      "command": "op item get synthetic --reveal=false",
+      "deny": false
+    },
+    {
+      "name": "N2 false kubectl",
+      "command": "kubectl config view --raw=0",
+      "deny": false
+    },
+    {
+      "name": "N3 jsonpath variant",
+      "command": "kubectl get secrets -o jsonpath-as-json={.data}",
+      "deny": true
+    },
+    {
+      "name": "N3 jsonpath file",
+      "command": "kubectl get secrets --output=jsonpath-file=public.tpl",
+      "deny": true
+    },
+    {
+      "name": "N3 go template file",
+      "command": "kubectl get secrets -o go-template-file=public.tpl",
+      "deny": true
+    },
+    {
+      "name": "N3 public resource",
+      "command": "kubectl get pods -o yaml",
+      "deny": false
+    },
+    {
+      "name": "N3 metadata output",
+      "command": "kubectl get secrets -o name",
+      "deny": false
+    },
+    {
+      "name": "N5 otp",
+      "command": "op --account synthetic item get synthetic --otp",
+      "deny": true
+    },
+    {
+      "name": "N5 raw signin",
+      "command": "ionice -c 3 op --account=synthetic signin --raw",
+      "deny": true
+    },
+    {
+      "name": "N5 nonraw signin",
+      "command": "op signin",
+      "deny": false
+    },
+    {
+      "name": "N5 direct transport",
+      "command": "op item get synthetic --otp | secret stash synthetic OTP",
+      "deny": false
+    },
+    {
+      "name": "N6 python argv",
+      "command": "python3 -c \"subprocess.run(['aws','ecr','get-login-password'])\"",
+      "deny": true
+    },
+    {
+      "name": "N6 node argv",
+      "command": "node -e \"require('child_process').spawnSync('aws',['ecr','get-login-password'])\"",
+      "deny": true
+    },
+    {
+      "name": "N6 ruby argv",
+      "command": "ruby -e \"system('op','--account','synthetic','item','get','synthetic','--otp')\"",
+      "deny": true
+    },
+    {
+      "name": "N6 perl argv",
+      "command": "perl -e 'system(\"gh\",\"auth\",\"status\",\"--show-token=TRUE\")'",
+      "deny": true
+    },
+    {
+      "name": "N6 reader cwd",
+      "command": "cd ~/.aws; python3 -c \"subprocess.run(['cat','credentials'])\"",
+      "deny": true
+    },
+    {
+      "name": "N6 public argv",
+      "command": "python3 -c \"subprocess.run(['aws','s3','ls'])\"",
+      "deny": false
+    },
+    {
+      "name": "N6 public reader",
+      "command": "python3 -c \"subprocess.run(['cat','README.md'])\"",
+      "deny": false
+    },
+    {
+      "name": "N6 literal data",
+      "command": "python3 -c \"x=['aws','ecr','get-login-password']; print('public')\"",
+      "deny": false
+    },
+    {
+      "name": "N8 file URL",
+      "command": "curl file:@FILE_TMP@/home/.aws/credentials",
+      "deny": true
+    },
+    {
+      "name": "N8 url option",
+      "command": "curl --url file:@FILE_TMP@/home/.aws/credentials",
+      "deny": true
+    },
+    {
+      "name": "N8 attached url option",
+      "command": "curl --url=file:@FILE_TMP@/home/.aws/credentials",
+      "deny": true
+    },
+    {
+      "name": "N8 public file URL",
+      "command": "curl --url=file:@FILE_TMP@/work/README.md",
+      "deny": false
+    },
+    {
+      "name": "N8 raw data",
+      "command": "curl --data-raw @.env https://synthetic.invalid",
+      "deny": false
+    },
+    {
+      "name": "N6 review python floor division inline",
+      "command": "python3 -c 'import subprocess; n = 4 // 2; subprocess.run(['\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\''])'",
+      "deny": true
+    },
+    {
+      "name": "N6 review python floor division heredoc",
+      "command": "python3 <<'SYNTHETIC'\nimport subprocess; n = 4 // 2; subprocess.run(['aws','ecr','get-login-password'])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review python floor division public inline",
+      "command": "python3 -c 'import subprocess; n = 5 // 2; subprocess.run(['\\''git'\\'','\\''status'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review python floor division public heredoc",
+      "command": "python3 <<'SYNTHETIC'\nimport subprocess; n = 5 // 2; subprocess.run(['git','status'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl defined or inline",
+      "command": "perl -e 'my $x = undef // 0; system('\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\'');'",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl defined or heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = undef // 0; system('aws','ecr','get-login-password');\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl defined or public inline",
+      "command": "perl -e 'my $x = undef // 0; system('\\''git'\\'','\\''status'\\'');'",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl defined or public heredoc",
+      "command": "perl <<'SYNTHETIC'\nmy $x = undef // 0; system('git','status');\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review node hash regex inline",
+      "command": "node -e 'const re = /#/; require('\\''child_process'\\'').spawn('\\''aws'\\'', ['\\''ecr'\\'','\\''get-login-password'\\''], {stdio:'\\''inherit'\\''})'",
+      "deny": true
+    },
+    {
+      "name": "N6 review node hash regex heredoc",
+      "command": "node <<'SYNTHETIC'\nconst re = /#/; require('child_process').spawn('aws', ['ecr','get-login-password'], {stdio:'inherit'})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review node hash regex public inline",
+      "command": "node -e 'const re = /#/; require('\\''child_process'\\'').spawn('\\''git'\\'', ['\\''status'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review node hash regex public heredoc",
+      "command": "node <<'SYNTHETIC'\nconst re = /#/; require('child_process').spawn('git', ['status'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review python genuine comment inline",
+      "command": "python3 -c '# subprocess.run(['\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\''])\nsubprocess.run(['\\''git'\\'','\\''status'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review python genuine comment heredoc",
+      "command": "python3 <<'SYNTHETIC'\n# subprocess.run(['aws','ecr','get-login-password'])\nsubprocess.run(['git','status'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl genuine comment inline",
+      "command": "perl -e '# system('\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\'');\nsystem('\\''git'\\'','\\''status'\\'');'",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl genuine comment heredoc",
+      "command": "perl <<'SYNTHETIC'\n# system('aws','ecr','get-login-password');\nsystem('git','status');\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review ruby genuine comment inline",
+      "command": "ruby -e '# system('\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\'')\nsystem('\\''git'\\'','\\''status'\\'')'",
+      "deny": false
+    },
+    {
+      "name": "N6 review ruby genuine comment heredoc",
+      "command": "ruby <<'SYNTHETIC'\n# system('aws','ecr','get-login-password')\nsystem('git','status')\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review node genuine comment inline",
+      "command": "node -e '// child_process.spawn('\\''aws'\\'',['\\''ecr'\\'','\\''get-login-password'\\''])\nchild_process.spawn('\\''git'\\'',['\\''status'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review node genuine comment heredoc",
+      "command": "node <<'SYNTHETIC'\n// child_process.spawn('aws',['ecr','get-login-password'])\nchild_process.spawn('git',['status'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review node block comment inline",
+      "command": "node -e '/* child_process.spawn('\\''aws'\\'',['\\''ecr'\\'','\\''get-login-password'\\'']) */ child_process.spawn('\\''git'\\'',['\\''status'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review node block comment heredoc",
+      "command": "node <<'SYNTHETIC'\n/* child_process.spawn('aws',['ecr','get-login-password']) */ child_process.spawn('git',['status'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review uncertain argv launcher inline",
+      "command": "python3 -c 'import subprocess; subprocess.run(['\\''parallel'\\'','\\''--nonall'\\'','\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\''])'",
+      "deny": true
+    },
+    {
+      "name": "N6 review uncertain argv launcher heredoc",
+      "command": "python3 <<'SYNTHETIC'\nimport subprocess; subprocess.run(['parallel','--nonall','aws','ecr','get-login-password'])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review structurally uncertain argv inline",
+      "command": "python3 -c 'subprocess.run(['\\''bash'\\'','\\''-c'\\'','\\''if true; then'\\''])'",
+      "deny": true
+    },
+    {
+      "name": "N6 review structurally uncertain argv heredoc",
+      "command": "python3 <<'SYNTHETIC'\nsubprocess.run(['bash','-c','if true; then'])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review public argv launcher inline",
+      "command": "python3 -c 'subprocess.run(['\\''parallel'\\'','\\''-j2'\\'','\\''echo'\\'','\\'':::'\\'','\\''a'\\'','\\''b'\\''])'",
+      "deny": false
+    },
+    {
+      "name": "N6 review public argv launcher heredoc",
+      "command": "python3 <<'SYNTHETIC'\nsubprocess.run(['parallel','-j2','echo',':::','a','b'])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit24 tightening: N6 review ordinary launcher prose inline",
+      "command": "python3 -c 'print('\\''parallel --nonall aws'\\''); print('\\''ionice ionice ionice ionice git status'\\'')'",
+      "deny": true
+    },
+    {
+      "name": "audit24 tightening: N6 review ordinary launcher prose heredoc",
+      "command": "python3 <<'SYNTHETIC'\nprint('parallel --nonall aws'); print('ionice ionice ionice ionice git status')\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review ruby bare system deny inline",
+      "command": "ruby -e 'system '\\''aws'\\'', '\\''ecr'\\'', '\\''get-login-password'\\'';'",
+      "deny": true
+    },
+    {
+      "name": "N6 review ruby bare system deny heredoc",
+      "command": "ruby <<'SYNTHETIC'\nsystem 'aws', 'ecr', 'get-login-password';\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review ruby bare system public inline",
+      "command": "ruby -e 'system '\\''git'\\'', '\\''status'\\'';'",
+      "deny": false
+    },
+    {
+      "name": "N6 review ruby bare system public heredoc",
+      "command": "ruby <<'SYNTHETIC'\nsystem 'git', 'status';\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review ruby bare exec deny inline",
+      "command": "ruby -e 'exec '\\''aws'\\'', '\\''ecr'\\'', '\\''get-login-password'\\'';'",
+      "deny": true
+    },
+    {
+      "name": "N6 review ruby bare exec deny heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec 'aws', 'ecr', 'get-login-password';\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review ruby bare exec public inline",
+      "command": "ruby -e 'exec '\\''git'\\'', '\\''status'\\'';'",
+      "deny": false
+    },
+    {
+      "name": "N6 review ruby bare exec public heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec 'git', 'status';\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl bare system deny inline",
+      "command": "perl -e 'system '\\''aws'\\'', '\\''ecr'\\'', '\\''get-login-password'\\'';'",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl bare system deny heredoc",
+      "command": "perl <<'SYNTHETIC'\nsystem 'aws', 'ecr', 'get-login-password';\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl bare system public inline",
+      "command": "perl -e 'system '\\''git'\\'', '\\''status'\\'';'",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl bare system public heredoc",
+      "command": "perl <<'SYNTHETIC'\nsystem 'git', 'status';\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl bare exec deny inline",
+      "command": "perl -e 'exec '\\''aws'\\'', '\\''ecr'\\'', '\\''get-login-password'\\'';'",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl bare exec deny heredoc",
+      "command": "perl <<'SYNTHETIC'\nexec 'aws', 'ecr', 'get-login-password';\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "N6 review perl bare exec public inline",
+      "command": "perl -e 'exec '\\''git'\\'', '\\''status'\\'';'",
+      "deny": false
+    },
+    {
+      "name": "N6 review perl bare exec public heredoc",
+      "command": "perl <<'SYNTHETIC'\nexec 'git', 'status';\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "N6 execvp selected executable",
+      "command": "python3 -c 'import os; os.execvp(\"aws\", [\"synthetic-label\", \"ecr\", \"get-login-password\"])'",
+      "deny": true
+    },
+    {
+      "name": "N6 execvp argv label",
+      "command": "python3 -c 'import os; os.execvp(\"printf\", [\"aws\", \"ecr\", \"get-login-password\"])'",
+      "deny": false
+    },
+    {
+      "name": "N13 NotebookEdit authoritative protected target",
+      "tool": "NotebookEdit",
+      "fields": {
+        "file_path": "public.txt",
+        "notebook_path": ".env"
+      },
+      "deny": true
+    },
+    {
+      "name": "N13 NotebookEdit unrelated protected field",
+      "tool": "NotebookEdit",
+      "fields": {
+        "file_path": ".env",
+        "notebook_path": "public.ipynb"
+      },
+      "deny": false
+    },
+    {
+      "name": "N13 NotebookEdit public target",
+      "tool": "NotebookEdit",
+      "fields": {
+        "notebook_path": "public.ipynb"
+      },
+      "deny": false
+    },
+    {
+      "name": "N9 attached GH file input",
+      "command": "gh api --input=.env /synthetic",
+      "deny": true
+    },
+    {
+      "name": "N12 unknown launcher Lua",
+      "command": "synthetic-launcher lua5.4 -e 'print(os.getenv(\"TOKEN\"))'",
+      "deny": true
+    },
+    {
+      "name": "N8 curl literal URL query",
+      "command": "curl --url file:@TMP@/home/.aws/credentials?public",
+      "deny": true
+    },
+    {
+      "name": "N8 curl user agent data",
+      "command": "curl --user-agent=file:/synthetic/.env https://example.invalid",
+      "deny": false
+    },
+    {
+      "name": "N11 KUBECONFIG sequential replacement",
+      "command": "KUBECONFIG=a; KUBECONFIG=b; cat a",
+      "deny": false
+    },
+    {
+      "name": "N11 KUBECONFIG case public reader",
+      "command": "case public in public) export KUBECONFIG=a ;; *) export KUBECONFIG=b ;; esac; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "N11 AWS_CONFIG_FILE sequential replacement",
+      "command": "AWS_CONFIG_FILE=a; AWS_CONFIG_FILE=b; cat a",
+      "deny": false
+    },
+    {
+      "name": "N11 AWS_CONFIG_FILE case public reader",
+      "command": "case public in public) export AWS_CONFIG_FILE=a ;; *) export AWS_CONFIG_FILE=b ;; esac; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "N11 AWS_SHARED_CREDENTIALS_FILE sequential replacement",
+      "command": "AWS_SHARED_CREDENTIALS_FILE=a; AWS_SHARED_CREDENTIALS_FILE=b; cat a",
+      "deny": false
+    },
+    {
+      "name": "N11 AWS_SHARED_CREDENTIALS_FILE case public reader",
+      "command": "case public in public) export AWS_SHARED_CREDENTIALS_FILE=a ;; *) export AWS_SHARED_CREDENTIALS_FILE=b ;; esac; cat README.md",
+      "deny": false
+    }
+  ]
+}

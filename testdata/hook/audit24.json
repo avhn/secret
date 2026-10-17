@@ -1,0 +1,1094 @@
+{
+  "fixtures": [
+    ["home/kc.yaml", "file", "synthetic\n"],
+    ["home/.aws/credentials", "file", "synthetic\n"],
+    ["home/.aws/public.txt", "file", "public\n"],
+    ["work/public-tree/public.txt", "file", "public\n"],
+    ["work/.env", "file", "synthetic\n"],
+    [
+      "work/README.md",
+      "file",
+      "public\n"
+    ],
+    [
+      "home/public.txt",
+      "file",
+      "public\n"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "P1 Python spawn inline",
+      "command": "python3 -c 'import pty; pty.spawn(['\\''gh'\\'','\\''auth'\\'','\\''token'\\''])'",
+      "deny": true
+    },
+    {
+      "name": "P1 Python spawn stdin",
+      "command": "python3 <<'SYNTHETIC'\nimport pty; pty.spawn(['gh','auth','token'])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P1 Bun spawn inline",
+      "command": "bun -e 'Bun.spawnSync(['\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\''],{stdout:'\\''inherit'\\''})'",
+      "deny": true
+    },
+    {
+      "name": "P1 Bun spawn stdin",
+      "command": "bun <<'SYNTHETIC'\nBun.spawnSync(['aws','ecr','get-login-password'],{stdout:'inherit'})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P1 Ruby spawn inline",
+      "command": "ruby -e 'pid = Process.spawn('\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\''); Process.wait(pid)'",
+      "deny": true
+    },
+    {
+      "name": "P1 Ruby spawn stdin",
+      "command": "ruby <<'SYNTHETIC'\npid = Process.spawn('aws','ecr','get-login-password'); Process.wait(pid)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P1 Ruby array inline",
+      "command": "ruby -e 'puts IO.popen(['\\''aws'\\'','\\''ecr'\\'','\\''get-login-password'\\'']).read'",
+      "deny": true
+    },
+    {
+      "name": "P1 Ruby array stdin",
+      "command": "ruby <<'SYNTHETIC'\nputs IO.popen(['aws','ecr','get-login-password']).read\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P2 template argv inline",
+      "command": "node -e 'require('\\''child_process'\\'').spawnSync(`gh`,[`auth`,`token`],{stdio:'\\''inherit'\\''})'",
+      "deny": true
+    },
+    {
+      "name": "P2 template argv stdin",
+      "command": "node <<'SYNTHETIC'\nrequire('child_process').spawnSync(`gh`,[`auth`,`token`],{stdio:'inherit'})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P2 template shell inline",
+      "command": "node -e 'require('\\''child_process'\\'').execSync(`python3 -m keyring get s u`,{stdio:'\\''inherit'\\''})'",
+      "deny": true
+    },
+    {
+      "name": "P2 template shell stdin",
+      "command": "node <<'SYNTHETIC'\nrequire('child_process').execSync(`python3 -m keyring get s u`,{stdio:'inherit'})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P3 Bun eval inline",
+      "command": "bun run -e 'require('\\''child_process'\\'').execSync('\\''dotenvx get'\\'')'",
+      "deny": true
+    },
+    {
+      "name": "P3 Bun eval stdin",
+      "command": "bun <<'SYNTHETIC'\nrequire('child_process').execSync('dotenvx get')\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P3 Deno eval inline",
+      "command": "deno eval 'import {execSync} from '\\''node:child_process'\\''; execSync('\\''dotenvx get'\\'')'",
+      "deny": true
+    },
+    {
+      "name": "P3 Deno eval stdin",
+      "command": "deno <<'SYNTHETIC'\nimport {execSync} from 'node:child_process'; execSync('dotenvx get')\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P4 Lua inline",
+      "command": "lua -e 'os.execute('\\''dotenvx get'\\'')'",
+      "deny": true
+    },
+    {
+      "name": "P4 Lua stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute('dotenvx get')\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P4 PHP inline",
+      "command": "php -r 'system('\\''dotenvx get'\\'', $rc);'",
+      "deny": true
+    },
+    {
+      "name": "P4 PHP stdin",
+      "command": "php <<'SYNTHETIC'\nsystem('dotenvx get', $rc);\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P4 R inline",
+      "command": "Rscript -e 'system(command='\\''dotenvx get'\\'', intern=TRUE)'",
+      "deny": true
+    },
+    {
+      "name": "P4 R stdin",
+      "command": "Rscript <<'SYNTHETIC'\nsystem(command='dotenvx get', intern=TRUE)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P4 Ruby inline",
+      "command": "ruby -e 'Open3.capture2('\\''dotenvx get'\\'')'",
+      "deny": true
+    },
+    {
+      "name": "P4 Ruby stdin",
+      "command": "ruby <<'SYNTHETIC'\nOpen3.capture2('dotenvx get')\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P4 Perl pipe inline",
+      "command": "perl -e 'open(my $f, '\\''dotenvx get |'\\'');'",
+      "deny": true
+    },
+    {
+      "name": "P4 Perl pipe stdin",
+      "command": "perl <<'SYNTHETIC'\nopen(my $f, 'dotenvx get |');\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P5 Perl q inline",
+      "command": "perl -e 'system(q{npm run env})'",
+      "deny": true
+    },
+    {
+      "name": "P5 Perl q stdin",
+      "command": "perl <<'SYNTHETIC'\nsystem(q{npm run env})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "P5 Perl qx inline",
+      "command": "perl -e 'print qx(grep -r TOKEN .)'",
+      "deny": true
+    },
+    {
+      "name": "P5 Perl qx stdin",
+      "command": "perl <<'SYNTHETIC'\nprint qx(grep -r TOKEN .)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "fallback python3 -c dotenvx get",
+      "command": "python3 -c 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback python3 -c ordinary public prose",
+      "command": "python3 -c 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback python3 -c echo hello",
+      "command": "python3 -c 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback python3 -c cat README.md",
+      "command": "python3 -c 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback pypy3 -c dotenvx get",
+      "command": "pypy3 -c 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback pypy3 -c ordinary public prose",
+      "command": "pypy3 -c 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback pypy3 -c echo hello",
+      "command": "pypy3 -c 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback pypy3 -c cat README.md",
+      "command": "pypy3 -c 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback node -e dotenvx get",
+      "command": "node -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback node -e ordinary public prose",
+      "command": "node -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback node -e echo hello",
+      "command": "node -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback node -e cat README.md",
+      "command": "node -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback bun -e dotenvx get",
+      "command": "bun -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback bun -e ordinary public prose",
+      "command": "bun -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback bun -e echo hello",
+      "command": "bun -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback bun -e cat README.md",
+      "command": "bun -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback deno eval dotenvx get",
+      "command": "deno eval 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback deno eval ordinary public prose",
+      "command": "deno eval 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback deno eval echo hello",
+      "command": "deno eval 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback deno eval cat README.md",
+      "command": "deno eval 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback ruby -e dotenvx get",
+      "command": "ruby -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback ruby -e ordinary public prose",
+      "command": "ruby -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback ruby -e echo hello",
+      "command": "ruby -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback ruby -e cat README.md",
+      "command": "ruby -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback perl -e dotenvx get",
+      "command": "perl -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback perl -e ordinary public prose",
+      "command": "perl -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback perl -e echo hello",
+      "command": "perl -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback perl -e cat README.md",
+      "command": "perl -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback php -r dotenvx get",
+      "command": "php -r 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback php -r ordinary public prose",
+      "command": "php -r 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback php -r echo hello",
+      "command": "php -r 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback php -r cat README.md",
+      "command": "php -r 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback lua -e dotenvx get",
+      "command": "lua -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback lua -e ordinary public prose",
+      "command": "lua -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback lua -e echo hello",
+      "command": "lua -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback lua -e cat README.md",
+      "command": "lua -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback Rscript -e dotenvx get",
+      "command": "Rscript -e 'unfamiliar(\"dotenvx get\")'",
+      "deny": true
+    },
+    {
+      "name": "fallback Rscript -e ordinary public prose",
+      "command": "Rscript -e 'unfamiliar(\"ordinary public prose\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback Rscript -e echo hello",
+      "command": "Rscript -e 'unfamiliar(\"echo hello\")'",
+      "deny": false
+    },
+    {
+      "name": "fallback Rscript -e cat README.md",
+      "command": "Rscript -e 'unfamiliar(\"cat README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "P6 --cwd @TMP@/home/.aws cat credentials",
+      "command": "bun --cwd @TMP@/home/.aws run cat credentials",
+      "deny": true
+    },
+    {
+      "name": "P6 --cwd @TMP@/home/.aws cat public.txt",
+      "command": "bun --cwd @TMP@/home/.aws run cat public.txt",
+      "deny": false
+    },
+    {
+      "name": "P6 --cwd @TMP@/home/.aws stat credentials",
+      "command": "bun --cwd @TMP@/home/.aws run stat credentials",
+      "deny": false
+    },
+    {
+      "name": "P6 --cwd=@TMP@/home/.aws cat credentials",
+      "command": "bun --cwd=@TMP@/home/.aws run cat credentials",
+      "deny": true
+    },
+    {
+      "name": "P6 --cwd=@TMP@/home/.aws cat public.txt",
+      "command": "bun --cwd=@TMP@/home/.aws run cat public.txt",
+      "deny": false
+    },
+    {
+      "name": "P6 --cwd=@TMP@/home/.aws stat credentials",
+      "command": "bun --cwd=@TMP@/home/.aws run stat credentials",
+      "deny": false
+    },
+    {
+      "name": "P7 bare export KUBECONFIG",
+      "command": "KUBECONFIG=kc.yaml; export KUBECONFIG; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 branch export KUBECONFIG",
+      "command": "if true; then KUBECONFIG=kc.yaml; fi; export KUBECONFIG; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 tilde KUBECONFIG",
+      "command": "export KUBECONFIG=~/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 public KUBECONFIG",
+      "command": "KUBECONFIG=kc.yaml; export KUBECONFIG; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "P7 bare export AWS_CONFIG_FILE",
+      "command": "AWS_CONFIG_FILE=kc.yaml; export AWS_CONFIG_FILE; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 branch export AWS_CONFIG_FILE",
+      "command": "if true; then AWS_CONFIG_FILE=kc.yaml; fi; export AWS_CONFIG_FILE; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 tilde AWS_CONFIG_FILE",
+      "command": "export AWS_CONFIG_FILE=~/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 public AWS_CONFIG_FILE",
+      "command": "AWS_CONFIG_FILE=kc.yaml; export AWS_CONFIG_FILE; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "P7 bare export AWS_SHARED_CREDENTIALS_FILE",
+      "command": "AWS_SHARED_CREDENTIALS_FILE=kc.yaml; export AWS_SHARED_CREDENTIALS_FILE; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 branch export AWS_SHARED_CREDENTIALS_FILE",
+      "command": "if true; then AWS_SHARED_CREDENTIALS_FILE=kc.yaml; fi; export AWS_SHARED_CREDENTIALS_FILE; cat kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 tilde AWS_SHARED_CREDENTIALS_FILE",
+      "command": "export AWS_SHARED_CREDENTIALS_FILE=~/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "P7 public AWS_SHARED_CREDENTIALS_FILE",
+      "command": "AWS_SHARED_CREDENTIALS_FILE=kc.yaml; export AWS_SHARED_CREDENTIALS_FILE; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "P8 missing .aws",
+      "command": "tar xf home.tar && cd .aws && cat credentials",
+      "deny": true
+    },
+    {
+      "name": "P8 metadata .aws",
+      "command": "cd .aws && stat credentials",
+      "deny": false
+    },
+    {
+      "name": "P8 workdir .aws",
+      "tool": "Bash",
+      "fields": {
+        "command": "cat credentials",
+        "workdir": "@TMP@/work/.aws"
+      },
+      "deny": true
+    },
+    {
+      "name": "P8 missing .ssh",
+      "command": "tar xf home.tar && cd .ssh && cat id_rsa",
+      "deny": true
+    },
+    {
+      "name": "P8 metadata .ssh",
+      "command": "cd .ssh && stat id_rsa",
+      "deny": false
+    },
+    {
+      "name": "P8 workdir .ssh",
+      "tool": "Bash",
+      "fields": {
+        "command": "cat id_rsa",
+        "workdir": "@TMP@/work/.ssh"
+      },
+      "deny": true
+    },
+    {
+      "name": "P8 missing .kube",
+      "command": "tar xf home.tar && cd .kube && cat config",
+      "deny": true
+    },
+    {
+      "name": "P8 metadata .kube",
+      "command": "cd .kube && stat config",
+      "deny": false
+    },
+    {
+      "name": "P8 workdir .kube",
+      "tool": "Bash",
+      "fields": {
+        "command": "cat config",
+        "workdir": "@TMP@/work/.kube"
+      },
+      "deny": true
+    },
+    {
+      "name": "review Lua hash witness inline",
+      "command": "lua -e 'os.execute(\"dotenvx get #{x}\")'",
+      "deny": true
+    },
+    {
+      "name": "review Lua hash witness heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"dotenvx get #{x}\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "review Lua hash witness here-string",
+      "command": "lua <<< 'os.execute(\"dotenvx get #{x}\")'",
+      "deny": true
+    },
+    {
+      "name": "review Lua hash witness pipe",
+      "command": "printf '%s\\n' 'os.execute(\"dotenvx get #{x}\")' | lua",
+      "deny": true
+    },
+    {
+      "name": "review Lua hash public inline",
+      "command": "lua -e 'os.execute(\"echo hello #{x}\")'",
+      "deny": false
+    },
+    {
+      "name": "review Lua hash public heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"echo hello #{x}\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "review Lua hash public here-string",
+      "command": "lua <<< 'os.execute(\"echo hello #{x}\")'",
+      "deny": false
+    },
+    {
+      "name": "review Lua hash public pipe",
+      "command": "printf '%s\\n' 'os.execute(\"echo hello #{x}\")' | lua",
+      "deny": false
+    },
+    {
+      "name": "review Bun template witness inline",
+      "command": "bun -e 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`dotenvx get ${x}`],{stdout:\"inherit\"})'",
+      "deny": true
+    },
+    {
+      "name": "review Bun template witness heredoc",
+      "command": "bun <<'SYNTHETIC'\nconst x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`dotenvx get ${x}`],{stdout:\"inherit\"})\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "review Bun template witness here-string",
+      "command": "bun <<< 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`dotenvx get ${x}`],{stdout:\"inherit\"})'",
+      "deny": true
+    },
+    {
+      "name": "review Bun template witness pipe",
+      "command": "printf '%s\\n' 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`dotenvx get ${x}`],{stdout:\"inherit\"})' | bun",
+      "deny": true
+    },
+    {
+      "name": "review Bun template public inline",
+      "command": "bun -e 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`echo hello ${x}`],{stdout:\"inherit\"})'",
+      "deny": false
+    },
+    {
+      "name": "review Bun template public heredoc",
+      "command": "bun <<'SYNTHETIC'\nconst x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`echo hello ${x}`],{stdout:\"inherit\"})\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "review Bun template public here-string",
+      "command": "bun <<< 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`echo hello ${x}`],{stdout:\"inherit\"})'",
+      "deny": false
+    },
+    {
+      "name": "review Bun template public pipe",
+      "command": "printf '%s\\n' 'const x=\"\"; Bun.spawnSync([\"sh\",\"-c\",`echo hello ${x}`],{stdout:\"inherit\"})' | bun",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG declare \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "declare KUBECONFIG=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG declare \"$HOME/kc.yaml\" README.md",
+      "command": "declare KUBECONFIG=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG declare $HOME/kc.yaml ~/kc.yaml",
+      "command": "declare KUBECONFIG=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG declare $HOME/kc.yaml README.md",
+      "command": "declare KUBECONFIG=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG declare \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "declare KUBECONFIG=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG declare \"${HOME}/kc.yaml\" README.md",
+      "command": "declare KUBECONFIG=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG declare ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "declare KUBECONFIG=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG declare ${HOME}/kc.yaml README.md",
+      "command": "declare KUBECONFIG=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "export -n KUBECONFIG=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n \"$HOME/kc.yaml\" README.md",
+      "command": "export -n KUBECONFIG=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n $HOME/kc.yaml ~/kc.yaml",
+      "command": "export -n KUBECONFIG=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n $HOME/kc.yaml README.md",
+      "command": "export -n KUBECONFIG=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "export -n KUBECONFIG=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n \"${HOME}/kc.yaml\" README.md",
+      "command": "export -n KUBECONFIG=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "export -n KUBECONFIG=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME KUBECONFIG export -n ${HOME}/kc.yaml README.md",
+      "command": "export -n KUBECONFIG=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "declare AWS_CONFIG_FILE=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare \"$HOME/kc.yaml\" README.md",
+      "command": "declare AWS_CONFIG_FILE=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare $HOME/kc.yaml ~/kc.yaml",
+      "command": "declare AWS_CONFIG_FILE=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare $HOME/kc.yaml README.md",
+      "command": "declare AWS_CONFIG_FILE=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "declare AWS_CONFIG_FILE=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare \"${HOME}/kc.yaml\" README.md",
+      "command": "declare AWS_CONFIG_FILE=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "declare AWS_CONFIG_FILE=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE declare ${HOME}/kc.yaml README.md",
+      "command": "declare AWS_CONFIG_FILE=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "export -n AWS_CONFIG_FILE=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n \"$HOME/kc.yaml\" README.md",
+      "command": "export -n AWS_CONFIG_FILE=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n $HOME/kc.yaml ~/kc.yaml",
+      "command": "export -n AWS_CONFIG_FILE=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n $HOME/kc.yaml README.md",
+      "command": "export -n AWS_CONFIG_FILE=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "export -n AWS_CONFIG_FILE=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n \"${HOME}/kc.yaml\" README.md",
+      "command": "export -n AWS_CONFIG_FILE=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "export -n AWS_CONFIG_FILE=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_CONFIG_FILE export -n ${HOME}/kc.yaml README.md",
+      "command": "export -n AWS_CONFIG_FILE=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare \"$HOME/kc.yaml\" README.md",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare $HOME/kc.yaml ~/kc.yaml",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare $HOME/kc.yaml README.md",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare \"${HOME}/kc.yaml\" README.md",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE declare ${HOME}/kc.yaml README.md",
+      "command": "declare AWS_SHARED_CREDENTIALS_FILE=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n \"$HOME/kc.yaml\" ~/kc.yaml",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=\"$HOME/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n \"$HOME/kc.yaml\" README.md",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=\"$HOME/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n $HOME/kc.yaml ~/kc.yaml",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=$HOME/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n $HOME/kc.yaml README.md",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=$HOME/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n \"${HOME}/kc.yaml\" ~/kc.yaml",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=\"${HOME}/kc.yaml\"; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n \"${HOME}/kc.yaml\" README.md",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=\"${HOME}/kc.yaml\"; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n ${HOME}/kc.yaml ~/kc.yaml",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=${HOME}/kc.yaml; cat ~/kc.yaml",
+      "deny": true
+    },
+    {
+      "name": "review HOME AWS_SHARED_CREDENTIALS_FILE export -n ${HOME}/kc.yaml README.md",
+      "command": "export -n AWS_SHARED_CREDENTIALS_FILE=${HOME}/kc.yaml; cat README.md",
+      "deny": false
+    },
+    {
+      "name": "review Bun runtime --cwd @TMP@/home/.aws -e credentials",
+      "command": "bun --cwd @TMP@/home/.aws -e 'console.log(require(\"fs\").readFileSync(\"credentials\",\"utf8\"))'",
+      "deny": true
+    },
+    {
+      "name": "review Bun runtime --cwd @TMP@/home/.aws -e public.txt",
+      "command": "bun --cwd @TMP@/home/.aws -e 'console.log(require(\"fs\").readFileSync(\"public.txt\",\"utf8\"))'",
+      "deny": false
+    },
+    {
+      "name": "review Bun runtime --cwd @TMP@/home/.aws run -e credentials",
+      "command": "bun --cwd @TMP@/home/.aws run -e 'console.log(require(\"fs\").readFileSync(\"credentials\",\"utf8\"))'",
+      "deny": true
+    },
+    {
+      "name": "review Bun runtime --cwd @TMP@/home/.aws run -e public.txt",
+      "command": "bun --cwd @TMP@/home/.aws run -e 'console.log(require(\"fs\").readFileSync(\"public.txt\",\"utf8\"))'",
+      "deny": false
+    },
+    {
+      "name": "review Bun runtime --cwd=@TMP@/home/.aws -e credentials",
+      "command": "bun --cwd=@TMP@/home/.aws -e 'console.log(require(\"fs\").readFileSync(\"credentials\",\"utf8\"))'",
+      "deny": true
+    },
+    {
+      "name": "review Bun runtime --cwd=@TMP@/home/.aws -e public.txt",
+      "command": "bun --cwd=@TMP@/home/.aws -e 'console.log(require(\"fs\").readFileSync(\"public.txt\",\"utf8\"))'",
+      "deny": false
+    },
+    {
+      "name": "review Bun runtime --cwd=@TMP@/home/.aws run -e credentials",
+      "command": "bun --cwd=@TMP@/home/.aws run -e 'console.log(require(\"fs\").readFileSync(\"credentials\",\"utf8\"))'",
+      "deny": true
+    },
+    {
+      "name": "review Bun runtime --cwd=@TMP@/home/.aws run -e public.txt",
+      "command": "bun --cwd=@TMP@/home/.aws run -e 'console.log(require(\"fs\").readFileSync(\"public.txt\",\"utf8\"))'",
+      "deny": false
+    },
+    {
+      "name": "review public-tree grep -r TOKEN . inline",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"grep -r TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -r TOKEN . heredoc",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"grep -r TOKEN .\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -r TOKEN . here-string",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"grep -r TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -r TOKEN . pipe",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"grep -r TOKEN .\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -rl TOKEN . inline",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"grep -rl TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -rl TOKEN . heredoc",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"grep -rl TOKEN .\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -rl TOKEN . here-string",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"grep -rl TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree grep -rl TOKEN . pipe",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"grep -rl TOKEN .\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree echo hello inline",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"echo hello\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree echo hello heredoc",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"echo hello\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree echo hello here-string",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"echo hello\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree echo hello pipe",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"echo hello\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -r TOKEN . inline",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -r TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -r TOKEN . heredoc",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"tar xf public.tar\"); os.execute(\"grep -r TOKEN .\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -r TOKEN . here-string",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -r TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -r TOKEN . pipe",
+      "deny": true,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -r TOKEN .\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -rl TOKEN . inline",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -rl TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -rl TOKEN . heredoc",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"tar xf public.tar\"); os.execute(\"grep -rl TOKEN .\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -rl TOKEN . here-string",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -rl TOKEN .\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); grep -rl TOKEN . pipe",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"tar xf public.tar\"); os.execute(\"grep -rl TOKEN .\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); echo hello inline",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua -e 'os.execute(\"tar xf public.tar\"); os.execute(\"echo hello\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); echo hello heredoc",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<'SYNTHETIC'\nos.execute(\"tar xf public.tar\"); os.execute(\"echo hello\")\nSYNTHETIC",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); echo hello here-string",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "lua <<< 'os.execute(\"tar xf public.tar\"); os.execute(\"echo hello\")'",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    },
+    {
+      "name": "review public-tree os.execute(\"tar xf public.tar\"); echo hello pipe",
+      "deny": false,
+      "tool": "Bash",
+      "fields": {
+        "command": "printf '%s\\n' 'os.execute(\"tar xf public.tar\"); os.execute(\"echo hello\")' | lua",
+        "workdir": "@TMP@/work/public-tree"
+      }
+    }
+  ]
+}

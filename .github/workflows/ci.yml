@@ -118,6 +118,12 @@ jobs:
         run: '"$BASH_BIN" tests/test-guard.sh'
       - name: Codex guard matrix
         run: '"$BASH_BIN" tests/test-codex.sh'
+      - name: Go Claude hook divergence matrix
+        if: runner.os == 'Linux'
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh guard "$RUNNER_TEMP/secret-go" claude
+      - name: Go Codex hook divergence matrix
+        if: runner.os == 'Linux'
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh codex "$RUNNER_TEMP/secret-go" codex
       - name: Check synthetic inventory
         run: BASH_BIN="$BASH_BIN" bash tests/inventory.sh --check
       - name: Stock bash 3.2 (macOS)
@@ -131,6 +137,7 @@ jobs:
 
   go:
     name: go (${{ matrix.os }})
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -149,9 +156,24 @@ jobs:
       - name: Vet Go packages
         shell: bash
         run: go vet ./...
+      - name: Test Windows policy package
+        if: runner.os == 'Windows'
+        shell: bash
+        timeout-minutes: 45
+        env:
+          GOTRACEBACK: all
+        # Stream subtests and timeout stacks. Disposable filesystem inputs are not
+        # reusable test results; avoid cmd/go rechecking their log after printing ok.
+        run: go test -v -count=1 -timeout 40m ./internal/hook/policy/
       - name: Test Go packages
         shell: bash
-        run: go test ./...
+        # Policy has its own Windows step; other packages retain the same deadline.
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            go list ./... | grep -v '^github.com/avhn/secret/internal/hook/policy$' | xargs go test -timeout 30m
+          else
+            go test -timeout 30m ./...
+          fi
       - name: Compare Bash store goldens
         if: runner.os != 'Windows'
         shell: bash
@@ -166,7 +188,13 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "1"
-        run: go test -race ./...
+        # The corpus replay is single-goroutine; Windows race builds run it too slowly to be useful.
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            go test -race -timeout 30m -skip '^TestGuardDeniedCorpus$' ./...
+          else
+            go test -race -timeout 30m ./...
+          fi
       - name: Check module files
         shell: bash
         run: go mod tidy && git diff --exit-code -- go.mod go.sum

@@ -1,0 +1,1149 @@
+# Hook tightening decisions for M2
+
+## Scope and limits
+
+The default Go build analyzes Bash tool calls through a bounded AST policy. The
+installed hook remains `hooks/guard-secrets`; no plugin manifest or `hooks.json`
+has changed. Synthetic tests do not establish installed-hook containment, host
+shell-dialect coverage, or failure-blocking behavior.
+
+The security model is accident prevention, not a sandbox. The analyzer does not
+execute Git, a shell interpreter, child commands, or provider value APIs while
+making a decision. It reads only the bounded metadata described below. Real-host
+failure tests, dialect evidence, and supported-platform CI remain separate gates.
+
+## Current policy
+
+- P0 recovers panics from decoding or analysis and emits a fixed denial without
+  the panic payload. Output errors still propagate, so an unwritable host channel
+  is not a failure-blocking guarantee.
+- P1 denies Git subcommands outside the case-sensitive built-in table, including
+  custom aliases and inline `-c alias.*`, without reading Git configuration for
+  aliases. Users can run an alias's expanded built-in command instead. It applies
+  exact global-option arities, inert-key allowlisting, index gates, and
+  command-running surface checks. Unknown options, subcommands, and ambiguous
+  repository locations deny.
+- P1 content checks use a bounded resolved index, rather than the work tree.
+  Protected index entries, protected path arguments, and indeterminate
+  repositories deny. Ignored and untracked `.env` files do not block `git log
+-p`; deleted-only history remains an exclusion. Index parsing supports versions
+  2, 3, and 4 under byte, entry, path-length, and checksum limits. Unsupported,
+  inaccessible, malformed, split, sparse, SHA-256, or otherwise indeterminate
+  index states deny.
+- P2 analyzes `find` children after wrapper handling. Only listed metadata
+  children are exempt from bounded scope inspection; unknown children, including
+  `echo`, are readers. Symlinks, uncertified operand streams, and unsupported
+  `parallel` grammar deny. A supplied non-protected `xargs` argument-list file is
+  a modeled operand source, while stdin-fed readers inspect the cwd scope.
+- P3 uses archive option and mode tables. Creation inspects bounded input scopes,
+  including symlinks. Stdout and extraction-to-command forms always deny.
+  Listing is metadata-only, including protected-looking member names. `cpio` and
+  `7z` model listing only; other forms deny. Literal safe compressor and
+  checkpoint commands are analyzed as shell text.
+- P4 and P5 invalidate later relative reads after ambiguous directory changes,
+  special tilde directories, `CDPATH`, relevant `shopt` settings, dynamic
+  `/proc` paths, and descriptor-directory aliases. Only specified harmless proc
+  files are exempt.
+- P6 models jq program-file selection, sed file and execution forms, and awk
+  literal file or system operands. Sed script files are inspected only through a
+  non-protected alias as bounded regular files of at most 8 KiB. Missing,
+  non-regular, unreadable, oversized, computed, or otherwise indeterminate
+  scripts deny. Sed script-file lookup uses native absolute paths on Windows,
+  preserving the regular-file and symlink checks.
+- P9 analyzes `-c` text for additional shell dialects and BusyBox or ToyBox shell
+  applets. P10 validates complete sed scripts before classifying file and
+  execution surfaces. P11 normalizes Bash option words before invalidating
+  uncertain path semantics. P12 tracks indirect assignment to environment names
+  consulted by later Git, shell, or ripgrep commands.
+- P13 expands single-element glob braces under explicit nesting and alternative
+  limits. P14 treats `apply_patch` heredocs as patches, rather than inert prose;
+  protected or malformed patches deny and safe framed patches remain allowed.
+- Inline Git configuration outside the inert `gitConfigInert` key allowlist
+  always denies, including `-c`, `--config-env`, `GIT_CONFIG_COUNT`, and
+  `GIT_CONFIG_PARAMETERS`. Inline editor and pager assignments accept only named
+  editor or pager programs and literal arguments; inline SSH, askpass, proxy,
+  and external-diff assignments deny. Inherited editor and pager settings are
+  not analyzed.
+- Shell hook code in `BASH_ENV` and `ENV` is treated as a file input. An
+  inline `BASH_ENV` pointing to an unprotected script also denies because its
+  sourced code is not certified. Inline `BASHOPTS` and `SHELLOPTS` with
+  path-changing options invalidate child shell directories. Other hook variables remain bounded shell fragments. Interpreter
+  environment access is denied for recognized environment reads in interpreter
+  arguments. No interpreter runs during analysis.
+- Sed uses a safe-subset allowlist: simple addresses, inert commands, bounded
+  labels, final one-line text commands, and final-line literal read/write
+  filenames. Execution commands and substitution execution/write flags always
+  deny. A positional script before `-e` or `-f`, or an inline assignment to
+  `POSIXLY_CORRECT`, denies. Multiple explicit scripts join with newlines.
+- Shell invocations without `-c` or a script file deny, including here-doc and
+  here-string input. Script-file operands and shell startup files must be
+  non-protected regular files. The scanner peels `setsid` and `script -qc`,
+  consumes shell option values, and rejects descriptor-based `source`. Inline `LESS*` settings
+  other than inert `LESS`, and append assignments to sensitive names, deny.
+- P17 checks known-command suffixes and shell-like arguments of unmodelled wrappers,
+  recognizes versioned shell names and option clusters around `-c`, and analyzes
+  fish initialization and coprocess bodies. Scriptless shells and sudo login or
+  shell mode without a command deny. Git commit messages remain operands, not
+  shell text, because Git is explicitly modelled.
+- P15 rejects non-read-only commands that touch Git configuration paths,
+  including directory options and in-place sed or perl abbreviations. Write
+  targets with unknown variables or globs, and relative targets after ambiguous
+  directory changes, deny. Literal assignments and HOME or XDG home paths are
+  resolved before deciding. P1e denies `git submodule foreach` outright.
+- Git helper names classify only when dispatched by bare name or from a
+  `git-core` directory; protected operands deny even for those helpers. Git
+  content commands deny for `.gitmodules` or submodule expansion. Command names
+  classify case-insensitively. Writes to Git configuration, `.gitmodules`,
+  worktree gitdirs, and global configuration deny, including redirected output,
+  command destinations, and in-place edits.
+
+The policy intentionally excludes simulated copy, link, and extraction state;
+computed script literals and `eval`; object-content reads; and claims about host
+installation or containment. Seven Bash-only external dependency fault cases are
+covered by Go scanner fault-injection tests, not command-text variants.
+
+## Current reviewed divergences
+
+Every row in `testdata/inventory/go-hook-divergence.tsv` has a named entry below.
+`deliberate-find-shim` is an injected dependency failure that Go does not execute,
+not a permission bypass. `deliberate-tightening` is an owner-approved
+indeterminate-input or audited input/output policy tightening.
+
+| Cases                                                                                                                                                                              | Category              | Reason                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `audit-arithmetic-unknown`                                                                                                                                                         | deliberate-tightening | `(( $(cat file) ))` contains a content-producing substitution and cannot be certified from arithmetic syntax.                                                                                |
+| `audit-cases5-6`                                                                                                                                                                   | deliberate-tightening | Ripgrep names mode with `--pre cat` invokes a content-producing child and cannot use the names-only shortcut.                                                                                |
+| `audit-cases7-2`                                                                                                                                                                   | deliberate-tightening | A symlinked ancestor can reach an actual credential file before `..`; a final-symlink alias exception cannot certify that input.                                                             |
+| `malformed_safe`, `oversized_safe`                                                                                                                                                 | deliberate-tightening | An absent framing pair, ambiguous header, or patch above the 40 KiB limit cannot certify safe target paths. Recognized protected headers deny even without framing.                          |
+| `active_safe_command`                                                                                                                                                              | deliberate-tightening | `$c package.json` does not establish the executable or its input and output roles.                                                                                                           |
+| `deep_safe`                                                                                                                                                                        | deliberate-tightening | Six nested `shell -c` layers exceed the Go analysis depth and deny.                                                                                                                          |
+| `audit6_sed_comment`, `audit6_sed_text_line`, `audit6_sed_insert_line`, `audit6_sed_change_line`                                                                                   | deliberate-tightening | GNU sed reads these as a comment or as a/i/c text, so Bash allows them; Go denies any script whose later commands follow a comment or text command on one line.                              |
+| `policy_v2_sed_script_clean`                                                                                                                                                       | deliberate-tightening | A `-f` script file holding `code` is a final one-line `c` command to GNU sed; Go certifies only scripts whose file text matches the safe subset exactly, so it denies.                       |
+| `grep_find_exit`, `grep_find_exit_count`, `grep_timeout`, `grep_timeout_count`, `rg_find_exit`, `rg_timeout`                                                                       | deliberate-find-shim  | Bash denies when the injected `find` exits or times out. Go does not execute `find`; its walk errors, permissions, loops, budgets, and deadlines deny under dedicated fault-injection tests. |
+| `unresolved_file_safe`, `unresolved_listing_safe`, `unresolved_literal_safe`, `unresolved_no_eval`, `unresolved_positional_safe`, `unresolved_redirect_safe`, `unresolved_wc_safe` | deliberate-tightening | Unknown parameter or substitution output cannot certify a non-protected content-producing input. The analyzer never executes a substitution to decide.                                       |
+
+## Permanent synthetic evidence
+
+Audit fixtures are synthetic and permanent in `testdata/hook/audit-cases.json`
+and `internal/hook/policy/testdata/audit3.json`. They cover JSON adapters,
+Git, archive, directory, find, xargs, parallel, jq, script, and patch decisions.
+Fixtures contain fabricated files, symlinks, and generated indexes only. The
+variant corpus preserves literal quoting, escaping, brace, and wrapper forms;
+active expansions are not made inert, heredoc delimiters are not changed to
+disable substitution, and invalid arithmetic rewrites are excluded.
+
+## Measurement and regeneration
+
+The default path uses bounded AST analysis with envelopes up to 1 MiB plus
+framing overhead. Ordinary shell text has an 8 KiB limit; inert heredoc bodies
+are excluded from that text limit but capped at 1 MiB overall. Word, brace, recursion, glob, and scan limits remain
+bounded. The timing wrapper measures process launch plus decision, not an
+installed host callback.
+
+Regenerate with `python3 -I tests/gen-go-hook-divergence.py ABSOLUTE_BINARY`.
+It runs the shell suites and both implementations on audit fixtures, refuses
+unreviewed suite categories or missing tightening-table entries, and writes the
+inventory mechanically. Run `bash tests/go-hook.sh guard ABSOLUTE_BINARY claude`
+and the corresponding Codex command for exact inventory checks.
+
+`tests/trial-go-hook.py` builds a disposable default binary and prints grouped
+counts and p99. Regenerate denied-command metadata fixtures with
+`python3 -I tests/gen-hook-variants.py`; it keeps Bash-only injected dependency
+faults out of command-text variants and tests their Go scanner boundary through
+fault injection.
+
+## Audit 10 addenda: Go hook
+
+The Go policy now treats attached Git tokens in non-reader operands and inline
+interpreter text as protected, and normalizes command-text Git directories and
+separate gitdirs for write checks. Shell `-c` option parsing stops at `-` or
+`--`, nested wrappers inspect command slots and option values, and interactive
+launchers without certifiable command text deny. `git submodule foreach` and
+unchecked `git apply` deny; a cwd listing piped to `xargs echo` denies only
+when its scope contains a protected file.
+
+Audit 10b distinguishes strict execution slots from best-effort ordinary
+arguments. Invalid shell syntax in titles, prose, JSON, SQL, and label filters
+is not a reason to deny; command slots such as `npm exec -c`, `make --eval`,
+`rsync -e`, and `gh alias set !...` must be certifiable. The `find` read-only
+allowlist excludes output-to-file primaries, and names modified after a static
+assignment no longer certify a write target. Synthetic fixtures under
+`internal/hook/policy/` and `internal/hook/paths/` pair the denials with
+ordinary Git metadata, safe file names, and public command forms. These are
+policy checks, not evidence that the installed Bash hook was replaced.
+
+## Audit 11a and 11b: Go hook
+
+Git configuration writes now include the destination itself, both bare and
+separate gitdirs, the effective working directory, attached destination options,
+and roots created by `git init` or `git clone` within the command. `git apply`
+passes only explicit check and summary modes with options from the reviewed
+allowlist; templates and command-running Git config do not pass. Static write
+variables are invalidated by subsequent identifier uses and indirect assignments.
+
+Make recipe and stdin sources, npm and npx call options, alias shells, launcher
+stdin, and abbreviated or clustered command slots are denied when execution
+cannot be certified. Heredocs fed to interpreters are not inert data. A command
+substitution containing only `cat` of an inert quoted heredoc is acceptable as
+Git or GitHub message data, and ordinary writes of a large inert heredoc remain
+acceptable. The Go envelope permits up to 1 MiB of such input; structural
+limits and internal failures still deny. The command corpus retains the audited
+allowances for public archive extraction, benign build tools, and literal copy
+and loop forms. Neither this policy nor synthetic tests assert installed-hook
+protection. The xargs reader with a named safe argument file now denies, because
+contents of that file are not certified to contain only safe paths.
+
+Additional unreviewed shell-suite divergence names from concurrent audit 11
+fixtures cannot be added to the inventory from this scope. Existing reviewed
+`sudo_shell_safe` and xargs argument-file permits now tighten under audit 11a;
+`heredoc_commit` supplies a protected token in a Git stdin message file and
+now denies under the revised P18 body rule; a `-m` cat heredoc substitution
+remains a valid inert message and must be permitted.
+
+Quoted shell wildcard metacharacters use private sentinel runes against bounded
+native directory entries instead of platform-dependent backslash escaping.
+This keeps quoted JSON, label filters, and prose literal on Windows while
+retaining unquoted wildcard expansion and protected-name checks. Invalid
+Windows fixture names are skipped; Windows runtime CI remains necessary.
+
+## P18 revised: Go backstop
+
+The revised backstop checks protected name tokens in interpreter heredoc and
+here-string bodies, literal interpreter code-option values, strict command
+slots, and arguments to commands without a classified model. Cat and tee
+bodies remain inert only when their output does not target a protected file;
+Cat heredocs inside Git commit message substitutions retain their previously
+classified data role; Git stdin message-file bodies still undergo P18 scanning.
+Existing Git configuration
+write checks still apply independently.
+
+Modelled operands retain their role classifications: secret transports,
+env-file consumers, metadata tools, Git messages, GitHub titles and bodies,
+reader patterns, and copy destinations are not raw-token denials. GitHub
+message operands are excluded from generic file-input checks without
+excluding other GitHub arguments. The synthetic P18 table covers both
+protected inline and unmodelled input and the documented safe forms. Sudo
+shell-option clusters continue to deny even with a command argument. The
+installed Bash hook remains separate from this Go policy.
+
+## P19 audit 12b Go fixes
+
+The bounded matcher now supports negated and POSIX bracket classes, directory
+wildcards, and globstar without treating quoted metacharacters as live on
+Windows. Inert heredoc substitutions are restricted to Git or GitHub message
+values, not file-option operands. Interpreter inline and stdin text receives
+Git directory and path checks, including separate and bare Git directories.
+Docker volume sources and GitHub API field-file inputs have file roles; Docker
+Compose configuration and dotenv listing are printers. Git configuration
+variables assigned in command text, make recipe prefixes and stdin makefiles,
+and interactive shell launchers deny. Safe build globs, metadata Git forms,
+Kubernetes secret creation, and public recursive grep trees remain available.
+`internal/hook/policy/p19_test.go` records these synthetic decisions. These
+checks do not execute any of their source commands.
+
+## Audit 13: Go hook
+
+The Go policy now rejects Compose configuration printers, dotenv/dotenvx
+printers through named package runners, credential configuration getters, PHP
+environment dumps, Docker environment inspection, and Kubernetes secret
+output with a Kubernetes printer reason. It denies credential-reading file URLs
+and zip inputs without evaluating source commands. Bounded glob expansion and
+recursive search check files actually in scope, while Git patterns and code
+identifiers are not mistaken for input paths. Ordinary unresolved non-reader
+operands, inert empty write arguments, static cwd changes in `&&` chains, and
+Docker PID pipelines remain available. Default rg excludes hidden files and
+simple root-level exact gitignored names; explicit hidden/no-ignore searches
+still deny. Windows native volume glob matching and quoted non-path operands
+have focused synthetic tests. Inert large heredocs skip content scans when
+their destination is already certified safe; non-inert bodies still receive
+protected-name checks. None of this changes the installed Bash hook.
+
+The `credential_glob` synthetic fixture now includes an actual matching home
+file. A glob over a missing credential file must allow under audit 13 even if
+the previous Bash guard denied its protected-looking spelling; this is a
+reviewed flipped expectation, not a weakening of a real protected read.
+
+The retained shell audit-13 fixture for `grep -rn --include='*.ts' foo .`
+contains `.secrets/nested.ts` under its reused cwd. Go correctly denies that
+read even though the new Bash suite expects allow. A clean fixture without a
+matching protected file allows. The Bash fixture or expectation must be
+corrected before this case can have honest parity.
+
+## Audit 14 decisions
+
+Git commit/tag stdin message files and GitHub stdin bodies from inert heredocs
+are data, not readers. This flips the older `git stdin message body` and
+`git commit -F -` prose expectations to allow. Clustered `-am` messages are
+likewise data. Explicit search roots are scanned even when hidden; recursively
+encountered hidden paths are skipped by default, and `.gitignore` exemptions
+require a work tree. The older denied `rg TOKEN src sub` corpus fixture now
+contains a visible `sub/app.env`, because its earlier hidden-only `sub/.env`
+would be skipped by default. An unmatched private-name glob denies if a later
+write could create a protected match, flipping the previous unmatched
+`~/.ssh/id_*` allowance. Conditional directory changes retain the original
+cwd as an alternative for later statements. Git cached removal, names-only
+searches, grep quiet/count output, and env-file consumers do not print values.
+
+Kubernetes `get secret -o custom-columns=...` selectors that target secret
+data and curl uploads of unresolved shell variables remain outside the
+syntactically certified subset. Neither guard provides containment against
+arbitrary transformed output or unobserved process behavior. macOS and Windows
+runtime CI remains necessary for native glob behavior.
+
+## Audit 15 Go decisions
+
+R1/R3 and L2 restore environment printers in launcher slots, peel leading
+package-manager options and local `run` binaries, and remove npm's argument
+separator before analyzing its selected command. Known venv/test/search data
+operands retain their non-command roles. R2/R8 analyze substitutions in
+unquoted message heredocs and keep interpreter heredocs scoped to their own
+statement. R4 derives future protected-name witnesses from the selector's
+literal structure, including arbitrary environment suffixes. R6 propagates
+success/failure cwd sets once per statement, with 32-directory and 4096-step
+caps; AST word budgets count each word once across alternative directories.
+
+L1 models fd execution as a child consuming the selected names. L3/L4 cover
+Kubernetes attached output values and comma-separated resource lists. L5/L6
+respect the selected Git worktree roots and effective ripgrep configuration;
+unsafe hidden/ignore settings cannot receive the default-skip exemption.
+L7 treats funzip as an uncertified archive stdout printer. L8 adds `.envrc`
+to path roles and the shipped ripgrep exclusions. O1/O2 keep grep output-only
+clusters and explicit-file rg counts/names available. O3/O4 use bounded,
+filter-aware walks for tool and shell searches. O5 certifies only pure filtered
+find name streams into xargs; formatted, disjunctive or otherwise unmodeled
+streams keep the conservative policy. O6 scopes no-index Git grep to its
+explicit roots. The older denied-corpus Git root fixtures now contain a
+visible `src/app.env`, preserving denied protected reads instead of retaining
+an over-denial of a public-only source tree. The old `grep -rl` role expectation
+flips to allow because names-only output is not a content read.
+
+W1 classifies Win32 invalid-name, bad-pathname, non-directory and filesystem
+invalid-argument errors as absent operand paths on Windows only. Permission
+and I/O errors are unchanged. Injected error tests run on Linux; native invalid
+filename cases still require Windows CI. R5/R7 and O7-O10 are Bash-specific;
+Go retains focused tests for the shared directory and search behavior without
+changing the installed Bash implementation from this workstream.
+
+Audit 15 completion also retains parent-directory and symlink checks for
+unmatched credential globs such as `~/.docker/c*.json`, in addition to deriving
+arbitrary environment-name witnesses from the selector. Repeated fd extension
+filters are alternatives: a later public extension cannot erase an earlier
+protected extension. Ripgrep JSON output does not gain the explicit-file
+count exemption when `--count` appears later in its arguments. Synthetic Go
+cases cover these regressions and the two Windows non-path data operands.
+The default-search proof accepts simple root-name Git ignore patterns, but a
+negation invalidates that proof: dropping `!app.env` after `*.env` could
+otherwise certify a file the search really reads. Both plain rg and untracked
+Git grep have a permanent synthetic negation case.
+
+## Audit 16 Go decisions and cross-platform regressions
+
+The initial cwd now goes through the same canonicalization as every subsequent
+flow state. Previously a future bare/clone Git root retained the original cwd
+alias, while a later redirect used the physical cwd and missed that protected
+root. A permanent Linux symlink-root reproducer covers all three creation forms.
+Unmatched credential-glob witnesses are slash-qualified before the shell callback,
+including on Windows, so an absent credential cannot enter the bare-name metadata
+exception merely because filepath.Join returned backslashes.
+
+A1 never uses negative glob alternatives as a narrowing proof, including mixed
+brace alternatives. Pure exclusions retain the ordinary rg default-scope/config
+proof; mixed positive/negative braces cannot reuse a protected config certificate.
+A2 normalizes shell negated classes in both selector and filesystem matching.
+A3 refuses the simple Git-ignore proof in the presence of .ignore/.rgignore files
+at the root, scanned descendant directories or ancestors through the worktree.
+Slash-free Git ignore patterns apply below the root as well; nested .gitignore
+files refuse that proof rather than silently overriding their negations.
+
+A4 models fd -g/--glob as boolean flags. A5 checks every positional/search-path
+root under the effective base directory for both fd execution and fd-to-xargs
+streams. Regex selectors without a glob/extension proof scan the whole selected
+scope. A6 uses the pattern-derived protected-name test for find name/iname
+filters and preserves a failed root proof instead of falling back to scanning
+only xargs' cwd. Metadata-only children stay available. Public file symlinks are
+checked through their resolved target; symlinked directories remain uncertified.
+A7 peels npm x just like npm exec, including package/yes options and its separator.
+A11 judges Windows alternate streams by their base file before missing-name
+handling, including unnamed $DATA streams; non-Windows colon names are unchanged.
+
+B2 peels Python -m modules while retaining venv/test environment-data roles.
+B3 accepts attached rg -tTYPE/-TTYPE with the same policy as separate type values.
+B4 adds the Markdown type family. B5 accepts rg quiet output on explicit files
+without exempting protected pattern-file inputs. B6 checks a literal DIR/** glob
+only within DIR, with the ordinary bounded protected-tree scan. B7 carries
+bounded cwd alternatives through brace blocks and if clauses, joined with the
+outer cwd instead of replacing alternatives with an unknown directory.
+
+These changes have synthetic Go deny and must-allow regressions. Native Windows
+stream behavior and macOS/Windows runner evidence remain CI gates; no installed
+hook or host-containment claim follows from Linux tests or cross-platform vet.
+
+## Audit 17 Go decisions and parity evidence
+
+D1 checks the roots supplying listing streams to xargs: every find path,
+fd/fdfind root and base directory, ls operand, Git -C directory and rg --files
+operand. Static shell expansion is shared with command dispatch. Missing,
+dynamic, unmodeled or protected scopes cannot fall back to a clean consumer
+cwd. Git repository/index overrides, scope-widening parent/top pathspecs and
+transformed or compound listing streams remain uncertified. Modeled wrappers check producer roots before retaining the
+existing consumer-scope check. Filtered find/fd proofs still walk matching
+physical names, including protected names such as .env.ts; directory symlinks
+remain uncertified unless
+the explicitly resolved root can be scanned safely. Metadata-only children
+remain available, as do public TypeScript find-to-wc and fd-to-gofmt commands.
+
+D2 leaves npx/npm exec call options and yarn exec shell strings out of
+safePackageChild. The strict shell-slot analyzer checks separate and attached
+call values, including pnpm exec calls and effective yarn/pnpm directory flags.
+D4 analyzes background commands without exporting their cwd, preserves the
+existing subshell/loop/branch denial coverage, and retains the parent cwd after
+a statically zero-iteration while-false loop. The historical audit3 `cd-41`
+expectation is a classified class (iii) over-denial correction: `cd .secrets &
+paste store` reads the ordinary outer `store`, not `.secrets/store`. Its command
+is retained with an allow expectation; new background-cd cases deny actual
+protected reads in the outer cwd.
+
+D7 shares fd roles with fdfind before raw operand checks and in pipe proofs.
+D8 treats keyring get, including Python module dispatch, as a credential printer;
+the existing direct-stash transport exception remains unchanged. D9 checks
+.ignore/.rgignore ancestors through the filesystem root, not merely through
+.git, and refuses certification if the 128-directory bound is exhausted.
+D3 dotted HOME store paths, D5 mixed brace selectors, D6 npm aliases/options and
+dotenv environment printers, and D10 option-prefixed package printers already
+deny in Go and now have permanent tests. D10 also consumes package-option values
+when peeling safe runners, preserving ordinary jest/vitest data operands.
+
+The audit 17 Go table runs shell text and argv-host routes against a fake HOME,
+with a shell-realistic missing-bare-operand callback. Dedicated physical-root
+and ancestor-ignore tests use disposable metadata only. No probed command is
+executed and these checks do not establish installed-host containment or native
+macOS/Windows runtime behavior.
+
+## Audit 18 Go package execution and keyring options
+
+pnpm `-c` and `--shell-mode` around `exec` analyze the joined child words as
+bounded strict shell source, rather than an executable name. Yarn exec uses
+that same joined-source check. npm exec/x and pnpm exec retain workspace
+selectors before and after the action, including npm options after child
+positionals until `--`. pnpm implicit local-binary execution shares shell-mode
+handling, and its workspace-root option resolves ancestor project metadata.
+Literal existing workspace directories
+are analyzed alongside the invocation directory. Unresolved package names and
+filter expressions inspect every possible project directory under the existing
+32-cwd, 4096-entry and analysis-deadline bounds. Workspace-root discovery checks
+only ancestor marker existence, never manifest contents. Git internals and
+installed node_modules trees are not implicit workspace candidates; explicit
+path selectors still check them. Unreadable scopes, directory symlinks and
+exhausted bounds deny rather than certify an incomplete scan. npm prefix checks
+both the selected directory and the invocation directory. Child cwd alternatives
+do not flow into subsequent sibling statements. Function definitions check their
+bodies without exporting their cwd or nested definitions. Known calls replay
+the body with bounded directory alternatives and recursion.
+
+npm script arguments retain their data role after the script name, so a literal
+`env` option value is not an environment-printing command. The env script itself
+still denies. Keyring consumes backend/path options with their documented arity,
+including attached and equals forms, before classifying get. Mode/output
+selectors also consume their values without obscuring the action. Python module
+execution shares those roles; help and direct-to-stash transport remain allowed.
+
+The retained Bash denial corpus and exact guard/Codex inventories include audit
+18, with Linux and Darwin guard inventories updated together. No denial case or
+expectation was removed, and no new acceptable divergence was added. The new Go
+tests use fabricated paths and values and never execute the probed commands.
+
+## Confirmation audit 19 credential and cwd coverage
+
+G1 protects Kubernetes config, literal inherited or command-assigned `KUBECONFIG`
+path lists, gcloud application-default credentials and its default credential
+DB/cache directory, Vault and Terraform tokens, Cargo credentials, PostgreSQL
+password files, and the user HOME's `.yarnrc.yml`. Matching uses names and physical
+path metadata, never credential contents. Project `.yarnrc.yml` remains readable:
+project npmAuthToken lines are outside this name-based protection. Static ripgrep
+certification requires the additional credential exclusions; custom KUBECONFIG
+names cannot be certified by that static list. Content-producing Git checks
+indexed names against inherited and command-assigned literal paths using both
+the command cwd and worktree root; a prior public index decision cannot erase a
+later configured credential witness. Filtered find/fd listing proofs
+and fd execution classify selected names against the analyzer's retained literal
+KUBECONFIG alternatives, including branch unions and physical aliases. Unfiltered
+ls, rg and Git listing proofs check those alternatives over the producer roots.
+Filters excluding the configured names and metadata-only consumers retain their
+allowances. Explicit names-only searches retain their existing rules.
+
+G2 treats `ack` and `ack-grep` as recursive content searches, not metadata tools.
+Their scopes get the conservative grep tree proof, without a Git-ignore
+exemption. Clean roots and names-only output remain allowed.
+
+G3 adds cloud, registry, Kubernetes and shell-environment token printers. Known
+global option values remain data, never actions. J1/J2 below extend recognition
+to unknown and interleaved options without relying on an exhaustive option list. A
+literal direct pipe to `docker login --password-stdin`, `helm registry login
+--password-stdin`, or validated `secret stash FILE KEY` is allowed. A tee,
+intermediate command, alternate stdin, upstream stdout diversion or unsupported
+sink cannot establish that exception. These syntax checks do not assert that an
+arbitrary child cannot transform or disclose values.
+
+G4 retains the deliberate template exemption: `.env.example`, `.env.sample`,
+`.env.template`, and names ending in those suffixes are readable outside protected
+directories. Git revision-member reads follow that rule as direct file reads do.
+Broad Git selectors such as `*.env*` are allowed with a safe bounded index,
+including template-only repositories; a protected index or explicit protected
+member still denies. The Bash side must use the same exemption; this is not
+permission for Go to be looser than the installed guard.
+
+H1 replays bounded literal eval source in the caller's cwd flow, including defined
+function calls and transparent command/builtin prefixes. Directory alternatives
+reach following statements, but child-shell and pipeline effects stay scoped.
+The former audit3 `cd-27` allowance is intentionally reclassified as a denial:
+eval can move the caller into a store before a relative read.
+
+H2 retains unknown cwd alongside replayed alternatives after multiple direct
+function directory changes, indirect function directory effects, or a call made
+away from the definition cwd. A single direct change at its definition cwd keeps
+its precise alternatives. Child-shell, background and uncalled nested-definition
+effects do not move the caller. Safe Git log/blame formatting still checks
+historical revision-member operands; pattern option values remain inert data.
+Doctl verbose flags, including equals forms, do not hide its auth token action.
+
+H4 includes npm global flags before or after exec operands. Operand-free pnpm
+script fallbacks avoid workspace enumeration even in wide projects, while still
+classifying default environment/token printers. Operand-bearing readers retain
+the complete bounded workspace-scope proof and deny if it cannot be completed.
+
+H3 accepts pnpm path selectors only with `./`, `../`, or an absolute path. npm
+workspace paths require a regular `package.json`. Other selectors conservatively
+check the bounded project directory tree rather than trusting an unrelated folder
+with the same name. This is the existing metadata-only fallback, not manifest
+parsing; incomplete or over-limit enumeration denies.
+
+Permanent mixed allow/deny envelopes are in `testdata/hook/audit19.json`, with
+additional quoted, escaped and wrapper variants for eval and Git in Go tests.
+Safe literal eval followed by a public read, including command/builtin and quoted
+forms, remains a required allow. Bash certifies the literal source in an isolated
+analysis scope without discarding its tracked cwd; dynamic source, shell-state
+mutations, and defined function calls still deny. The denied corpus retains
+per-case HOME and literal KUBECONFIG path metadata, including physical aliases,
+so replay uses the same credential witnesses as the synthetic shell suite.
+The directional inventory generator rejects
+any Bash-deny/Go-allow outcome rather than recording that split as tightening.
+
+Historical audit 19 directional tightening rows (both now deny in Bash as well;
+audit 22 regeneration removes their measured divergence rows):
+
+| Case                                    | Go difference                                                       | Reason                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `audit19_G3_13_printer_unknown_wrapper` | Deny an unknown launcher's Kubernetes token child                   | The recognized printer argv suffix is not ordinary data under an unmodeled launcher.                |
+| `audit19_G1_kube_branch_union`          | Deny a literal configured path after conflicting branch assignments | Branch merging must retain every possible configured credential path instead of clearing the proof. |
+
+## Commit review J1-J4 printer options and shell aliases
+
+J1/J2 match cloud, registry and Kubernetes printer action words in order across
+option positions. Known value-taking options retain their data roles. Unknown
+option tokens are omitted but their possible values remain candidates, so both
+boolean and value-taking readings are covered by the ordered-word match. The
+option terminator ends subcommand recognition. This deliberately conservative
+classification does not certify arbitrary option values as harmless. Ordinary
+AWS S3 listings, gcloud auth listings, Azure account metadata and Kubernetes pod
+listings remain allowed. No exhaustive global-option allowlist is needed to
+recognize a later printer action.
+
+The J1 direct-pipe exception is unchanged: only a literal single pipe into the
+validated docker login, helm registry login or secret stash consumer qualifies.
+Intermediate commands, unrelated docker/helm subcommands, redirected stdin and
+upstream stdout diversion still deny. Alias printers do not acquire a new
+transport exception.
+
+J3 retains bounded literal alias definitions, including definitions replayed by
+eval. Definitions containing cd/pushd/popd, eval or unresolved command syntax
+make subsequent cwd uncertain. Reader aliases replay as bounded shell source at
+the use site with the caller's arguments, assignments and redirects; conditional
+redefinitions retain every literal alternative. Recursive alias expansion is
+suppressed, as in the shell, and nested alias chains share the existing depth,
+word, flow-step and deadline bounds. Definitions in uncalled functions, child
+shells, substitutions, background commands and pipelines do not affect the
+outer alias scope. Public aliases such as ll='ls -l' retain their allowance.
+
+The named J3 wrapper-cwd tightening (`audit20_j3_alias#6` and
+`audit20_j3_alias#7`) also invalidates cwd after `command NAME` or `builtin NAME`
+when the live alias has directory effects, including through later-defined
+functions or alias chains, or unresolved command syntax. These wrappers suppress
+real shell alias expansion; the conservative uncertainty preserves directional
+Bash parity rather than claiming the alias executes. Ordinary `command ls`,
+`command -v`/`-V` queries and public aliases remain allowed. Redirects and
+operands on the wrapped call still receive normal analysis.
+
+J4 preserves Go's precise existing eval cwd flow: a cd inside a subshell or
+command substitution cannot move the caller. A subsequent missing bare
+credentials operand in the public cwd remains allowed, but the same read inside
+the child after its cd denies. Unresolved current-shell eval variables and
+arithmetic shell-state mutations retain unknown cwd rather than borrowing the
+child-scope exception. Tests and Claude/Codex envelopes use a disposable
+HOME with synthetic AWS credentials, never real stores or executed probe code.
+These results establish analyzer behavior only, not installed-host containment.
+
+## Confirmation audit 20 envelope and credential follow-ups
+
+K1 requires native absolute envelope cwd and no longer substitutes the guard
+process cwd. K2 validates raw argv element types before decoding strings, so null
+cannot become an empty argument. K3 preserves the no-decision behavior only for
+zero input bytes; whitespace and NUL-only requests receive explicit JSON denial.
+K4 rejects invalid UTF-8, raw or command NULs, missing/null shell command fields,
+non-string/non-array commands, null argv elements and duplicate keys at every
+JSON depth. The existing duplicate-key scanner is retained. Shared malformed
+byte fixtures are in `testdata/hook/audit20-invalid.json`, tested through the
+input decoder and both Claude/Codex decision routes.
+
+K5 protects `.aws/config` exactly like `.aws/credentials`, including tree and
+filtered content searches. Literal inherited AWS_CONFIG_FILE and
+AWS_SHARED_CREDENTIALS_FILE paths are matched as singular names, with lexical
+and physical aliases. Shell assignments retain path alternatives through branch
+unions and share the existing configured-path checks with KUBECONFIG. Assigned
+AWS paths containing the native path-list separator deny as indeterminate rather
+than being incorrectly split. Static ripgrep certification requires the AWS
+config exclusion and cannot certify arbitrary inherited AWS path names. Ordinary
+AWS configure list, S3 listings and get-caller-identity remain allowed.
+
+L1 interpreter inline code, heredocs, here-strings and oversized heredoc bodies
+use the shared name/metadata classifier with the interpreter cwd, HOME and
+retained literal configured paths. Bare filename literals count, not only
+slash-qualified paths. Redirect bodies see literal credential-path assignments
+on their recipient before analysis. No source is evaluated and no credential is
+opened. Public source files and project Yarn configuration retain their rules.
+The L1 decoded-producer check also inspects shell quote/escape-decoded arguments
+and here-strings on the upstream AST, including command/builtin wrappers, before
+interpreter pipeline exceptions. It retains the raw-source check and shares the
+existing word and deadline budgets. These are positive credential-name witnesses,
+not execution of producers or a general stdout evaluator. Permanent tables cover
+Python, Node, Ruby and Perl, relative and `./` names, inherited and assigned
+Kubernetes/AWS paths, literal quoting variants and public source allowances.
+
+L2 historical revision-member checks use configured-path-aware classification
+before safe log/blame/diff formatting returns. Summary flags cannot turn a
+protected historical blob operand into metadata-only input. Pattern/message
+option values remain data, and public template member reads remain allowed.
+
+L3 adds ECR public login passwords, ECR authorization tokens and STS assume-role,
+assume-role-with-web-identity, assume-role-with-saml and get-federation-token.
+Their option-independent classification and direct transport rules are the same
+as J1/J2. Tests also cover color off, no-cli-auto-prompt, gcloud billing project,
+doctl -c and Kubernetes request timeout options. All evidence is synthetic
+analyzer input, not a claim of host containment or installed protection.
+
+Windows CI follow-ups keep native drive-qualified absolute paths independent of
+uncertain cwd. Configured-path comparison canonicalizes the existing physical
+prefix through EvalSymlinks on Windows, which expands 8.3 aliases consistently
+with cwd and search-root normalization. Missing final components retain that
+canonical anchor; metadata errors other than absence still deny. The shared
+helper has OS-independent injected-resolver tests. Sed file slots admit a
+forward-slash drive prefix and literal tilde characters (including 8.3 names),
+without accepting colon as a general script delimiter or changing backslash
+escape grammar. Existing strict Windows function/index/search/sed tests remain.
+
+### Audit 20 interpreter stdin and inherited-index review
+
+Interpreter stdin provenance now follows the normal bounded command dispatcher
+through execution wrappers, literal aliases, subshells and brace groups. It is
+scoped to the recipient, not later independent commands. Source expansion stays
+anchored at the producer or redirect cwd; filename classification uses the
+interpreter's effective cwd, including env chdir and grouped directory changes.
+Here-strings and expansion-enabled heredocs use bounded, non-executing scalar
+expansion before the shared classifier, while quoted heredocs stay literal.
+Raw-source witnesses remain checked. Unknown or unsupported executable redirect
+expansion denies as indeterminate rather than becoming an empty body.
+
+Interpreter prose with a component longer than 255 characters is not sent to
+filesystem metadata checks as a plausible filename. Lexical and configured
+credential witnesses still deny, even in oversized names, and metadata failures
+for plausible paths still fail closed. Public long-text controls cover inline,
+heredoc, here-string and decoded-producer forms.
+
+The Git index lexical-only shortcut also requires both inherited singular AWS
+credential variables to be empty. Configured-path callbacks retain singular AWS
+names (including literal colons on supporting filesystems), cwd/worktree anchors
+and protected-name checks. Synthetic v2/v3/v4 indexes cover configured entries
+and public-file controls for both AWS variables. Permanent table regressions are
+in `internal/hook/policy/audit20_stdin_review_test.go`; none execute the probed
+commands or read credential contents. The directional parity requirement still
+applies; these tests make no installed-host protection claim.
+
+### Audit 20 cross-platform CI follow-ups
+
+Configured-name comparison retains the deepest resolvable physical ancestor when
+an oversized suffix cannot be looked up (ENAMETOOLONG, or Windows
+ERROR_FILENAME_EXCED_RANGE). This preserves configured witnesses across symlinked
+ancestors such as macOS /var and /private/var even when a component exceeds the
+filesystem limit. Ordinary physical resolution and the Windows existing-prefix
+resolver still return these errors to their fail-closed callers. Linux-runnable
+regressions use a disposable symlink and 300-byte components, check both alias
+directions and subtree coverage, and retain unrelated public-file controls.
+
+Existing-prefix canonicalization has a 128-attempt bound to limit metadata work
+independently of path depth and spelling. Exhaustion returns an error, not an
+allow. Injected-resolver tests cover relative parents, deep suffixes, drive roots,
+volume-relative names, UNC and extended-length paths without contacting shares.
+Relative-parent inputs converge under filepath.Dir in the baseline tests too;
+these tests do not demonstrate a Windows ancestor loop. The existing symlink-hop
+limit and strict metadata errors remain unchanged.
+
+All hook subprocess launches are synthetic test evidence, not analyzer behavior.
+GNU sed evidence and disposable Git fixture creation use context deadlines, empty
+stdin unless a test explicitly supplies synthetic sed source, captured output and
+a bounded inherited-pipe wait. Git fixtures also disable terminal prompts, pagers
+and optional locks, retaining isolated config, hooks and signing. A self-test
+checks synthetic stdin EOF, stdout/stderr capture and deadline termination. The
+GNU sed tests are Linux-only, so their previously unbounded commands do not
+establish the cause of the Windows stall. The retained Windows CI log contains
+no active test name or timeout stack; it is insufficient to attribute that stall
+to ancestor traversal or a child process. Windows policy tests now run separately
+with verbose subtest output, all-goroutine timeout diagnostics and a 25-minute
+test deadline, within a 60-minute Go job bound. Native Windows CI evidence is
+still required; Linux tests do not establish that the runner hang is resolved.
+
+### Audit 21 printer grammar and child roles (M2, M3)
+
+Go printer roles share one option normalizer for global and interleaved options,
+long equals forms, attached short values and short flag clusters. Known option
+values are data; unknown option values remain possible action words. Security
+password flags and clipboard output flags use cluster membership, not whole-argv
+spelling. Security -g remains an unconditional stderr denial. Docker inspect and
+Compose config, gh oauth_token, op, wallet and npm global config output use the
+same roles through launchers and literal interpreter command strings. Repeated
+output-option aliases cannot erase an earlier credential-output witness. The
+explicit Docker image-inspect and public-format controls remain readable; an
+unknown global option cannot supply the image-only proof. The boolean op --cache
+flag cannot consume an action word. A global -- cannot hide later positional
+actions or subcommand flags; harmless post-terminator operations remain allowed.
+
+Launchers consume their own option grammar and dispatch the actual child through
+ordinary command analysis, rather than a partial printer-name list. Scheduling
+priority, CPU mask, timeout duration and flock lock operands are not children.
+Malformed scheduling syntax denies instead of discarding a possible printer.
+Watch checks both literal child argv and joined shell source; --exec retains argv
+semantics. Watch --differences accepts its optional attached value without
+consuming the child command. Generic unknown execution derives printer witnesses from the shared
+role classifier. Classified reader operands and documented test/script data are
+not recast as launcher commands. Direct credential sink validation is unchanged;
+PHP, package config output, gh oauth_token and Kubernetes secret-object output
+retain their pre-existing unconditional denials when moved into shared roles.
+
+### Audit 21 command directories and curl inputs (M4, M5)
+
+Yarn --cwd joins the existing package directory model. Sudo chdir and env chdir
+continue to scope their child; make directory options and Compose project
+options now anchor their own reader/command analysis. A command's directory does
+not change the next shell statement. Repeated package, env, sudo and Compose
+directory options stay anchored at the original process cwd; make applies its
+-C options sequentially, including -sC and attached cluster values. Required and
+optional make option arities prevent letters inside file, include and scheduling
+values from becoming directory switches. Sudo retains its conservative
+original-cwd alternative. Tests cover HOME credential basenames, repeated options
+and public siblings.
+
+Curl file-input syntax is normalized before shared credential metadata checks:
+@ data and JSON inputs, --write-out/-w @ format files, form uploads/content
+files, upload/config options and local file URLs (including URL decoding and
+native drive paths). Quoted form filenames retain commas and semicolons;
+headers=@ is another file input even on a literal-valued field, while filename=
+remains metadata. Literal format strings are data. Known payloads,
+form-string literals and output destinations retain their data roles. Physical
+credential aliases and HOME paths use the ordinary resolver. Unknown curl
+options retain generic positive-witness checks; unsupported command-like syntax
+cannot become an allow merely because curl's known inputs have a grammar.
+
+### Audit 21 executable interpreter bodies (M6)
+
+Lua and Rscript join the interpreter stdin and inline-code paths, including
+os.getenv and Sys.getenv witnesses. Executable bodies inspect independently
+quoted literal strings and backticks with the same credential-printer roles as
+shell calls, including declare -p. Modeled literal launchers use the ordinary
+bounded child dispatcher with isolated command state. Indeterminate probes of
+incomplete launcher text such as "timeout" are not positive printer witnesses.
+The probe's recursion limit likewise supplies no witness on its own. Actual
+credential-printing children remain denied. These probes never launch source or
+a candidate command. File-only programs such as sed keep their file-literal
+classifier, without treating an ordinary process.env search pattern as an
+environment dump.
+Public interpreter-output controls and configured-path cache-scope tests remain.
+
+### Audit 21 per-analysis metadata and Windows CI (M8)
+
+Physical resolution caches Lstat, readlink, canonical-existing-prefix results,
+returned errors and raw-path resolution only within an analysis. Raw keys retain
+link/.. semantics. Each metadata map has a 4096-entry cap; a full cache resolves
+normally rather than certifying a miss. Interpreter filename decisions include
+cwd and the accumulated configured-credential path set in their key. Caller
+metadata callbacks are memoized only within the same bounded analysis. Git
+configuration-target metadata proofs also cache raw name, cwd and effective
+XDG/global config paths; live Git roots and directory assignments are checked
+before consulting this cache. No cache survives the next host envelope, and this
+metadata snapshot does not provide
+filesystem race containment or sandbox protection.
+
+Synthetic tests compare cached and uncached classification, retain errors,
+exercise physical aliases and a fresh analysis, and ensure later configured-path
+assignments cannot reuse a public-file result. Linux CPU profiles identify
+ConfiguredProtected -> physicalOrClean -> physical/Lstat as the producer hot
+path (4.30 seconds cumulative in ConfiguredProtected, 57.10% of sampled CPU).
+A serial Linux rerun against HEAD 8dcb901 and the revised tree reduced
+TestAudit20DecodedInterpreterProducers from 6.877 to 3.125 seconds (both CPU
+profiled), and TestGuardDeniedCorpus from 99.604 to 63.950 seconds (uncached test
+runs). The revised corpus covered 48,017 variants from 2,461 Bash-deny cases
+with zero allows. Native Windows runtime and speedup still require CI evidence;
+cross-vet is not a Windows runtime test. The Windows policy step temporarily has a
+45-minute step limit and a 40-minute Go test deadline inside the existing
+60-minute job bound.
+
+Permanent regressions are in internal/hook/policy/audit21_test.go,
+internal/hook/roles/audit21_test.go and internal/hook/paths/metadata_test.go.
+The internal/hook/audit21_test.go replay uses testdata/hook/audit21.json for both
+host decisions with a disposable HOME. These tests do not install a guard or
+establish installed-host protection. Existing corpus expectations are retained.
+
+### Audit 21 integration parity (M1 to M6)
+
+Failed Go shell parses now deny regardless of raw risk substrings. Missing sudo
+option values, oversized brace alternatives and reserved ANSI-C separator bytes
+also deny before inert-output exemptions. Supported literal ANSI-C escapes keep
+their data role, including unknown escapes whose backslash remains literal.
+
+GNU Parallel distinguishes complete joined shell templates from explicit input
+lists and accepts attached job counts. Source filenames still receive protected
+metadata checks for reading templates; ordinary printf, echo and secret show
+children retain their data/metadata roles through xargs and Parallel. Find's
+existing protected-name metadata proof remains narrower. External
+time options parsed as a shell time clause use the utility's normal child grammar.
+Make's option-value boundaries keep letters in attached filenames from becoming
+printer flags, while attached makefile inputs are checked at the effective cwd.
+Docker build/load file operands use shared protected-path checks. Docker
+--env-file consumers keep their documented non-printing exemption. Single-action
+keyring and secret-tool commands stop resolving actions before data operands,
+without letting an unknown global option hide lookup/get. Versioned and hyphenated
+Lua/LuaJIT names share inline, stdin and producer checks.
+
+These groups resolve to the retained Bash decisions, not new deliberate Go-stricter
+rows. The historical `audit-cases6-7` clustered-xargs protected argument-list
+case now denies in both guards, so its measured divergence row is removed.
+Existing deny expectations are preserved. The M1 inert parse-failure Go
+unit expectation is intentionally tightened to match the fail-closed policy.
+Integration regressions are in internal/hook/policy/audit21_test.go,
+internal/hook/roles/audit21_test.go and testdata/hook/audit21.json.
+
+### Audit 22 shared Go classification and schema (N1 to N6, N8, N13)
+
+Implicit yarn children inherit --cwd through the same fallback directory model
+as -C/--dir. Repeated directory options remain relative to the incoming cwd, and
+none changes the next shell statement. Explicit exec and implicit child forms
+therefore check the same credential basenames and public-file controls.
+
+The shared printer normalizer accepts case-insensitive true/1/yes/on and
+false/0/no/off boolean values. Only an explicit false spelling removes that
+option's witness; invalid values and another enabled occurrence cannot establish
+a non-printing proof. Kubectl secret output covers JSON/YAML, JSONPath, template
+and custom-column families, including file-backed and as-JSON variants. Resource
+names and table output remain metadata, and public resources are not credential
+printers solely because of their output format. Op item get --otp and signin
+--raw use the ordinary account-option and launcher classification. Existing
+single-direct-pipe stash/login allowances are unchanged; kubectl secret content
+keeps its pre-existing always-deny transport policy.
+
+Executable interpreter bodies recognize complete literal argv launch signatures
+for Python subprocess and os.execv/execvp families, Node spawn/execFile families,
+and Ruby/Perl system or exec calls. Literal elements retain argv boundaries and
+use the ordinary isolated child dispatcher, including printer options, launchers,
+reader operands, configured paths and cwd. Python exec's selected executable is
+not confused with its argv[0] label. The bounded lexical scan does not execute or
+evaluate language source, infer variable lists or concatenations, or treat an
+ordinary standalone array as a launch. Existing shell-string, file-literal and
+environment witnesses continue independently. Public child argv and non-printing
+options remain readable. This positive-witness coverage is not general language
+containment or a sandbox.
+
+The audit 22 review carries the recipient interpreter identity through inline,
+heredoc and literal-producer stdin paths. Comment syntax is language-specific:
+Python floor division and Perl defined-or cannot truncate executable source, and
+Node regex literals containing # remain data rather than hash comments. Bounded
+slash-regex scanning retains escaped delimiters and character classes; genuine
+line/block comments and public-command controls remain non-witnesses. Positively
+identified argv calls retain indeterminate or structurally uncertain child
+results and deny at the dispatch recursion bound. Arbitrary standalone strings
+still require concrete role witnesses, so incomplete launcher prose stays allowed.
+
+Named tightening `audit22-bare-interpreter-argv`: Go also recognizes bounded,
+parenthesis-free Ruby/Perl system and exec literal lists ending at a semicolon,
+newline, closing brace or end of source. These were a shared class (i) N6 gap,
+not a directional-parity blocker under P22; Go now denies their credential
+children even if the retained Bash guard has not acquired this coverage. Public
+children, literal prose and unclassified concatenations keep their prior roles.
+Permanent review tests are internal/hook/policy/audit22_review_test.go and the
+N6 review cases in testdata/hook/audit22.json. No prior expectation is weakened.
+
+Curl's file-input normalizer accepts file:/ paths as well as file:// URLs,
+including --url and --url= operands, percent-decoded paths and physical aliases.
+Native drive URLs retain their Windows conversion. Payloads, --data-raw and
+public file URLs keep their data/public-input roles.
+
+Envelope validation rejects unpaired UTF-16 surrogate escapes before Go's JSON
+decoder can replace them with U+FFFD, including in unknown fields and keys. Valid
+surrogate pairs, literal replacement characters and escaped backslashes remain
+valid. Read/Edit/Write/MultiEdit require a nonempty string file_path;
+NotebookEdit requires a nonempty authoritative notebook_path; an unrelated
+file_path neither substitutes for it nor changes the selected target.
+Every supplied optional path, output_mode and workdir field must be a string,
+not null, an array or another JSON type. Missing optional Grep/Bash fields keep
+their prior defaults; missing or empty tool names still deny. Both host adapters
+emit explicit value-free denials for malformed supported envelopes.
+
+The audit 21 makefile arity control remains allowed on Unix. On Windows,
+`make -fC$HOME/.aws` names a makefile with an embedded drive colon after HOME
+expansion, not a directory option. The makefile metadata check cannot certify
+that invalid native path and retains its conservative denial; the test records
+this platform-specific outcome without weakening a credential read.
+
+Permanent tests are internal/hook/policy/audit22_test.go,
+internal/hook/roles/audit22_test.go, internal/hook/input/audit22_test.go and
+internal/hook/audit22_test.go. The last two replay
+testdata/hook/audit22-invalid.json; both host adapters also replay
+testdata/hook/audit22.json with disposable HOME fixtures. Candidate commands are
+never executed. The former file_path-only NotebookEdit allow is now a classified N13 malformed-
+envelope denial. The old unrelated-file_path denial becomes an allow because
+that field is not a host target; protected notebook_path targets still deny.
+Other existing expectations are unchanged. Except for the named
+parenthesis-free argv tightening above, these are parity fixes rather than new
+Go-stricter decisions. Cross-vet does not establish
+Windows or macOS runtime behavior, installed-hook protection, or host failure
+blocking; applicable CI and host gates remain required.
+
+The parity handoff keeps configured paths keyed by their environment variable:
+plain sequential assignment replaces that variable's prior target, while
+conditional, loop and scoped assignments retain alternatives. Application child
+analysis restores the parent's configured paths on return, including env and
+shell children, while allowing sequential replacement within the child itself. Case arms are all
+analysed without making an otherwise literal public reader indeterminate.
+Kubernetes values retain native path-list semantics; singular AWS paths stay
+whole even when a filename contains the native list separator. File, interpreter,
+search and Git-index checks receive those singular alternatives without joining
+or splitting them. Per-analysis interpreter cache keys retain both kinds.
+
+Unknown-launcher dispatch now includes every recognized interpreter alias,
+including Lua versions and LuaJIT. Attached GH --input operands use the shared
+file classifier. Curl preserves unmatched literal file URLs for query/fragment
+normalization, but --user-agent values remain data. These close measured
+Go-allow/Bash-deny splits or ordinary-syntax over-denials, not new tightenings.
+
+Corpus extraction retains direct-envelope optional fields and their original
+JSON types, including malformed workdir values. Corpus fixture directory names
+no longer inherit subtest # suffixes, which would turn URL path bytes into a
+fragment. Every original case and variant remains, with per-case fixture cleanup.
+
+## Confirmation audit 23: Go directional parity (O1-O5)
+
+These changes close measured Go-allow/Bash-deny decisions from snapshot
+7535c5c. They do not weaken an existing denial or introduce a reviewed
+Go-stricter divergence. The retained Bash CLI and installed hooks are unchanged
+by the Go implementation; synthetic decisions are not host protection evidence.
+
+- O1: Python triple-single and triple-double quoted strings are one opaque
+  tokenizer token, including embedded matching quotes, escapes and newlines.
+  Subsequent literal argv launches still reach the shared child dispatcher;
+  quoted launch text remains data. Static Python prefixes are normalized with
+  Python escape rules; unsupported escapes and dynamic replacement fields do
+  not supply a fully literal argv witness.
+- O2: gh API field-file checks resolve the action through the printer option
+  normalizer rather than requiring api at argv position zero. Known global
+  option values remain data. Separate and attached -F/-f, --field and
+  --raw-field operands retain their protected-file checks with leading hostname
+  and repository options. Public fields and non-API commands remain allowed.
+- O3: curl file-URL paths reject decoded C0 controls and DEL before metadata
+  classification, including tab, LF, CR and NUL. Percent-encoded spaces,
+  once-decoded percent signs, HTTP URL paths and literal request data retain
+  their public-input or data roles.
+- O4: identified literal shell-launch calls and Ruby/Perl backticks use the full
+  bounded shell AST policy, not a single argv word or a printer/wrapper subset.
+  This includes dotenvx readers, package environment commands and Python module
+  printers, as well as shell cwd changes and compound statements. Literal argv
+  lists keep argv semantics. Both launch forms share isolated child analysis,
+  configured-path metadata, recursion limits and uncertain-decision handling.
+  Python os.popen shares os.system's full shell-child dispatch, including
+  optional later arguments. Raw, bytes, Unicode and interpolation-free formatted
+  Python literals (including supported combined and case-insensitive prefixes)
+  supply static arguments with Python-correct escape handling. Raw escapes stay
+  raw, bytes retain Unicode escape spellings, and doubled formatted braces are
+  literal braces; genuine replacement fields remain unknown. Python/PyPy exec
+  evaluates interpreter source, not shell source, so it retains existing source
+  checks without supplying a shell-launch witness. Ruby/Perl/Node exec launches
+  retain their shell roles. Arbitrary prose retains positive-witness scanning
+  rather than full command dispatch; public literal children, ordinary Python
+  exec source and child-local cwd changes remain allowed.
+- O5: PyPy executable aliases, including versioned names, share Python's inline,
+  argv, heredoc, producer, module, comment and literal-token roles. Existing
+  Python aliases keep their recognition. Public code and venv creation remain
+  allowed while environment dumps and credential-printer children deny.
+
+Permanent tests are internal/hook/policy/audit23_test.go,
+internal/hook/policy/audit23_review_test.go, internal/hook/roles/audit23_test.go
+and internal/hook/audit23_test.go.
+Both adapters replay all 282 cases in testdata/hook/audit23.json with a disposable
+HOME and synthetic files. Candidate commands are never executed. Native checks
+and cross-vet do not replace applicable macOS/Windows runtime CI or host failure
+checks.
+
+### Confirmation audit 23: envelope integration (O6-O9)
+
+Bash validates complete JSON before jq, rejects malformed surrogate escapes and
+non-JSON scalar grammar, and checks workdir controls before extraction. Envelope
+preprocessing and every successful file-tool exit count against its four-second
+decision budget. Shared path normalization stops on budget exhaustion and cannot
+certify a public file after normalization fails. The dependency-light no-Perl
+path retains strict bounded ASCII JSON with ordinary scalar and whitespace
+controls.
+
+Both validators cap raw envelopes at 1 MiB plus 64 KiB, with at most 4,096 keys
+globally, 32,768 JSON tokens (including punctuation) and 128 nested containers.
+Go counts these before unmarshaling; root objects count as one container and
+object keys, colons and commas count as individual tokens. Exact limits allow;
+under-byte-cap structural overflows deny. Go also rejects more than 4,096 slash
+separators in cwd, file_path, notebook_path, path and workdir before cleaning
+redundant components. This deterministic tightening covers excessive-component
+paths that exhaust Bash's wall-clock normalizer; ordinary redundant paths allow.
+It is not a claim that Go reproduces every host-dependent Bash timing decision.
+
+Permanent boundary and public-path controls are in
+internal/hook/input/audit23_test.go and internal/hook/audit23_test.go. The shell
+suites retain audit23_o6 through audit23_o9 deny and must-allow controls, including
+keys_limit/over, tokens_limit/over, depth_limit/over and both excessive-component
+file_path/cwd reproducers. Synthetic dependency delays test Bash's deadline, not
+installed host behavior.
+
+The existing Go text-field validator still rejects LF and tab in path fields;
+Bash permits those valid filename characters. The new shell public controls
+`audit23_o8_workdir_newline` and `audit23_o8_cwd_newline` therefore record a
+retained Go-stricter decision in each suite. These four deliberate-tightening
+rows do not represent Go allows or newly weakened Bash expectations. The
+regressions in internal/hook/input/audit23_test.go keep the Go decision explicit.
+
+### Confirmation audit 24: shared literal fallback and input deadline
+
+These changes close the Go-side P1-P9 and P11 findings without a new reviewed
+Go-allow divergence. P10 bounds the shared Bash scanners and the corresponding
+Go interpreter scan structure, rather than accepting a faster Go allow after a
+Bash scan exhausts its limits.
+
+- P1: literal list-first spawn calls, Ruby positional spawn (including Process
+  and Kernel qualifiers and statement syntax), and IO.popen literal argv arrays
+  reuse the existing complete child-role dispatcher. Quoted argv is never joined
+  into executable shell syntax. Public git/status and metadata children allow.
+- P2-P3: Node, Node.js, Bun and Deno share static template-string, comment and
+  regex tokenization. Interpolated templates remain unknown as static argv,
+  but retain recognized command-prefix witnesses in the conservative fallback.
+  String interpolation rules are language-specific: Lua, JavaScript double quotes
+  and R do not interpolate Ruby's #{...} or Perl/PHP's dollar expressions. Bun inline flags,
+  run with inline flags, Deno eval and stdin bodies use executable interpreter
+  analysis. Runtime flags are not discarded as package child options.
+- P4: every executable interpreter uses the same broad literal fallback before
+  precise argv signatures. A closed whitespace-bearing literal starting with a
+  recognized command role goes through full bounded shell policy, even when
+  interpolation prevents static argv certification, irrespective
+  of its surrounding API. This covers Lua os.execute/io.popen, PHP shell APIs,
+  R named/status arguments, Ruby IO/Open3 strings and Perl pipe-open strings
+  without maintaining a separate API table for each command family. The same
+  metadata/configured-path and environment witnesses remain in force. Recursive
+  content grep inside interpreter literals cannot use the current tree as a
+  safety proof: earlier interpreter code may extract files before the search.
+  This applies even to an initially empty tree; names/count/quiet modes and
+  nonrecursive public-file searches retain their non-content/public roles.
+- P5: Perl q, qq, qx and qw operators are tokenized atomically with paired or
+  same-character delimiters and nested pairs. qx is shell source; qw contributes
+  separate literal argv elements. Interpolation does not supply static argv.
+- P6: Bun implicit, run, x and exec children and inline runtime code retain the
+  package launcher's --cwd or --cwd= directory, anchored at the incoming cwd.
+  Leading options are resolved before either runtime-code or child dispatch;
+  directory operands are not interpreter source. Invocation cwd cannot escape
+  to the next statement. Public filenames and stat operands remain allowed.
+- P7: value-less declarations do not assign an empty value or erase credential
+  path alternatives, including after a branch join. Configured assignment values
+  share bounded scalar expansion with interpreter stdin, without execution,
+  splitting, globbing or ~user lookup. Unquoted leading ~ or ~/ and supported
+  quoted/unquoted $HOME and ${HOME} use the supplied HOME. Unknown expansions
+  deny rather than clearing configured protection. This includes declare and
+  export -n, and all three configured credential variables. Sequential explicit
+  replacements retain their existing precision.
+- P8: lexical protection of cwd-anchored credential operands precedes the bare
+  operand existence exception. A missing target or empty store directory cannot
+  certify a reader because an earlier extractor can create it. Explicit workdir,
+  envelope cwd and tracked cd paths share the rule. Metadata-only and unrelated
+  public-file operands remain allowed.
+- P9: HOME/.aws is an explicit protected content-search root before rg config
+  certification, including an implicit cwd at that root. Filename-only modes and
+  certified public/SSH/Kubernetes roots retain their existing behavior. This
+  intentionally matches Bash rather than introducing an unrecorded Go allow.
+- P10: executable interpreter source shares the retained scanner ceilings of
+  8 KiB per literal and 128 separator bytes, before literal policy dispatch.
+  Decoded literal records, including Perl qw elements and numeric data words,
+  use the same 256-entry ceiling as the Go word budget (stricter than Bash
+  extraction at 512 records). Numeric words consume work without becoming
+  certified string argv elements.
+  This bounds literal work independently of interpreter API or input shape and
+  denies the original 200-line, 400-data-word P10 reproducer as well as the
+  600-literal forms. Inline, heredoc, here-string, producer and argv paths
+  share the limits, with exact-boundary must-allow and exceeded-boundary denials.
+  Existing outer shell-fragment and 1 MiB stdin-body limits still apply; a
+  large inert heredoc without literal records retains its allowance.
+  Here-string quote removal
+  decodes escaped unquoted literal bytes before scalar expansion, preserving
+  quoted/escaped dollars and tildes without a second evaluation pass. Raw
+  serialized stdin keeps file/environment witnesses, not literal scan budgets.
+- P11: one shared envelope reader bounds both bytes and elapsed read time. It
+  requires EOF within two seconds for both Decode and the initial Decide read;
+  complete JSON with an open writer is not yet a complete envelope. Timeout,
+  panic, read error and size overflow deny without echoing input. Closed empty
+  input retains no-decision behavior. A buffered, private read result prevents
+  a late read from emitting another decision. The owner must close an arbitrary
+  blocked io.Reader to release its goroutine; the one-shot CLI exits after its
+  decision. No installed-host timeout behavior is claimed.
+
+Audit 24 deliberately supersedes older positive-witness-only allowances for
+recognized-command literals. Incomplete launcher strings such as "bash -c",
+"watch --unknown date" and "parallel --nonall aws", and recognized command text
+such as print("dotenvx get"), now deny like Bash even when used as data. The
+corresponding audit21/audit22/audit23 tests and envelopes change only from allow
+to deny, retaining every command and recording this classified tightening.
+Unrecognized prose, standalone non-launch argv data, public interpreter reads,
+comments/regex data and complete harmless child commands retain must-allow tests.
+Broad launch analysis operates on decoded interpreter source, not serialized
+producer shell quotes, so ordinary Perl file-reading source is not mistaken for
+an implicit shell command.
+
+Integration closes the review-control splits in the shared Bash classifiers.
+Configured assignments resolve active scalar values before caching paths or
+checking declaration indirection; export -n options are not variable names.
+The shared search parser classifies interpreter literal names/count/quiet modes
+before rejecting recursive content searches without a tree proof. Raw recursive
+flag matching no longer overrides these interpreter metadata roles. Public HOME
+declaration controls and empty-tree metadata controls retain their must-allow
+expectations in both adapters, without accepted Go-allow divergence rows.
+The Bash normalizer also maps PyPy aliases to Python analysis, normalizes Perl
+q/qq/qx/qw operators before literal and argv dispatch, and retains Ruby popen
+argv arrays as complete child launches. Paired Perl delimiters scan nested
+pairs and escapes within the existing extractor deadline; qx emits shell source,
+while qw supplies separate literal argv words. These shared paths preserve
+recursive content denial without restoring raw metadata over-denials.
+
+The lexical-before-existence rule deliberately tightens older Bash allows:
+`no_file`, `env_chdir_empty`, `audit15_r7_success`, `audit15_r1_data#12` and
+`audit15_r1_data#13` in the guard suite, and `cwd_safe`, `audit19_allow#14`,
+`audit19_allow#15`, `audit19_allow#16` and `audit19_allow#17` in Codex. The
+first group and cwd_safe read an absent protected basename after a cwd change,
+including package directory options. The four Codex package workspace controls
+have public missing basenames across a conservative directory union that
+includes the synthetic protected `.secrets` root (created earlier in that suite). Existing shell expectations stay unchanged; Go denies
+rather than assuming these targets remain absent when execution begins.
+These are named deliberate-tightening rows, not accepted Go-allow differences.
+
+Permanent coverage is internal/hook/policy/audit24_test.go,
+internal/hook/policy/audit24_review_test.go (including an actually empty tree),
+internal/hook/search/audit24_test.go, internal/hook/input/read_test.go and
+internal/hook/audit24_test.go, plus both-adapter testdata/hook/audit24.json.
+All candidate commands remain JSON/analyzer inputs only, with disposable HOME
+and synthetic fixtures. Native checks and cross-vet do not substitute for
+applicable macOS/Windows runtime CI or installed-host evidence.

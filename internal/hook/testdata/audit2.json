@@ -1,0 +1,989 @@
+{
+  "fixtures": [
+    [
+      "w/proj/.secrets/store",
+      "file",
+      ""
+    ],
+    [
+      "w/proj/sub/link",
+      "link",
+      "../../dirty/app.env"
+    ],
+    [
+      "w/dirty/app.env",
+      "file",
+      ""
+    ],
+    [
+      "w/clean/src/a.ts",
+      "file",
+      ""
+    ],
+    [
+      "w/r/src",
+      "dir",
+      ""
+    ],
+    [
+      "w/r/app.env",
+      "file",
+      ""
+    ],
+    [
+      "w/r/.secrets/store",
+      "file",
+      ""
+    ],
+    [
+      "w/r/safe.txt",
+      "file",
+      ""
+    ],
+    [
+      "w/r2/safe.txt",
+      "file",
+      ""
+    ],
+    [
+      "w/g/node_modules/pkg/app.env",
+      "file",
+      ""
+    ],
+    [
+      "out",
+      "dir",
+      ""
+    ]
+  ],
+  "cases": [
+    {
+      "name": "G1-1",
+      "cwd": "r/src",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git show HEAD:app.env"
+      }
+    },
+    {
+      "name": "G1-2",
+      "cwd": "r2",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git show HEAD~1:.env"
+      }
+    },
+    {
+      "name": "G2-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "for i in 1; do cd .secrets; done; paste store"
+      }
+    },
+    {
+      "name": "G2-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "while cd .secrets; do break; done; paste store"
+      }
+    },
+    {
+      "name": "G2-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "until cd .secrets; do :; done; paste store"
+      }
+    },
+    {
+      "name": "G2-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "f() { cd .secrets; }; f; paste store"
+      }
+    },
+    {
+      "name": "G3-1",
+      "cwd": "dirty",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "dotenv -e app.env -- paste app.env"
+      }
+    },
+    {
+      "name": "G3-2",
+      "cwd": "dirty",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "dotenv -e app.env -- bash -c 'echo $SYNTH_TOKEN'"
+      }
+    },
+    {
+      "name": "G4-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "ps axe #\u0001"
+      }
+    },
+    {
+      "name": "G4-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "xclip -o #\u0001"
+      }
+    },
+    {
+      "name": "G4-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "pass foo #\u0001"
+      }
+    },
+    {
+      "name": "G4-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "kwallet-query --read-password k w #\u0001"
+      }
+    },
+    {
+      "name": "G4-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "gcloud auth application-default print-access-token #\u0001"
+      }
+    },
+    {
+      "name": "G5-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "python3 -c 'from os import environ as e;print(e)'"
+      }
+    },
+    {
+      "name": "G5-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "node -p 'process[\"env\"]' "
+      }
+    },
+    {
+      "name": "G6-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "tar -xOf @TMP@/out/a.tar .env"
+      }
+    },
+    {
+      "name": "G16-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "echo \"$(case x in x) cd .secrets;; esac; paste store)\""
+      }
+    },
+    {
+      "name": "G16-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "echo \"$(cd \"$PWD/.secrets\" && paste store)\""
+      }
+    },
+    {
+      "name": "S7-1",
+      "cwd": "r2",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "git log -p"
+      }
+    },
+    {
+      "name": "S7-2",
+      "cwd": "r2",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git log -p -- .env"
+      }
+    },
+    {
+      "name": "S7-3",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git show HEAD~1"
+      }
+    },
+    {
+      "name": "S7-4",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git archive HEAD | tar -xO"
+      }
+    },
+    {
+      "name": "S7-5",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git cat-file --batch-all-objects --batch"
+      }
+    },
+    {
+      "name": "S7-6",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git diff HEAD~1 HEAD"
+      }
+    },
+    {
+      "name": "S7-7",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git diff HEAD~1..HEAD"
+      }
+    },
+    {
+      "name": "S7-8",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git format-patch --stdout HEAD~1"
+      }
+    },
+    {
+      "name": "S7-9",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep SYNTH HEAD~1"
+      }
+    },
+    {
+      "name": "S7-10",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git log -p -- safe.txt"
+      }
+    },
+    {
+      "name": "S7-11",
+      "cwd": "clean",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git log -p"
+      }
+    },
+    {
+      "name": "S8-1",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep -l --open=cat SYNTH"
+      }
+    },
+    {
+      "name": "S8-2",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep -l --open-files=cat SYNTH"
+      }
+    },
+    {
+      "name": "S8-3",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git --no-pager grep -l --open=cat -e SYNTH"
+      }
+    },
+    {
+      "name": "S8-4",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep -l --unknown SYNTH"
+      }
+    },
+    {
+      "name": "S9-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd -LP .secrets; paste store"
+      }
+    },
+    {
+      "name": "S9-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd -e .secrets; paste store"
+      }
+    },
+    {
+      "name": "S9-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd -Pe .secrets; paste store"
+      }
+    },
+    {
+      "name": "S9-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd .secrets; cd ..; cd - >/dev/null; paste store"
+      }
+    },
+    {
+      "name": "S9-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd .secrets && paste /proc/self/cwd/store"
+      }
+    },
+    {
+      "name": "S9-6",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd; paste store"
+      }
+    },
+    {
+      "name": "S9-7",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "paste /proc/123/root/etc/config"
+      }
+    },
+    {
+      "name": "S9-8",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "paste /dev/fd/3"
+      }
+    },
+    {
+      "name": "S9-9",
+      "cwd": "dirty",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "CDPATH=@TMP@/w/proj; cd .secrets; paste store"
+      }
+    },
+    {
+      "name": "S10-1",
+      "cwd": "dirty",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "find . -name '*.env' -exec paste {} +"
+      }
+    },
+    {
+      "name": "S10-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "find .secrets -type f -exec paste {} +"
+      }
+    },
+    {
+      "name": "S10-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "find . -name store -exec paste {} +"
+      }
+    },
+    {
+      "name": "S11-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "label=env; jq -n --arg label x \"$label\""
+      }
+    },
+    {
+      "name": "S11-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "label='$ENV'; jq -nr --arg label x \"$label\""
+      }
+    },
+    {
+      "name": "S12-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "awk 'BEGIN{print ENVIRON[\"SYNTH_TOKEN\"]}'"
+      }
+    },
+    {
+      "name": "S12-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "envsubst <<< '$SYNTH_TOKEN'"
+      }
+    },
+    {
+      "name": "S12-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "perl -MEnv -le 'print $SYNTH_TOKEN'"
+      }
+    },
+    {
+      "name": "S12-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "nodejs -p process.env"
+      }
+    },
+    {
+      "name": "S12-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "make -pn -f /dev/null"
+      }
+    },
+    {
+      "name": "S12-6",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "php -r 'print_r(getenv());'"
+      }
+    },
+    {
+      "name": "S12-7",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "yq -n 'strenv(X)'"
+      }
+    },
+    {
+      "name": "S12-8",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "gh auth status --show-token"
+      }
+    },
+    {
+      "name": "S12-9",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "npm config get //registry.npmjs.org/:_authToken"
+      }
+    },
+    {
+      "name": "S12-10",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "kubectl config view --raw"
+      }
+    },
+    {
+      "name": "S12-11",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "basename \"$SYNTH_TOKEN\""
+      }
+    },
+    {
+      "name": "S12-12",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "ls \"$SYNTH_TOKEN\""
+      }
+    },
+    {
+      "name": "S13-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "BASH_ENV=sub/link bash -xc :"
+      }
+    },
+    {
+      "name": "S13-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "PS4='$(paste sub/link)' bash -xc :"
+      }
+    },
+    {
+      "name": "S13-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "PROMPT_COMMAND='paste sub/link' bash -i"
+      }
+    },
+    {
+      "name": "S13-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "env -S 'paste\\_sub/link'"
+      }
+    },
+    {
+      "name": "S13-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git -c alias.x='!paste sub/link' x"
+      }
+    },
+    {
+      "name": "S13-6",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "env BASH_ENV=sub/link bash -xc :"
+      }
+    },
+    {
+      "name": "S13-7",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git -c core.sshCommand='paste sub/link' fetch"
+      }
+    },
+    {
+      "name": "S14-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "jq -nf sub/link"
+      }
+    },
+    {
+      "name": "S14-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "jq -n --from-file sub/link"
+      }
+    },
+    {
+      "name": "S14-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "diff --from-file=sub/link /dev/null"
+      }
+    },
+    {
+      "name": "S15-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "cp -r sub s2; paste s2/link"
+      }
+    },
+    {
+      "name": "S15-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "ln -s sub s3; paste s3/link"
+      }
+    },
+    {
+      "name": "S15-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "tar -chf - sub | tar -xO"
+      }
+    },
+    {
+      "name": "S15-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "tar -cf - . | tar -xO"
+      }
+    },
+    {
+      "name": "S15-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": false,
+      "fields": {
+        "command": "cp -rL sub @TMP@/out/s"
+      }
+    },
+    {
+      "name": "S17-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "awk 'BEGIN{while((getline l<\".secrets/store\")>0)print l}'"
+      }
+    },
+    {
+      "name": "S17-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "sed -n '1r .secrets/store' FILE"
+      }
+    },
+    {
+      "name": "S17-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "sed -n '1e paste .secrets/store' FILE"
+      }
+    },
+    {
+      "name": "S17-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "python3 -c 'print(open(\"sub/link\").read())'"
+      }
+    },
+    {
+      "name": "S17-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "vim -es '+r sub/link' '+%p' '+q!'"
+      }
+    },
+    {
+      "name": "S18-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "unzip -p @TMP@/out/a.zip .env"
+      }
+    },
+    {
+      "name": "S18-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "paste sub/link # \u0001"
+      }
+    },
+    {
+      "name": "S18-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "apply_patch <<'EOF'\n*** Begin Patch\n*** Update File: sub/link\n@@\n-A\n+B\n*** End Patch\nEOF"
+      }
+    },
+    {
+      "name": "S18-4",
+      "cwd": "dirty",
+      "tool": "apply_patch",
+      "deny": true,
+      "fields": {
+        "command": "*** Begin Patch\n*** Add File: safe.txt\n+hi\n *** Update File: app.env\n@@\n-A\n+B\n*** End Patch"
+      }
+    },
+    {
+      "name": "S18-5",
+      "cwd": "dirty",
+      "tool": "apply_patch",
+      "deny": true,
+      "fields": {
+        "command": "*** Begin Patch\n*** Delete File: safe.txt\n *** Update File: app.env\n@@\n-A\n+B\n*** End Patch"
+      }
+    },
+    {
+      "name": "B1-1",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep -l --open-files-in-pa=cat SYNTH"
+      }
+    },
+    {
+      "name": "B1-2",
+      "cwd": "r",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "git grep -lOcat SYNTH"
+      }
+    },
+    {
+      "name": "B2-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "sed -n --expression=p sub/link"
+      }
+    },
+    {
+      "name": "B3-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "grep --regex=SYNTH sub/link"
+      }
+    },
+    {
+      "name": "B3-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "grep --reg=SYNTH sub/link"
+      }
+    },
+    {
+      "name": "B4-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "grep -1eSYNTH sub/link"
+      }
+    },
+    {
+      "name": "B5-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cd -PL .secrets; paste store"
+      }
+    },
+    {
+      "name": "B6-1",
+      "cwd": "g",
+      "tool": "Grep",
+      "deny": true,
+      "fields": {
+        "glob": "**/*.{env}",
+        "pattern": "SYNTH",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "B6-2",
+      "cwd": "g",
+      "tool": "Grep",
+      "deny": true,
+      "fields": {
+        "glob": "node_modules/pkg/app.e{n}v",
+        "pattern": "SYNTH",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "B6-3",
+      "cwd": "g",
+      "tool": "Grep",
+      "deny": true,
+      "fields": {
+        "glob": "**/{app.env}",
+        "pattern": "SYNTH",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "B6-4",
+      "cwd": "g",
+      "tool": "Grep",
+      "deny": true,
+      "fields": {
+        "glob": "node_modules/pkg/*.{{env},x}",
+        "pattern": "SYNTH",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "B6-5",
+      "cwd": "g",
+      "tool": "Grep",
+      "deny": true,
+      "fields": {
+        "glob": "node_modules/**/*.{e}nv",
+        "pattern": "SYNTH",
+        "output_mode": "content"
+      }
+    },
+    {
+      "name": "B7-1",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cat -A sub/link"
+      }
+    },
+    {
+      "name": "B7-2",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cat -T sub/link"
+      }
+    },
+    {
+      "name": "B7-3",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "cat -t sub/link"
+      }
+    },
+    {
+      "name": "B7-4",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "grep -T SYNTH sub/link"
+      }
+    },
+    {
+      "name": "B7-5",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "diff -B sub/link /dev/null"
+      }
+    },
+    {
+      "name": "B7-6",
+      "cwd": "proj",
+      "tool": "Bash",
+      "deny": true,
+      "fields": {
+        "command": "diff -T sub/link /dev/null"
+      }
+    }
+  ]
+}

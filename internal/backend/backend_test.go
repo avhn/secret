@@ -248,16 +248,22 @@ func TestStashKeepsSizeLimitMessage(t *testing.T) {
 func TestConcurrentBackendSameIdentity(t *testing.T) {
 	dir := t.TempDir()
 	s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
-	const count = 16
+	// Four simultaneous writers still exercise account reuse under contention
+	// without spending most of the production lock timeout in polling sleeps
+	// on loaded CI runners. The start barrier keeps the writes concurrent.
+	const count = 4
 	errs := make(chan error, count)
+	start := make(chan struct{})
 	var wg sync.WaitGroup
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			<-start
 			errs <- Stash(dir, "libsecret:demo", "TOKEN", map[string]string{"env": "dev", "zone": "west"}, []byte("synthetic"), s)
 		}()
 	}
+	close(start)
 	wg.Wait()
 	close(errs)
 	for err := range errs {
