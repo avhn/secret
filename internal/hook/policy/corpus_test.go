@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -239,7 +238,7 @@ func TestGuardDeniedCorpus(t *testing.T) {
 	}
 	// Subtest names contain # for duplicate cases. A URL would interpret that
 	// byte as a fragment, changing a synthetic path before the policy sees it.
-	fixtureRoot := t.TempDir()
+	fixtures := corpusFixtures{root: t.TempDir(), repository: root, snapshots: corpus.Snapshots}
 	count, failures := 0, 0
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -255,54 +254,17 @@ func TestGuardDeniedCorpus(t *testing.T) {
 					t.Skip("host has no /proc")
 				}
 			}
-			tmp, err := os.MkdirTemp(fixtureRoot, "case-")
-			if err != nil {
-				t.Fatal(err)
+			// Audit 14/15 scope controls need visible protected inputs, but must
+			// not add them to the immutable snapshot used by unrelated cases.
+			extra := ""
+			switch tc.Name {
+			case "rg_without_config_multiple", "rg_without_config_glob":
+				extra = "search/sub/app.env"
+			case "git_scope_--no-index", "git_scope_--untracked":
+				extra = "search/src/app.env"
 			}
-			t.Cleanup(func() {
-				if err := os.RemoveAll(tmp); err != nil {
-					t.Error(err)
-				}
-			})
+			tmp := fixtures.directory(t, tc.Snapshot, extra)
 			replace := strings.NewReplacer("@TMP@", filepath.ToSlash(tmp), "@ROOT@", filepath.ToSlash(root))
-			for _, fixture := range corpus.Snapshots[tc.Snapshot] {
-				name := filepath.Join(tmp, filepath.FromSlash(fixture[0]))
-				if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
-					t.Fatal(err)
-				}
-				switch fixture[1] {
-				case "dir":
-					err = os.MkdirAll(name, 0700)
-				case "unreadable-dir":
-					err = os.MkdirAll(name, 0000)
-				case "unreadable":
-					err = os.WriteFile(name, nil, 0000)
-				case "link":
-					err = os.Symlink(replace.Replace(fixture[2]), name)
-				case "file":
-					err = os.WriteFile(name, []byte(replace.Replace(fixture[2])), 0600)
-				}
-				if err != nil && runtime.GOOS == "windows" && strings.ContainsAny(fixture[0], "\n\r:*?\"<>|") {
-					t.Skip("fixture name is not valid on Windows")
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			// Audit 14: the original scope fixture only had hidden descendants.
-			// Keep these denied cases testing a visible protected file instead.
-			if tc.Name == "rg_without_config_multiple" || tc.Name == "rg_without_config_glob" {
-				if err := os.WriteFile(filepath.Join(tmp, "search", "sub", "app.env"), []byte("synthetic"), 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			// Audit 15 makes explicit Git worktree roots scope-sensitive.
-			// Preserve real denied reads rather than the old safe-src over-denial.
-			if tc.Name == "git_scope_--no-index" || tc.Name == "git_scope_--untracked" {
-				if err := os.WriteFile(filepath.Join(tmp, "search", "src", "app.env"), []byte("synthetic"), 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
 			t.Setenv("KUBECONFIG", replace.Replace(tc.Kubeconfig))
 			home := replace.Replace(tc.Home)

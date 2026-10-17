@@ -162,11 +162,12 @@ jobs:
         timeout-minutes: 45
         env:
           GOTRACEBACK: all
-        # Stream subtest names and timeout stacks instead of buffering a hung package.
-        run: go test -v -timeout 40m ./internal/hook/policy/
+        # Stream subtests and timeout stacks. Disposable filesystem inputs are not
+        # reusable test results; avoid cmd/go rechecking their log after printing ok.
+        run: go test -v -count=1 -timeout 40m ./internal/hook/policy/
       - name: Test Go packages
         shell: bash
-        # The denied-command corpus replays about 2000 fixture trees; Windows needs more than the default.
+        # Policy has its own Windows step; other packages retain the same deadline.
         run: |
           if [ "$RUNNER_OS" = Windows ]; then
             go list ./... | grep -v '^github.com/avhn/secret/internal/hook/policy$' | xargs go test -timeout 30m

@@ -85,6 +85,12 @@ Parallel templates, attached makefile names and metadata children retain parity.
 Exact inventories, regenerated deny variants and directional host-envelope tests
 remain required. Windows cache performance and cross-platform runner outcomes
 still require CI evidence; local cross-vet is not a Windows runtime check.
+Corpus replay now shares immutable snapshot trees within one test run, isolates
+case-specific search inputs, and preflights existing Windows filename skips.
+The Windows policy step disables result caching to avoid post-test filesystem
+input rechecks. Fuzz seeds use native absolute fixture paths, with sequential
+metadata/configured-path regression coverage; no production decision changes
+or Windows host-protection claims follow from these test-infrastructure changes.
 
 Audit 22 adds literal interpreter argv launches and argv-label controls,
 normalized boolean printer flags and curl file inputs, configured-path branch
