@@ -15,6 +15,13 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+func (a *analyzer) pathMetadata() *paths.Metadata {
+	if a.metadata == nil {
+		a.metadata = new(paths.Metadata)
+	}
+	return a.metadata
+}
+
 // inputProtected keeps unknown shell directories and process-relative aliases
 // out of the filesystem existence exception for bare operands.
 func (a *analyzer) inputProtected(name, cwd string) bool {
@@ -35,7 +42,7 @@ func (a *analyzer) inputProtected(name, cwd string) bool {
 	if cwd == "" && !filepath.IsAbs(name) {
 		return true
 	}
-	return a.metadata.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...) || a.protected(name, cwd)
+	return a.pathMetadata().ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...) || a.protected(name, cwd)
 }
 
 func (a *analyzer) treeProtected(root, cwd string) bool {
@@ -154,7 +161,7 @@ func (a *analyzer) interpreterProtected(code, cwd string) bool {
 		}
 	}
 	for _, token := range strings.FieldsFunc(code, func(r rune) bool { return strings.ContainsRune(" \t\r\n\"'`(){}[];<>=,+", r) }) {
-		if (strings.ContainsAny(token, "/\\") || a.metadata.LexicalProtected(token, cwd, a.home) || a.metadata.ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...)) && a.interpreterNameProtected(token, cwd) {
+		if (strings.ContainsAny(token, "/\\") || a.pathMetadata().LexicalProtected(token, cwd, a.home) || a.pathMetadata().ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...)) && a.interpreterNameProtected(token, cwd) {
 			return true
 		}
 	}
@@ -180,7 +187,7 @@ func (a *analyzer) interpreterNameProtected(name, cwd string) bool {
 }
 
 func (a *analyzer) checkInterpreterName(name, cwd string) bool {
-	if a.metadata.LexicalProtected(name, cwd, a.home) || a.metadata.ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...) {
+	if a.pathMetadata().LexicalProtected(name, cwd, a.home) || a.pathMetadata().ConfiguredProtected(name, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...) {
 		return true
 	}
 	for _, component := range strings.FieldsFunc(name, func(r rune) bool { return r == '/' || r == '\\' }) {

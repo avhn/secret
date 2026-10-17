@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
@@ -140,7 +139,7 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	tokens := interpreterBodyTokens(code, name, a.regexBody)
 	literals := 0
 	for _, token := range tokens {
-		if token.indeterminate || time.Now().After(a.deadline) {
+		if token.indeterminate || a.expired() {
 			a.reason = roles.Indeterminate
 			return true
 		}
@@ -188,6 +187,10 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 		return true
 	}
 	for _, value := range sourceLiterals(code) {
+		if a.expired() {
+			a.reason = roles.Indeterminate
+			return true
+		}
 		if a.literalPrinter(value, cwd) {
 			return true
 		}
@@ -197,7 +200,8 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	// even when interpolation prevents static argv certification or their API
 	// is unfamiliar. Static argv elements remain separate tokens.
 	for _, token := range tokens {
-		if time.Now().After(a.deadline) {
+		if a.expired() {
+			a.reason = roles.Indeterminate
 			return true
 		}
 		if !token.literal && !token.witness {
@@ -282,8 +286,18 @@ func (a *analyzer) literalShellProtected(source, cwd string) bool {
 }
 
 func (a *analyzer) literalChild(cwd string) *analyzer {
+	// Initialize on the parent before copying: a child must not create a
+	// private cache for each repeated literal. Only metadata proofs are shared;
+	// mutable command/environment state remains scoped to the child.
+	if a.interpreterNames == nil {
+		a.interpreterNames = make(map[interpreterName]bool)
+	}
+	if a.configWrites == nil {
+		a.configWrites = make(map[[4]string]bool)
+	}
 	return &analyzer{protected: a.protected, cwd: cwd, home: a.home,
-		deadline: a.deadline, metadata: a.metadata,
+		deadline: a.deadline, now: a.now, metadata: a.pathMetadata(),
+		configWrites: a.configWrites, configWriteCheck: a.configWriteCheck,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
 }

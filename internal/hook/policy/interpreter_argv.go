@@ -3,7 +3,6 @@ package policy
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/avhn/secret/internal/hook/roles"
 )
@@ -279,7 +278,7 @@ func literalStatementArguments(tokens []interpreterToken, start int) ([]string, 
 func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 	tokens := interpreterBodyTokens(code, language, a.regexBody)
 	for i := 0; i < len(tokens); i++ {
-		if time.Now().After(a.deadline) {
+		if a.expired() {
 			a.reason = roles.Indeterminate
 			return true
 		}

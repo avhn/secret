@@ -94,7 +94,11 @@ func (a *analyzer) configPath(name, cwd string) bool {
 	if protected, ok := a.configWrites[key]; ok {
 		return protected
 	}
-	protected := paths.ConfigWriteProtected(name, cwd, "", a.home, xdg, global)
+	check := a.configWriteCheck
+	if check == nil {
+		check = paths.ConfigWriteProtected
+	}
+	protected := check(name, cwd, "", a.home, xdg, global)
 	if a.configWrites == nil {
 		a.configWrites = make(map[[4]string]bool)
 	}

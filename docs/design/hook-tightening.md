@@ -12,6 +12,26 @@ execute Git, a shell interpreter, child commands, or provider value APIs while
 making a decision. It reads only the bounded metadata described below. Real-host
 failure tests, dialect evidence, and supported-platform CI remain separate gates.
 
+## Interpreter metadata lifetime
+
+Interpreter literal children share their parent's bounded metadata snapshot,
+interpreter-name results and Git configuration-write proofs. Initialize caches on
+the parent before constructing children so lazy allocation cannot create a fresh
+cache for every repeated literal. Command state and environment assignments remain
+child-scoped. Configuration proof keys retain raw names, cwd and effective XDG and
+global paths; live Git roots are checked before cached proofs. Lookup failures
+remain denials, and a fresh analysis gets fresh metadata. This is a per-analysis
+snapshot, not filesystem race protection.
+
+The audit 24 Windows boundary regression reached repeated configuration-write
+metadata work through full literal command dispatch, despite caching the ordinary
+protected-file callback. A simulated 20 ms resolver cost now verifies the exact
+256-literal and mixed-literal controls across inline, heredoc, here-string, pipe
+and argv inputs without sleeping or enlarging the two-second policy deadline.
+Final decisions report deadline exhaustion as indeterminate even when a caller
+has supplied a more specific interpreter role reason. Native Windows CI and host
+protection remain separate gates.
+
 ## Current policy
 
 - P0 recovers panics from decoding or analysis and emits a fixed denial without

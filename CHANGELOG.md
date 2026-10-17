@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Share Go interpreter literal metadata and Git configuration-path proofs across
+  sibling child analyses, avoiding repeated filesystem lookups at the 256-literal
+  boundary on slow runners. Keep cwd and effective configuration paths in cache
+  keys, retain lookup-error denials, and discard caches between analyses. Report
+  exhausted analysis deadlines as indeterminate rather than protected-file
+  witnesses. Add deterministic simulated-slow-resolver and cache-scope controls
+  without raising work limits or changing the boundary allow expectations.
+
 - Bound Bash interpreter Git-path extraction and physical ancestor resolution
   with subprocess alarms and the shared decision deadline. Cap unnormalized
   envelope paths before filesystem work. Validate confirmed shell framing with

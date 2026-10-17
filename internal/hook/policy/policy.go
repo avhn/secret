@@ -40,13 +40,7 @@ func Analyze(source, cwd, home string, protected func(string, string) bool) stri
 	}
 	a := &analyzer{protected: cachedProtection(protected), cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(source, "RIPGREP_CONFIG_PATH"), source: source}
 	a.fragment(source, 0)
-	if a.reason != "" {
-		return a.reason
-	}
-	if a.structuralUncertain || a.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source)) {
-		return roles.Indeterminate
-	}
-	return ""
+	return a.decision(source)
 }
 
 // stripLineCR accepts CRLF and a final CR without accepting embedded controls.
@@ -67,22 +61,41 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 	}
 	a := &analyzer{protected: cachedProtection(protected), cwd: cwd, home: home, deadline: time.Now().Add(2 * time.Second), configUntrusted: strings.Contains(strings.Join(argv, " "), "RIPGREP_CONFIG_PATH")}
 	a.command(argv, 0, cwd, false)
+	return a.decision(strings.Join(argv, " "))
+}
+
+// An exhausted analysis cannot supply a protected-file witness, even if a
+// caller replaced an interpreter's indeterminate reason with its role reason.
+func (a *analyzer) decision(source string) string {
+	if a.expired() {
+		return roles.Indeterminate
+	}
 	if a.reason != "" {
 		return a.reason
 	}
-	if a.structuralUncertain || a.uncertain && (witness(strings.Join(argv, " ")) || riskyRole(strings.Join(argv, " ")) || contentSyntax(strings.Join(argv, " "))) {
+	if a.structuralUncertain || a.uncertain && (witness(source) || riskyRole(source) || contentSyntax(source)) {
 		return roles.Indeterminate
 	}
 	return ""
+}
+
+func (a *analyzer) expired() bool {
+	now := time.Now
+	if a.now != nil {
+		now = a.now
+	}
+	return now().After(a.deadline)
 }
 
 type analyzer struct {
 	regexBody           bool
 	literalFallback     bool // Unidentified source strings are not unknown launcher slots.
 	literalDepth        int
-	metadata            paths.Metadata
+	metadata            *paths.Metadata
 	interpreterNames    map[interpreterName]bool
 	configWrites        map[[4]string]bool
+	configWriteCheck    func(name, cwd, workdir, home, xdg, global string) bool
+	now                 func() time.Time
 	credentialConfigs   []credentialConfig
 	credentialBranch    bool
 	interpreterInputs   []interpreterInput

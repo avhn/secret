@@ -91,6 +91,12 @@ The Windows policy step disables result caching to avoid post-test filesystem
 input rechecks. Fuzz seeds use native absolute fixture paths, with sequential
 metadata/configured-path regression coverage; no production decision changes
 or Windows host-protection claims follow from these test-infrastructure changes.
+Interpreter literal children now share the analysis metadata snapshot and keyed
+Git configuration-path proofs, eliminating repeated sibling lookups behind the
+Windows audit 24 boundary failure. Deterministic slow-resolver regressions retain
+all five input shapes and distinguish deadline exhaustion from file witnesses.
+The two-second policy deadline and literal limits are unchanged; native Windows
+runtime CI remains required before calling the runner failure resolved.
 
 Audit 22 adds literal interpreter argv launches and argv-label controls,
 normalized boolean printer flags and curl file inputs, configured-path branch
