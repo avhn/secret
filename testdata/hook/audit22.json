@@ -313,14 +313,14 @@
       "deny": false
     },
     {
-      "name": "N6 review ordinary launcher prose inline",
+      "name": "audit24 tightening: N6 review ordinary launcher prose inline",
       "command": "python3 -c 'print('\\''parallel --nonall aws'\\''); print('\\''ionice ionice ionice ionice git status'\\'')'",
-      "deny": false
+      "deny": true
     },
     {
-      "name": "N6 review ordinary launcher prose heredoc",
+      "name": "audit24 tightening: N6 review ordinary launcher prose heredoc",
       "command": "python3 <<'SYNTHETIC'\nprint('parallel --nonall aws'); print('ionice ionice ionice ionice git status')\nSYNTHETIC",
-      "deny": false
+      "deny": true
     },
     {
       "name": "N6 review ruby bare system deny inline",

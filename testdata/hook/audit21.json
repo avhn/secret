@@ -403,9 +403,9 @@
       "deny": false
     },
     {
-      "name": "allow_interpreter_incomplete_shell_literal",
+      "name": "audit24 tightening: allow_interpreter_incomplete_shell_literal",
       "command": "python3 -c 'print(\"bash -c\")'",
-      "deny": false
+      "deny": true
     },
     {
       "name": "M1_unclosed",

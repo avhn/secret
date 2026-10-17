@@ -91,6 +91,11 @@ func recursiveGrepSafe(args []string, cwd string, a *analyzer) bool {
 	if names {
 		return true
 	}
+	// Interpreter literals are independent witnesses, not an ordered execution
+	// model. Earlier code may populate even an empty tree before this search.
+	if a.literalDepth > 0 {
+		return false
+	}
 	follow := false
 	for _, v := range args {
 		if v == "--dereference-recursive" || strings.HasPrefix(v, "-") && !strings.HasPrefix(v, "--") && strings.ContainsRune(v, 'R') {
@@ -171,13 +176,17 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 	switch name {
 	case "npx", "bunx":
 		args = packageRunnerOptions(args)
-	case "pnpm", "yarn":
+	case "pnpm", "yarn", "bun":
 		args = packageLeadingOptions(args)
-		if len(args) == 0 || args[0] == "config" {
+		if len(args) == 0 || args[0] == "config" || name == "bun" && strings.HasPrefix(args[0], "-") {
 			return nil, false
 		}
-		if optionIn("dlx exec run", args[0]) {
-			args = packageRunnerOptions(args[1:])
+		if optionIn("dlx exec run", args[0]) || name == "bun" && args[0] == "x" {
+			if name == "bun" {
+				args = packageLeadingOptions(args[1:])
+			} else {
+				args = packageRunnerOptions(args[1:])
+			}
 		}
 	case "python", "python3":
 		if len(args) < 2 || args[0] != "-m" {
@@ -235,6 +244,9 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 	}
 	if len(args) == 0 {
 		return nil, false
+	}
+	if name == "bun" && strings.HasPrefix(args[0], "-") {
+		return nil, false // Inline runtime options are interpreter code, not a child.
 	}
 	child := strings.TrimPrefix(args[0], "@dotenvx/")
 	child = strings.SplitN(child, "@", 2)[0]

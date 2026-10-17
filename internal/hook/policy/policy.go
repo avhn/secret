@@ -235,7 +235,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				// Redirected interpreter bodies run with the call's literal
 				// credential-path assignments, not just inherited paths.
 				if assign.Name != nil && !assign.Append && optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE", assign.Name.Value) {
-					a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+					a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 				}
 				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME GIT_DIR GIT_COMMON_DIR", assign.Name.Value) {
 					if a.env == nil {
@@ -316,9 +316,9 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 						cwd = ""
 					}
 					if assign.Append {
-						a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
-					} else {
-						a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+						a.hookAppend(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
+					} else if assign.Value != nil {
+						a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 					}
 				}
 			}
@@ -498,6 +498,9 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				skip := false
 				for _, w := range cmd.Args[1:] {
 					code := a.raw(w)
+					if decoded := literal(w); decoded != "" {
+						code = decoded // Language literals belong to decoded argv, not shell quoting.
+					}
 					if name == "node" {
 						if skip {
 							skip = false
@@ -701,9 +704,9 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 						cwd = ""
 					}
 					if assign.Append {
-						a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
-					} else {
-						a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+						a.hookAppend(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
+					} else if assign.Value != nil {
+						a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 					}
 				}
 				if assign.Name != nil {
@@ -938,9 +941,9 @@ func (a *analyzer) printerPipe(s *syntax.Stmt, depth int, cwd string) {
 				cwd = ""
 			}
 			if assign.Append {
-				a.hookAppend(assign.Name.Value, literal(assign.Value), depth, cwd)
+				a.hookAppend(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 			} else {
-				a.hookAssignment(assign.Name.Value, literal(assign.Value), depth, cwd)
+				a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 			}
 		}
 		a.walkNode(assign, depth, cwd)
@@ -982,6 +985,18 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	name := strings.ToLower(path.Base(words[0]))
+	args := words[1:]
+	if name == "bun" {
+		// Runtime code, stdin and package children share Bun's leading options.
+		// Consume directory operands before interpreter analysis sees them as code.
+		options := packageExecOptions{cwd: cwd}
+		args = a.packageExecOptions(name, args, &options)
+		if options.bad {
+			a.reason = roles.Indeterminate
+			return
+		}
+		cwd = options.cwd
+	}
 	if !optionIn("eval command builtin export declare typeset local readonly source .", name) {
 		// Application command strings run in children. Keep sequential changes
 		// precise inside them without replacing the parent's configured paths.
@@ -997,7 +1012,6 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "fdfind" {
 		name = "fd"
 	}
-	args := words[1:]
 	if name == "ack" || name == "ack-grep" {
 		// ack searches recursively without Git ignore certification. Reuse the
 		// conservative grep option grammar and metadata-only tree proof.
@@ -1158,7 +1172,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if child, ok := safePackageChild(name, args); ok {
 		childCWD := cwd
-		if name == "pnpm" || name == "yarn" {
+		if optionIn("pnpm yarn", name) {
 			// Implicit children use the same directory-option grammar and
 			// incoming-cwd anchor as explicit package exec children.
 			options := packageExecOptions{cwd: cwd}

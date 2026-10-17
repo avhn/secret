@@ -4,10 +4,26 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
 )
 
 var declarationName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// Configured paths use the same bounded scalar expansion as interpreter stdin:
+// HOME and static variables expand without execution, splitting or globbing.
+// An unresolved declaration is not an empty assignment that erases protection.
+func (a *analyzer) assignmentLiteral(key string, word *syntax.Word, cwd string) string {
+	if !optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE", key) || word == nil {
+		return literal(word)
+	}
+	value, known := a.expandInterpreterStdin(word, false, cwd)
+	if !known {
+		a.reason = roles.Indeterminate
+		return ""
+	}
+	return value
+}
 
 func declarationCommand(name string) bool {
 	return optionIn("export declare typeset", name)

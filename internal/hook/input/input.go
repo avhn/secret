@@ -24,7 +24,7 @@ type Envelope struct {
 // Decode reads at most one JSON object, rejecting duplicate keys at every depth.
 // An empty or malformed request is reported as ErrInvalid without echoing its content.
 func Decode(r io.Reader) (Envelope, error) {
-	data, err := io.ReadAll(io.LimitReader(r, MaxBytes+1))
+	data, err := Read(r)
 	if err != nil || len(data) > MaxBytes || len(bytes.TrimSpace(data)) == 0 || !utf8.Valid(data) || !validSurrogates(data) {
 		return Envelope{}, ErrInvalid
 	}

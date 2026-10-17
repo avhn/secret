@@ -29,7 +29,7 @@ func pythonLiteralToken(code string, start int) (interpreterToken, int, bool) {
 	var value strings.Builder
 	for i < len(code) {
 		if strings.HasPrefix(code[i:], delimiter) {
-			return interpreterToken{text: value.String(), literal: known}, i + len(delimiter), true
+			return interpreterToken{text: value.String(), literal: known, witness: true}, i + len(delimiter), true
 		}
 		ch := code[i]
 		if ch == '\\' && i+1 < len(code) {

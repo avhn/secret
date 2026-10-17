@@ -21,7 +21,7 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 			_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
 		}
 	}()
-	data, readErr := io.ReadAll(io.LimitReader(in, input.MaxBytes+1))
+	data, readErr := input.Read(in)
 	if readErr == nil && len(data) == 0 {
 		return nil
 	}

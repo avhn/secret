@@ -43,9 +43,10 @@ func (a *analyzer) interpreterInputProtected(cwd, name string) bool {
 		if r.Hdoc != nil {
 			word = r.Hdoc
 		}
-		// Retain raw witnesses, including literal quoted-heredoc bodies.
+		// Retain raw file/environment witnesses. Literal scan ceilings belong
+		// to decoded source, not here-string shell quoting and escape bytes.
 		raw := a.raw(word)
-		if a.inlineGitDir(raw, cwd) || a.executableInterpreterProtected(raw, cwd, name) {
+		if a.inlineGitDir(raw, cwd) || environmentCode(raw) || a.interpreterProtected(raw, cwd) {
 			return true
 		}
 		body, known := a.expandInterpreterStdin(word, r.Hdoc != nil, input.cwd)
@@ -129,7 +130,37 @@ func (a *analyzer) expandInterpreterStdin(word *syntax.Word, document bool, cwd 
 	if document {
 		body, err = expand.Document(cfg, word)
 	} else {
-		body, err = expand.Literal(cfg, word)
+		// expand.Literal retains backslashes in unquoted Lit parts, unlike
+		// shell quote removal. Decode only those parts before scalar expansion;
+		// single-quoting the result prevents a second tilde or expansion pass.
+		copy := *word
+		copy.Parts = append([]syntax.WordPart(nil), word.Parts...)
+		for i, part := range copy.Parts {
+			lit, ok := part.(*syntax.Lit)
+			if !ok {
+				continue
+			}
+			value := lit.Value
+			var decoded strings.Builder
+			if i == 0 && (value == "~" || strings.HasPrefix(value, "~/")) {
+				decoded.WriteString(a.home)
+				value = value[1:]
+			}
+			for j := 0; j < len(value); j++ {
+				if j%128 == 0 && time.Now().After(a.deadline) {
+					return "", false
+				}
+				if value[j] == '\\' && j+1 < len(value) {
+					j++
+					if value[j] == '\n' {
+						continue
+					}
+				}
+				decoded.WriteByte(value[j])
+			}
+			copy.Parts[i] = &syntax.SglQuoted{Value: decoded.String()}
+		}
+		body, err = expand.Literal(cfg, &copy)
 	}
 	return body, err == nil && len(body) <= maxBody && time.Now().Before(a.deadline)
 }

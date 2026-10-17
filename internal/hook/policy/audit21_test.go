@@ -275,8 +275,8 @@ func TestAudit21InterpreterPrinters(t *testing.T) {
 		{"python3", "-c", `print("timeout")`, false},
 		{"python3", "-c", `print("chrt")`, false},
 		{"python3", "-c", `print("flock")`, false},
-		{"python3", "-c", `print("watch --unknown date")`, false},
-		{"python3", "-c", `print("bash -c")`, false},
+		{"python3", "-c", `print("watch --unknown date")`, true},
+		{"python3", "-c", `print("bash -c")`, true},
 	} {
 		for _, source := range []string{tc.interpreter + " " + tc.flag + " '" + tc.body + "'", tc.interpreter + " <<'BODY'\n" + tc.body + "\nBODY", "printf '%s' '" + tc.body + "' | " + tc.interpreter} {
 			if reason := Analyze(source, work, home, check); (reason != "") != tc.deny {

@@ -5,6 +5,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
@@ -114,11 +115,55 @@ func (a *analyzer) literalPrinter(code, cwd string) bool {
 // addition to file literals. Reader programs such as sed do not execute these
 // strings and continue to use the file-only classifier.
 func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
+	// Count decoded literals against the existing 256-word analysis budget,
+	// retaining the scanner's separator and record-length ceilings. Faster Go
+	// analysis cannot certify unbounded literal work in any input adapter.
+	if len(code) > 1<<20 || strings.Count(code, ";")+strings.Count(code, "|") > 128 {
+		return true
+	}
+	tokens := interpreterTokens(code, name)
+	literals := 0
+	for _, token := range tokens {
+		// Numeric data words consume work too, without certifying them as
+		// string argv elements for the precise launch recognizers.
+		numeric := token.text != "" && token.text[0] >= '0' && token.text[0] <= '9'
+		if token.literal || token.witness || numeric {
+			literals++
+			if literals > 256 || len(token.text) > 8192 {
+				return true
+			}
+		}
+	}
 	if environmentCode(code) {
 		return true
 	}
 	for _, value := range sourceLiterals(code) {
 		if a.literalPrinter(value, cwd) {
+			return true
+		}
+	}
+	// Match the Bash guard's broad literal fallback before the precise argv
+	// signatures. A whitespace-bearing literal beginning with a known command
+	// role is a command witness even when interpolation prevents static argv
+	// certification or its API is unfamiliar. Ordinary prose is not a command
+	// slot; static argv elements remain separate tokens.
+	for _, token := range tokens {
+		if time.Now().After(a.deadline) {
+			return true
+		}
+		if !token.literal && !token.witness {
+			continue
+		}
+		value := token.text
+		if a.interpreterNameProtected(value, cwd) {
+			return true
+		}
+		fields := strings.Fields(value)
+		if len(fields) < 2 {
+			continue
+		}
+		first := strings.ToLower(path.Base(fields[0]))
+		if (knownNested(first) || roles.PrinterReason(first, fields[1:], false) != "") && a.literalShellProtected(value, cwd) {
 			return true
 		}
 	}
@@ -146,7 +191,7 @@ func (a *analyzer) literalCommandProtected(words []string, cwd string, executabl
 
 // An identified shell-string launch is shell source, not a one-word argv.
 // Reuse the complete AST policy, including child roles, cwd flow and limits.
-// Arbitrary source literals still require literalPrinter's positive witnesses.
+// Arbitrary prose must first pass the shared literal command-role classifier.
 func (a *analyzer) literalShellProtected(source, cwd string) bool {
 	if a.literalDepth >= 4 {
 		return true

@@ -1436,5 +1436,128 @@ chmod +x "$TMP/audit23-analysis-bin/perl"
 printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit23-analysis-bin:$PATH" "$BASH" "$ROOT/hooks/guard-secrets" >"$TMP/audit23-analysis-guard"
 audit23_envelope audit23_o9_analysis_deadline deny "$TMP/audit23-analysis-guard"
 
+# Audit 24 integration: configured HOME values and interpreter metadata roles
+# share the same scalar and search classifiers as their protected counterparts.
+for key in KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE; do
+    prefix_index=0
+    for prefix in 'declare ' 'export -n ' 'command export -n '; do
+        prefix_index=$((prefix_index + 1))
+        value_index=0
+        # shellcheck disable=SC2016,SC2088  # literal command-text expansions, never run
+        for value in '"$HOME/kc.yaml"' '$HOME/kc.yaml' '"${HOME}/kc.yaml"' '${HOME}/kc.yaml'; do
+            value_index=$((value_index + 1))
+            for target in '~/kc.yaml' README.md; do
+                expected=allow
+                [[ "$target" != '~/kc.yaml' ]] || expected=deny
+                command_text="${prefix}${key}=${value}; cat ${target}"
+                NAME="audit24_integration_home_${key}_${prefix_index}_${value_index}_${expected}"
+                check "$NAME" "$expected" Bash "$(jq -cn --arg c "$command_text" '$c')"
+            done
+        done
+        # shellcheck disable=SC2016
+        command_text="${prefix}${key}="'"$unknown/kc.yaml"; cat ~/kc.yaml'
+        NAME="audit24_integration_unknown_${key}_${prefix_index}"
+        expected=deny
+        check "$NAME" "$expected" Bash "$(jq -cn --arg c "$command_text" '$c')"
+    done
+done
+mkdir -p "$TMP/audit24-empty"
+option_index=0
+for options in '-r' '-R' '-rl' '-rc' '-rq' '--recursive --files-with-matches' '--recursive --count'; do
+    option_index=$((option_index + 1))
+    expected=allow
+    case "$options" in -r | -R) expected=deny ;; esac
+    code="os.execute(\"grep $options TOKEN .\")"
+    for shape in inline heredoc here_string pipe; do
+        case "$shape" in
+            inline) command_text="lua -e '$code'" ;;
+            heredoc) command_text="lua <<'LUA'
+$code
+LUA" ;;
+            here_string) command_text="lua <<< '$code'" ;;
+            pipe) command_text="printf '%s\\n' '$code' | lua" ;;
+        esac
+        command_text="cd '$TMP/audit24-empty'; $command_text"
+        NAME="audit24_integration_grep_${option_index}_${shape}"
+        check "$NAME" "$expected" Bash "$(jq -cn --arg c "$command_text" '$c')"
+    done
+done
+
+# Shared source normalization retains Perl quote-like literals, Ruby argv
+# arrays and PyPy aliases before reader/printer and output-role dispatch.
+literal_index=0
+for command_text in \
+    'perl -e '"'"'print qx{grep -r TOKEN .}'"'"'' \
+    'perl -e '"'"'print qx{grep -rl TOKEN .}'"'"'' \
+    'perl -e '"'"'system(q{grep -r TOKEN .})'"'"'' \
+    'perl -e '"'"'system(qq{grep -rc TOKEN .})'"'"'' \
+    'perl -e '"'"'system(q{echo hello})'"'"'' \
+    'perl -e '"'"'print q{public {nested} prose}'"'"'' \
+    'perl -e '"'"'system(qw(gh auth token))'"'"'' \
+    'perl -e '"'"'system(qw(git status))'"'"'' \
+    'ruby -e '"'"'puts IO.popen(["aws","ecr","get-login-password"]).read'"'"'' \
+    'ruby -e '"'"'puts IO.popen(["aws","sts","get-caller-identity"]).read'"'"'' \
+    'pypy3 -c "unfamiliar('"'"'dotenvx get'"'"')"' \
+    'pypy3 -c "print('"'"'public'"'"')"' \
+    'perl <<'"'"'SYNTHETIC'"'"'
+print qx{grep -r TOKEN .}
+SYNTHETIC' \
+    'perl <<'"'"'SYNTHETIC'"'"'
+print qx{grep -rq TOKEN .}
+SYNTHETIC'; do
+    literal_index=$((literal_index + 1))
+    expected=allow
+    case "$literal_index" in 1 | 3 | 7 | 9 | 11 | 13) expected=deny ;; esac
+    NAME="audit24_integration_literal_$literal_index"
+    check "$NAME" "$expected" Bash "$(jq -cn --arg c "$command_text" '$c')"
+done
+
+# Audit 24 P10: under-cap interpreter literal scans share the decision deadline.
+# These scripts are command text in JSON only. Small equivalents must allow;
+# excessive scans must emit a denial before the four-second outer alarm fires.
+for shape in argv triple print paths inline herestring inline_parameters herestring_parameters oversized punctuated fanout; do
+    for size in ordinary excessive; do
+        perl -MJSON::PP -e '
+            my ($shape, $size, $cwd) = @ARGV;
+            my $count = $shape eq "fanout" ? ($size eq "ordinary" ? 128 : 129) :
+                $size eq "ordinary" ? 3 : $shape eq "oversized" ? 900 : 600;
+            my $quote = chr 39;
+            my $source = "print(${quote}a${quote})\n" x $count;
+            if ($shape eq "argv") {
+                $source = "import subprocess\nsubprocess.run([" .
+                    join(",", map { "${quote}a${quote}" } 1 .. $count) . "])\n";
+            } elsif ($shape eq "triple") {
+                $source = ("x=" . ($quote x 3) . "a" . ($quote x 3) . "\n") x $count;
+            } elsif ($shape eq "paths") {
+                $source = "x=${quote}a/b${quote}\n" x $count;
+            } elsif ($shape =~ /_parameters$/) {
+                # Escaped dollar bytes exercise the scanner, not its fast path.
+                $source = "x=${quote}\\\$a${quote}\n" x $count;
+            } elsif ($shape eq "punctuated") {
+                $source = "x=1;\n" . $source;
+            } elsif ($shape eq "fanout") {
+                $source = ("x=1;" x $count) . "print(${quote}a${quote})\n";
+            }
+            my $command = "python3 - <<${quote}PY${quote}\n${source}PY\n";
+            $command = qq{python3 -c "$source"} if $shape =~ /^inline/ || $shape eq "argv";
+            $command = qq{python3 <<< "$source"} if $shape =~ /^herestring/;
+            length($command) <= 8192 or die "fixture exceeds command cap\n"
+                unless $shape eq "oversized" && $size eq "excessive";
+            print encode_json({tool_name => "Bash", cwd => $cwd,
+                tool_input => {command => $command}, hook_event_name => "PreToolUse", session_id => "synthetic",
+                tool_use_id => "synthetic", permission_mode => "default"});
+        ' "$shape" "$size" "$TMP" >"$TMP/audit23-envelope"
+        expected=deny
+        [[ "$size" != ordinary ]] || expected=allow
+        audit23_envelope "audit24_p10_${shape}_$size" "$expected"
+        # Repeat the coarse-clock regressions serially without relaxing alarms.
+        if [[ "$size" == excessive && ( "$shape" == inline || "$shape" == herestring ) ]]; then
+            for repeat in 2 3; do
+                audit23_envelope "audit24_p10_${shape}_${size}_repeat_$repeat" "$expected"
+            done
+        fi
+    done
+done
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

@@ -30,7 +30,7 @@ func TestAudit22InterpreterLaunchReview(t *testing.T) {
 		{"structurally uncertain child", "python3", `subprocess.run(['bash','-c','if true; then'])`, true},
 		{"bounded launcher depth", "python3", `subprocess.run(['ionice','ionice','ionice','ionice','git','status'])`, true},
 		{"public parallel child", "python3", `subprocess.run(['parallel','-j2','echo',':::','a','b'])`, false},
-		{"ordinary launcher prose", "python3", `print('parallel --nonall aws'); print('ionice ionice ionice ionice git status')`, false},
+		{"recognized launcher literals (audit 24 tightening)", "python3", `print('parallel --nonall aws'); print('ionice ionice ionice ionice git status')`, true},
 		{"standalone argv data", "python3", `data = ['parallel','--nonall','aws','ecr','get-login-password']`, false},
 		{"ruby bare system", "ruby", `system 'aws', 'ecr', 'get-login-password';`, true},
 		{"ruby bare exec", "ruby", `exec 'aws', 'ecr', 'get-login-password'`, true},

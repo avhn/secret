@@ -1021,3 +1021,129 @@ Bash permits those valid filename characters. The new shell public controls
 retained Go-stricter decision in each suite. These four deliberate-tightening
 rows do not represent Go allows or newly weakened Bash expectations. The
 regressions in internal/hook/input/audit23_test.go keep the Go decision explicit.
+
+### Confirmation audit 24: shared literal fallback and input deadline
+
+These changes close the Go-side P1-P9 and P11 findings without a new reviewed
+Go-allow divergence. P10 bounds the shared Bash scanners and the corresponding
+Go interpreter scan structure, rather than accepting a faster Go allow after a
+Bash scan exhausts its limits.
+
+- P1: literal list-first spawn calls, Ruby positional spawn (including Process
+  and Kernel qualifiers and statement syntax), and IO.popen literal argv arrays
+  reuse the existing complete child-role dispatcher. Quoted argv is never joined
+  into executable shell syntax. Public git/status and metadata children allow.
+- P2-P3: Node, Node.js, Bun and Deno share static template-string, comment and
+  regex tokenization. Interpolated templates remain unknown as static argv,
+  but retain recognized command-prefix witnesses in the conservative fallback.
+  String interpolation rules are language-specific: Lua, JavaScript double quotes
+  and R do not interpolate Ruby's #{...} or Perl/PHP's dollar expressions. Bun inline flags,
+  run with inline flags, Deno eval and stdin bodies use executable interpreter
+  analysis. Runtime flags are not discarded as package child options.
+- P4: every executable interpreter uses the same broad literal fallback before
+  precise argv signatures. A closed whitespace-bearing literal starting with a
+  recognized command role goes through full bounded shell policy, even when
+  interpolation prevents static argv certification, irrespective
+  of its surrounding API. This covers Lua os.execute/io.popen, PHP shell APIs,
+  R named/status arguments, Ruby IO/Open3 strings and Perl pipe-open strings
+  without maintaining a separate API table for each command family. The same
+  metadata/configured-path and environment witnesses remain in force. Recursive
+  content grep inside interpreter literals cannot use the current tree as a
+  safety proof: earlier interpreter code may extract files before the search.
+  This applies even to an initially empty tree; names/count/quiet modes and
+  nonrecursive public-file searches retain their non-content/public roles.
+- P5: Perl q, qq, qx and qw operators are tokenized atomically with paired or
+  same-character delimiters and nested pairs. qx is shell source; qw contributes
+  separate literal argv elements. Interpolation does not supply static argv.
+- P6: Bun implicit, run, x and exec children and inline runtime code retain the
+  package launcher's --cwd or --cwd= directory, anchored at the incoming cwd.
+  Leading options are resolved before either runtime-code or child dispatch;
+  directory operands are not interpreter source. Invocation cwd cannot escape
+  to the next statement. Public filenames and stat operands remain allowed.
+- P7: value-less declarations do not assign an empty value or erase credential
+  path alternatives, including after a branch join. Configured assignment values
+  share bounded scalar expansion with interpreter stdin, without execution,
+  splitting, globbing or ~user lookup. Unquoted leading ~ or ~/ and supported
+  quoted/unquoted $HOME and ${HOME} use the supplied HOME. Unknown expansions
+  deny rather than clearing configured protection. This includes declare and
+  export -n, and all three configured credential variables. Sequential explicit
+  replacements retain their existing precision.
+- P8: lexical protection of cwd-anchored credential operands precedes the bare
+  operand existence exception. A missing target or empty store directory cannot
+  certify a reader because an earlier extractor can create it. Explicit workdir,
+  envelope cwd and tracked cd paths share the rule. Metadata-only and unrelated
+  public-file operands remain allowed.
+- P9: HOME/.aws is an explicit protected content-search root before rg config
+  certification, including an implicit cwd at that root. Filename-only modes and
+  certified public/SSH/Kubernetes roots retain their existing behavior. This
+  intentionally matches Bash rather than introducing an unrecorded Go allow.
+- P10: executable interpreter source shares the retained scanner ceilings of
+  8 KiB per literal and 128 separator bytes, before literal policy dispatch.
+  Decoded literal records, including Perl qw elements and numeric data words,
+  use the same 256-entry ceiling as the Go word budget (stricter than Bash
+  extraction at 512 records). Numeric words consume work without becoming
+  certified string argv elements.
+  This bounds literal work independently of interpreter API or input shape and
+  denies the original 200-line, 400-data-word P10 reproducer as well as the
+  600-literal forms. Inline, heredoc, here-string, producer and argv paths
+  share the limits, with exact-boundary must-allow and exceeded-boundary denials.
+  Existing outer shell-fragment and 1 MiB stdin-body limits still apply; a
+  large inert heredoc without literal records retains its allowance.
+  Here-string quote removal
+  decodes escaped unquoted literal bytes before scalar expansion, preserving
+  quoted/escaped dollars and tildes without a second evaluation pass. Raw
+  serialized stdin keeps file/environment witnesses, not literal scan budgets.
+- P11: one shared envelope reader bounds both bytes and elapsed read time. It
+  requires EOF within two seconds for both Decode and the initial Decide read;
+  complete JSON with an open writer is not yet a complete envelope. Timeout,
+  panic, read error and size overflow deny without echoing input. Closed empty
+  input retains no-decision behavior. A buffered, private read result prevents
+  a late read from emitting another decision. The owner must close an arbitrary
+  blocked io.Reader to release its goroutine; the one-shot CLI exits after its
+  decision. No installed-host timeout behavior is claimed.
+
+Audit 24 deliberately supersedes older positive-witness-only allowances for
+recognized-command literals. Incomplete launcher strings such as "bash -c",
+"watch --unknown date" and "parallel --nonall aws", and recognized command text
+such as print("dotenvx get"), now deny like Bash even when used as data. The
+corresponding audit21/audit22/audit23 tests and envelopes change only from allow
+to deny, retaining every command and recording this classified tightening.
+Unrecognized prose, standalone non-launch argv data, public interpreter reads,
+comments/regex data and complete harmless child commands retain must-allow tests.
+Broad launch analysis operates on decoded interpreter source, not serialized
+producer shell quotes, so ordinary Perl file-reading source is not mistaken for
+an implicit shell command.
+
+Integration closes the review-control splits in the shared Bash classifiers.
+Configured assignments resolve active scalar values before caching paths or
+checking declaration indirection; export -n options are not variable names.
+The shared search parser classifies interpreter literal names/count/quiet modes
+before rejecting recursive content searches without a tree proof. Raw recursive
+flag matching no longer overrides these interpreter metadata roles. Public HOME
+declaration controls and empty-tree metadata controls retain their must-allow
+expectations in both adapters, without accepted Go-allow divergence rows.
+The Bash normalizer also maps PyPy aliases to Python analysis, normalizes Perl
+q/qq/qx/qw operators before literal and argv dispatch, and retains Ruby popen
+argv arrays as complete child launches. Paired Perl delimiters scan nested
+pairs and escapes within the existing extractor deadline; qx emits shell source,
+while qw supplies separate literal argv words. These shared paths preserve
+recursive content denial without restoring raw metadata over-denials.
+
+The lexical-before-existence rule deliberately tightens older Bash allows:
+`no_file`, `env_chdir_empty`, `audit15_r7_success`, `audit15_r1_data#12` and
+`audit15_r1_data#13` in the guard suite, and `cwd_safe`, `audit19_allow#14`,
+`audit19_allow#15`, `audit19_allow#16` and `audit19_allow#17` in Codex. The
+first group and cwd_safe read an absent protected basename after a cwd change,
+including package directory options. The four Codex package workspace controls
+have public missing basenames across a conservative directory union that
+includes the synthetic protected `.secrets` root (created earlier in that suite). Existing shell expectations stay unchanged; Go denies
+rather than assuming these targets remain absent when execution begins.
+These are named deliberate-tightening rows, not accepted Go-allow differences.
+
+Permanent coverage is internal/hook/policy/audit24_test.go,
+internal/hook/policy/audit24_review_test.go (including an actually empty tree),
+internal/hook/search/audit24_test.go, internal/hook/input/read_test.go and
+internal/hook/audit24_test.go, plus both-adapter testdata/hook/audit24.json.
+All candidate commands remain JSON/analyzer inputs only, with disposable HOME
+and synthetic fixtures. Native checks and cross-vet do not substitute for
+applicable macOS/Windows runtime CI or installed-host evidence.

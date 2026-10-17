@@ -32,7 +32,7 @@ func (a *analyzer) packageExecOptions(name string, args []string, options *packa
 		key, value, attached := strings.Cut(arg, "=")
 		kind := ""
 		switch {
-		case name == "npm" && key == "--prefix", name != "npm" && optionIn("-C --dir", key), name == "yarn" && key == "--cwd":
+		case name == "npm" && key == "--prefix", name != "npm" && optionIn("-C --dir", key), optionIn("yarn bun", name) && key == "--cwd":
 			kind = "directory"
 		case name == "npm" && optionIn("-w --workspace", key), name == "pnpm" && optionIn("-F --filter", key):
 			kind = "workspace"

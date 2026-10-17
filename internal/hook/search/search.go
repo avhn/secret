@@ -421,8 +421,11 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 	if len(roots) == 0 {
 		roots = []string{cwd}
 	}
+	// Explicit HOME/.aws content roots retain the Bash guard's lexical
+	// protection even under a certified exclusion config. Names-only modes
+	// have already returned; config certification cannot widen this input.
 	for _, root := range roots {
-		if paths.Protected(root, cwd, "", home) {
+		if paths.Protected(root, cwd, "", home) || paths.Resolve(root, cwd, "", home) == filepath.Join(home, ".aws") {
 			return "explicit search input is protected"
 		}
 		if _, err := os.Lstat(paths.Resolve(root, cwd, "", home)); err == nil && paths.RootProtected(root, cwd, home) {

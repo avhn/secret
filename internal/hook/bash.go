@@ -15,9 +15,9 @@ func bashDecision(e input.Envelope, cwd string, _ func(string) bool) string {
 	home := os.Getenv("HOME")
 	metadata := new(paths.Metadata)
 	check := func(name, dir string) bool {
-		// Bare shell operands match the legacy metadata existence check. Paths
-		// containing a slash and unresolved aliases retain lexical protection.
-		if !strings.Contains(name, "/") {
+		// Resolve lexical credential names before the bare-operand existence
+		// exception. Earlier commands may create an absent store target.
+		if !strings.Contains(name, "/") && !metadata.LexicalProtected(name, dir, home) {
 			if _, err := os.Lstat(paths.Resolve(name, dir, "", home)); os.IsNotExist(err) {
 				return false
 			}

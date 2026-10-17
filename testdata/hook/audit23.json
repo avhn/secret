@@ -503,29 +503,29 @@
       "deny": false
     },
     {
-      "name": "O4 prose dotenvx get",
+      "name": "audit24 tightening: O4 prose dotenvx get",
       "command": "python3 -c 'print(\"dotenvx get\")'",
-      "deny": false
+      "deny": true
     },
     {
-      "name": "O4 prose dotenvx decrypt --stdout",
+      "name": "audit24 tightening: O4 prose dotenvx decrypt --stdout",
       "command": "python3 -c 'print(\"dotenvx decrypt --stdout\")'",
-      "deny": false
+      "deny": true
     },
     {
-      "name": "O4 prose npm run env",
+      "name": "audit24 tightening: O4 prose npm run env",
       "command": "python3 -c 'print(\"npm run env\")'",
-      "deny": false
+      "deny": true
     },
     {
-      "name": "O4 prose npm exec -- env",
+      "name": "audit24 tightening: O4 prose npm exec -- env",
       "command": "python3 -c 'print(\"npm exec -- env\")'",
-      "deny": false
+      "deny": true
     },
     {
-      "name": "O4 prose python3 -m keyring get synthetic synthetic",
+      "name": "audit24 tightening: O4 prose python3 -m keyring get synthetic synthetic",
       "command": "python3 -c 'print(\"python3 -m keyring get synthetic synthetic\")'",
-      "deny": false
+      "deny": true
     },
     {
       "name": "O4 backtick ruby dotenvx get",

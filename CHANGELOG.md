@@ -58,9 +58,25 @@ All notable changes to this project are documented here. Format follows [Keep a 
   decision budget while retaining bounded names-only operation without Perl.
   Stop shared path normalization on budget exhaustion, propagate failures to
   file-target checks, and preserve valid numeric/scalar metadata and spaced JSON
-  arrays in the no-Perl path.
+  arrays in the no-Perl path. Count all interpreter literal scanning against the
+  shared decision deadline, stop consuming literals on exhaustion, and propagate
+  failed reader and configured-path normalization without empty-path fallbacks.
+  Bound preliminary fanout and tokenizer control scans in small chunks, and
+  reserve a coarse-clock tick for Bash 3.2 to emit its decision before timeout.
+  Bound shared substitution collection and nested parsing between budget checks,
+  skip collection without expansion markers, and repeat strict four-second inline
+  and here-string regressions with escaped-parameter controls.
+  Resolve configured scalar paths before declaration checks, recognize export -n
+  options, and classify interpreter recursive search output through shared roles
+  so public reads and names/count/quiet controls retain both-adapter parity.
+  Normalize PyPy aliases, Perl quote-like literals and Ruby popen argv arrays
+  through the shared interpreter and child classifiers.
   Add permanent Claude/Codex regressions,
   must-allow cases and exact platform inventories.
+
+- Bound shared Go interpreter literal scans to the retained source, separator
+  and closed-literal ceilings, including stdin and producer adapters. Keep the
+  older missing-file allowances as explicit reviewed Go tightenings.
 
 - Classify Go token printers through unknown and interleaved options without
   widening direct login/stash transports. Track literal reader aliases and
@@ -116,6 +132,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
   Match Bash's global envelope key, punctuation-token and container-depth bounds
   before unmarshaling. Bound unnormalized path separators before redundant
   components disappear, retaining ordinary public-path and metadata controls.
+  Share Bash's broad interpreter literal fallback across Python/PyPy, Node,
+  Bun, Deno, Ruby, Perl, PHP, Lua and Rscript. Classify recognized child-command
+  literals through full shell policy even in unfamiliar APIs; retain unrecognized
+  prose and harmless child controls. Cover list-first and Ruby positional spawn,
+  static JavaScript templates and Perl quote-like literals. Retain command-prefix
+  witnesses when interpolation prevents static argv certification, using
+  language-specific string rules. Reject interpreter recursive-content searches
+  without relying on the current tree, which preceding code may populate.
+  Apply Bun --cwd before runtime-code and child dispatch, preserving invocation
+  scope and public-file controls. Preserve configured credential paths through
+  value-less declarations and bounded quoted/unquoted HOME expansion, including
+  declare and export -n; deny unresolved configured assignments. Keep
+  absent cwd-relative credential targets protected and reject explicit HOME/.aws
+  content searches even with certified rg exclusions. Bound initial envelope reads
+  to two seconds, requiring EOF and denying read failures without delayed output.
 
 - Keep the Bash cwd after bounded inert literal eval source, retain denials for
   dynamic source and directory/function effects, and use Bash 3.2-safe empty

@@ -126,8 +126,8 @@ func TestAudit23InterpreterShellDispatch(t *testing.T) {
 		}
 	}
 	for _, code := range []string{`print("dotenvx get")`, `print("npm run env")`, `print("npm exec -- env")`, `print("python3 -m keyring get synthetic synthetic")`} {
-		if reason := Analyze("python3 -c "+shellLiteral(code), work, home, check); reason != "" {
-			t.Errorf("ordinary prose %s: %s", code, reason)
+		if reason := Analyze("python3 -c "+shellLiteral(code), work, home, check); reason == "" {
+			t.Errorf("audit 24 recognized-command literal allowed: %s", code)
 		}
 	}
 	for _, program := range []string{"ruby", "perl"} {

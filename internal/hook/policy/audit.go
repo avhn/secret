@@ -136,8 +136,12 @@ func pythonInterpreter(name string) bool {
 
 var luaVersion = regexp.MustCompile(`^lua(?:jit)?(?:[0-9._-][a-z0-9._-]*)?$`)
 
+func javascriptInterpreter(name string) bool {
+	return optionIn("node nodejs bun deno", name)
+}
+
 func interpreter(name string) bool {
-	return pythonInterpreter(name) || luaVersion.MatchString(name) || strings.Contains(" perl ruby node nodejs php rscript awk gawk jq yq ", " "+name+" ")
+	return pythonInterpreter(name) || luaVersion.MatchString(name) || strings.Contains(" perl ruby node nodejs bun deno php rscript awk gawk jq yq ", " "+name+" ")
 }
 
 // Interpreter literals share the shell/file credential classifier, including
@@ -192,7 +196,9 @@ func (a *analyzer) checkInterpreterName(name, cwd string) bool {
 func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd, name string) bool {
 	var source strings.Builder
 	syntax.NewPrinter().Print(&source, left)
-	if a.executableInterpreterProtected(source.String(), cwd, name) {
+	// Serialized shell quoting is not an interpreter literal boundary. Retain
+	// raw path/environment witnesses, then run launch analysis on decoded words.
+	if environmentCode(source.String()) || a.interpreterProtected(source.String(), cwd) {
 		return true
 	}
 	// Serialized shell source retains escapes around the interpreter's own

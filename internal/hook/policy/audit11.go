@@ -163,13 +163,13 @@ func p18InlineCode(name string, args []string) bool {
 	}
 	for i, arg := range args {
 		key, value, attached := strings.Cut(arg, "=")
-		if (key == "--eval" || key == "--print") && (name == "node" || name == "nodejs") {
+		if (key == "--eval" || key == "--print") && javascriptInterpreter(name) {
 			if attached && hasProtectedLiteral(value) || !attached && i+1 < len(args) && hasProtectedLiteral(args[i+1]) {
 				return true
 			}
 			continue
 		}
-		if len(arg) < 2 || arg[0] != '-' || !(arg[1] == 'c' && pythonInterpreter(name) || arg[1] == 'e' && (name == "perl" || name == "ruby" || name == "node" || name == "nodejs") || arg[1] == 'E' && name == "perl" || arg[1] == 'p' && (name == "node" || name == "nodejs") || arg[1] == 'r' && name == "php") {
+		if len(arg) < 2 || arg[0] != '-' || !(arg[1] == 'c' && pythonInterpreter(name) || arg[1] == 'e' && (optionIn("perl ruby", name) || javascriptInterpreter(name)) || arg[1] == 'E' && name == "perl" || arg[1] == 'p' && javascriptInterpreter(name) || arg[1] == 'r' && name == "php") {
 			continue
 		}
 		if len(arg) > 2 && hasProtectedLiteral(arg[2:]) || len(arg) == 2 && i+1 < len(args) && hasProtectedLiteral(args[i+1]) {

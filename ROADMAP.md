@@ -106,6 +106,13 @@ Go mirrors the 4,096-key, 32,768-token and 128-container envelope limits and
 bounds unnormalized path components. Permanent deny and must-allow controls
 cover both adapters; applicable runtime CI remains the milestone gate.
 
+Audit 24 adds shared interpreter literal fallback and argv classification across
+runtime aliases, Bun invocation cwd, configured HOME declaration preservation,
+lexical absent-store protection and explicit AWS-root search parity. Shared
+Bash scanners count preprocessing against the decision budget, and Go requires
+stdin EOF within two seconds. Integration preserves public declaration and
+interpreter metadata controls in both adapters; runtime CI remains required.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

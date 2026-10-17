@@ -130,12 +130,23 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   Envelope preparation and analysis each have a two-second budget (with one
   phase tick of rounding tolerance for Bash 3.2's integer clock), and a
   four-second overall decision deadline starting before reads and preprocessing.
+  Bash 3.2 reserves the final overall clock tick for emitting a denial, rather
+  than continuing analysis up to the coarse-clock deadline. Statement-fanout and
+  tokenizer control checks scan bounded chunks, avoiding slow whole-body pattern
+  replacements before the next deadline check. Substitution collection and its
+  nested parser check the shared budget after bounded scanner steps, including
+  escaped bytes, so inline and here-string preprocessing cannot defer exhaustion
+  until interpreter analysis. Text without expansion markers skips collection.
   Bounded reads time out and every otherwise-allowing exit checks both its phase
   budget and that overall deadline. Shared path normalization checks the budget
   while removing and rebuilding components, including envelope cwd components;
-  normalization failure cannot certify a safe file target. Synthetic deadline
-  tests do not establish installed-host timeout behavior. Existing command and
-  heredoc budgets still apply.
+  normalization failure cannot certify a safe file target. Interpreter Git-path
+  and credential-literal scans check that same budget while consuming literals,
+  including inline code, stdin and oversized heredocs, and stop on exhaustion
+  rather than continuing path checks. Failed reader or configured-path
+  normalization denies without treating an empty result as a safe filename.
+  Synthetic deadline tests do not establish installed-host timeout behavior.
+  Existing command and heredoc budgets still apply.
 - **Credential filename coverage** also includes `.aws/config` as well as
   `.aws/credentials`, `.kube/config`, paths named by a literal `KUBECONFIG` path
   list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE` (including alternatives

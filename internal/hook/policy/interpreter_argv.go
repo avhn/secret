@@ -10,13 +10,14 @@ import (
 // argv witness. Existing file/environment/string witnesses still run separately.
 type interpreterToken struct {
 	text    string
-	literal bool
+	literal bool // Fully static argv element.
+	witness bool // Closed source literal, even when interpolation is unresolved.
 	shell   bool
 }
 
 func interpreterTokens(code, name string) []interpreterToken {
 	hashComments := pythonInterpreter(name) || optionIn("ruby perl php rscript", name)
-	slashComments := optionIn("node nodejs php", name)
+	slashComments := javascriptInterpreter(name) || name == "php"
 	statementLines := optionIn("ruby perl", name)
 	var tokens []interpreterToken
 	for i := 0; i < len(code); {
@@ -30,6 +31,13 @@ func interpreterTokens(code, name string) []interpreterToken {
 		}
 		// Python floor division and Perl's defined-or operator are not
 		// comments. Node's # is data (except for an initial hashbang).
+		if luaVersion.MatchString(name) && strings.HasPrefix(code[i:], "--") {
+			if end := strings.IndexByte(code[i:], '\n'); end >= 0 {
+				i += end
+				continue
+			}
+			break
+		}
 		if ch == '#' && (hashComments || i == 0 && strings.HasPrefix(code, "#!")) || slashComments && strings.HasPrefix(code[i:], "//") {
 			if end := strings.IndexByte(code[i:], '\n'); end >= 0 {
 				i += end
@@ -44,9 +52,16 @@ func interpreterTokens(code, name string) []interpreterToken {
 			}
 			break
 		}
-		if ch == '/' && optionIn("node nodejs ruby perl", name) && interpreterRegexStart(tokens) {
+		if ch == '/' && (javascriptInterpreter(name) || optionIn("ruby perl", name)) && interpreterRegexStart(tokens) {
 			if end := interpreterRegexEnd(code, i); end > i {
 				tokens = append(tokens, interpreterToken{text: code[i:end]})
+				i = end
+				continue
+			}
+		}
+		if name == "perl" {
+			if quoted, end, ok := perlLiteralTokens(code, i); ok {
+				tokens = append(tokens, quoted...)
 				i = end
 				continue
 			}
@@ -64,7 +79,7 @@ func interpreterTokens(code, name string) []interpreterToken {
 			i += len(delimiter)
 			var value strings.Builder
 			shell := ch == '`' && optionIn("ruby perl", name)
-			known, closed := ch != '`' || shell, false
+			known, closed := ch != '`' || shell || javascriptInterpreter(name), false
 			for i < len(code) {
 				if strings.HasPrefix(code[i:], delimiter) {
 					i += len(delimiter)
@@ -85,12 +100,16 @@ func interpreterTokens(code, name string) []interpreterToken {
 				value.WriteRune(r)
 				i = len(code) - len(tail)
 			}
-			// Identifier-adjacent literals and double-quoted interpolation do
-			// not supply a fully literal argv element.
-			if start > 0 && interpreterIdentifier(code[start-1]) || ch == '"' && (strings.Contains(value.String(), "$") || strings.Contains(value.String(), "#{")) {
+			// Interpolation syntax belongs to the source language, not every
+			// double-quoted string. Lua/JavaScript/R strings do not expand $ or #{}.
+			interpolated := ch == '"' && (name == "ruby" && (strings.Contains(value.String(), "#{") || strings.Contains(value.String(), "#$") || strings.Contains(value.String(), "#@")) || optionIn("perl php", name) && strings.ContainsAny(value.String(), "$@"))
+			if start > 0 && interpreterIdentifier(code[start-1]) || interpolated {
 				known = false
 			}
-			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, shell: shell})
+			if ch == '`' && javascriptInterpreter(name) && strings.Contains(value.String(), "${") {
+				known = false
+			}
+			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, witness: closed, shell: shell})
 			continue
 		}
 		start := i
@@ -221,7 +240,7 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 		var words []string
 		var known bool
 		if tokens[i+1].text != "(" || tokens[i+1].literal {
-			if optionIn("ruby perl", language) && optionIn("system exec", name) {
+			if optionIn("ruby perl", language) && (optionIn("system exec", name) || language == "ruby" && name == "spawn") {
 				words, known = literalStatementArguments(tokens, i+1)
 			}
 			if known {
@@ -248,14 +267,20 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			}
 		}
 		switch name {
-		case "run", "call", "check_call", "check_output", "Popen":
+		case "run", "call", "check_call", "check_output", "Popen", "popen":
 			if tokens[start].text == "[" && !tokens[start].literal {
 				var end int
 				words, end, known = literalArguments(tokens, start+1, "]")
 				known = known && end < len(tokens) && !tokens[end].literal && (tokens[end].text == "," || tokens[end].text == ")")
 			}
 		case "execv", "execvp", "execve", "execvpe", "spawn", "spawnSync", "execFile", "execFileSync":
-			if start+2 < len(tokens) && tokens[start].literal && tokens[start+1].text == "," && !tokens[start+1].literal && tokens[start+2].text == "[" && !tokens[start+2].literal {
+			if tokens[start].text == "[" && !tokens[start].literal {
+				var end int
+				words, end, known = literalArguments(tokens, start+1, "]")
+				known = known && end < len(tokens) && !tokens[end].literal && optionIn(", )", tokens[end].text)
+			} else if language == "ruby" && name == "spawn" {
+				words, _, known = literalArguments(tokens, start, ")")
+			} else if start+2 < len(tokens) && tokens[start].literal && tokens[start+1].text == "," && !tokens[start+1].literal && tokens[start+2].text == "[" && !tokens[start+2].literal {
 				var end int
 				words, end, known = literalArguments(tokens, start+3, "]")
 				known = known && end < len(tokens) && !tokens[end].literal && (tokens[end].text == "," || tokens[end].text == ")")
