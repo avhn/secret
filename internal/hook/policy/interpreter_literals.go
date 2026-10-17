@@ -91,8 +91,7 @@ func (a *analyzer) literalPrinter(code, cwd string) bool {
 			if len(words) > 0 {
 				name := strings.ToLower(path.Base(words[0]))
 				printer = roles.PrinterReason(name, words[1:], false) != ""
-				_, utility := utilityTable[name]
-				if !printer && a.literalDepth < 4 && (utility || shellName(name) || optionIn("env command builtin setsid parallel", name)) {
+				if !printer && a.literalDepth < 4 {
 					// Reuse the actual child-role dispatcher, but isolate command
 					// state from the enclosing interpreter and outer shell.
 					printer = a.literalCommandProtected(words, cwd, false)
@@ -141,7 +140,7 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	tokens := interpreterBodyTokens(code, name, a.regexBody)
 	literals := 0
 	for _, token := range tokens {
-		if token.indeterminate {
+		if token.indeterminate || time.Now().After(a.deadline) {
 			a.reason = roles.Indeterminate
 			return true
 		}
@@ -150,6 +149,16 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 		// opacity only prevents treating its contents as nested launch code.
 		if token.opaque && interpreterRecursiveGrep.MatchString(token.text) {
 			return true
+		}
+		for _, expression := range token.expressions {
+			literals++
+			if a.literalDepth >= 4 || literals > 256 || len(expression) > 8192 {
+				return true
+			}
+			probe := a.literalChild(cwd)
+			if probe.executableInterpreterProtected(expression, cwd, name) {
+				return true
+			}
 		}
 		if token.regexCode {
 			if a.literalDepth >= 4 {
@@ -184,10 +193,9 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 		}
 	}
 	// Match the Bash guard's broad literal fallback before the precise argv
-	// signatures. A whitespace-bearing literal beginning with a known command
-	// role is a command witness even when interpolation prevents static argv
-	// certification or its API is unfamiliar. Ordinary prose is not a command
-	// slot; static argv elements remain separate tokens.
+	// signatures. Whitespace-bearing literals receive full child classification
+	// even when interpolation prevents static argv certification or their API
+	// is unfamiliar. Static argv elements remain separate tokens.
 	for _, token := range tokens {
 		if time.Now().After(a.deadline) {
 			return true
@@ -200,11 +208,19 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 			return true
 		}
 		fields := strings.Fields(value)
-		if len(fields) < 2 {
+		if len(fields) == 0 {
 			continue
 		}
-		first := strings.ToLower(path.Base(fields[0]))
-		if (knownNested(first) || roles.PrinterReason(first, fields[1:], false) != "") && a.literalShellProtected(value, cwd) {
+		if len(fields) == 1 {
+			// A standalone argv element is not an incomplete shell launcher.
+			// Keep positive single-word printer roles without denying public
+			// arrays merely because they contain "sh", "timeout" or "parallel".
+			if a.literalPrinter(value, cwd) {
+				return true
+			}
+			continue
+		}
+		if a.literalFallbackProtected(value, cwd) {
 			return true
 		}
 	}
@@ -223,11 +239,34 @@ func (a *analyzer) literalCommandProtected(words []string, cwd string, executabl
 		return executable
 	}
 	probe := a.literalChild(cwd)
+	probe.literalFallback = !executable
 	probe.command(words, probe.literalDepth, cwd, false)
 	if executable {
 		return probe.literalExecutionProtected(strings.Join(words, " "))
 	}
 	return probe.reason != "" && probe.reason != roles.Indeterminate && !probe.structuralUncertain
+}
+
+// Every fallback command reaches the real dispatcher, without a separate role
+// registry. Unknown prose is not an argv-launch slot and cannot acquire a role
+// from a later word or unresolved interpolation. Invalid shell text can still
+// supply a positive command witness, such as a Perl pipe literal ending in '|'.
+func (a *analyzer) literalFallbackProtected(source, cwd string) bool {
+	if a.literalDepth >= 4 {
+		return true
+	}
+	probe := a.literalChild(cwd)
+	probe.literalFallback = true
+	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
+	if err != nil {
+		probe.command(strings.Fields(source), probe.literalDepth, cwd, false)
+	} else {
+		// Preserve declarations, sequential cwd and producer/consumer roles.
+		// The statement classifier keeps unidentified prose operands literal;
+		// modeled launches and their children retain normal shell analysis.
+		probe.stmts(file.Stmts, probe.literalDepth, cwd)
+	}
+	return probe.reason != "" || probe.structuralUncertain
 }
 
 // An identified shell-string launch is shell source, not a one-word argv.

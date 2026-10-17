@@ -1228,3 +1228,86 @@ both retained shell suites and `internal/hook/audit25_test.go`, plus lexer, argv
 producer tests in `internal/hook/policy/audit25_test.go`. Every fixture is
 synthetic. Applicable native CI and installed-host failure testing remain
 separate requirements; these tests establish no host sandbox guarantee.
+
+## Confirmation audit 25: complete Go child roles and scoped launch inputs
+
+Q1 through Q8 repair directional parity gaps without changing existing denied
+expectations. The earlier commit-review fixes above remain in place.
+
+- Q1: interpreter fallback command witnesses enter the complete command
+  dispatcher rather than a second known-program registry. Archive stdout roles,
+  multicall busybox/toybox applets, gmake normalization and credential printers
+  therefore share top-level behavior. Unidentified strings are positive witnesses,
+  not unknown-launcher argv slots: prose such as "not env", interpolation in
+  prose and Lua bracket data do not become nested commands or filesystem globs.
+  Identified shell-launch APIs still receive full shell-source analysis. A
+  malformed pipe literal can retain a positive child witness without treating
+  arbitrary parse failures as denials. Valid fallback shell source uses the shared
+  statement classifier, retaining declaration assignments, sequential cwd changes
+  and pipeline producer roots rather than dispatching isolated argv calls.
+  Best-effort argument scans retain completed statements before a malformed
+  suffix, with prose treatment scoped to those statements rather than executable
+  children. An unresolved first word stays prose instead of becoming the source
+  builtin through empty-path normalization; inert quoted heredoc substitutions
+  therefore retain their existing allow outcome and positive printer controls.
+- Q2: retain the shared Lua long-string scanner from the commit-review repair,
+  including matching equals delimiters and versioned Lua/LuaJIT. Add credential
+  printer and public-reader coverage inline, in stdin and through argv. Existing
+  backtick, template and Perl quote-like extraction continues to use the same
+  literal and child classifiers. Single-word witnesses also reach command roles,
+  including long-bracket printenv and harmless true controls. JavaScript template
+  expressions are extracted with balanced strings, comments, regexes and nested
+  templates, then scanned by the shared interpreter classifier under lexical work,
+  depth and deadline bounds. Template literals retain positive string witnesses;
+  quoted heredocs preserve escaped interpolation instead of decoding it as code.
+- Q3: normalize Ruby's literal [executable, argv0] launch operand before
+  classifying its remaining argv, with and without parentheses. The display
+  name never replaces the actual executable. A recognized safe pair is not
+  reinterpreted as an unrelated list-first launch.
+- Q4: PHP proc_open literal command arrays share the existing list-first launch
+  parser and child dispatcher. Output descriptors and the pipes variable are
+  not command operands. Inline and valid <?php stdin bodies share classification.
+- Q5: Deno.Command combines its literal executable with each literal options.args
+  array. Balanced object-value scanning distinguishes top-level args from nested
+  option data, accepts quoted keys and static templates, and preserves duplicate
+  positive witnesses. Valid shorthand properties before or after args are skipped
+  without discarding collected argv. Comments and strings containing API text
+  remain inert.
+- Q6: sudo consumes child NAME=VALUE operands after its options and registers
+  them through shared environment checks before child dispatch. Configured
+  Kubernetes/AWS filenames apply to readers and interpreter literals only within
+  that invocation. Scoped environment and directory-option state cannot leak to
+  a later statement. Other modeled wrappers retain these assignments when they
+  dispatch sudo or env children.
+- Q7: Parallel and xargs share listing-producer certification for find, fd, rg,
+  ls and git. Protected or uncertain producer scopes cannot borrow a clean
+  consumer cwd. Parallel option/template parsing is shared with ordinary
+  dispatch; explicit input operands keep their own roles. Consumer-side scoped
+  assignments participate in the proof. Recognized fd type options consume their
+  value without accidentally turning it into a producer root. Public producer
+  roots and metadata-only consumers remain allowed.
+- Q8: command-slot analysis consumes and checks every executable option value,
+  including attached/clustered values, instead of returning after a safe first
+  value. Missing later values deny. The same launcher option normalizer handles
+  su's command detection and strict slot classification. Safe repeated values
+  and option-like data retain their existing roles. Make/gmake clusters share a
+  normalizer with the database-printer check, so -sE and attached recipes retain
+  their executable slot while preceding value-taking options consume their data.
+
+Permanent coverage is `internal/hook/policy/audit25_launch_test.go`,
+`internal/hook/policy/audit25_review_test.go`, option-normalizer tests and the 487
+synthetic cases in `testdata/hook/audit25-launch.json`, replayed on both adapters
+by `internal/hook/audit25_launch_test.go`. Candidates are analyzer/envelope data
+only, with a disposable HOME. These Go checks do not establish installed-host
+protection, replace provider/OS CI, or certify Bash deadline and malformed-shell
+repairs (Q9 through Q11) without their subprocess checks.
+
+Exact integration replay also retains Ruby executable/argv0 pairs, PHP proc_open
+arrays and Deno.Command options.args on the Bash side. The existing bounded
+interpreter literal scanner normalizes these shapes into shell-quoted argv for
+full child classification. Balanced option values keep nested args keys, comments
+and quoted API text inert; repeated args and shorthand properties retain positive
+witnesses. Both shell suites add 28 stdin/inline deny and public-data controls from
+the launch corpus. Existing broad Bash environment-name and indirect-write
+policies remain unchanged; these targeted controls do not claim parity for every
+safe source-language spelling.

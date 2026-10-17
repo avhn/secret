@@ -4282,6 +4282,129 @@ for shape in argv triple print paths inline herestring inline_parameters herestr
     done
 done
 
+# Audit 25 Q9-Q11: every request is synthetic JSON, never executed source.
+# The subprocess alarm requires a decision before four seconds, including for
+# a single long regex witness and paths that have not yet been normalized.
+for quote_style in single double; do
+    for size in ordinary excessive; do
+        perl -MJSON::PP -e '
+            my ($style, $size, $cwd) = @ARGV;
+            my $quote = $style eq "single" ? chr(39) : chr(34);
+            my $source = "value=" . $quote . ("a" x ($size eq "ordinary" ? 1000 : 100000)) . $quote;
+            my $command = "python3 <<" . chr(39) . "PY" . chr(39) . "\n$source\nPY";
+            print encode_json({tool_name => "Bash", cwd => $cwd,
+                tool_input => {command => $command}});
+        ' "$quote_style" "$size" "$TMP" >"$TMP/audit23-envelope"
+        expected=deny
+        [[ "$size" != ordinary ]] || expected=allow
+        audit23_envelope "audit25_q9_${quote_style}_$size" "$expected"
+    done
+done
+
+# Large inert bodies are trimmed before syntax parsing, but commands after
+# the terminator must still have complete framing. The body itself stays data.
+for ending in complete incomplete; do
+    perl -MJSON::PP -e '
+        my ($ending, $cwd) = @ARGV;
+        my $quote = chr(39);
+        my $command = "cat > notes.md <<${quote}DATA${quote}\n" . ("a" x 20000) . "\nDATA\ntrue &&";
+        $command .= " true" if $ending eq "complete";
+        print encode_json({tool_name => "Bash", cwd => $cwd,
+            tool_input => {command => $command}});
+    ' "$ending" "$TMP" >"$TMP/audit23-envelope"
+    expected=deny
+    [[ "$ending" != complete ]] || expected=allow
+    audit23_envelope "audit25_q10_oversized_$ending" "$expected"
+done
+
+for location in cwd workdir; do
+    for size in ordinary excessive; do
+        perl -MJSON::PP -e '
+            my ($location, $size, $cwd) = @ARGV;
+            my $path = "$cwd/" . ("./" x ($size eq "ordinary" ? 128 : 10000));
+            my $envelope = {tool_name => "Bash", cwd => $cwd,
+                tool_input => {command => "echo audit"}};
+            if ($location eq "cwd") { $envelope->{cwd} = $path; }
+            else { $envelope->{tool_input}{workdir} = $path; }
+            print encode_json($envelope);
+        ' "$location" "$size" "$TMP" >"$TMP/audit23-envelope"
+        expected=deny
+        [[ "$size" != ordinary ]] || expected=allow
+        audit23_envelope "audit25_q11_${location}_$size" "$expected"
+    done
+done
+
+# Framing checks share the shell analyzer, including nested literal children.
+# Pair each malformed family with complete syntax and keep operators in quoted
+# data inert. Heuristic literals retain printer prefixes before malformed text
+# without treating printed prose as shell source; explicit children stay strict.
+# None of these commands are run by the test or the guard.
+while IFS= read -r row; do
+    NAME="$(jq -r '.name' <<<"$row")"
+    expected="$(jq -r '.expected' <<<"$row")"
+    command_text="$(jq -r '.command' <<<"$row")"
+    jq -cn --arg command "$command_text" --arg cwd "$TMP" \
+        '{tool_name:"Bash",cwd:$cwd,tool_input:{command:$command}}' >"$TMP/audit23-envelope"
+    audit23_envelope "audit25_q10_$NAME" "$expected"
+done <<'AUDIT25_SYNTAX'
+{"name":"and_missing","expected":"deny","command":"true &&"}
+{"name":"or_missing","expected":"deny","command":"true ||"}
+{"name":"pipe_missing","expected":"deny","command":"true |"}
+{"name":"pipe_stderr_missing","expected":"deny","command":"true |&"}
+{"name":"if_missing_body","expected":"deny","command":"if true; then"}
+{"name":"if_missing_fi","expected":"deny","command":"if true; then true"}
+{"name":"for_missing_done","expected":"deny","command":"for item in a; do true"}
+{"name":"group_missing_close","expected":"deny","command":"( true"}
+{"name":"group_missing_open","expected":"deny","command":"true )"}
+{"name":"brace_missing_close","expected":"deny","command":"{ true;"}
+{"name":"case_missing_esac","expected":"deny","command":"case public in public) true;;"}
+{"name":"while_missing_done","expected":"deny","command":"while false; do true"}
+{"name":"and_missing_left","expected":"deny","command":"&& true"}
+{"name":"pipe_empty_middle","expected":"deny","command":"true | | true"}
+{"name":"nested_incomplete","expected":"deny","command":"bash -c 'true &&'"}
+{"name":"and_complete","expected":"allow","command":"true && true"}
+{"name":"or_complete","expected":"allow","command":"true || true"}
+{"name":"pipe_complete","expected":"allow","command":"true | true"}
+{"name":"and_newline_complete","expected":"allow","command":"true &&\ntrue"}
+{"name":"if_complete","expected":"allow","command":"if true; then true; fi"}
+{"name":"if_else_complete","expected":"allow","command":"if true; then true; else true; fi"}
+{"name":"for_complete","expected":"allow","command":"for item in a; do true; done"}
+{"name":"group_complete","expected":"allow","command":"( true )"}
+{"name":"brace_complete","expected":"allow","command":"{ true; }"}
+{"name":"case_complete","expected":"allow","command":"case public in public) true;; esac"}
+{"name":"while_complete","expected":"allow","command":"while false; do true; done"}
+{"name":"background_complete","expected":"allow","command":"true & true"}
+{"name":"quoted_operators","expected":"allow","command":"printf '%s' 'true && || | |& if then for do ( )'"}
+{"name":"nested_complete","expected":"allow","command":"bash -c 'true && true'"}
+{"name":"review_argument_env_prefix","expected":"deny","command":"ansible localhost -c local -m ansible.builtin.shell -a 'printenv TOKEN\nif true; then'"}
+{"name":"review_argument_gh_prefix","expected":"deny","command":"ansible localhost -c local -m ansible.builtin.shell -a 'gh auth token\nif true; then'"}
+{"name":"review_argument_public_prefix","expected":"allow","command":"ansible localhost -c local -m ansible.builtin.shell -a 'echo public\nif true; then'"}
+{"name":"review_python_operator_inline","expected":"allow","command":"python3 -c 'print(\"true &&\")'"}
+{"name":"review_python_operator_heredoc","expected":"allow","command":"python3 <<'PY'\nprint(\"true &&\")\nPY"}
+{"name":"review_python_prose_inline","expected":"allow","command":"python3 -c 'print(\"echo hello (world)\")'"}
+{"name":"review_python_prose_heredoc","expected":"allow","command":"python3 <<'PY'\nprint(\"echo hello (world)\")\nPY"}
+{"name":"review_node_prose_inline","expected":"allow","command":"node -e 'console.log(\"echo hello (world)\")'"}
+{"name":"review_node_prose_heredoc","expected":"allow","command":"node <<'JS'\nconsole.log(\"echo hello (world)\")\nJS"}
+{"name":"review_shell_env_prefix","expected":"deny","command":"bash -c 'printenv TOKEN\nif true; then'"}
+{"name":"review_shell_gh_prefix","expected":"deny","command":"bash -c 'gh auth token\nif true; then'"}
+{"name":"review_literal_shell_incomplete","expected":"deny","command":"python3 -c 'import subprocess; subprocess.run([\"bash\",\"-c\",\"true &&\"])'"}
+{"name":"review_literal_shell_complete","expected":"allow","command":"python3 -c 'import subprocess; subprocess.run([\"bash\",\"-c\",\"true && true\"])'"}
+{"name":"review_backtick_incomplete","expected":"deny","command":"ruby -e '`true &&`'"}
+{"name":"review_backtick_complete","expected":"allow","command":"ruby -e '`true && true`'"}
+{"name":"review_argument_shell_incomplete","expected":"deny","command":"ansible localhost -c local -m ansible.builtin.shell -a \"bash -c 'true &&'\""}
+{"name":"review_argument_shell_complete","expected":"allow","command":"ansible localhost -c local -m ansible.builtin.shell -a \"bash -c 'true && true'\""}
+AUDIT25_SYNTAX
+
+# Structured interpreter launches use the same quoted argv classifier as shell
+# children. Pair every printer witness with public-reader or inert-code controls.
+printf '%s\n' public >"$TMP/search/README.md"
+while IFS= read -r row; do
+    NAME="$(jq -r '.name' <<<"$row")"
+    expected="$(jq -r 'if .deny then "deny" else "allow" end' <<<"$row")"
+    command_text="$(jq -r '.command' <<<"$row")"
+    audit21_case "$NAME" "$expected" "$command_text"
+done < <(jq -c '.cases[] | select(.name | test("^audit25_q[345]_.*_(heredoc|herestring)$|^audit25_bash_"))' "$REPO_ROOT/testdata/hook/audit25-launch.json")
+
 # Audit 25 replays interpreter extraction, quote boundaries and producer inputs.
 # Commands remain JSON data; fixture metadata comes from the disposable search tree.
 while IFS= read -r row; do

@@ -233,7 +233,7 @@ func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd, name
 				inspect(node.Word)
 			}
 			if node.Hdoc != nil {
-				body, known := a.expandInterpreterStdin(node.Hdoc, true, producerCWD)
+				body, known := a.interpreterRedirectBody(node, producerCWD)
 				if !known {
 					a.reason = roles.Indeterminate
 					protected = true

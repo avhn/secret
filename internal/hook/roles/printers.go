@@ -174,6 +174,7 @@ func printerAction(words []string, actions string) string {
 }
 
 func makePrintsDatabase(args []string) bool {
+	args = NormalizeMakeArgs(args)
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
@@ -184,7 +185,7 @@ func makePrintsDatabase(args []string) bool {
 			return true
 		}
 		if strings.HasPrefix(arg, "--") {
-			if !attached && strings.Contains(" --directory --file --makefile --include-dir --old-file --assume-old --what-if --new-file --assume-new --eval ", " "+key+" ") {
+			if !attached && makeLongValueOption(key) {
 				i++
 			}
 			continue

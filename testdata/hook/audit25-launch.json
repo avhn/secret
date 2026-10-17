@@ -1,0 +1,2466 @@
+{
+  "fixtures": [
+    [
+      "home/.aws/credentials",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "home/.aws/config",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "work/README.md",
+      "file",
+      "public\n"
+    ],
+    [
+      "work/custom.cfg",
+      "file",
+      "synthetic\n"
+    ],
+    [
+      "work/public/README.md",
+      "file",
+      "public\n"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "audit25_q1_unzip_deny_inline",
+      "command": "lua -e 'os.execute(\"unzip -p fixture.zip\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_unzip_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"unzip -p fixture.zip\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_unzip_allow_inline",
+      "command": "lua -e 'os.execute(\"unzip -l fixture.zip\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_unzip_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"unzip -l fixture.zip\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_7z_deny_inline",
+      "command": "lua -e 'os.execute(\"7z x -so fixture.zip\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_7z_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"7z x -so fixture.zip\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_7z_allow_inline",
+      "command": "lua -e 'os.execute(\"7z l fixture.zip\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_7z_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"7z l fixture.zip\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_cpio_deny_inline",
+      "command": "lua -e 'os.execute(\"cpio -i --to-stdout -F fixture.cpio\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_cpio_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"cpio -i --to-stdout -F fixture.cpio\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_cpio_allow_inline",
+      "command": "lua -e 'os.execute(\"cpio -t fixture.cpio\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_cpio_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"cpio -t fixture.cpio\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_gmake_deny_inline",
+      "command": "lua -e 'os.execute(\"gmake -p\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_gmake_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"gmake -p\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_gmake_allow_inline",
+      "command": "lua -e 'os.execute(\"gmake public\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_gmake_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"gmake public\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_busybox_deny_inline",
+      "command": "lua -e 'os.execute(\"busybox tar xOf fixture.tar\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_busybox_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"busybox tar xOf fixture.tar\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_busybox_allow_inline",
+      "command": "lua -e 'os.execute(\"busybox tar tf fixture.tar\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_busybox_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"busybox tar tf fixture.tar\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_toybox_deny_inline",
+      "command": "lua -e 'os.execute(\"toybox tar xOf fixture.tar\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_toybox_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"toybox tar xOf fixture.tar\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q1_toybox_allow_inline",
+      "command": "lua -e 'os.execute(\"toybox tar tf fixture.tar\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q1_toybox_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nos.execute(\"toybox tar tf fixture.tar\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_0_deny_inline",
+      "command": "lua -e 'io.popen([[gh auth token]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_0_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[gh auth token]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_0_allow_inline",
+      "command": "lua -e 'io.popen([[cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_0_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_1_deny_inline",
+      "command": "lua -e 'io.popen([=[gh auth token]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_1_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[gh auth token]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_1_allow_inline",
+      "command": "lua -e 'io.popen([=[cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_1_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_2_deny_inline",
+      "command": "lua -e 'io.popen([==[gh auth token]==])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_2_deny_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([==[gh auth token]==])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua_2_allow_inline",
+      "command": "lua -e 'io.popen([==[cat README.md]==])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua_2_allow_stdin",
+      "command": "lua <<'SYNTHETIC'\nio.popen([==[cat README.md]==])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_0_deny_inline",
+      "command": "lua5.4 -e 'io.popen([[gh auth token]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_0_deny_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[gh auth token]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_0_allow_inline",
+      "command": "lua5.4 -e 'io.popen([[cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_0_allow_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_1_deny_inline",
+      "command": "lua5.4 -e 'io.popen([=[gh auth token]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_1_deny_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[gh auth token]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_1_allow_inline",
+      "command": "lua5.4 -e 'io.popen([=[cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_1_allow_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_2_deny_inline",
+      "command": "lua5.4 -e 'io.popen([==[gh auth token]==])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_2_deny_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([==[gh auth token]==])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_lua5_4_2_allow_inline",
+      "command": "lua5.4 -e 'io.popen([==[cat README.md]==])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_lua5_4_2_allow_stdin",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([==[cat README.md]==])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_0_deny_inline",
+      "command": "luajit -e 'io.popen([[gh auth token]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_0_deny_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[gh auth token]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_0_allow_inline",
+      "command": "luajit -e 'io.popen([[cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_0_allow_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_1_deny_inline",
+      "command": "luajit -e 'io.popen([=[gh auth token]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_1_deny_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[gh auth token]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_1_allow_inline",
+      "command": "luajit -e 'io.popen([=[cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_1_allow_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_2_deny_inline",
+      "command": "luajit -e 'io.popen([==[gh auth token]==])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_2_deny_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([==[gh auth token]==])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q2_luajit_2_allow_inline",
+      "command": "luajit -e 'io.popen([==[cat README.md]==])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q2_luajit_2_allow_stdin",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([==[cat README.md]==])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_pair_deny_inline",
+      "command": "ruby -e 'exec([\"gh\",\"display\"],\"auth\",\"token\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_pair_deny_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec([\"gh\",\"display\"],\"auth\",\"token\")\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_pair_deny_herestring",
+      "command": "ruby <<< 'exec([\"gh\",\"display\"],\"auth\",\"token\")'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_pair_allow_inline",
+      "command": "ruby -e 'exec([\"cat\",\"display\"],\"README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_pair_allow_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec([\"cat\",\"display\"],\"README.md\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_pair_allow_herestring",
+      "command": "ruby <<< 'exec([\"cat\",\"display\"],\"README.md\")'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_bare_deny_inline",
+      "command": "ruby -e 'exec [\"gh\",\"display\"],\"auth\",\"token\"'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_bare_deny_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec [\"gh\",\"display\"],\"auth\",\"token\"\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_bare_deny_herestring",
+      "command": "ruby <<< 'exec [\"gh\",\"display\"],\"auth\",\"token\"'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q3_bare_allow_inline",
+      "command": "ruby -e 'exec [\"cat\",\"display\"],\"README.md\"'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_bare_allow_heredoc",
+      "command": "ruby <<'SYNTHETIC'\nexec [\"cat\",\"display\"],\"README.md\"\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q3_bare_allow_herestring",
+      "command": "ruby <<< 'exec [\"cat\",\"display\"],\"README.md\"'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q4_deny_inline",
+      "command": "php -r 'proc_open([\"gh\",\"auth\",\"token\"],[1=>STDOUT,2=>STDERR],$pipes);'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q4_deny_heredoc",
+      "command": "php <<'SYNTHETIC'\n<?php\nproc_open([\"gh\",\"auth\",\"token\"],[1=>STDOUT,2=>STDERR],$pipes);\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q4_deny_herestring",
+      "command": "php <<< '<?php\nproc_open([\"gh\",\"auth\",\"token\"],[1=>STDOUT,2=>STDERR],$pipes);'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q4_allow_inline",
+      "command": "php -r 'proc_open([\"cat\",\"README.md\"],[1=>STDOUT,2=>STDERR],$pipes);'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q4_allow_heredoc",
+      "command": "php <<'SYNTHETIC'\n<?php\nproc_open([\"cat\",\"README.md\"],[1=>STDOUT,2=>STDERR],$pipes);\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q4_allow_herestring",
+      "command": "php <<< '<?php\nproc_open([\"cat\",\"README.md\"],[1=>STDOUT,2=>STDERR],$pipes);'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q5_deny_inline",
+      "command": "deno eval 'new Deno.Command(\"gh\",{args:[\"auth\",\"token\"],stdout:\"inherit\"}).spawn();'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q5_deny_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nnew Deno.Command(\"gh\",{args:[\"auth\",\"token\"],stdout:\"inherit\"}).spawn();\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_q5_deny_herestring",
+      "command": "deno run --allow-run - <<< 'new Deno.Command(\"gh\",{args:[\"auth\",\"token\"],stdout:\"inherit\"}).spawn();'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q5_allow_inline",
+      "command": "deno eval 'new Deno.Command(\"cat\",{args:[\"README.md\"],stdout:\"inherit\"}).spawn();'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q5_allow_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nnew Deno.Command(\"cat\",{args:[\"README.md\"],stdout:\"inherit\"}).spawn();\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_q5_allow_herestring",
+      "command": "deno run --allow-run - <<< 'new Deno.Command(\"cat\",{args:[\"README.md\"],stdout:\"inherit\"}).spawn();'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_sudo",
+      "command": "sudo -n KUBECONFIG=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_sudo_public",
+      "command": "sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_timeout",
+      "command": "timeout 2 sudo -n KUBECONFIG=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_timeout_public",
+      "command": "timeout 2 sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_env",
+      "command": "env SYNTHETIC=yes sudo -n KUBECONFIG=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_KUBECONFIG_env_public",
+      "command": "env SYNTHETIC=yes sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_sudo",
+      "command": "sudo -n AWS_CONFIG_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_sudo_public",
+      "command": "sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_timeout",
+      "command": "timeout 2 sudo -n AWS_CONFIG_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_timeout_public",
+      "command": "timeout 2 sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_env",
+      "command": "env SYNTHETIC=yes sudo -n AWS_CONFIG_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_CONFIG_FILE_env_public",
+      "command": "env SYNTHETIC=yes sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_sudo",
+      "command": "sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_sudo_public",
+      "command": "sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_timeout",
+      "command": "timeout 2 sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_timeout_public",
+      "command": "timeout 2 sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_env",
+      "command": "env SYNTHETIC=yes sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat custom.cfg",
+      "deny": true
+    },
+    {
+      "name": "audit25_q6_AWS_SHARED_CREDENTIALS_FILE_env_public",
+      "command": "env SYNTHETIC=yes sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg",
+      "deny": false
+    },
+    {
+      "name": "audit25_q7_0_parallel_cat",
+      "command": "find ~/.aws -type f | parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_0_parallel_-0_cat",
+      "command": "find ~/.aws -type f | parallel -0 cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_0_env_SYNTHETIC=yes_parallel_cat",
+      "command": "find ~/.aws -type f | env SYNTHETIC=yes parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_1_parallel_cat",
+      "command": "find ~/.aws -type f -print0 | parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_1_parallel_-0_cat",
+      "command": "find ~/.aws -type f -print0 | parallel -0 cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_1_env_SYNTHETIC=yes_parallel_cat",
+      "command": "find ~/.aws -type f -print0 | env SYNTHETIC=yes parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_2_parallel_cat",
+      "command": "rg --files --hidden --no-ignore ~/.aws | parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_2_parallel_-0_cat",
+      "command": "rg --files --hidden --no-ignore ~/.aws | parallel -0 cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_2_env_SYNTHETIC=yes_parallel_cat",
+      "command": "rg --files --hidden --no-ignore ~/.aws | env SYNTHETIC=yes parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_3_parallel_cat",
+      "command": "fd --hidden --no-ignore --type f . ~/.aws | parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_3_parallel_-0_cat",
+      "command": "fd --hidden --no-ignore --type f . ~/.aws | parallel -0 cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_3_env_SYNTHETIC=yes_parallel_cat",
+      "command": "fd --hidden --no-ignore --type f . ~/.aws | env SYNTHETIC=yes parallel cat",
+      "deny": true
+    },
+    {
+      "name": "audit25_q7_allow_0",
+      "command": "find public -type f | parallel cat",
+      "deny": false
+    },
+    {
+      "name": "audit25_q7_allow_1",
+      "command": "find public -type f -print0 | parallel -0 cat",
+      "deny": false
+    },
+    {
+      "name": "audit25_q7_allow_2",
+      "command": "fd --type f . public | parallel cat",
+      "deny": false
+    },
+    {
+      "name": "audit25_q7_allow_3",
+      "command": "find ~/.aws -type f | parallel stat",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_0_deny",
+      "command": "make --eval 'audit:; echo public' --eval 'audit:; printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_0_allow",
+      "command": "make --eval 'audit:; echo public' --eval 'audit:; echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_1_deny",
+      "command": "gmake -E 'audit:; echo public' -E 'audit:; printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_1_allow",
+      "command": "gmake -E 'audit:; echo public' -E 'audit:; echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_2_deny",
+      "command": "rsync -e 'echo public' -e 'printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_2_allow",
+      "command": "rsync -e 'echo public' -e 'echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_3_deny",
+      "command": "su -c 'echo public' -c 'printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_3_allow",
+      "command": "su -c 'echo public' -c 'echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_4_deny",
+      "command": "runuser -c 'echo public' -c 'printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_4_allow",
+      "command": "runuser -c 'echo public' -c 'echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_q8_5_deny",
+      "command": "npm exec --call 'echo public' --call 'printenv TOKEN'",
+      "deny": true
+    },
+    {
+      "name": "audit25_q8_5_allow",
+      "command": "npm exec --call 'echo public' --call 'echo public'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_0_0_inline",
+      "command": "lua -e 'os.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_0_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_0_1_inline",
+      "command": "lua -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_0_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_1_0_inline",
+      "command": "lua -e 'os.execute([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_1_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_1_1_inline",
+      "command": "lua -e 'os.execute([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_1_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_2_0_inline",
+      "command": "lua -e 'os.execute([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_2_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_2_1_inline",
+      "command": "lua -e 'os.execute([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_2_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_3_0_inline",
+      "command": "lua -e 'os.execute([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_3_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_3_1_inline",
+      "command": "lua -e 'os.execute([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_3_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_4_0_inline",
+      "command": "lua -e 'os.execute([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_4_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_4_1_inline",
+      "command": "lua -e 'os.execute([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_4_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_5_0_inline",
+      "command": "lua -e 'os.execute([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_5_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_5_1_inline",
+      "command": "lua -e 'os.execute([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_5_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_6_0_inline",
+      "command": "lua -e 'os.execute([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_6_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_6_1_inline",
+      "command": "lua -e 'os.execute([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_6_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_7_0_inline",
+      "command": "lua -e 'os.execute([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_7_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_7_1_inline",
+      "command": "lua -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_7_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_8_0_inline",
+      "command": "lua -e 'os.execute([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_8_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_8_1_inline",
+      "command": "lua -e 'os.execute([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_8_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_9_0_inline",
+      "command": "lua -e 'os.execute([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_9_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_9_1_inline",
+      "command": "lua -e 'os.execute([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_os.execute_9_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nos.execute([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_0_0_inline",
+      "command": "lua -e 'io.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_0_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_0_1_inline",
+      "command": "lua -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_0_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_1_0_inline",
+      "command": "lua -e 'io.popen([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_1_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_1_1_inline",
+      "command": "lua -e 'io.popen([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_1_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_2_0_inline",
+      "command": "lua -e 'io.popen([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_2_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_2_1_inline",
+      "command": "lua -e 'io.popen([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_2_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_3_0_inline",
+      "command": "lua -e 'io.popen([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_3_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_3_1_inline",
+      "command": "lua -e 'io.popen([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_3_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_4_0_inline",
+      "command": "lua -e 'io.popen([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_4_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_4_1_inline",
+      "command": "lua -e 'io.popen([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_4_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_5_0_inline",
+      "command": "lua -e 'io.popen([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_5_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_5_1_inline",
+      "command": "lua -e 'io.popen([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_5_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_6_0_inline",
+      "command": "lua -e 'io.popen([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_6_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_6_1_inline",
+      "command": "lua -e 'io.popen([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_6_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_7_0_inline",
+      "command": "lua -e 'io.popen([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_7_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_7_1_inline",
+      "command": "lua -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_7_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_8_0_inline",
+      "command": "lua -e 'io.popen([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_8_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_8_1_inline",
+      "command": "lua -e 'io.popen([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_8_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_9_0_inline",
+      "command": "lua -e 'io.popen([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_9_0_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_9_1_inline",
+      "command": "lua -e 'io.popen([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua_io.popen_9_1_heredoc",
+      "command": "lua <<'SYNTHETIC'\nio.popen([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_0_0_inline",
+      "command": "lua5.4 -e 'os.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_0_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_0_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_0_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_1_0_inline",
+      "command": "lua5.4 -e 'os.execute([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_1_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_1_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_1_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_2_0_inline",
+      "command": "lua5.4 -e 'os.execute([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_2_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_2_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_2_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_3_0_inline",
+      "command": "lua5.4 -e 'os.execute([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_3_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_3_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_3_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_4_0_inline",
+      "command": "lua5.4 -e 'os.execute([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_4_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_4_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_4_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_5_0_inline",
+      "command": "lua5.4 -e 'os.execute([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_5_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_5_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_5_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_6_0_inline",
+      "command": "lua5.4 -e 'os.execute([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_6_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_6_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_6_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_7_0_inline",
+      "command": "lua5.4 -e 'os.execute([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_7_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_7_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_7_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_8_0_inline",
+      "command": "lua5.4 -e 'os.execute([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_8_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_8_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_8_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_9_0_inline",
+      "command": "lua5.4 -e 'os.execute([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_9_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_9_1_inline",
+      "command": "lua5.4 -e 'os.execute([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_os.execute_9_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nos.execute([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_0_0_inline",
+      "command": "lua5.4 -e 'io.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_0_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_0_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_0_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_1_0_inline",
+      "command": "lua5.4 -e 'io.popen([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_1_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_1_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_1_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_2_0_inline",
+      "command": "lua5.4 -e 'io.popen([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_2_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_2_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_2_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_3_0_inline",
+      "command": "lua5.4 -e 'io.popen([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_3_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_3_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_3_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_4_0_inline",
+      "command": "lua5.4 -e 'io.popen([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_4_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_4_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_4_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_5_0_inline",
+      "command": "lua5.4 -e 'io.popen([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_5_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_5_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_5_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_6_0_inline",
+      "command": "lua5.4 -e 'io.popen([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_6_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_6_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_6_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_7_0_inline",
+      "command": "lua5.4 -e 'io.popen([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_7_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_7_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_7_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_8_0_inline",
+      "command": "lua5.4 -e 'io.popen([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_8_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_8_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_8_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_9_0_inline",
+      "command": "lua5.4 -e 'io.popen([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_9_0_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_9_1_inline",
+      "command": "lua5.4 -e 'io.popen([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_lua5.4_io.popen_9_1_heredoc",
+      "command": "lua5.4 <<'SYNTHETIC'\nio.popen([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_0_0_inline",
+      "command": "luajit -e 'os.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_0_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_0_1_inline",
+      "command": "luajit -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_0_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_1_0_inline",
+      "command": "luajit -e 'os.execute([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_1_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_1_1_inline",
+      "command": "luajit -e 'os.execute([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_1_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_2_0_inline",
+      "command": "luajit -e 'os.execute([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_2_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_2_1_inline",
+      "command": "luajit -e 'os.execute([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_2_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_3_0_inline",
+      "command": "luajit -e 'os.execute([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_3_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_3_1_inline",
+      "command": "luajit -e 'os.execute([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_3_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_4_0_inline",
+      "command": "luajit -e 'os.execute([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_4_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_4_1_inline",
+      "command": "luajit -e 'os.execute([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_4_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_5_0_inline",
+      "command": "luajit -e 'os.execute([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_5_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_5_1_inline",
+      "command": "luajit -e 'os.execute([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_5_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_6_0_inline",
+      "command": "luajit -e 'os.execute([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_6_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_6_1_inline",
+      "command": "luajit -e 'os.execute([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_6_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_7_0_inline",
+      "command": "luajit -e 'os.execute([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_7_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_7_1_inline",
+      "command": "luajit -e 'os.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_7_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_8_0_inline",
+      "command": "luajit -e 'os.execute([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_8_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_8_1_inline",
+      "command": "luajit -e 'os.execute([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_8_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_9_0_inline",
+      "command": "luajit -e 'os.execute([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_9_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_9_1_inline",
+      "command": "luajit -e 'os.execute([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_os.execute_9_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nos.execute([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_0_0_inline",
+      "command": "luajit -e 'io.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_0_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat custom.cfg]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_0_1_inline",
+      "command": "luajit -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_0_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat custom.cfg]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_1_0_inline",
+      "command": "luajit -e 'io.popen([[find ~/.aws -type f | parallel cat]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_1_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[find ~/.aws -type f | parallel cat]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_1_1_inline",
+      "command": "luajit -e 'io.popen([=[find ~/.aws -type f | parallel cat]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_1_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[find ~/.aws -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_2_0_inline",
+      "command": "luajit -e 'io.popen([[export -p]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_2_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[export -p]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_2_1_inline",
+      "command": "luajit -e 'io.popen([=[export -p]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_2_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[export -p]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_3_0_inline",
+      "command": "luajit -e 'io.popen([[cd ~/.aws; cat credentials]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_3_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[cd ~/.aws; cat credentials]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_3_1_inline",
+      "command": "luajit -e 'io.popen([=[cd ~/.aws; cat credentials]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_3_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[cd ~/.aws; cat credentials]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_4_0_inline",
+      "command": "luajit -e 'io.popen([[printenv]])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_4_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[printenv]])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_4_1_inline",
+      "command": "luajit -e 'io.popen([=[printenv]=])'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_4_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[printenv]=])\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_5_0_inline",
+      "command": "luajit -e 'io.popen([[true]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_5_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[true]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_5_1_inline",
+      "command": "luajit -e 'io.popen([=[true]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_5_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[true]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_6_0_inline",
+      "command": "luajit -e 'io.popen([[export SYNTHETIC=public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_6_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[export SYNTHETIC=public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_6_1_inline",
+      "command": "luajit -e 'io.popen([=[export SYNTHETIC=public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_6_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[export SYNTHETIC=public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_7_0_inline",
+      "command": "luajit -e 'io.popen([[export KUBECONFIG=custom.cfg; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_7_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[export KUBECONFIG=custom.cfg; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_7_1_inline",
+      "command": "luajit -e 'io.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_7_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[export KUBECONFIG=custom.cfg; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_8_0_inline",
+      "command": "luajit -e 'io.popen([[cd public; cat README.md]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_8_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[cd public; cat README.md]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_8_1_inline",
+      "command": "luajit -e 'io.popen([=[cd public; cat README.md]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_8_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[cd public; cat README.md]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_9_0_inline",
+      "command": "luajit -e 'io.popen([[find public -type f | parallel cat]])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_9_0_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([[find public -type f | parallel cat]])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_9_1_inline",
+      "command": "luajit -e 'io.popen([=[find public -type f | parallel cat]=])'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_lua_luajit_io.popen_9_1_heredoc",
+      "command": "luajit <<'SYNTHETIC'\nio.popen([=[find public -type f | parallel cat]=])\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_0_inline",
+      "command": "node -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_0_heredoc",
+      "command": "node <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_1_inline",
+      "command": "node -e 'console.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_1_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_2_inline",
+      "command": "node -e 'console.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_2_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_node_3_inline",
+      "command": "node -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_3_heredoc",
+      "command": "node <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_4_inline",
+      "command": "node -e 'console.log(`public ${\"hello\"}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_4_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`public ${\"hello\"}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_5_inline",
+      "command": "node -e 'console.log(`outer ${`inner ${\"public\"}`}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_5_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${\"public\"}`}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_6_inline",
+      "command": "node -e 'console.log(`public ${'\\''execFileSync(\"gh\",[\"auth\",\"token\"])'\\''}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_6_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`public ${'execFileSync(\"gh\",[\"auth\",\"token\"])'}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_7_inline",
+      "command": "node -e 'console.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_node_7_heredoc",
+      "command": "node <<'SYNTHETIC'\nconsole.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_0_inline",
+      "command": "nodejs -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_0_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_1_inline",
+      "command": "nodejs -e 'console.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_1_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_2_inline",
+      "command": "nodejs -e 'console.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_2_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_nodejs_3_inline",
+      "command": "nodejs -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_3_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_4_inline",
+      "command": "nodejs -e 'console.log(`public ${\"hello\"}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_4_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`public ${\"hello\"}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_5_inline",
+      "command": "nodejs -e 'console.log(`outer ${`inner ${\"public\"}`}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_5_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${\"public\"}`}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_6_inline",
+      "command": "nodejs -e 'console.log(`public ${'\\''execFileSync(\"gh\",[\"auth\",\"token\"])'\\''}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_6_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`public ${'execFileSync(\"gh\",[\"auth\",\"token\"])'}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_7_inline",
+      "command": "nodejs -e 'console.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_nodejs_7_heredoc",
+      "command": "nodejs <<'SYNTHETIC'\nconsole.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_0_inline",
+      "command": "bun -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_0_heredoc",
+      "command": "bun <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_1_inline",
+      "command": "bun -e 'console.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_1_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_2_inline",
+      "command": "bun -e 'console.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_2_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_bun_3_inline",
+      "command": "bun -e 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_3_heredoc",
+      "command": "bun <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_4_inline",
+      "command": "bun -e 'console.log(`public ${\"hello\"}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_4_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`public ${\"hello\"}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_5_inline",
+      "command": "bun -e 'console.log(`outer ${`inner ${\"public\"}`}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_5_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${\"public\"}`}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_6_inline",
+      "command": "bun -e 'console.log(`public ${'\\''execFileSync(\"gh\",[\"auth\",\"token\"])'\\''}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_6_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`public ${'execFileSync(\"gh\",[\"auth\",\"token\"])'}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_7_inline",
+      "command": "bun -e 'console.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_bun_7_heredoc",
+      "command": "bun <<'SYNTHETIC'\nconsole.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_0_inline",
+      "command": "deno eval 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_0_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_1_inline",
+      "command": "deno eval 'console.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_1_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_2_inline",
+      "command": "deno eval 'console.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_2_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`public ${/* } */ require(\"child_process\").execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_template_deno_3_inline",
+      "command": "deno eval 'require(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_3_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nrequire(\"child_process\").execSync(`echo ${require(\"child_process\").execFileSync(\"cat\",[\"README.md\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_4_inline",
+      "command": "deno eval 'console.log(`public ${\"hello\"}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_4_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`public ${\"hello\"}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_5_inline",
+      "command": "deno eval 'console.log(`outer ${`inner ${\"public\"}`}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_5_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`outer ${`inner ${\"public\"}`}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_6_inline",
+      "command": "deno eval 'console.log(`public ${'\\''execFileSync(\"gh\",[\"auth\",\"token\"])'\\''}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_6_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`public ${'execFileSync(\"gh\",[\"auth\",\"token\"])'}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_7_inline",
+      "command": "deno eval 'console.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_template_deno_7_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log(`public \\${execFileSync(\"gh\",[\"auth\",\"token\"])}`)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_0_True_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{args:[\"auth\",\"token\"],stdout:\"inherit\",env}).outputSync();'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_0_True_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{args:[\"auth\",\"token\"],stdout:\"inherit\",env}).outputSync();\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_0_False_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{args:[\"README.md\"],stdout:\"inherit\",env}).outputSync();'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_0_False_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{args:[\"README.md\"],stdout:\"inherit\",env}).outputSync();\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_1_True_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{env,args:[\"auth\",\"token\"],stdout:\"inherit\"}).outputSync();'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_1_True_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{env,args:[\"auth\",\"token\"],stdout:\"inherit\"}).outputSync();\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_1_False_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{env,args:[\"README.md\"],stdout:\"inherit\"}).outputSync();'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_1_False_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{env,args:[\"README.md\"],stdout:\"inherit\"}).outputSync();\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_2_True_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{env,args:[\"auth\",\"token\"],cwd,}).outputSync();'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_2_True_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"gh\",{env,args:[\"auth\",\"token\"],cwd,}).outputSync();\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_shorthand_2_False_inline",
+      "command": "deno eval 'const env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{env,args:[\"README.md\"],cwd,}).outputSync();'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_shorthand_2_False_heredoc",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst env = {}; const cwd = \".\"; new Deno.Command(\"cat\",{env,args:[\"README.md\"],cwd,}).outputSync();\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_make_-sE_False_True",
+      "command": "make --eval 'public:; echo ok' -sE 'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_make_-sE_False_False",
+      "command": "make --eval 'public:; echo ok' -sE 'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_make_-sE_True_True",
+      "command": "make --eval 'public:; echo ok' -sE'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_make_-sE_True_False",
+      "command": "make --eval 'public:; echo ok' -sE'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_missing_make_-sE",
+      "command": "make --eval 'public:; echo ok' -sE",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_make_-nsE_False_True",
+      "command": "make --eval 'public:; echo ok' -nsE 'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_make_-nsE_False_False",
+      "command": "make --eval 'public:; echo ok' -nsE 'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_make_-nsE_True_True",
+      "command": "make --eval 'public:; echo ok' -nsE'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_make_-nsE_True_False",
+      "command": "make --eval 'public:; echo ok' -nsE'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_missing_make_-nsE",
+      "command": "make --eval 'public:; echo ok' -nsE",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-sE_False_True",
+      "command": "gmake --eval 'public:; echo ok' -sE 'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-sE_False_False",
+      "command": "gmake --eval 'public:; echo ok' -sE 'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_gmake_-sE_True_True",
+      "command": "gmake --eval 'public:; echo ok' -sE'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-sE_True_False",
+      "command": "gmake --eval 'public:; echo ok' -sE'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_missing_gmake_-sE",
+      "command": "gmake --eval 'public:; echo ok' -sE",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-nsE_False_True",
+      "command": "gmake --eval 'public:; echo ok' -nsE 'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-nsE_False_False",
+      "command": "gmake --eval 'public:; echo ok' -nsE 'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_gmake_-nsE_True_True",
+      "command": "gmake --eval 'public:; echo ok' -nsE'public:; gh auth token'",
+      "deny": true
+    },
+    {
+      "name": "audit25_review_make_gmake_-nsE_True_False",
+      "command": "gmake --eval 'public:; echo ok' -nsE'public:; cat README.md'",
+      "deny": false
+    },
+    {
+      "name": "audit25_review_make_missing_gmake_-nsE",
+      "command": "gmake --eval 'public:; echo ok' -nsE",
+      "deny": true
+    },
+    {
+      "name": "audit25_integration_argument_env_prefix",
+      "command": "ansible localhost -a 'printenv TOKEN\nif true; then'",
+      "deny": true
+    },
+    {
+      "name": "audit25_integration_argument_gh_prefix",
+      "command": "ansible localhost -a 'gh auth token\nif true; then'",
+      "deny": true
+    },
+    {
+      "name": "audit25_integration_argument_later_gh_prefix",
+      "command": "ansible localhost -a 'echo public\ngh auth token\nif true; then'",
+      "deny": true
+    },
+    {
+      "name": "audit25_integration_argument_public_prefix",
+      "command": "ansible localhost -a 'echo public\nif true; then'",
+      "deny": false
+    },
+    {
+      "name": "audit25_integration_argument_prose",
+      "command": "ansible localhost -a 'echo hello (world)'",
+      "deny": false
+    },
+    {
+      "name": "audit25_integration_argument_shell_incomplete",
+      "command": "ansible localhost -a \"bash -c 'true &&'\"",
+      "deny": true
+    },
+    {
+      "name": "audit25_integration_argument_shell_complete",
+      "command": "ansible localhost -a \"bash -c 'true && true'\"",
+      "deny": false
+    },
+    {
+      "name": "audit25_integration_heredoc_speculative_public",
+      "command": "python3 <<'CODE'\nprint(\"$UNKNOWN $(printf public) `printf public`\")\nCODE",
+      "deny": false
+    },
+    {
+      "name": "audit25_integration_heredoc_speculative_printer",
+      "command": "python3 <<'CODE'\nprint(\"$UNKNOWN $(gh auth token) `printf public`\")\nCODE",
+      "deny": true
+    },
+    {
+      "name": "audit25_bash_ruby_display_data",
+      "command": "ruby <<'SYNTHETIC'\nexec([\"cat\",\"gh\"],\"README.md\")\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_php_comment",
+      "command": "php <<'SYNTHETIC'\n<?php\n// proc_open([\"gh\",\"auth\",\"token\"],[],$pipes)\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_php_quoted",
+      "command": "php <<'SYNTHETIC'\n<?php\necho 'proc_open([\"gh\",\"auth\",\"token\"],[],$pipes)';\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_deno_comment",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\n// new Deno.Command(\"gh\",{args:[\"auth\",\"token\"]})\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_deno_quoted",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconsole.log('new Deno.Command(\"gh\",{args:[\"auth\",\"token\"]})')\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_deno_nested_data",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nnew Deno.Command(\"echo\",{other:{args:[\"auth\",\"token\"]},args:[\"public\"]}).spawn()\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_deno_nested_witness",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nnew Deno.Command(\"gh\",{other:{args:[\"help\"]},args:[\"auth\",\"token\"]}).spawn()\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_bash_deno_shorthand_witness",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst opts={}; new Deno.Command(\"gh\",{opts,args:[\"auth\",\"token\"]}).spawn()\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_bash_deno_shorthand_data",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nconst opts={}; new Deno.Command(\"cat\",{opts,args:[\"README.md\"]}).spawn()\nSYNTHETIC",
+      "deny": false
+    },
+    {
+      "name": "audit25_bash_deno_repeated_args",
+      "command": "deno run --allow-run - <<'SYNTHETIC'\nnew Deno.Command(\"gh\",{args:[\"help\"],args:[\"auth\",\"token\"]}).spawn()\nSYNTHETIC",
+      "deny": true
+    },
+    {
+      "name": "audit25_bash_php_inline_witness",
+      "command": "php -r 'proc_open([\"gh\",\"auth\",\"token\"],[],$pipes);'",
+      "deny": true
+    },
+    {
+      "name": "audit25_bash_php_inline_public",
+      "command": "php -r 'proc_open([\"cat\",\"README.md\"],[],$pipes);'",
+      "deny": false
+    }
+  ]
+}

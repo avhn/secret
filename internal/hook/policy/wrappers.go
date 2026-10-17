@@ -146,6 +146,28 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 	return args, cwd, shell
 }
 
+// Child environment operands are already expanded argv, not shell source.
+// Stop at the executable so its own NAME=VALUE data operands remain data.
+func (a *analyzer) childAssignments(args []string, depth int, cwd string) ([]string, string) {
+	for len(args) > 0 {
+		key, value, appendValue, ok := declarationOperand(args[0])
+		if !ok {
+			break
+		}
+		if appendValue {
+			a.hookAppend(key, value, depth, cwd)
+		} else {
+			a.hookAssignment(key, value, depth, cwd)
+		}
+		if key == "CDPATH" {
+			a.cdpath = true
+			cwd = ""
+		}
+		args = args[1:]
+	}
+	return args, cwd
+}
+
 // An explicit safe argument file supplies operands instead of cwd/stdin.
 // Inspect only xargs options before the child, not a child's own -a flag.
 func xargsHasArgFile(args []string) bool {

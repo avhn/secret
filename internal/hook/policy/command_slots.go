@@ -36,10 +36,21 @@ func (a *analyzer) strictCommandSlot(name, code string, depth int, cwd string) b
 	return true
 }
 
+// Launcher command slots share option normalization with the interactive-shell
+// check, so attached values and long prefixes do not lose their command role.
+func shellCommandOption(arg string) bool {
+	key, _, _ := strings.Cut(arg, "=")
+	return strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--command" || strings.HasPrefix(key, "--co") && strings.HasPrefix("--command", key)
+}
+
 // commandSlot handles argv positions that an application executes as commands.
 // Unlike generic prose arguments, these must be certifiable shell text.
 func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string) bool {
+	if name == "make" {
+		args = roles.NormalizeMakeArgs(args)
+	}
 	strict := func(code string) bool { return a.strictCommandSlot(name, code, depth, cwd) }
+	handled := false
 	if name == "yarn" || name == "pnpm" {
 		leading := args
 		for len(leading) > 0 && strings.HasPrefix(leading[0], "-") {
@@ -88,8 +99,20 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 				}
 			}
 		}
-		for i, arg := range args {
+		for i := 0; i < len(args); i++ {
+			arg := args[i]
 			if name == "make" {
+				if arg == "--" {
+					break
+				}
+				if optionIn("-C -I -o -W --directory --include-dir --old-file --assume-old --what-if --new-file --assume-new", arg) {
+					i++
+					if i >= len(args) {
+						a.reason = roles.Indeterminate
+						return true
+					}
+					continue
+				}
 				if strings.Contains(arg, "=") && !strings.HasPrefix(arg, "-") {
 					_, value, _ := strings.Cut(arg, "=")
 					if strings.Contains(value, "$(") || strings.Contains(value, "${") || strings.Contains(value, "`") {
@@ -99,35 +122,34 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 				}
 			}
 			key, attached, hasValue := strings.Cut(arg, "=")
-			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && (arg == "-c" || strings.HasPrefix(arg, "-c") && !strings.HasPrefix(arg, "--") || key == "--command" || strings.HasPrefix(key, "--co") && strings.HasPrefix("--command", key)) ||
+			slot := (name == "flock" || name == "su" || name == "runuser" || name == "expect") && shellCommandOption(arg) ||
 				(name == "npm" && npmExec || optionIn("npx pnpm yarn", name)) && packageCallOption(arg) ||
 				name == "make" && (arg == "-E" || strings.HasPrefix(arg, "-E") && len(arg) > 2 || strings.HasPrefix("--eval", key) && len(key) >= 3 && strings.HasPrefix(key, "--e")) ||
 				name == "rsync" && (arg == "-e" || key == "--rsh" || strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e"))
 			if slot {
-				if name == "rsync" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "e") && arg != "-e" {
-					suffix := strings.SplitN(arg[1:], "e", 2)[1]
-					if suffix != "" {
-						return strict(suffix)
-					}
+				value := attached
+				if name == "rsync" && strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+					value = strings.SplitN(arg[1:], "e", 2)[1]
+					hasValue = value != ""
+				} else if len(arg) > 2 && (strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-E")) && !strings.HasPrefix(arg, "--") {
+					value, hasValue = arg[2:], true
 				}
-				if arg == "-E" {
-					if i+1 >= len(args) {
+				if !hasValue {
+					i++
+					if i >= len(args) {
 						a.reason = roles.Indeterminate
 						return true
 					}
-					return strict(args[i+1])
+					value = args[i]
 				}
-				if len(arg) > 2 && (strings.HasPrefix(arg, "-c") || strings.HasPrefix(arg, "-E")) && !strings.HasPrefix(arg, "--") {
-					return strict(arg[2:])
-				}
-				if hasValue {
-					return strict(attached)
-				}
-				if i+1 >= len(args) {
-					a.reason = roles.Indeterminate
+				handled = true
+				strict(value)
+				if a.reason != "" {
 					return true
 				}
-				return strict(args[i+1])
+				// A safe first value does not certify later executable options.
+				// Consume each slot operand exactly once, including option-like data.
+				continue
 			}
 			if name == "make" && (strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg[1:], "f") || arg == "--file" || arg == "--makefile" || key == "--file" || key == "--makefile" || strings.HasPrefix(arg, "-f") && len(arg) > 2) {
 				file := attached
@@ -139,7 +161,8 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 						a.reason = roles.Indeterminate
 						return true
 					}
-					file = args[i+1]
+					i++
+					file = args[i]
 				}
 				if file == "-" || strings.HasPrefix(file, "/dev/") || strings.HasPrefix(file, "<(") || strings.HasPrefix(file, ">(") {
 					a.reason = roles.Indeterminate
@@ -204,5 +227,5 @@ func (a *analyzer) commandSlot(name string, args []string, depth int, cwd string
 			}
 		}
 	}
-	return false
+	return handled
 }

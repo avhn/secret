@@ -1,9 +1,11 @@
 package policy
 
 import (
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -55,16 +57,35 @@ func (a *analyzer) certifiedListingPipe(upstream, downstream *syntax.Stmt, depth
 		return false
 	}
 	name := strings.ToLower(path.Base(literal(unwrapCall(call).Args[0])))
-	if _, wrapper := utilityTable[name]; name != "xargs" && name != "env" && !wrapper {
+	if _, wrapper := utilityTable[name]; !optionIn("xargs parallel env", name) && !wrapper {
 		return false
 	}
 	sink, sinkCWD, sinkOK := a.listingInvocation(downstream, cwd)
-	if !sinkOK || strings.ToLower(path.Base(literal(sink.Args[0]))) != "xargs" {
+	if !sinkOK || !optionIn("xargs parallel", strings.ToLower(path.Base(literal(sink.Args[0])))) {
 		return false
+	}
+	// Consumer-side configured paths apply to the supplied filenames, but
+	// cannot replace the calling shell's environment after this pipeline.
+	parentEnv, parentConfigs := a.env, a.credentialConfigs
+	a.env, a.credentialConfigs = maps.Clone(a.env), slices.Clone(a.credentialConfigs)
+	defer func() { a.env, a.credentialConfigs = parentEnv, parentConfigs }()
+	for _, assign := range sink.Assigns {
+		if assign.Name == nil {
+			continue
+		}
+		value := a.assignmentLiteral(assign.Name.Value, assign.Value, sinkCWD)
+		if assign.Append {
+			a.hookAppend(assign.Name.Value, value, depth, sinkCWD)
+		} else {
+			a.hookAssignment(assign.Name.Value, value, depth, sinkCWD)
+		}
 	}
 	down := *downstream
 	down.Cmd = sink
 	source, sourceCWD, sourceOK := a.listingInvocation(upstream, cwd)
+	if sourceOK && len(source.Assigns) != 0 {
+		sourceOK = false
+	}
 	if original, ok := upstream.Cmd.(*syntax.CallExpr); ok && len(original.Assigns) != 0 {
 		sourceOK = false
 	}
@@ -72,7 +93,7 @@ func (a *analyzer) certifiedListingPipe(upstream, downstream *syntax.Stmt, depth
 		// An intervening pipeline or compound command does not certify an
 		// unchanged name stream. Never let its listing fall back to cwd.
 		if listingStage(upstream) {
-			a.protectedXargsPipe(&down, depth, sinkCWD)
+			a.protectedListingConsumer(&down, depth, sinkCWD)
 		}
 		return false
 	}
@@ -102,7 +123,7 @@ func (a *analyzer) certifiedListingPipe(upstream, downstream *syntax.Stmt, depth
 		}
 	}
 	if !safe {
-		a.protectedXargsPipe(&down, depth, sinkCWD)
+		a.protectedListingConsumer(&down, depth, sinkCWD)
 	}
 	// Execution wrappers retain the pre-existing consumer check. Inert
 	// command/builtin prefixes do not change the direct listing grammar.
@@ -121,6 +142,10 @@ func (a *analyzer) listingInvocation(stmt *syntax.Stmt, cwd string) (*syntax.Cal
 	if !known {
 		return nil, cwd, false
 	}
+	assignments := slices.Clone(call.Assigns)
+	addAssignment := func(key, value string) {
+		assignments = append(assignments, &syntax.Assign{Name: &syntax.Lit{Value: key}, Value: &syntax.Word{Parts: []syntax.WordPart{&syntax.SglQuoted{Value: value}}}})
+	}
 	for level := 0; level < 5 && len(words) > 0; level++ {
 		name := strings.ToLower(path.Base(words[0]))
 		if name != "xargs" {
@@ -130,6 +155,19 @@ func (a *analyzer) listingInvocation(stmt *syntax.Stmt, cwd string) (*syntax.Cal
 					return nil, cwd, false
 				}
 				words, cwd = child, dir
+				if name == "sudo" {
+					for len(words) > 0 {
+						key, value, appendValue, ok := declarationOperand(words[0])
+						if !ok {
+							break
+						}
+						if appendValue {
+							return nil, cwd, false
+						}
+						addAssignment(key, value)
+						words = words[1:]
+					}
+				}
 				continue
 			}
 		}
@@ -164,14 +202,24 @@ func (a *analyzer) listingInvocation(stmt *syntax.Stmt, cwd string) (*syntax.Cal
 					words = words[1:]
 					continue
 				}
-				if strings.HasPrefix(arg, "-") || name == "env" && strings.Contains(arg, "=") {
+				if name == "env" {
+					if key, value, appendValue, ok := declarationOperand(arg); ok {
+						if appendValue {
+							return nil, cwd, false
+						}
+						addAssignment(key, value)
+						words = words[1:]
+						continue
+					}
+				}
+				if strings.HasPrefix(arg, "-") {
 					return nil, cwd, false
 				}
 				break
 			}
 			continue
 		}
-		result := &syntax.CallExpr{}
+		result := &syntax.CallExpr{Assigns: assignments}
 		for _, word := range words {
 			result.Args = append(result.Args, &syntax.Word{Parts: []syntax.WordPart{&syntax.SglQuoted{Value: word}}})
 		}

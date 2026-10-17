@@ -49,7 +49,7 @@ func (a *analyzer) interpreterInputProtected(cwd, name string) bool {
 		if a.inlineGitDir(raw, cwd) || environmentCode(raw) || a.interpreterProtected(raw, cwd) {
 			return true
 		}
-		body, known := a.expandInterpreterStdin(word, r.Hdoc != nil, input.cwd)
+		body, known := a.interpreterRedirectBody(r, input.cwd)
 		if !known {
 			a.reason = roles.Indeterminate
 			return true
@@ -59,6 +59,20 @@ func (a *analyzer) interpreterInputProtected(cwd, name string) bool {
 		}
 	}
 	return false
+}
+
+// Quoted heredocs retain source-language escapes, including JavaScript's \${.
+// The shared expansion still accounts for word, body and deadline budgets.
+func (a *analyzer) interpreterRedirectBody(r *syntax.Redirect, cwd string) (string, bool) {
+	word := r.Word
+	if r.Hdoc != nil {
+		word = r.Hdoc
+	}
+	body, known := a.expandInterpreterStdin(word, r.Hdoc != nil, cwd)
+	if known && r.Hdoc != nil && strings.ContainsAny(a.raw(r.Word), "'\"\\") {
+		body = a.raw(r.Hdoc)
+	}
+	return body, known
 }
 
 // Expand executable stdin without shell execution, field splitting or globbing.

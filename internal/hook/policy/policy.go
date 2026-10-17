@@ -78,6 +78,7 @@ func AnalyzeArgv(argv []string, cwd, home string, protected func(string, string)
 
 type analyzer struct {
 	regexBody           bool
+	literalFallback     bool // Unidentified source strings are not unknown launcher slots.
 	literalDepth        int
 	metadata            paths.Metadata
 	interpreterNames    map[interpreterName]bool
@@ -383,7 +384,21 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				}
 			}
 			unknown := false
+			literalName := literal(cmd.Args[0])
+			// An unresolved prose word is not the source builtin: path.Base("")
+			// is ".", but only a literal dot can select that executable role.
+			prose := a.literalFallback && (literalName == "" || unmodelledCommand(strings.ToLower(path.Base(literalName))))
 			for idx, w := range cmd.Args {
+				if prose {
+					// Unidentified interpreter literals supply command witnesses,
+					// not shell expansions of prose brackets or interpolation.
+					value := literal(w)
+					if value == "" {
+						value = a.raw(w)
+					}
+					addValues(w, []string{value}, true)
+					continue
+				}
 				// A filtered child may use a credential in a curl header, not a file.
 				if a.inRun && path.Base(literal(cmd.Args[0])) == "curl" && idx > 0 && literal(cmd.Args[idx-1]) == "-H" {
 					a.walkWord(w, depth, cwd)
@@ -981,6 +996,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if len(words) == 0 || a.reason != "" {
 		return
 	}
+	// Prose handling belongs only to this fallback command frame. Children
+	// selected by a modeled launcher are executable argv, not more prose.
+	fallback := a.literalFallback
+	a.literalFallback = false
+	defer func() { a.literalFallback = fallback }()
 	if strings.Contains(words[0], "/") && a.inputProtected(words[0], cwd) {
 		a.reason = roles.FileInput
 		return
@@ -1121,7 +1141,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		a.reason = roles.Indeterminate
 		return
 	}
-	if name == "su" && !strings.Contains(" "+strings.Join(args, " ")+" ", " -c ") && !strings.Contains(" "+strings.Join(args, " ")+" ", " --command ") {
+	if name == "su" && !slices.ContainsFunc(args, shellCommandOption) {
 		a.reason = roles.Indeterminate
 		return
 	}
@@ -1278,6 +1298,14 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if _, ok := utilityTable[name]; ok {
 		child, dir, shell := a.utilityChild(name, args, cwd)
+		if name == "sudo" {
+			// sudo assignments belong to its child, not the calling shell.
+			// Reuse the environment assignment checks before selecting a reader.
+			parentEnv, parentCDPath := a.env, a.cdpath
+			a.env = maps.Clone(a.env)
+			defer func() { a.env, a.cdpath = parentEnv, parentCDPath }()
+			child, dir = a.childAssignments(child, depth, dir)
+		}
 		if a.reason == "" && name == "xargs" && !a.xargsIDs && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.dataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
@@ -1631,6 +1659,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if !modelledCommand(name) && !roles.KnownReader(name) && !shellName(name) && roles.PrinterReason(name, args, false) == "" && !optionIn("npm npx make rsync op gh curl kubectl aws gcloud", name) {
+		if fallback {
+			// All modeled execution roles above still run. An arbitrary source
+			// string such as "not env" is not an unknown launcher's argv slot.
+			return
+		}
 		a.unknownExecution(a.environmentDataArgs(name, args), depth, cwd)
 		if a.reason != "" {
 			return

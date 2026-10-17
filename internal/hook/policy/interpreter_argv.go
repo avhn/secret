@@ -3,6 +3,9 @@ package policy
 import (
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/avhn/secret/internal/hook/roles"
 )
 
 // These tokens identify literal launch signatures, not a language evaluator.
@@ -13,9 +16,10 @@ type interpreterToken struct {
 	literal       bool // Fully static argv element.
 	witness       bool // Closed source literal, even when interpolation is unresolved.
 	shell         bool
-	indeterminate bool // A recognized literal did not terminate.
-	opaque        bool // Inert regex syntax, not unextracted executable source.
-	regexCode     bool // Ruby/Perl regex interpolation needs a bounded code scan.
+	indeterminate bool     // A recognized literal did not terminate.
+	opaque        bool     // Inert regex syntax, not unextracted executable source.
+	regexCode     bool     // Ruby/Perl regex interpolation needs a bounded code scan.
+	expressions   []string // Executable JavaScript template interpolations.
 }
 
 func interpreterTokens(code, name string) []interpreterToken {
@@ -26,7 +30,7 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 	hashComments := !regexBody && (pythonInterpreter(name) || optionIn("ruby perl php rscript", name))
 	slashComments := javascriptInterpreter(name) || name == "php"
 	statementLines := optionIn("ruby perl", name)
-	regexWork := 0
+	regexWork, templateWork := 0, 0
 	var tokens []interpreterToken
 	for i := 0; i < len(code); {
 		ch := code[i]
@@ -112,6 +116,7 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 			delimiter := string(ch)
 			i += len(delimiter)
 			var value strings.Builder
+			var expressions []string
 			shell := ch == '`' && optionIn("ruby perl php", name)
 			known, closed := ch != '`' || shell || javascriptInterpreter(name), false
 			for i < len(code) {
@@ -119,6 +124,17 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 					i += len(delimiter)
 					closed = true
 					break
+				}
+				if ch == '`' && javascriptInterpreter(name) && strings.HasPrefix(code[i:], "${") {
+					end, complete := javascriptInterpolationEnd(code, i+2, 0, &templateWork)
+					if !complete {
+						return append(tokens, interpreterToken{indeterminate: true})
+					}
+					expressions = append(expressions, code[i+2:end])
+					value.WriteString(code[i : end+1])
+					i = end + 1
+					known = false
+					continue
 				}
 				r, _, tail, err := strconv.UnquoteChar(code[i:], ch)
 				if err != nil {
@@ -143,7 +159,7 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 			if ch == '`' && javascriptInterpreter(name) && strings.Contains(value.String(), "${") {
 				known = false
 			}
-			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, witness: closed, shell: shell})
+			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, witness: closed, shell: shell, expressions: expressions})
 			continue
 		}
 		start := i
@@ -263,6 +279,10 @@ func literalStatementArguments(tokens []interpreterToken, start int) ([]string, 
 func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 	tokens := interpreterBodyTokens(code, language, a.regexBody)
 	for i := 0; i < len(tokens); i++ {
+		if time.Now().After(a.deadline) {
+			a.reason = roles.Indeterminate
+			return true
+		}
 		if tokens[i].literal {
 			if tokens[i].shell && a.literalShellProtected(tokens[i].text, cwd) {
 				return true
@@ -277,6 +297,26 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			name = name[dot+1:]
 		}
 		start := i + 2
+		if language == "ruby" && optionIn("system exec spawn", name) {
+			statement := tokens[i+1].literal || tokens[i+1].text != "("
+			if statement {
+				start = i + 1
+			}
+			if words, known := rubyExecutableArguments(tokens, start, statement); known {
+				if a.literalCommandProtected(words, cwd, true) {
+					return true
+				}
+				continue
+			}
+			start = i + 2
+		}
+		if javascriptInterpreter(language) && tokens[i].text == "Deno.Command" && !tokens[i+1].literal && tokens[i+1].text == "(" {
+			for _, words := range constructorArguments(tokens, start) {
+				if a.literalCommandProtected(words, cwd, true) {
+					return true
+				}
+			}
+		}
 		var words []string
 		var known bool
 		if tokens[i+1].text != "(" || tokens[i+1].literal {
@@ -307,7 +347,10 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			}
 		}
 		switch name {
-		case "run", "call", "check_call", "check_output", "Popen", "popen":
+		case "run", "call", "check_call", "check_output", "Popen", "popen", "proc_open":
+			if name == "proc_open" && language != "php" {
+				break
+			}
 			if tokens[start].text == "[" && !tokens[start].literal {
 				var end int
 				words, end, known = literalArguments(tokens, start+1, "]")

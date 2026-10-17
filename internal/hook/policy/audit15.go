@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -115,7 +116,7 @@ func (a *analyzer) fdScope(args []string, cwd string) (child []string, dir strin
 			continue
 		}
 		key, value, attached := strings.Cut(arg, "=")
-		if optionIn("-e --extension --search-path --base-directory -E --exclude", key) {
+		if optionIn("-e --extension --search-path --base-directory -E --exclude -t --type", key) {
 			if !attached {
 				i++
 				if i >= len(args) {
@@ -194,7 +195,7 @@ func (a *analyzer) fdCommand(args []string, depth int, cwd string) {
 
 // A filtered fd stream is certified by the same root and selector proof as -x.
 func (a *analyzer) filteredFDPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
-	if !optionIn("fd fdfind", commandName(upstream)) || commandName(downstream) != "xargs" {
+	if !optionIn("fd fdfind", commandName(upstream)) || !optionIn("xargs parallel", commandName(downstream)) {
 		return false
 	}
 	call, ok := upstream.Cmd.(*syntax.CallExpr)
@@ -210,13 +211,13 @@ func (a *analyzer) filteredFDPipe(upstream, downstream *syntax.Stmt, depth int, 
 		return false
 	}
 	if protected {
-		a.protectedXargsPipe(downstream, depth, dir)
+		a.protectedListingConsumer(downstream, depth, dir)
 		return false
 	}
 	return true
 }
 
-func (a *analyzer) protectedXargsPipe(downstream *syntax.Stmt, depth int, cwd string) {
+func (a *analyzer) protectedListingConsumer(downstream *syntax.Stmt, depth int, cwd string) {
 	call, ok := downstream.Cmd.(*syntax.CallExpr)
 	if !ok {
 		a.reason = roles.Indeterminate
@@ -227,7 +228,17 @@ func (a *analyzer) protectedXargsPipe(downstream *syntax.Stmt, depth int, cwd st
 		a.reason = roles.Indeterminate
 		return
 	}
-	child, dir, shell := a.utilityChild("xargs", words[1:], cwd)
+	var child []string
+	dir, shell := cwd, false
+	if strings.EqualFold(path.Base(words[0]), "parallel") {
+		var explicit bool
+		child, _, explicit = a.parallelTemplate(words[1:])
+		if a.reason != "" || explicit {
+			return
+		}
+	} else {
+		child, dir, shell = a.utilityChild("xargs", words[1:], cwd)
+	}
 	if shell || !a.metadataChild(child, depth+1, dir) {
 		a.reason = roles.FileInput
 	}
@@ -236,7 +247,7 @@ func (a *analyzer) protectedXargsPipe(downstream *syntax.Stmt, depth int, cwd st
 // A conjunctive name filter narrows a find stream, but every producer root
 // must still be scanned. Unfiltered streams use the complete root scope.
 func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int, cwd string) bool {
-	if commandName(upstream) != "find" || commandName(downstream) != "xargs" {
+	if commandName(upstream) != "find" || !optionIn("xargs parallel", commandName(downstream)) {
 		return false
 	}
 	call, ok := upstream.Cmd.(*syntax.CallExpr)
@@ -286,7 +297,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 	}
 
 	if selector != "" && a.protectedGlob(strings.ToLower(selector), cwd) {
-		a.protectedXargsPipe(downstream, depth, cwd)
+		a.protectedListingConsumer(downstream, depth, cwd)
 		return false
 	}
 	if len(roots) == 0 {
@@ -294,7 +305,7 @@ func (a *analyzer) filteredFindPipe(upstream, downstream *syntax.Stmt, depth int
 	}
 	for _, root := range roots {
 		if selector == "" && a.treeProtectedAll(root, cwd) || selector != "" && search.FilteredScopeConfigured(root, selector, "", cwd, a.home, a.credentialConfig(), a.credentialPaths()...) != "" {
-			a.protectedXargsPipe(downstream, depth, cwd)
+			a.protectedListingConsumer(downstream, depth, cwd)
 			return false
 		}
 	}

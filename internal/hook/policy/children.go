@@ -68,7 +68,9 @@ func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data b
 	return data && !roles.Reading(name) || optionIn("ls stat chmod chown rm rmdir touch mkdir test true false basename dirname realpath readlink file", name)
 }
 
-func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
+// parallelTemplate separates launcher options and explicit inputs from the
+// shell template. Pipe certification and ordinary dispatch share this grammar.
+func (a *analyzer) parallelTemplate(args []string) (template, inputs []string, explicit bool) {
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
 		arg := args[0]
 		key, _, attached := strings.Cut(arg, "=")
@@ -96,8 +98,6 @@ func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
 			return
 		}
 	}
-	var inputs []string
-	explicit := false
 	for i, arg := range args {
 		if arg == "::::" {
 			a.reason = roles.Indeterminate
@@ -112,6 +112,14 @@ func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
 		a.reason = roles.Indeterminate
 		return
 	}
+	return args, inputs, explicit
+}
+
+func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
+	args, inputs, explicit := a.parallelTemplate(args)
+	if a.reason != "" {
+		return
+	}
 	// Parallel joins its template words into shell source. Analyze the whole
 	// template before treating any explicit input operands as data.
 	template := strings.Join(args, " ")
@@ -120,7 +128,7 @@ func (a *analyzer) parallelCommand(args []string, depth int, cwd string) {
 		return
 	}
 	metadata := a.dataChild(strings.Fields(template), depth+1, cwd)
-	if !explicit && !metadata && a.treeProtectedAll(".", cwd) {
+	if !explicit && !metadata && !a.xargsIDs && a.treeProtectedAll(".", cwd) {
 		a.reason = roles.FileInput
 		return
 	}

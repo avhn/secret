@@ -121,7 +121,7 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   Perl validator rejects non-JSON number syntax and unmatched escaped surrogates
   throughout keys and values, retaining raw NUL, UTF-8 and duplicate-key checks.
   Both validators permit at most 4,096 object keys, 32,768 JSON tokens (including
-  punctuation), and 128 container levels. Go also bounds unnormalized envelope
+  punctuation), and 128 container levels. Both guards bound unnormalized envelope
   paths to 4,096 slash separators before redundant components are removed.
   Without Perl, only bounded 8 KiB,
   unescaped ASCII JSON retains the dependency-light names-only path, with strict
@@ -140,10 +140,22 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   Bounded reads time out and every otherwise-allowing exit checks both its phase
   budget and that overall deadline. Shared path normalization checks the budget
   while removing and rebuilding components, including envelope cwd components;
-  normalization failure cannot certify a safe file target. Interpreter Git-path
-  and credential-literal scans check that same budget while consuming literals,
-  including inline code, stdin and oversized heredocs, and stop on exhaustion
-  rather than continuing path checks. Failed reader or configured-path
+  normalization failure cannot certify a safe file target. Physical ancestor
+  resolution checks that deadline before and after its alarm-bounded Perl
+  subprocess, which also caps path separators before filesystem work.
+  Interpreter Git-path and credential-literal scans use alarm-bounded extraction
+  rather than whole-body Bash regex matching, check the shared budget while
+  consuming literals, and deny incomplete extraction, including oversized
+  heredocs. Confirmed shell source has its framing checked with an alarm-bounded
+  Bash noexec parser, with startup files disabled, before command analysis or
+  oversized-heredoc early exits. Missing operator operands and unbalanced
+  compound commands deny as indeterminate syntax. Heuristic argument and
+  interpreter-literal scans retain positive reader and printer witnesses even
+  before malformed trailing text, without requiring inert prose to be valid
+  shell syntax. Explicit shell children still receive strict framing checks,
+  including within those heuristic scans. Candidate commands are never executed
+  by this check.
+  Failed reader or configured-path
   normalization denies without treating an empty result as a safe filename.
   Synthetic deadline tests do not establish installed-host timeout behavior.
   Existing command and heredoc budgets still apply.

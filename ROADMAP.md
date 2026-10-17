@@ -124,6 +124,19 @@ locally instead of relying on the final uncertainty check. Permanent envelopes
 retain public hash, Lua, backtick and non-content search
 controls. These are synthetic results, not installed-host or runtime CI evidence.
 
+Confirmation audit 25 routes interpreter fallback witnesses through full child
+classification, preserves literal argv across Ruby/PHP/Deno launch syntax and
+JavaScript interpolation, scopes sudo configured paths, and shares listing roots
+with Parallel consumers. Repeated executable options, including make clusters,
+all retain analysis. Bash bounds Git-path witnesses and physical resolution,
+checks raw envelope path depth, and validates complete shell framing without
+turning printed prose into executable source. Its literal-argv normalizer also
+retains Ruby pairs, PHP arrays and Deno constructor options during exact replay.
+Permanent deny and must-allow
+controls cover both adapters; exact inventory, divergence and denied-variant
+refreshes remain integration gates. Native runtime CI and installed-host failure
+checks are still required before declaring M2 complete.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

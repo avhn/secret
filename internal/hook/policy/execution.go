@@ -191,8 +191,13 @@ func knownNested(name string) bool {
 // ordinary argument cannot become an accidental fail-closed command slot.
 func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(value), "")
-	if err != nil || len(file.Stmts) == 0 {
+	if len(file.Stmts) == 0 {
 		return
+	}
+	if err != nil {
+		// A malformed prose suffix cannot erase completed command witnesses.
+		// Only the parsed prefix has shell roles; do not certify the suffix.
+		value = value[:file.Stmts[len(file.Stmts)-1].End().Offset()]
 	}
 	syntax.Walk(file, func(node syntax.Node) bool {
 		if stmt, ok := node.(*syntax.Stmt); ok {
@@ -211,6 +216,9 @@ func (a *analyzer) genericShellText(value string, depth int, cwd string) {
 		return
 	}
 	probe := *a
+	// A partial parse supplies positive role witnesses, not unknown-launcher
+	// operand slots in language source or prose such as "const env = {}".
+	probe.literalFallback = err != nil
 	probe.credentialConfigs = slices.Clone(a.credentialConfigs)
 	probe.reason, probe.uncertain, probe.structuralUncertain = "", false, false
 	probe.env = make(map[string]string)

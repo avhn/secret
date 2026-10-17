@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Bound Bash interpreter Git-path extraction and physical ancestor resolution
+  with subprocess alarms and the shared decision deadline. Cap unnormalized
+  envelope paths before filesystem work. Validate confirmed shell framing with
+  a bounded noexec parser, denying unfinished operators and compound commands
+  without executing source. Keep heuristic literal scans best effort, retaining
+  printer witnesses before malformed trailing text and allowing printed prose
+  without treating it as shell source. Explicit shell children remain strict.
+  Normalize Ruby executable/argv0 pairs, PHP proc_open arrays and Deno.Command
+  option-object argv through the bounded interpreter literal scanner and shared
+  child classifier, preserving public readers, nested option data and inert API
+  text. Add strict-deadline synthetic regressions for long quoted heredoc literals and
+  redundant cwd/workdir components, with ordinary literals, printed Python/Node
+  data, paths and complete shell constructs retained as must-allow controls.
+
+- Close Go confirmation-audit launch gaps through full interpreter child
+  dispatch, including archives, multicall applets and gmake. Retain Lua long
+  strings and recognize Ruby executable/argv0 pairs, PHP proc_open arrays and
+  Deno.Command option-object argv without treating comments or quoted calls as
+  executable APIs. Preserve declarations, cwd changes and pipeline scopes in
+  fallback shell source, including single-word Lua printers. Keep completed
+  argument witnesses before malformed trailing text without promoting prose
+  operands into launches or unresolved words into source builtins. Scan executable
+  JavaScript template interpolations within shared budgets and preserve escaped
+  interpolation in quoted heredocs. Retain Deno argv across shorthand options.
+  Scope sudo environment assignments to its child, check Parallel readers against
+  listing producer roots, and inspect every repeated executable option, including
+  make/gmake short-option clusters, before allowing a command. Preserve public
+  reads, metadata, prose and safe repeated values with synthetic analyzer and
+  host-envelope tests.
+
 - Restore recursive-search protection in Bash interpreter backticks and Lua long
   strings, retaining conservative witnesses for unextracted source and allowing
   literal names/count/quiet searches. Give Go the same Lua literal boundaries.
