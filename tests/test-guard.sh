@@ -4882,5 +4882,55 @@ while IFS= read -r row; do
     audit21_case "$NAME" "$expected" "$command_text"
 done < <(jq -c '.cases[]' "$REPO_ROOT/testdata/hook/audit25.json")
 
+# Review 935ad4e: preserve physical parents after symlinked glob prefixes.
+# Feed synthetic envelopes only. Candidate commands are never executed.
+review_home="$TMP/review-935ad4e/home"
+review_work="$TMP/review-935ad4e/work"
+mkdir -p "$review_home/.aws/inner" "$review_work/inner" "$review_work/config-scope" "$TMP/review-935ad4e/public/inner"
+printf '%s\n' synthetic-only >"$review_home/.aws/credentials"
+printf '%s\n' synthetic-only >"$review_home/.aws/inner/.env"
+printf '%s\n' public-only >"$TMP/review-935ad4e/public/README.md"
+printf '%s\n' synthetic-only >"$review_work/config-scope/.env"
+printf '%s\n' --hidden >"$review_home/.aws/config"
+: >"$review_work/rg-config"
+cp "$REPO_ROOT/examples/ripgreprc" "$review_work/config"
+git -C "$TMP/review-935ad4e" init -q
+ln -s "$review_home/.aws/inner" "$review_work/lnk"
+ln -s "$TMP/review-935ad4e/public/inner" "$review_work/public-link"
+while IFS='|' read -r label expected command_text; do
+    jq -cn --arg cwd "$review_work" --arg command "$command_text" \
+        '{tool_name:"Bash",cwd:$cwd,tool_input:{command:$command}}' >"$TMP/audit23-envelope"
+    HOME="$review_home" RIPGREP_CONFIG_PATH="$review_work/rg-config" \
+        audit23_envelope "review_935ad4e_$label" "$expected"
+done <<REVIEW_935AD4E_SHELL
+relative_glob|deny|cat lnk/../cred*
+absolute_glob|deny|cat '$review_work/lnk/../'cred*
+wildcard_link|deny|cat l*/../cred*
+repeated_parent|deny|cat lnk/../inner/../cred*
+literal_parent|deny|cat lnk/../credentials
+public_glob|allow|cat public-link/../READ*
+public_literal|allow|cat public-link/../README.md
+rg_root|deny|rg x lnk/..
+rg_absolute_root|deny|rg x '$review_work/lnk/..'
+rg_public_root|allow|rg x public-link/..
+REVIEW_935AD4E_SHELL
+for label in selector path_prefix path public_selector public_path; do
+    expected=deny
+    case "$label" in
+        selector) review_path="$review_work"; review_glob='lnk/../inner/**' ;;
+        path_prefix) review_path='lnk/..'; review_glob='inner/**' ;;
+        path) review_path='lnk/..'; review_glob='cred*' ;;
+        public_selector) expected=allow; review_path="$review_work"; review_glob='public-link/../inner/**' ;;
+        *) expected=allow; review_path='public-link/..'; review_glob='*.md' ;;
+    esac
+    jq -cn --arg cwd "$review_work" --arg path "$review_path" --arg glob "$review_glob" \
+        '{tool_name:"Grep",cwd:$cwd,tool_input:{pattern:"x",path:$path,glob:$glob,output_mode:"content"}}' >"$TMP/audit23-envelope"
+    HOME="$review_home" audit23_envelope "review_935ad4e_grep_$label" "$expected"
+done
+jq -cn --arg cwd "$review_work" \
+    '{tool_name:"Bash",cwd:$cwd,tool_input:{command:"rg x config-scope"}}' >"$TMP/audit23-envelope"
+HOME="$review_home" RIPGREP_CONFIG_PATH='lnk/../config' \
+    audit23_envelope review_935ad4e_rg_config deny
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

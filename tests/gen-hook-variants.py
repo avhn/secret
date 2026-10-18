@@ -101,6 +101,13 @@ def generate():
     audit27_case "$@"
     "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --direct "$TMP" "$VARIANT_ROWS" "$2" "$1" <"$TMP/audit27-envelope"
 }''', 1)
+    # The physical-parent review uses audit23's custom-cwd envelope runner.
+    # Capture only its named regressions, with their per-case HOME and config.
+    source = source.replace('audit23_envelope() {', '''audit23_envelope() {
+    case "$1" in review_935ad4e_*)
+        "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --direct "$TMP" "$VARIANT_ROWS" "$2" "$1" <"$TMP/audit23-envelope"
+        ;;
+    esac''', 1)
     with tempfile.TemporaryDirectory(prefix="hook-variant-extract-") as directory:
         tmp = pathlib.Path(directory)
         script, rows = tmp / "suite.sh", tmp / "rows.jsonl"

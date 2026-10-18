@@ -335,14 +335,12 @@ func (a *analyzer) rgRootVisibleSafe(root, cwd string) bool {
 
 func (a *analyzer) visibleRootSafe(root, cwd string, skipHidden, gitSearch bool) bool {
 	explicit := root != "."
-	root = filepath.Clean(a.resolve(root, cwd))
-	if info, err := os.Lstat(root); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		resolved, resolveErr := filepath.EvalSymlinks(root)
-		if resolveErr != nil {
-			return false
-		}
-		root = resolved
+	// Resolve intermediate symlinks before any lexical parent normalization.
+	resolved, resolveErr := filepath.EvalSymlinks(a.resolve(root, cwd))
+	if resolveErr != nil {
+		return false
 	}
+	root = resolved
 	if !gitSearch {
 		for dir, count := root, 0; ; dir, count = filepath.Dir(dir), count+1 {
 			// Ripgrep's higher-priority ignore files above a work tree can

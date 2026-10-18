@@ -242,6 +242,123 @@ func TestGlobLiteralWindowsAliasPrefix(t *testing.T) {
 	}
 }
 
+// Parent traversal must not turn native literal aliases back into directory
+// entry regexes. This has no symlinks and also runs on native Windows CI.
+func TestGlobLiteralAliasParent(t *testing.T) {
+	for _, name := range []string{"KUBECONFIG", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE"} {
+		t.Setenv(name, "")
+	}
+	root := t.TempDir()
+	alias := filepath.Join(root, "RUNNER~1")
+	home, work := filepath.Join(alias, "home"), filepath.Join(alias, "work")
+	for _, name := range []string{".aws/credentials", "public/README.md"} {
+		name = filepath.Join(home, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(work, 0700); err != nil {
+		t.Fatal(err)
+	}
+	readDir := func(dir string) ([]os.DirEntry, error) {
+		if dir == root {
+			return nil, nil // The native alias is not a listed directory name.
+		}
+		return os.ReadDir(dir)
+	}
+	for _, tc := range []struct {
+		pattern, base string
+		protected     bool
+	}{{"*/credentials", "credentials", true}, {"public/*", "README.md", false}} {
+		for _, prefix := range []string{home + "/../home/", "../home/"} {
+			for _, pattern := range []string{filepath.FromSlash(prefix + tc.pattern), prefix + tc.pattern} {
+				got, ok := shellGlobMatchesWith(pattern, work, time.Now().Add(time.Second), readDir)
+				if !ok || len(got) != 1 || filepath.Base(got[0]) != tc.base {
+					t.Errorf("%q: matches=%q valid=%v", pattern, got, ok)
+					continue
+				}
+				if protected := paths.Protected(got[0], work, "", home); protected != tc.protected {
+					t.Errorf("%q: protected=%v want %v", pattern, protected, tc.protected)
+				}
+			}
+		}
+	}
+}
+
+func TestGlobPhysicalParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation needs Windows developer mode")
+	}
+	for _, name := range []string{"KUBECONFIG", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE"} {
+		t.Setenv(name, "")
+	}
+	root := t.TempDir()
+	home, work := filepath.Join(root, "home"), filepath.Join(root, "work")
+	for _, dir := range []string{filepath.Join(home, ".aws", "inner"), work, filepath.Join(root, "public", "inner")} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, target := range []string{"credentials", "README.md"} {
+		dir := filepath.Join(home, ".aws")
+		if target == "README.md" {
+			dir = filepath.Join(root, "public")
+		}
+		if err := os.WriteFile(filepath.Join(dir, target), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, link := range []struct{ name, target string }{
+		{"lnk", filepath.Join(home, ".aws", "inner")},
+		{"public-link", filepath.Join(root, "public", "inner")},
+	} {
+		if err := os.Symlink(link.target, filepath.Join(work, link.name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct{ pattern, cwd, want string }{
+		{"lnk/../cred*", work, filepath.Join(home, ".aws", "credentials")},
+		{work + "/lnk/../cred*", work, filepath.Join(home, ".aws", "credentials")},
+		{"l*/../cred*", work, filepath.Join(home, ".aws", "credentials")},
+		{"lnk/../inner/../cred*", work, filepath.Join(home, ".aws", "credentials")},
+		{"../cred*", filepath.Join(work, "lnk"), filepath.Join(home, ".aws", "credentials")},
+		{"public-link/../READ*", work, filepath.Join(root, "public", "README.md")},
+	} {
+		t.Run(tc.pattern+"@"+tc.cwd, func(t *testing.T) {
+			got, ok := shellGlobMatches(tc.pattern, tc.cwd, time.Now().Add(time.Second))
+			if !ok || len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("matches=%q valid=%v, want %q", got, ok, tc.want)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		path string
+		safe bool
+	}{{"lnk/..", false}, {work + "/lnk/..", false}, {"public-link/..", true}} {
+		a := &analyzer{home: home, protected: func(name, cwd string) bool {
+			return paths.Protected(name, cwd, "", home)
+		}}
+		if safe := a.rgRootVisibleSafe(tc.path, work); safe != tc.safe {
+			t.Errorf("visible root %q: safe=%v want %v", tc.path, safe, tc.safe)
+		}
+	}
+	// No existing match must still retain the physical credential parent.
+	if err := os.Remove(filepath.Join(home, ".aws", "credentials")); err != nil {
+		t.Fatal(err)
+	}
+	a := &analyzer{home: home, protected: func(name, cwd string) bool {
+		return paths.Protected(name, cwd, "", home)
+	}}
+	for _, pattern := range []string{"lnk/../cred*", work + "/lnk/../cred*"} {
+		if !a.protectedGlob(pattern, work) {
+			t.Errorf("missing protected parent context for %q", pattern)
+		}
+	}
+}
+
 func TestGlobVolumeLikeComponent(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("colon is a native Windows volume separator")

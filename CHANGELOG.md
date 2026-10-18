@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Preserve physical `..` traversal after symlinked glob components, including
+  wildcard prefixes and missing credential-name context. Apply the same ordering
+  to Grep directory selectors, visible search roots and relative ripgrep config
+  paths, while retaining native Windows literal-alias lookup and public controls.
+  Synthetic paired regressions do not establish installed-host protection.
+
 - Preserve literal glob ancestors for native OS lookup, including Windows 8.3
   aliases and case variants, before enumerating wildcard components. This retains
   protected hidden-directory matches under a sibling HOME and public-glob controls.

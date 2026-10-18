@@ -187,6 +187,11 @@ The Windows glob follow-up preserves literal ancestors for OS lookup rather than
 matching short aliases such as RUNNER~1 against long directory-entry names. A
 cross-platform simulated alias/listing mismatch covers protected hidden-directory
 globs and public controls under a sibling HOME. Native Windows CI is still required.
+Review 935ad4e retains physical parent traversal after literal and wildcarded
+symlink components, including missing credential-name context. Grep directory
+selectors, visible search roots and relative ripgrep config lookup preserve the
+same ordering. Paired synthetic cases retain protected denials and public controls;
+Windows cross-vet is not native runtime evidence or an installed-host claim.
 
 The a3b0306 follow-up review certifies effective patch stdin independently from
 other heredoc descriptors, rejects opaque patch streams on both guards and keeps
@@ -210,6 +215,8 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 ### M2 coverage backlog (class i, non-blocking under P22)
 
 - [ ] Track future shared or Bash-only coverage findings under the P22 class (i) rule
+- [ ] Review 935ad4e: shared Docker bind-source and container-operand symlink-parent
+  traversal (both guards allow synthetic protected-reader aliases; not class ii)
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads
 - [ ] Audit 28: shared UV tool-runner directory options and Bash attached

@@ -42,7 +42,9 @@ func filteredScopeConfigured(root, glob, typ, cwd, home, config string, certifie
 	}
 	root = paths.Resolve(root, cwd, "", home)
 	if dir, ok := globDirectory(glob); ok {
-		directory := filepath.Join(root, filepath.FromSlash(dir))
+		// Keep parent traversal after symlink lookup, in both the root and
+		// the selector prefix. Join would silently scan a different directory.
+		directory := root + string(os.PathSeparator) + filepath.FromSlash(dir)
 		if paths.ConfiguredTreeProtected(directory, cwd, home, config, literals...) || paths.TreeProtectedScope(directory, cwd, home, true) {
 			return ScopeReason
 		}

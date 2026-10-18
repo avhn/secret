@@ -96,18 +96,19 @@ func shellGlobMatchesWith(pattern, cwd string, deadline time.Time, readDir func(
 	// a backslash even when the shell supplies forward slashes elsewhere.
 	pattern = filepath.FromSlash(pattern)
 	if !filepath.IsAbs(pattern) {
-		pattern = filepath.Join(cwd, pattern)
+		pattern = cwd + string(os.PathSeparator) + pattern
 	}
-	// Start at the known cwd when possible. Walking from the volume root
-	// can miss symlinked temp roots and needlessly enumerate a large tree.
-	base := filepath.Clean(cwd)
-	remainder := ""
-	if rel, err := filepath.Rel(base, pattern); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		remainder = rel
-	} else {
-		volume := filepath.VolumeName(pattern)
-		base = volume + string(os.PathSeparator)
-		remainder = strings.TrimPrefix(pattern, volume)
+	volume := filepath.VolumeName(pattern)
+	base := volume + string(os.PathSeparator)
+	remainder := strings.TrimPrefix(pattern, volume)
+	// Start at the known cwd when possible. Rel cleans paths lexically, so
+	// parent components (including those in cwd) must instead survive until
+	// the physical directory walk below has followed their preceding symlinks.
+	if !strings.Contains("/"+filepath.ToSlash(pattern)+"/", "/../") {
+		if rel, err := filepath.Rel(cwd, pattern); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			base = filepath.Clean(cwd)
+			remainder = rel
+		}
 	}
 	parts := strings.Split(filepath.ToSlash(remainder), "/")
 	// Resolve literal ancestors through the OS, not directory-entry regexes.
@@ -121,7 +122,8 @@ func shellGlobMatchesWith(pattern, cwd string, deadline time.Time, readDir func(
 			return nil, false
 		}
 		part := parts[0]
-		if strings.ContainsAny(part, "*?[") || strings.IndexFunc(part, func(r rune) bool {
+		// Resolve parents in the physical walk, not by joining text.
+		if part == ".." || strings.ContainsAny(part, "*?[") || strings.IndexFunc(part, func(r rune) bool {
 			return r >= quotedGlobBase && r < quotedGlobBase+5
 		}) >= 0 {
 			break
@@ -132,6 +134,25 @@ func shellGlobMatchesWith(pattern, cwd string, deadline time.Time, readDir func(
 	dirs := []string{base}
 	for index, part := range parts {
 		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			var next []string
+			for _, dir := range dirs {
+				if time.Now().After(deadline) {
+					return nil, false
+				}
+				resolved, err := filepath.EvalSymlinks(dir)
+				if err != nil {
+					return nil, false
+				}
+				info, err := os.Stat(resolved)
+				if err != nil || !info.IsDir() {
+					return nil, false
+				}
+				next = append(next, filepath.Dir(resolved))
+			}
+			dirs = next
 			continue
 		}
 		if part == "**" {
@@ -204,14 +225,17 @@ func (a *analyzer) protectedGlob(pattern, cwd string) bool {
 	}
 	// Credential basenames depend on their parent, including symlink targets.
 	// Retain that context when no existing file can witness the glob match.
-	matcher, err := globRegexp(filepath.Base(pattern))
+	pattern = filepath.FromSlash(pattern)
+	base := filepath.Base(pattern)
+	parent := strings.TrimSuffix(pattern, base)
+	matcher, err := globRegexp(base)
 	if err != nil {
 		return true
 	}
 	for _, name := range []string{"credentials", "config.json", "hosts.yml", "id_rsa", "id_ed25519"} {
 		// Keep the shell callback's slash-qualified path role on Windows too;
 		// a native-only path can otherwise enter its absent bare-name exception.
-		if matcher.MatchString(name) && a.inputProtected(filepath.ToSlash(filepath.Join(filepath.Dir(pattern), name)), cwd) {
+		if matcher.MatchString(name) && a.inputProtected(filepath.ToSlash(parent+name), cwd) {
 			return true
 		}
 	}
