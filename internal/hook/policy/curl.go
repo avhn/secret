@@ -215,3 +215,20 @@ func curlFormFiles(value string) ([]string, bool) {
 	}
 	return files, true
 }
+
+// fileURLWithoutDirectory reports a file: URL word whose first path component
+// is not an existing directory under cwd, so shell globbing leaves it literal.
+func fileURLWithoutDirectory(word, cwd string) bool {
+	if !strings.HasPrefix(strings.ToLower(word), "file:") {
+		return false
+	}
+	first := word
+	if i := strings.IndexAny(first, `/\`); i >= 0 {
+		first = first[:i]
+	}
+	if strings.ContainsAny(first, "*?[") {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(cwd, first))
+	return err != nil || !info.IsDir()
+}

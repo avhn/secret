@@ -2105,7 +2105,15 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			matches, valid := shellGlobMatches(pattern, cwd, a.deadline)
+			var matches []string
+			valid := true
+			// A file: URL only globs as a path when its first component
+			// names an existing directory; otherwise the shell keeps it literal.
+			// Windows cannot hold a colon in that component, and native lookup
+			// would read the rest as a drive path.
+			if !fileURLWithoutDirectory(v, cwd) {
+				matches, valid = shellGlobMatches(pattern, cwd, a.deadline)
+			}
 			if !valid || a.globs+len(matches) > 200 {
 				a.uncertain = true
 				return nil, false

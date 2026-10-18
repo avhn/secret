@@ -295,7 +295,12 @@ func TestGlobPhysicalParent(t *testing.T) {
 	for _, name := range []string{"KUBECONFIG", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE"} {
 		t.Setenv(name, "")
 	}
-	root := t.TempDir()
+	// Matches through "..": paths are physical, so anchor the fixture at the
+	// physical temp root (macOS /var is a symlink to /private/var).
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	home, work := filepath.Join(root, "home"), filepath.Join(root, "work")
 	for _, dir := range []string{filepath.Join(home, ".aws", "inner"), work, filepath.Join(root, "public", "inner")} {
 		if err := os.MkdirAll(dir, 0700); err != nil {
