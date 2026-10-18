@@ -57,14 +57,14 @@ Known differences, kept deliberately: Go run uses separate stdout and stderr pip
 
 ## M2: Go hook parity and tightening
 
-Status: in progress. Estimate: 7-10 days. Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax.
+Status: done (2026-10-19, merged from `go/m2` under the owner's convergence rule). Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax. The installed Bash hook stays active until the M4 cutover; open malformed-syntax, raw-limit and coverage items are tracked under M2.1 below.
 
-- [ ] feat(hook): decode host envelopes and path roles
-- [ ] feat(hook): analyse bash AST and bounded expansions
-- [ ] feat(hook): port command and printer role tables
-- [ ] feat(hook): certify search config and git grep scope
-- [ ] feat(hook): guard Codex patches and workdir
-- [ ] test(hook): classify every bash differential and fuzz seeds
+- [x] feat(hook): decode host envelopes and path roles
+- [x] feat(hook): analyse bash AST and bounded expansions
+- [x] feat(hook): port command and printer role tables
+- [x] feat(hook): certify search config and git grep scope
+- [x] feat(hook): guard Codex patches and workdir
+- [x] test(hook): classify every bash differential and fuzz seeds
 
 Variant extraction streams command text through stdin to handle 1 MiB synthetic
 cases without argv limits. The full denied-command variant corpus is regenerated
@@ -207,6 +207,8 @@ reviewed harmless splits and the named M2.1 malformed-syntax/raw-limit items
 remain visible follow-ups, not claims of closure. Shared or Bash-only coverage
 gaps (class i) remain backlog, and ordinary-syntax over-denials (class iii) remain
 follow-ups. Applicable CI is still required. P22 superseded P21.
+
+Merge gate (2026-10-19, `c079e7f`): all eight CI jobs green, including Ubuntu, macOS and Windows Go with race tests, stock macOS Bash 3.2, isolated libsecret and disposable Keychain. Inventory: Bash guard 5738 cases, Codex 2669, CLI 201, backends 63; Go hook parity with 80 reviewed divergence rows (tightenings, dependency shims and exact reviewed Bash over-denials). Confirmation audits 23 to 29 ran; their remaining class (i) and malformed-input items are listed below.
 
 Last green suites before policy v2: Bash guard 1496/1496, Codex 48/48, CLI 201/201, backends 63/63, Bash 3.2 1478/1478; Go guard exact parity with 25 reviewed divergences, Codex with 2; process-inclusive p99 about 5 ms. See `docs/design/hook-tightening.md` for deliberate tightenings and scope exclusions.
 

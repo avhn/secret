@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Complete M2: the Go hook (`secret hook claude|codex`) reaches parity with the
+  Bash guard under the owner's convergence rule, with 80 reviewed divergences and
+  all CI jobs green. The installed Bash hook remains active until the M4 cutover.
+
 - Preserve physical `..` traversal after symlinked glob components, including
   wildcard prefixes and missing credential-name context. Apply the same ordering
   to Grep directory selectors, visible search roots and relative ripgrep config
