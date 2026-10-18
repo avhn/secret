@@ -1442,6 +1442,35 @@ its missing-bare-operand exception, retaining all regenerated nested-eval varian
 `audit27_s4_preanalysis_deadline` is the only new injected-dependency distinction;
 it is named above and is not a Go-looser policy outcome.
 
+## Review a3b0306: effective patch stdin and brace-cap propagation
+
+`review_a3b0306_*` cases submit synthetic envelopes to both adapters, never run
+candidate commands, and keep file contents and symlink metadata disposable.
+The Go policy tracks the effective stdin source separately from interpreter-body
+witnesses. Pipeline input replaces inherited stdin, explicit stdin redirects
+apply in order, and non-stdin heredocs cannot certify patch framing. An effective
+pipe, file redirect, descriptor duplication, here-string or absent source denies
+as indeterminate. Prior same-scope stdin-heredoc denials remain conservative;
+child redirects still shadow ancestor patch bodies. Valid public heredocs,
+explicit fd 0, file/pipe input shadowed by a heredoc and sibling scopes retain
+positive controls.
+
+The Bash tokenizer retains input descriptor identity. Patch dispatch requires a
+stdin heredoc, not an arbitrary retained body. Its single-body tokenizer denies
+multiple pending heredocs rather than associating a body with the wrong source.
+File inputs on other descriptors still receive protected-path checks. Both guards
+deny patch streams whose framing cannot be certified, including wrapped calls.
+
+Every Bash brace enumeration budget failure sets a denial reason. Filename
+selectors already interpret failure conservatively; negative-selector checks
+cannot certify exclusions on failure, and Grep propagates their budget reason.
+Tokenizer callers retain the reason on failure. Best-effort argument scans retain
+cap failures and fall back to a raw protected-mention check for other expansion
+failures. Depth, scan-step, alternative and Cartesian-product cases deny while
+shallow public command text and inert printer data retain positive controls.
+The depth regression was allowed by a3b0306 but denied by 4f6a213. Synthetic
+replay does not establish installed-host or cross-platform protection.
+
 ## Confirmation audit 28: launch witnesses, effective patches and bounded selectors
 
 All cases are synthetic JSON guard submissions; candidate commands are never run.

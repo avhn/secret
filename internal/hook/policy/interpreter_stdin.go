@@ -19,10 +19,16 @@ type interpreterInput struct {
 // than a second wrapper/alias parser which can lose the original pipe source.
 func (a *analyzer) pipelineRecipient(cmd *syntax.BinaryCmd, depth int, cwd string) string {
 	prior := a.interpreterInputs
+	priorPatchInput := a.patchInput
 	if cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll {
-		a.interpreterInputs = append(a.interpreterInputs, interpreterInput{producer: cmd.X, cwd: cwd})
+		input := interpreterInput{producer: cmd.X, cwd: cwd}
+		a.interpreterInputs = append(a.interpreterInputs, input)
+		a.patchInput = &input
 	}
-	defer func() { a.interpreterInputs = prior }()
+	defer func() {
+		a.interpreterInputs = prior
+		a.patchInput = priorPatchInput
+	}()
 	return a.stmts([]*syntax.Stmt{cmd.Y}, depth, cwd)
 }
 

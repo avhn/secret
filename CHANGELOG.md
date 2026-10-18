@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Close a3b0306 review gaps in patch stdin certification and capped brace scans:
+  distinguish stdin heredocs from other descriptors, reject opaque effective
+  patch streams after pipes or file redirects, and preserve brace-budget denials
+  through best-effort Bash argument analysis. Add synthetic regressions for both
+  adapters without changing installed hooks or claiming host protection.
+
 - Close confirmation audit 28 launch and syntax parity gaps: preserve Deno argv
   witnesses across unrelated options, recognize PHP literal array constructors
   and consecutive numeric argv keys, retain attached env split-string operands,

@@ -101,7 +101,8 @@ type analyzer struct {
 	credentialConfigs   []credentialConfig
 	credentialBranch    bool
 	interpreterInputs   []interpreterInput
-	patchInputStart     int // First input in the innermost scope that redirects stdin.
+	patchInputStart     int               // First input in the innermost scope that redirects stdin.
+	patchInput          *interpreterInput // Effective stdin, with last redirect winning.
 	protected           func(string, string) bool
 	cwd, home, reason   string
 	words, globs        int
@@ -230,6 +231,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 	for _, stmt := range stmts {
 		prior := a.interpreterInputs
 		priorPatchInputStart := a.patchInputStart
+		priorPatchInput := a.patchInput
 		priorFilenameStdin := a.filenameStdin
 		for _, redirect := range stmt.Redirs {
 			if stdinRedirect(redirect) {
@@ -242,6 +244,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		for _, redirect := range stmt.Redirs {
 			if stdinRedirect(redirect) {
 				a.filenameStdin = true
+				a.patchInput = &interpreterInput{redirect: redirect, cwd: cwd}
 			}
 			if redirect.Hdoc != nil || redirect.Op == syntax.WordHdoc {
 				a.interpreterInputs = append(a.interpreterInputs, interpreterInput{redirect: redirect, cwd: cwd})
@@ -250,6 +253,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		cwd = a.singleStmtInput([]*syntax.Stmt{stmt}, depth, cwd)
 		a.interpreterInputs = prior
 		a.patchInputStart = priorPatchInputStart
+		a.patchInput = priorPatchInput
 		a.filenameStdin = priorFilenameStdin
 		if a.reason != "" {
 			break
@@ -1040,19 +1044,19 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "apply_patch" {
 		// Wrappers retain redirect provenance. Validate only the effective stdin
 		// scope at the child, using its scoped cwd for patch targets.
-		found := false
+		if a.patchInput == nil || a.patchInput.redirect == nil || a.patchInput.redirect.Hdoc == nil {
+			a.reason = roles.Indeterminate
+			return
+		}
+		// Keep prior same-scope stdin-body denials, but unrelated descriptors
+		// cannot certify the effective patch stream. Pipes and files deny above.
 		for _, input := range a.interpreterInputs[a.patchInputStart:] {
-			if r := input.redirect; r != nil && r.Hdoc != nil {
-				found = true
+			if r := input.redirect; r != nil && stdinRedirect(r) && r.Hdoc != nil {
 				if reason := patch.Decision(a.raw(r.Hdoc), cwd, "", a.home); reason != "" {
 					a.reason = reason
 					return
 				}
 			}
-		}
-		if !found {
-			a.reason = roles.Indeterminate
-			return
 		}
 	}
 	if name == "bun" {

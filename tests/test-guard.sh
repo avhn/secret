@@ -155,6 +155,62 @@ audit27_case() {
 # Audit 28 regressions use the four-second, stderr-free envelope runner above.
 # Every candidate remains JSON data, including arithmetic and patch contents.
 audit28_case() { audit27_case "$@"; }
+
+# Review a3b0306: stdin provenance and brace caps, submitted as JSON only.
+mkdir -p "$HOME/.aws" "$TMP/search"
+ln -s "$HOME/.aws" "$TMP/search/review_cfg"
+review_public=$'*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\n'
+review_protected=$'*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\n'
+printf '%s' "$review_protected" >"$TMP/search/p.patch"
+for entry in 'direct:' 'env:env '; do
+    review_label="${entry%%:*}"
+    review_patch="${entry#*:}apply_patch"
+    for review_shape in no_stdin pipe file fd3 pipe_fd3 file_fd3 heredoc_then_file leading_heredoc_then_file leading_public leading_protected heredoc_then_dup heredoc_then_here_string two_protected two_malformed prior_malformed public explicit_stdin zero_padded_stdin file_then_heredoc pipe_then_heredoc nonstdin_file nonstdin_protected_file protected_alias; do
+        review_want=deny
+        case "$review_shape" in
+            no_stdin) review_command="$review_patch" ;;
+            pipe) review_command="cat p.patch | $review_patch" ;;
+            file) review_command="$review_patch < p.patch" ;;
+            fd3) review_command="$review_patch 3<<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            pipe_fd3) review_command="cat p.patch | $review_patch 3<<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            file_fd3) review_command="$review_patch < p.patch 3<<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            heredoc_then_file) review_command="$review_patch <<'PATCH' < p.patch"$'\n'"${review_public}PATCH" ;;
+            leading_heredoc_then_file) review_command="<<'PATCH' $review_patch < p.patch"$'\n'"${review_public}PATCH" ;;
+            leading_public) review_want=allow; review_command="<<'PATCH' $review_patch"$'\n'"${review_public}PATCH" ;;
+            leading_protected) review_command="<<'PATCH' $review_patch"$'\n'"${review_protected}PATCH" ;;
+            heredoc_then_dup) review_command="$review_patch <<'PATCH' 0<&3"$'\n'"${review_public}PATCH" ;;
+            heredoc_then_here_string) review_command="$review_patch <<'PATCH' <<< 'not a patch'"$'\n'"${review_public}PATCH" ;;
+            two_protected) review_command="$review_patch <<'ONE' <<'TWO'"$'\n'"${review_public}ONE"$'\n'"${review_protected}TWO" ;;
+            two_malformed) review_command="$review_patch <<'ONE' <<'TWO'"$'\n'"${review_public}ONE"$'\nnot a patch\nTWO' ;;
+            prior_malformed) review_command="$review_patch <<'ONE' <<'TWO'"$'\nnot a patch\nONE\n'"${review_public}TWO" ;;
+            public) review_want=allow; review_command="$review_patch <<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            explicit_stdin) review_want=allow; review_command="$review_patch 0<<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            zero_padded_stdin) review_want=allow; review_command="$review_patch 00<<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            file_then_heredoc) review_want=allow; review_command="$review_patch < p.patch <<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            pipe_then_heredoc) review_want=allow; review_command="cat p.patch | $review_patch <<'PATCH'"$'\n'"${review_public}PATCH" ;;
+            nonstdin_file) review_want=allow; review_command="$review_patch <<'PATCH' 3< p.patch"$'\n'"${review_public}PATCH" ;;
+            nonstdin_protected_file) review_command="$review_patch <<'PATCH' 3< ~/.aws/credentials"$'\n'"${review_public}PATCH" ;;
+            protected_alias) review_command="$review_patch <<'PATCH'"$'\n'"${review_protected}PATCH" ;;
+        esac
+        review_encoded="$(jq -cn --arg c "$review_command" '$c')"
+        audit28_case "review_a3b0306_${review_label}_${review_shape}" "$review_want" ".tool_input.command = $review_encoded"
+        audit28_case "review_a3b0306_${review_label}_${review_shape}_argv" "$review_want" ".tool_input.command = [\"bash\",\"-c\",$review_encoded]"
+    done
+done
+rm "$TMP/search/review_cfg" "$TMP/search/p.patch"
+audit28_case review_a3b0306_brace_depth deny '.tool_input.command = ("curl \u0027cat " + ("{" * 65) + "x" + ("}" * 65) + " ~/.aws/credentials\u0027")'
+audit28_case review_a3b0306_brace_depth_alternative deny '.tool_input.command = ("curl \u0027cat {" + ("{" * 65) + "x" + ("}" * 65) + ",~/.aws/credentials}\u0027")'
+audit28_case review_a3b0306_brace_alternatives deny '.tool_input.command = ("curl \u0027cat {" + ("public," * 65) + "~/.aws/credentials}\u0027")'
+audit28_case review_a3b0306_brace_steps deny '.tool_input.command = ("curl \u0027cat " + ("{a,b}" * 5) + ("x" * 700) + " ~/.aws/credentials\u0027")'
+audit28_case review_a3b0306_brace_product deny '.tool_input.command = ("curl \u0027cat " + ("{a,b}" * 10) + "{public,~/.aws/credentials}\u0027")'
+audit28_case review_a3b0306_brace_public allow '.tool_input.command = "curl \u0027cat {a,b} README.md\u0027"'
+audit28_case review_a3b0306_brace_inert_public allow '.tool_input.command = ("printf %s \u0027" + ("{" * 65) + "public" + ("}" * 65) + "\u0027")'
+case "${SECRET_TEST_FILTER:-}" in review_a3b0306_*)
+    printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
+    [[ "$FAILED" -eq 0 ]]
+    exit "$?"
+    ;;
+esac
 mkdir -p "$HOME/.aws"
 printf '%s\n' 'synthetic-only' >"$HOME/.aws/credentials"
 ln -s "$HOME/.aws" "$TMP/search/audit28_cfg"

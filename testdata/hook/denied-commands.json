@@ -32258,6 +32258,376 @@
       "home": "@TMP@/home",
       "name": "audit-arithmetic-unknown",
       "snapshot": 130
+    },
+    {
+      "command": "apply_patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_no_stdin",
+      "snapshot": 131
+    },
+    {
+      "command": "cat p.patch | apply_patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_pipe",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch < p.patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_file",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "cat p.patch | apply_patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_pipe_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch < p.patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_file_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'PATCH' < p.patch\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_heredoc_then_file",
+      "snapshot": 131
+    },
+    {
+      "command": "<<'PATCH' apply_patch < p.patch\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_leading_heredoc_then_file",
+      "snapshot": 131
+    },
+    {
+      "command": "<<'PATCH' apply_patch\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_leading_protected",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'PATCH' 0<&3\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_heredoc_then_dup",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'PATCH' <<< 'not a patch'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_heredoc_then_here_string",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'ONE' <<'TWO'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nONE\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_two_protected",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'ONE' <<'TWO'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nONE\nnot a patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_two_malformed",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'ONE' <<'TWO'\nnot a patch\nONE\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_prior_malformed",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'PATCH' 3< ~/.aws/credentials\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_nonstdin_protected_file",
+      "snapshot": 131
+    },
+    {
+      "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_direct_protected_alias",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_no_stdin",
+      "snapshot": 131
+    },
+    {
+      "command": "cat p.patch | env apply_patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_pipe",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch < p.patch",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_file",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "cat p.patch | env apply_patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_pipe_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch < p.patch 3<<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_file_fd3",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'PATCH' < p.patch\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_heredoc_then_file",
+      "snapshot": 131
+    },
+    {
+      "command": "<<'PATCH' env apply_patch < p.patch\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_leading_heredoc_then_file",
+      "snapshot": 131
+    },
+    {
+      "command": "<<'PATCH' env apply_patch\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_leading_protected",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'PATCH' 0<&3\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_heredoc_then_dup",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'PATCH' <<< 'not a patch'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_heredoc_then_here_string",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'ONE' <<'TWO'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nONE\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_two_protected",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'ONE' <<'TWO'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nONE\nnot a patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_two_malformed",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'ONE' <<'TWO'\nnot a patch\nONE\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nTWO",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_prior_malformed",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'PATCH' 3< ~/.aws/credentials\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_nonstdin_protected_file",
+      "snapshot": 131
+    },
+    {
+      "command": "env apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: review_cfg/credentials\n@@\n-old\n+synthetic\n*** End Patch\nPATCH",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_env_protected_alias",
+      "snapshot": 131
+    },
+    {
+      "command": "curl 'cat {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{x}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}} ~/.aws/credentials'",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_brace_depth",
+      "snapshot": 132
+    },
+    {
+      "command": "curl 'cat {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{x}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}},~/.aws/credentials}'",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_brace_depth_alternative",
+      "snapshot": 132
+    },
+    {
+      "command": "curl 'cat {public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,public,~/.aws/credentials}'",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_brace_alternatives",
+      "snapshot": 132
+    },
+    {
+      "command": "curl 'cat {a,b}{a,b}{a,b}{a,b}{a,b}xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ~/.aws/credentials'",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_brace_steps",
+      "snapshot": 132
+    },
+    {
+      "command": "curl 'cat {a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{a,b}{public,~/.aws/credentials}'",
+      "config": "@ROOT@/examples/ripgreprc",
+      "cwd": "@TMP@/search",
+      "extra": {},
+      "home": "@TMP@/home",
+      "kubeconfig": "",
+      "name": "review_a3b0306_brace_product",
+      "snapshot": 132
     }
   ],
   "snapshots": [
@@ -354851,6 +355221,430 @@
         "w/g2/.env",
         "link",
         "../dirty/app.env"
+      ]
+    ],
+    [
+      [
+        "audit27-envelope",
+        "file",
+        ""
+      ],
+      [
+        "audit27-error",
+        "file",
+        ""
+      ],
+      [
+        "deep-search",
+        "dir",
+        ""
+      ],
+      [
+        "descendant-only",
+        "dir",
+        ""
+      ],
+      [
+        "empty-search",
+        "dir",
+        ""
+      ],
+      [
+        "home",
+        "dir",
+        ""
+      ],
+      [
+        "search",
+        "dir",
+        ""
+      ],
+      [
+        "template-search",
+        "dir",
+        ""
+      ],
+      [
+        "upper-private",
+        "dir",
+        ""
+      ],
+      [
+        "upper-search",
+        "dir",
+        ""
+      ],
+      [
+        "xdg",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i/j",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i/j/.ENV",
+        "file",
+        ""
+      ],
+      [
+        "descendant-only/sub",
+        "dir",
+        ""
+      ],
+      [
+        "descendant-only/sub/.env",
+        "file",
+        ""
+      ],
+      [
+        "home/.aws",
+        "dir",
+        ""
+      ],
+      [
+        "search/.ENV",
+        "file",
+        ""
+      ],
+      [
+        "search/.env",
+        "file",
+        ""
+      ],
+      [
+        "search/X.SECRET",
+        "file",
+        ""
+      ],
+      [
+        "search/app.env",
+        "file",
+        ""
+      ],
+      [
+        "search/one.secret",
+        "file",
+        ""
+      ],
+      [
+        "search/p.patch",
+        "file",
+        ""
+      ],
+      [
+        "search/review_cfg",
+        "link",
+        "@TMP@/home/.aws"
+      ],
+      [
+        "search/src",
+        "dir",
+        ""
+      ],
+      [
+        "search/sub",
+        "dir",
+        ""
+      ],
+      [
+        "search/web",
+        "dir",
+        ""
+      ],
+      [
+        "search/src/a.ts",
+        "file",
+        ""
+      ],
+      [
+        "search/sub/.env",
+        "file",
+        ""
+      ],
+      [
+        "search/web/.env",
+        "file",
+        ""
+      ],
+      [
+        "template-search/.ENV.EXAMPLE",
+        "file",
+        ""
+      ],
+      [
+        "upper-private/.Secrets",
+        "dir",
+        ""
+      ],
+      [
+        "upper-private/.Secrets/file.txt",
+        "file",
+        ""
+      ],
+      [
+        "upper-search/X.SECRET",
+        "file",
+        ""
+      ],
+      [
+        "xdg/git",
+        "dir",
+        ""
+      ]
+    ],
+    [
+      [
+        "audit27-envelope",
+        "file",
+        ""
+      ],
+      [
+        "audit27-error",
+        "file",
+        ""
+      ],
+      [
+        "deep-search",
+        "dir",
+        ""
+      ],
+      [
+        "descendant-only",
+        "dir",
+        ""
+      ],
+      [
+        "empty-search",
+        "dir",
+        ""
+      ],
+      [
+        "home",
+        "dir",
+        ""
+      ],
+      [
+        "search",
+        "dir",
+        ""
+      ],
+      [
+        "template-search",
+        "dir",
+        ""
+      ],
+      [
+        "upper-private",
+        "dir",
+        ""
+      ],
+      [
+        "upper-search",
+        "dir",
+        ""
+      ],
+      [
+        "xdg",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i/j",
+        "dir",
+        ""
+      ],
+      [
+        "deep-search/a/b/c/d/e/f/g/h/i/j/.ENV",
+        "file",
+        ""
+      ],
+      [
+        "descendant-only/sub",
+        "dir",
+        ""
+      ],
+      [
+        "descendant-only/sub/.env",
+        "file",
+        ""
+      ],
+      [
+        "home/.aws",
+        "dir",
+        ""
+      ],
+      [
+        "search/.ENV",
+        "file",
+        ""
+      ],
+      [
+        "search/.env",
+        "file",
+        ""
+      ],
+      [
+        "search/X.SECRET",
+        "file",
+        ""
+      ],
+      [
+        "search/app.env",
+        "file",
+        ""
+      ],
+      [
+        "search/one.secret",
+        "file",
+        ""
+      ],
+      [
+        "search/src",
+        "dir",
+        ""
+      ],
+      [
+        "search/sub",
+        "dir",
+        ""
+      ],
+      [
+        "search/web",
+        "dir",
+        ""
+      ],
+      [
+        "search/src/a.ts",
+        "file",
+        ""
+      ],
+      [
+        "search/sub/.env",
+        "file",
+        ""
+      ],
+      [
+        "search/web/.env",
+        "file",
+        ""
+      ],
+      [
+        "template-search/.ENV.EXAMPLE",
+        "file",
+        ""
+      ],
+      [
+        "upper-private/.Secrets",
+        "dir",
+        ""
+      ],
+      [
+        "upper-private/.Secrets/file.txt",
+        "file",
+        ""
+      ],
+      [
+        "upper-search/X.SECRET",
+        "file",
+        ""
+      ],
+      [
+        "xdg/git",
+        "dir",
+        ""
       ]
     ]
   ]

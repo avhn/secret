@@ -172,6 +172,12 @@ later search controls, and records retained Go arithmetic/function/time
 conservatism as exact divergences. Native platform CI and installed-host failure
 checks remain required; local integration does not complete M2.
 
+The a3b0306 follow-up review certifies effective patch stdin independently from
+other heredoc descriptors, rejects opaque patch streams on both guards and keeps
+Bash brace-cap failures visible through heuristic argument scans. Focused tests
+retain prior same-scope patch denials and safe last-redirect controls. This remains
+synthetic evidence, not a completed platform or installed-host gate.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or
