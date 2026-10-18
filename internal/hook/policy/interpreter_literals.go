@@ -33,11 +33,17 @@ func cachedProtection(check func(string, string) bool) func(string, string) bool
 // Inspect each quote kind independently so a shell-quoted interpreter argument
 // does not hide its inner language literals. This is positive-witness scanning,
 // not a language evaluator; escaped and decoded stdin are checked separately.
-func sourceLiterals(code string) []string {
+func (a *analyzer) sourceLiterals(code string) ([]string, bool) {
+	if a.interpreterBudget(len(code) > 1<<20) {
+		return nil, false
+	}
 	var values []string
 	for _, quote := range []byte{'\'', '"', '`'} {
 		start := -1
 		for i := 0; i < len(code); i++ {
+			if i%8192 == 0 && a.interpreterBudget(false) {
+				return nil, false
+			}
 			if code[i] == '\\' {
 				i++
 				continue
@@ -48,12 +54,63 @@ func sourceLiterals(code string) []string {
 			if start < 0 {
 				start = i + 1
 			} else {
+				if a.interpreterBudget(len(values) >= 256) {
+					return nil, false
+				}
 				values = append(values, code[start:i])
 				start = -1
 			}
 		}
 	}
-	return values
+	return values, true
+}
+
+// Raw path scanners run before decoded executable-source analysis. Apply the
+// same literal work ceiling there, before filesystem metadata can multiply by
+// tens of thousands of unique strings. A partial scan is never an allow proof.
+func (a *analyzer) interpreterBudget(exceeded bool) bool {
+	if exceeded || a.expired() {
+		a.reason = roles.Indeterminate
+		return true
+	}
+	return false
+}
+
+// Internal windows must not turn their artificial end into a $ witness. Keep
+// unbounded name suffixes matchable; only end-of-input alternatives are removed.
+var bodyProtectedToken = regexp.MustCompile(strings.ReplaceAll(protectedLiteralToken.String(), "|$", ""))
+var bodyGitToken = regexp.MustCompile(strings.ReplaceAll(gitToken.String(), "|$", ""))
+
+// Raw stdin receives the protected-token backstop before interpreter dispatch.
+// Bound each regex operation so a large source body cannot run past the shared
+// deadline before reaching the literal work cap. The overlap exceeds every
+// fixed token; the only unbounded prefix is a filename before .secret, for which
+// a short suffix is already a complete positive witness. Inert bodies never
+// enter this scanner and retain their separate large-data allowance.
+func (a *analyzer) protectedBodyLiteral(code string) bool {
+	const chunk, overlap = 8192, 256
+	// Preserve hasProtectedLiteral's template exemptions even when the name
+	// straddles a window boundary. Git tokens still inspect the original body.
+	paths := strings.ReplaceAll(strings.ReplaceAll(code, ".env.example", ""), ".env.template", "")
+	for _, scan := range []struct {
+		code          string
+		full, bounded *regexp.Regexp
+	}{{paths, protectedLiteralToken, bodyProtectedToken}, {code, gitToken, bodyGitToken}} {
+		for start := 0; start < len(scan.code); start += chunk {
+			if a.interpreterBudget(false) {
+				return true
+			}
+			end := min(len(scan.code), start+chunk+overlap)
+			matcher := scan.full
+			if end < len(scan.code) {
+				matcher = scan.bounded
+			}
+			if matcher.MatchString(scan.code[start:end]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Literal command strings use the same credential roles as direct shell calls.
@@ -192,9 +249,12 @@ func (a *analyzer) interpreterArgumentProtected(code, cwd, name string, source b
 	if environmentCode(code) || unextractedRecursiveGrep(tokens) {
 		return true
 	}
-	for _, value := range sourceLiterals(code) {
-		if a.expired() {
-			a.reason = roles.Indeterminate
+	values, known := a.sourceLiterals(code)
+	if !known {
+		return true
+	}
+	for _, value := range values {
+		if a.interpreterBudget(false) {
 			return true
 		}
 		if a.literalPrinter(value, cwd) {
@@ -309,6 +369,7 @@ func (a *analyzer) literalChild(cwd string) *analyzer {
 		cwdPaths: a.cwdPaths, cwdPathCheck: a.cwdPathCheck,
 		configWrites: a.configWrites, configWriteCheck: a.configWriteCheck,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
+		arithmeticValues: maps.Clone(a.arithmeticValues),
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
 }
 

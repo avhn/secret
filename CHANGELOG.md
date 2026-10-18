@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Close confirmation audit 29 protected-read parity gaps in computed Deno argv
+  keys, constructor child directories and package executable paths containing
+  `@`. Validate expanded patch headers without executing expansions, retain
+  quoted Git-write parity, and protect inherited Git-directory roots.
+- Inspect opaque extglob substitutions, unsupported deep backquotes and stored
+  arithmetic syntax across loops, assignments, appends and branches. Retain
+  hidden intermediate glob matches conservatively. Cap interpreter literal work
+  before metadata scans and bound raw-body regex work within the shared analysis
+  deadline, preserving decoded literal boundaries and inert writer bodies.
+- Certify public Parallel null-option and fd producer pipelines in Bash while
+  retaining protected scopes and metadata-child roles. Record exact supplemental
+  Bash over-denials separately from Go tightenings without weakening assertions.
+  Audit 29 malformed-input and raw-limit follow-ups remain explicit M2.1 work;
+  local synthetic checks do not establish CI or installed-host protection.
+
 - Close a3b0306 review gaps in patch stdin certification and capped brace scans:
   distinguish stdin heredocs from other descriptors, reject opaque effective
   patch streams after pipes or file redirects, and preserve brace-budget denials

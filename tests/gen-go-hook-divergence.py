@@ -30,6 +30,13 @@ AUDIT28_TIGHTENING = {"audit28_t13_compound_time_end_public"} | {
                  "quoted_index", "quoted_loop", "quoted_child")
     for suffix in ("", "_argv")
 }
+# Exact harmless controls retained by Bash, reviewed in hook-tightening.md.
+# These are not protected-read, malformed-shell or budget exceptions.
+AUDIT29_BASH_OVER_DENIAL = {
+    "audit29_u22_" + name + suffix
+    for name in ("unknown_type", "metadata_write") for suffix in ("", "_argv")
+}
+AUDIT29_TIGHTENING = {"audit29_u22_fd_type_attached", "audit29_u22_fd_type_attached_argv"}
 TIGHTENING = {"malformed_json", "malformed_sensitive", "active_safe_command", "unresolved_file_safe", "unresolved_positional_safe", "unresolved_listing_safe", "unresolved_wc_safe", "unresolved_redirect_safe", "unresolved_xargs_safe", "unresolved_literal_safe", "unresolved_no_eval", "unknown_timeout_safe", "unknown_nice_safe", "unknown_stdbuf_safe", "unknown_caffeinate_safe", "unknown_xargs_safe", "unknown_exec_safe", "sudo_unknown_safe", "audit6_sed_comment", "audit6_sed_text_line", "audit6_sed_insert_line", "audit6_sed_change_line", "policy_v2_sed_script_clean", "no_file", "env_chdir_empty", "audit15_r7_success", "audit15_r1_data#12", "audit15_r1_data#13"}
 
 
@@ -56,7 +63,9 @@ def suite_rows(suite, binary, host, tmp):
         if status == "fail":
             if expected[key] == "deny" and (key in PREPROCESS_SHIMS or suite == "guard" and key in FIND_SHIMS):
                 category = "deliberate-find-shim"
-            elif expected[key] == "allow" and (key in ENVELOPE_TIGHTENING or key in AUDIT28_TIGHTENING or
+            elif expected[key] == "deny" and key in AUDIT29_BASH_OVER_DENIAL:
+                category = "reviewed-bash-over-denial"
+            elif expected[key] == "allow" and (key in ENVELOPE_TIGHTENING or key in AUDIT28_TIGHTENING or key in AUDIT29_TIGHTENING or
                                                 (suite == "guard" and key in TIGHTENING) or
                                                 (suite == "codex" and key in CODEX_TIGHTENING)):
                 category = "deliberate-tightening"

@@ -382,9 +382,15 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			start = i + 2
 		}
 		if javascriptInterpreter(language) && (tokens[i].text == "Deno.Command" || strings.HasSuffix(tokens[i].text, ".Deno.Command")) && !tokens[i+1].literal && tokens[i+1].text == "(" {
+			dirs := a.interpreterLaunchCwds(tokens, start, "Deno.Command", language, cwd)
 			for _, words := range constructorArguments(tokens, start) {
 				if a.literalCommandProtected(words, cwd, true) {
 					return true
+				}
+				for _, dir := range dirs {
+					if a.literalCommandProtected(words, dir, true) {
+						return true
+					}
 				}
 			}
 		}

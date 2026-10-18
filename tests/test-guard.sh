@@ -156,6 +156,57 @@ audit27_case() {
 # Every candidate remains JSON data, including arithmetic and patch contents.
 audit28_case() { audit27_case "$@"; }
 
+# Audit 29 U22: certify public producer roots and literal metadata children.
+# Candidates are submitted as JSON only, in string and explicit-shell forms.
+mkdir -p "$HOME/.aws" "$TMP/search/audit29_public" "$TMP/search/audit29_alias"
+printf '%s\n' 'synthetic-only' >"$HOME/.aws/credentials"
+printf '%s\n' 'public-only' >"$TMP/search/audit29_public/README.md"
+ln -s "$HOME/.aws/credentials" "$TMP/search/audit29_alias/public.txt"
+audit29_u22_case() {
+    local name="$1" expected="$2" encoded
+    encoded="$(jq -cn --arg c "$3" '$c')"
+    audit27_case "audit29_u22_$name" "$expected" ".tool_input.command = $encoded"
+    audit27_case "audit29_u22_${name}_argv" "$expected" ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+}
+while IFS='|' read -r audit29_name audit29_want audit29_command; do
+    audit29_u22_case "$audit29_name" "$audit29_want" "$audit29_command"
+done <<'AUDIT29_PARALLEL'
+find_null|allow|find audit29_public -type f -print0 | parallel -0 cat
+find_long_null|allow|find audit29_public -type f -print0 | parallel --null cat
+fd_type|allow|fd --type f . audit29_public | parallel cat
+fd_type_equals|allow|fd --type=file . audit29_public | parallel cat
+fd_type_short|allow|fd -t f . audit29_public | parallel cat
+fd_type_attached|allow|fd -tf . audit29_public | parallel cat
+fd_xargs|allow|fd --type f . audit29_public | xargs cat
+metadata|allow|find ~/.aws -type f | parallel stat
+metadata_null|allow|find ~/.aws -type f -print0 | parallel -0 stat
+protected_find|deny|find ~/.aws -type f -print0 | parallel -0 cat
+protected_find_long|deny|find ~/.aws -type f -print0 | parallel --null cat
+protected_fd|deny|fd --type f . ~/.aws | parallel cat
+protected_fd_equals|deny|fd --type=file . ~/.aws | parallel cat
+protected_fd_short|deny|fd -tf . ~/.aws | parallel cat
+protected_fd_xargs|deny|fd --type f . ~/.aws | xargs cat
+protected_alias|deny|fd --type f . audit29_alias | parallel cat
+protected_cwd|deny|fd --type f . | parallel cat
+protected_extra_root|deny|fd --type f . audit29_public ~/.aws | parallel cat
+missing_type|deny|fd --type | parallel cat
+unknown_type|deny|fd --type unknown . audit29_public | parallel cat
+missing_child|deny|find audit29_public -type f -print0 | parallel -0
+metadata_template|deny|find ~/.aws -type f | parallel 'stat; cat ~/.aws/credentials'
+metadata_substitution|deny|find audit29_public -type f | parallel 'stat $(cat ~/.aws/credentials)'
+metadata_printer|deny|find audit29_public -type f | parallel 'stat; printenv'
+metadata_write|deny|find ~/.aws -type f | parallel touch
+metadata_explicit_read|deny|find audit29_public -type f | parallel 'stat; cat .env'
+AUDIT29_PARALLEL
+rm "$HOME/.aws/credentials" "$TMP/search/audit29_alias/public.txt" "$TMP/search/audit29_public/README.md"
+rmdir "$TMP/search/audit29_alias" "$TMP/search/audit29_public"
+case "${SECRET_TEST_FILTER:-}" in audit29_u22_*)
+    printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
+    [[ "$FAILED" -eq 0 ]]
+    exit "$?"
+    ;;
+esac
+
 # Review a3b0306: stdin provenance and brace caps, submitted as JSON only.
 mkdir -p "$HOME/.aws" "$TMP/search"
 ln -s "$HOME/.aws" "$TMP/search/review_cfg"

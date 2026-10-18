@@ -42,7 +42,10 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   Claude Code matcher includes MultiEdit and NotebookEdit file paths.
   Protected Git write targets include independent directories identified by a
   HEAD file, objects directory and refs directory, and declared Git directory
-  roots. Non-reader argument words containing Git configuration tokens deny,
+  roots. The Go hook also treats inherited GIT_DIR and GIT_COMMON_DIR values as
+  protected write roots, including lexical and physical aliases without HEAD
+  metadata; this is not a claim of equivalent installed Bash coverage.
+  Non-reader argument words containing Git configuration tokens deny,
   including attached option values and interpreter code. The shell scanner
   denies over-limit token streams rather than falling back to a raw regex.
   Generic shell-looking arguments are inspected for positive findings; known
@@ -214,7 +217,25 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   Failed reader or configured-path
   normalization denies without treating an empty result as a safe filename.
   Synthetic deadline tests do not establish installed-host timeout behavior.
-  Existing command and heredoc budgets still apply.
+  Existing command and heredoc budgets still apply. The Go interpreter scanner
+  caps raw literal extraction before filesystem metadata work and checks bounded
+  raw-body regex windows against its shared two-second analysis deadline. Source
+  limits count decoded literals, not shell quote-escape fragments. The envelope
+  read has a separate two-second timeout, so these are not a strict two-second
+  end-to-end wall-time guarantee. Synthetic large-body and delayed-input checks
+  do not establish installed-host fail-closed behavior.
+- **Audit-29 Go syntax witnesses** include static computed Deno argv keys,
+  constructor-local child cwd, package executable paths containing `@`, expanded
+  patch headers, substitutions hidden in extglobs and stored arithmetic values
+  across loops and assignment merges. Unsupported deep backquote residue and
+  active arithmetic reevaluation deny conservatively. Intermediate glob
+  directories may include hidden stores even without explicit dotglob options;
+  this intentionally over-denies some default-shell patterns. These scanners
+  inspect synthetic syntax and path metadata, never execute candidate commands.
+  Bash now permits certified public Parallel null/fd pipelines and literal
+  read-only metadata children; protected scopes, aliases and compound reader
+  templates still deny. Exact remaining harmless Bash over-denials are listed in
+  docs/design/hook-tightening.md, not generalized allow exceptions.
 - **Credential filename coverage** also includes `.aws/config` as well as
   `.aws/credentials`, `.kube/config`, paths named by a literal `KUBECONFIG` path
   list, `AWS_CONFIG_FILE` or `AWS_SHARED_CREDENTIALS_FILE` (including alternatives
@@ -252,6 +273,15 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
 These are outside the threat model. Reports about them are welcome as
 documentation or hardening suggestions, but they are not vulnerabilities:
 
+- **Known audit-29 follow-ups.** M2.1 retains malformed coprocess framing,
+  raw path/component byte-limit parity, native patch control bytes and incomplete
+  patch-body grammar (U2, U15, U16, U17). Go now rejects the reported opaque
+  extglob and deep-backquote malformed forms, while some malformed nested
+  backquotes still allow in Bash (U8/U11). Opaque pipeline patch stdin is denied
+  by Go after the a3b0306 review; retained Bash provenance limits remain U3 work.
+  These limits are not evidence that arbitrary malformed input is rejected.
+  Audit 27 to 29 shared/Bash-only class (i) findings remain coverage backlog;
+  closing Go directional differences does not establish installed Bash coverage.
 - **Known audit-28 coverage limits.** The retained Bash guard does not cover all
   explicit-shell positional argv forms, awk pipe/getline readers, whitespace-list
   Grep selectors, attached systemd-run configured credential assignments or

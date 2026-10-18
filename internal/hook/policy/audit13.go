@@ -248,11 +248,7 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 	if name == "bun" && strings.HasPrefix(args[0], "-") {
 		return nil, false // Inline runtime options are interpreter code, not a child.
 	}
-	child := strings.TrimPrefix(args[0], "@dotenvx/")
-	child = strings.SplitN(child, "@", 2)[0]
-	if child == "python-dotenv" {
-		child = "dotenv"
-	}
+	child := packageChildExecutable(args[0])
 	args = append([]string(nil), args...)
 	args[0] = child
 	return args, true

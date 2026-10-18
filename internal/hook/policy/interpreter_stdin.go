@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -52,6 +53,11 @@ func (a *analyzer) interpreterInputProtected(cwd, name string) bool {
 		// Retain raw file/environment witnesses. Literal scan ceilings belong
 		// to decoded source, not here-string shell quoting and escape bytes.
 		raw := a.raw(word)
+		if r.Hdoc == nil {
+			// Remove shell quoting before counting source-language literals. A
+			// quoted apostrophe can otherwise inflate one literal into five.
+			raw = literal(word)
+		}
 		if a.inlineGitDir(raw, cwd) || environmentCode(raw) || a.interpreterProtected(raw, cwd) {
 			return true
 		}
@@ -79,6 +85,41 @@ func (a *analyzer) interpreterRedirectBody(r *syntax.Redirect, cwd string) (stri
 		body = a.raw(r.Hdoc)
 	}
 	return body, known
+}
+
+var patchWriteParameter = regexp.MustCompile(`^\$(?:([A-Za-z_][A-Za-z_0-9]*)|\{([A-Za-z_][A-Za-z_0-9]*)\})(/.*)?$`)
+
+// patchGitWriteDecision retains Bash's conservative static-parameter Git-write
+// denials even for quoted heredocs. The validated body stays literal: this view
+// checks only header targets, never expands payloads or revalidates framing.
+func (a *analyzer) patchGitWriteDecision(body, cwd string) string {
+	for _, line := range strings.Split(body, "\n") {
+		if time.Now().After(a.deadline) {
+			return roles.Indeterminate
+		}
+		line = strings.TrimSpace(line)
+		for _, prefix := range []string{"*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "} {
+			name, ok := strings.CutPrefix(line, prefix)
+			if !ok {
+				continue
+			}
+			match := patchWriteParameter.FindStringSubmatch(name)
+			if match == nil {
+				continue
+			}
+			variable := match[1]
+			if variable == "" {
+				variable = match[2]
+			}
+			if value, known := a.staticVariable(variable); known {
+				target := value + match[3]
+				if gitToken.MatchString(target) || a.configPath(target, cwd) {
+					return "git configuration write target"
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // Expand executable stdin without shell execution, field splitting or globbing.

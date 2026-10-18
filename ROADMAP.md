@@ -172,17 +172,32 @@ later search controls, and records retained Go arithmetic/function/time
 conservatism as exact divergences. Native platform CI and installed-host failure
 checks remain required; local integration does not complete M2.
 
+Confirmation audit 29 adds computed Deno argv keys, constructor child cwd,
+path-preserving package launchers, expanded patch headers and inherited Git-root
+write protection. Go checks opaque extglobs, deep backquote residue and possible
+stored arithmetic syntax across loops and assignment-state merges; bounded raw
+literal scans preserve decoded boundaries. Hidden intermediate globs remain
+conservative. Bash certifies public Parallel pipelines without dropping protected
+scopes. Exact harmless Bash over-denials are reviewed rather than copied into Go.
+The owner adopted the convergence rule on 2026-10-18: close real Go-looser reads
+and Go crashes, record harmless reviewed differences and track the remaining
+malformed-syntax and raw-limit work in M2.1. This is not a claim that every audit
+29 item is fixed or that applicable CI and installed-host gates have passed.
+
 The a3b0306 follow-up review certifies effective patch stdin independently from
 other heredoc descriptors, rejects opaque patch streams on both guards and keeps
 Bash brace-cap failures visible through heuristic argument scans. Focused tests
 retain prior same-scope patch denials and safe last-redirect controls. This remains
 synthetic evidence, not a completed platform or installed-host gate.
 
-Merge rule P22: M2 merges when every applicable CI job is green and a full
-three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
-hang past budget, fail-open or malformed-input allow (class iv). Shared or
-Bash-only coverage gaps (class i) go to the coverage backlog; ordinary-syntax
-over-denials (class iii) remain follow-ups. This supersedes P21.
+Merge rule P22 originally required every applicable CI job green and a full
+three-angle confirmation audit with no class (ii) or class (iv) finding. The
+owner's 2026-10-18 convergence decision narrows the immediate work to real
+Go-looser protected reads/configuration writes and Go crashes or deadline hangs;
+reviewed harmless splits and the named M2.1 malformed-syntax/raw-limit items
+remain visible follow-ups, not claims of closure. Shared or Bash-only coverage
+gaps (class i) remain backlog, and ordinary-syntax over-denials (class iii) remain
+follow-ups. Applicable CI is still required. P22 superseded P21.
 
 Last green suites before policy v2: Bash guard 1496/1496, Codex 48/48, CLI 201/201, backends 63/63, Bash 3.2 1478/1478; Go guard exact parity with 25 reviewed divergences, Codex with 2; process-inclusive p99 about 5 ms. See `docs/design/hook-tightening.md` for deliberate tightenings and scope exclusions.
 
@@ -198,6 +213,29 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 - [ ] Audit 28: Bash whitespace-listed Grep selectors (Go now checks their union)
 - [ ] Audit 28: shared relocated gh hosts.yml under XDG_CONFIG_HOME/GH_CONFIG_DIR
 - [ ] Audit 28: Bash recursive grep following protected symlink targets
+
+### M2.1 follow-ups (audit 29 syntax, raw limits and coverage)
+
+- [ ] U2: malformed coprocess reserved-word framing in direct shell strings
+- [ ] U3: effective pipeline patch stdin, including retained Bash provenance limits;
+  the a3b0306 review already rejects opaque recipient streams in Go
+- [ ] U8: malformed code in opaque extglobs; Go now denies the reported forms,
+  retain paired malformed-language regression coverage
+- [ ] U11: malformed nested backquotes; Go now denies deep residue, while Bash
+  still permits some malformed nesting
+- [ ] U15: Bash/Go raw path-byte and component-byte limit parity
+- [ ] U16: native apply_patch control-byte validation parity
+- [ ] U17: full malformed apply_patch body grammar, beyond header/EOF validation
+- [ ] Preserve the audit 27 to 29 class (i) backlog: shared and Bash-only coverage
+  gaps are not closures merely because Go denies the same command
+- [ ] Audit 29 class (i): Bash explicit-shell argv option terminators; interpreter
+  parent cwd changes; Python/Ruby child-directory options; ordinary literal argv
+  API/options; find -execdir child cwd; TypeScript eval runners; builtin quoted
+  reevaluation; Bash syntax/redirect/producer/static-variable gaps; nested
+  backquotes; final-component dotglob matches. U10/U12 Go closures cover only
+  their named witnesses, not every shared or Bash-only variant
+- [ ] Audit 29: distinguish the two-second Go analysis budget from end-to-end
+  input-read plus analysis timing, including delayed-stdin synthetic checks
 
 ### M2 follow-ups (over-denials, non-blocking)
 

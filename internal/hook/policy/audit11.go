@@ -11,7 +11,17 @@ import (
 var inlinePath = regexp.MustCompile(`['"]([^'"\r\n]+)['"]`)
 
 func (a *analyzer) inlineGitDir(code, cwd string) bool {
-	for _, match := range inlinePath.FindAllStringSubmatch(code, -1) {
+	if a.interpreterBudget(len(code) > 1<<20) {
+		return true
+	}
+	matches := inlinePath.FindAllStringSubmatch(code, 257)
+	if a.interpreterBudget(len(matches) > 256) {
+		return true
+	}
+	for _, match := range matches {
+		if a.interpreterBudget(false) {
+			return true
+		}
 		value := strings.TrimLeft(match[1], "><")
 		if strings.ContainsAny(value, " ;(){}") {
 			continue

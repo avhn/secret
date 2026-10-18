@@ -21,10 +21,16 @@ def rows(path, columns):
 
 def check():
     """Require every assertion and every expected failure to match once."""
-    inventory = {name for item, name, _, _ in rows(inventory_path, 4) if item == suite}
+    decisions = {name: decision for item, name, _, decision in rows(inventory_path, 4) if item == suite}
+    inventory = set(decisions)
+    reviewed = {"audit29_u22_" + name + suffix
+                for name in ("unknown_type", "metadata_write") for suffix in ("", "_argv")}
     expected = {}
     for item, name, category in rows(divergence_path, 3):
-        if category not in ("deliberate-find-shim", "deliberate-tightening"):
+        if category == "reviewed-bash-over-denial":
+            if item not in ("guard", "codex") or name not in reviewed or item == suite and decisions.get(name) != "deny":
+                raise ValueError(f"unreviewed Bash over-denial: {item}/{name}")
+        elif category not in ("deliberate-find-shim", "deliberate-tightening"):
             raise ValueError(f"invalid category: {item}/{name}")
         if item == suite:
             if name in expected:

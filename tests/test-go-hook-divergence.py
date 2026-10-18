@@ -2,6 +2,7 @@
 """Keep reviewed path tightenings directional and exact using synthetic rows."""
 import importlib.util
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -52,6 +53,40 @@ class EnvelopeTighteningTests(unittest.TestCase):
             for name in ["audit28_t13_review_unknown_public", "audit28_t19_depth_65_deadline"]:
                 with self.assertRaisesRegex(ValueError, "unreviewed difference"):
                     self.measure(suite, name, "allow")
+
+    def test_audit29_categories_are_exact_and_directional(self):
+        self.assertEqual(len(divergence.AUDIT29_BASH_OVER_DENIAL), 4)
+        for suite in ("guard", "codex"):
+            for name in divergence.AUDIT29_BASH_OVER_DENIAL:
+                self.assertEqual(self.measure(suite, name, "deny"), [(suite, name, "reviewed-bash-over-denial")])
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure(suite, name, "allow")
+            for name in divergence.AUDIT29_TIGHTENING:
+                self.assertEqual(self.measure(suite, name, "allow"), [(suite, name, "deliberate-tightening")])
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure(suite, name, "deny")
+            for name in ("audit29_u22_protected_fd", "audit29_u22_unknown_type_other", "audit29_u22_metadata_template"):
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure(suite, name, "deny")
+
+    def test_checker_rejects_unreviewed_allow_categories(self):
+        checker = GENERATOR.with_name("check-go-hook-divergence.py")
+        for suite in ("guard", "codex"):
+            for name, decision, valid in (("audit29_u22_unknown_type", "deny", True),
+                                          ("audit29_u22_metadata_write_argv", "deny", True),
+                                          ("audit29_u22_protected_fd", "deny", False),
+                                          ("audit29_u22_unknown_type_extra", "deny", False),
+                                          ("audit29_u22_unknown_type", "allow", False)):
+                with self.subTest(suite=suite, name=name, decision=decision), tempfile.TemporaryDirectory() as directory:
+                    root = pathlib.Path(directory)
+                    (root / "inventory").write_text(f"{suite}\t{name}\tdecision\t{decision}\n")
+                    (root / "results").write_text(f"{suite}\t{name}\tfail\n")
+                    (root / "divergences").write_text(f"{suite}\t{name}\treviewed-bash-over-denial\n")
+                    (root / "log").write_text("0 passed, 1 failed\n")
+                    run = subprocess.run([sys.executable, "-I", str(checker), suite,
+                                          str(root / "inventory"), str(root / "results"),
+                                          str(root / "divergences"), str(root / "log")], capture_output=True, text=True)
+                    self.assertEqual(run.returncode == 0, valid, run.stderr)
 
     def test_unknown_newline_case_stays_unreviewed(self):
         with self.assertRaisesRegex(ValueError, "unreviewed difference"):

@@ -7,6 +7,33 @@ import (
 	"github.com/avhn/secret/internal/hook/roles"
 )
 
+// Package versions belong to package names, not executable path components.
+// Scoped names keep their scope; dotenv's published aliases share its CLI roles.
+func packageChildExecutable(child string) string {
+	packageName, start := child, 0
+	if strings.HasPrefix(child, "@") {
+		if slash := strings.IndexByte(child, '/'); slash > 1 {
+			start = slash + 1
+		} else {
+			return child
+		}
+	}
+	name, version, hasVersion := strings.Cut(child[start:], "@")
+	if hasVersion && !strings.ContainsAny(name, `/\\`) {
+		// URL and alias package specifications may themselves contain slashes.
+		// They still select a package binary rather than a local executable.
+		urlVersion := strings.Contains(version, "://") || strings.HasPrefix(version, "file:") || strings.HasPrefix(version, "npm:") || strings.HasPrefix(version, "github:")
+		if !strings.ContainsAny(version, `/\\`) || urlVersion {
+			packageName = child[:start] + name
+		}
+	}
+	packageName = strings.TrimPrefix(packageName, "@dotenvx/")
+	if packageName == "python-dotenv" {
+		packageName = "dotenv"
+	}
+	return packageName
+}
+
 // metadataChild is an allowlist, not a list of known readers. Wrappers do not
 // change whether the underlying child consumes the supplied file contents.
 func (a *analyzer) metadataChild(words []string, depth int, cwd string) bool {

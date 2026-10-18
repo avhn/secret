@@ -1,6 +1,10 @@
 package policy
 
-import "mvdan.cc/sh/v3/syntax"
+import (
+	"strings"
+
+	"mvdan.cc/sh/v3/syntax"
+)
 
 // The parser accepts some AST shapes that Bash rejects. Certify these framing
 // rules before walking commands, including inactive branches and substitutions.
@@ -11,6 +15,10 @@ func bashFraming(root syntax.Node) bool {
 			return false
 		}
 		switch cmd := node.(type) {
+		case *syntax.Redirect:
+			// Document can finish a command substitution without consuming
+			// its pending heredoc. A missing body is not valid inner framing.
+			valid = (cmd.Op != syntax.Hdoc && cmd.Op != syntax.DashHdoc) || cmd.Hdoc != nil
 		case *syntax.CallExpr:
 			// The parser leaves these misplaced reserved words as literal calls.
 			// Quoting, escaping and prefix assignments remove that keyword role.
@@ -25,6 +33,8 @@ func bashFraming(root syntax.Node) bool {
 			valid = cmd.ThenPos.IsValid() || cmd.Else == nil
 		case *syntax.CoprocClause:
 			valid = coprocCommand(cmd)
+		case *syntax.CmdSubst:
+			valid = backquoteFraming(cmd)
 		case *syntax.ArithmExp:
 			valid = arithmeticQuotes(cmd.X)
 		case *syntax.ArithmCmd:
@@ -66,6 +76,32 @@ func bashFraming(root syntax.Node) bool {
 		}
 		return valid
 	})
+	return valid
+}
+
+// The parser removes only one level of backquote escaping. At deeper nesting,
+// escaped backquotes can remain literal AST words even though Bash reevaluates
+// them as shell syntax. Deny this unsupported residue, including malformed inner
+// code, rather than silently skip commands hidden below a compound statement.
+func backquoteFraming(sub *syntax.CmdSubst) bool {
+	if !sub.Backquotes {
+		return true
+	}
+	valid := true
+	for _, stmt := range sub.Stmts {
+		syntax.Walk(stmt, func(node syntax.Node) bool {
+			if !valid {
+				return false
+			}
+			switch n := node.(type) {
+			case *syntax.CmdSubst, *syntax.ProcSubst:
+				return false // Each substitution has its own escaping context.
+			case *syntax.Lit:
+				valid = !strings.Contains(n.Value, "\\`")
+			}
+			return valid
+		})
+	}
 	return valid
 }
 

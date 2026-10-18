@@ -59,6 +59,7 @@ func (a *analyzer) hookAppend(key, value string, depth int, cwd string) {
 		a.reason = roles.Indeterminate
 		return
 	}
+	a.noteArithmeticAppend(key, value)
 	a.hookAssignment(key, previous+value, depth, cwd)
 }
 
@@ -69,6 +70,7 @@ type credentialConfig struct {
 // hookAssignment checks only variables interpreted by a shell, never ordinary
 // assignment data. No assignment value is evaluated to determine its contents.
 func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
+	a.noteArithmeticValue(key, value)
 	// Branches and scoped assignments cannot erase a possible credential path.
 	if key == "KUBECONFIG" || key == "AWS_CONFIG_FILE" || key == "AWS_SHARED_CREDENTIALS_FILE" {
 		if !a.credentialBranch {
@@ -155,12 +157,19 @@ func interpreter(name string) bool {
 // bare configured names and HOME/cwd-relative paths. Inspect names only; never
 // evaluate source or open a credential to determine whether it is protected.
 func (a *analyzer) interpreterProtected(code, cwd string) bool {
-	for _, value := range sourceLiterals(code) {
-		if a.interpreterNameProtected(value, cwd) {
+	values, known := a.sourceLiterals(code)
+	if !known {
+		return true
+	}
+	for _, value := range values {
+		if a.interpreterBudget(false) || a.interpreterNameProtected(value, cwd) {
 			return true
 		}
 	}
 	for _, token := range strings.FieldsFunc(code, func(r rune) bool { return strings.ContainsRune(" \t\r\n\"'`(){}[];<>=,+", r) }) {
+		if a.interpreterBudget(false) {
+			return true
+		}
 		if (strings.ContainsAny(token, "/\\") || a.pathMetadata().LexicalProtected(token, cwd, a.home) || a.pathMetadata().ConfiguredProtected(token, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...)) && a.interpreterNameProtected(token, cwd) {
 			return true
 		}
@@ -204,8 +213,9 @@ func (a *analyzer) interpreterProducer(left *syntax.Stmt, producerCWD, cwd, name
 	var source strings.Builder
 	syntax.NewPrinter().Print(&source, left)
 	// Serialized shell quoting is not an interpreter literal boundary. Retain
-	// raw path/environment witnesses, then run launch analysis on decoded words.
-	if environmentCode(source.String()) || a.interpreterProtected(source.String(), cwd) {
+	// the environment witness here; path and literal ceilings are checked on
+	// every decoded producer word below, not on shell quote-escape fragments.
+	if environmentCode(source.String()) {
 		return true
 	}
 	// Serialized shell source retains escapes around the interpreter's own

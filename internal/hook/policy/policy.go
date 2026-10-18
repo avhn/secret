@@ -117,6 +117,7 @@ type analyzer struct {
 	configUntrusted     bool
 	structuralUncertain bool
 	env                 map[string]string
+	arithmeticValues    map[string][]string
 	gitRoots            []string
 	source              string
 	assignments         map[string]int
@@ -296,11 +297,11 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 		for _, r := range s.Redirs {
 			if r.Hdoc != nil && !a.inertCatTeeBody(s, cwd) && !inertMessageStdin(s) {
 				body := a.raw(r.Hdoc)
-				if hasProtectedLiteral(body) || gitToken.MatchString(body) {
+				if a.protectedBodyLiteral(body) {
 					a.reason = roles.FileInput
 				}
 			}
-			if r.Op.String() == "<<<" && (hasProtectedLiteral(a.raw(r.Word)) || gitToken.MatchString(a.raw(r.Word))) && !a.inertCatTeeBody(s, cwd) {
+			if r.Op.String() == "<<<" && !a.inertCatTeeBody(s, cwd) && a.protectedBodyLiteral(a.raw(r.Word)) {
 				a.reason = roles.FileInput
 			}
 			a.walkWord(r.Word, depth, cwd)
@@ -786,13 +787,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				a.reason = reason
 			}
 		case *syntax.TestClause:
-			syntax.Walk(cmd, func(node syntax.Node) bool {
-				if nested, ok := node.(*syntax.CmdSubst); ok {
-					a.stmts(nested.Stmts, depth+1, cwd)
-					return false
-				}
-				return true
-			})
+			a.walkNode(cmd, depth, cwd)
 		case *syntax.TimeClause:
 			if cmd.Stmt != nil {
 				child := *cmd.Stmt
@@ -1052,7 +1047,18 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		// cannot certify the effective patch stream. Pipes and files deny above.
 		for _, input := range a.interpreterInputs[a.patchInputStart:] {
 			if r := input.redirect; r != nil && stdinRedirect(r) && r.Hdoc != nil {
-				if reason := patch.Decision(a.raw(r.Hdoc), cwd, "", a.home); reason != "" {
+				// Unquoted bodies are executable shell input. Resolve only bounded
+				// static parameters before checking framing and every patch target.
+				body, known := a.interpreterRedirectBody(r, input.cwd)
+				if !known {
+					a.reason = roles.Indeterminate
+					return
+				}
+				if reason := patch.Decision(body, cwd, "", a.home); reason != "" {
+					a.reason = reason
+					return
+				}
+				if reason := a.patchGitWriteDecision(body, cwd); reason != "" {
 					a.reason = reason
 					return
 				}
@@ -1886,6 +1892,10 @@ func (a *analyzer) walkNode(node syntax.Node, depth int, cwd string) {
 		return
 	}
 	syntax.Walk(node, func(node syntax.Node) bool {
+		a.walkExpansionSyntax(node, depth, cwd)
+		if a.reason != "" {
+			return false
+		}
 		switch n := node.(type) {
 		case *syntax.DblQuoted:
 			a.walkDoubleQuotedParameters(n, depth, cwd)

@@ -48,7 +48,7 @@ func interpreterCallArguments(tokens []interpreterToken, start int) ([][]interpr
 // Literal cwd options are child-local. Retain every cwd witness, including an
 // unknown cwd when a recognized value cannot be certified. Nested option keys
 // and literal punctuation must not be mistaken for the launch's cwd.
-func interpreterObjectCwds(tokens []interpreterToken) []string {
+func interpreterObjectCwds(tokens []interpreterToken, constructor bool) []string {
 	if len(tokens) == 0 || tokens[0].literal || tokens[0].text != "{" {
 		return nil
 	}
@@ -58,7 +58,11 @@ func interpreterObjectCwds(tokens []interpreterToken) []string {
 			return dirs
 		}
 		key := tokens[i]
-		i++
+		if computed, after, known := interpreterComputedProperty(tokens, i); constructor && known {
+			key, i = computed, after
+		} else {
+			i++
+		}
 		valueStart, embedded := i, ""
 		if colon := strings.IndexByte(key.text, ':'); !key.literal && colon >= 0 {
 			embedded = key.text[colon+1:]
@@ -70,7 +74,9 @@ func interpreterObjectCwds(tokens []interpreterToken) []string {
 			}
 		} else {
 			if i < len(tokens) && !key.literal && javascriptPropertyIdentifier(key.text) && !tokens[i].literal && optionIn(", }", tokens[i].text) {
-				if key.text == "cwd" {
+				// Constructors retain their literal-option witness policy; a
+				// shorthand may refer to an earlier harmless local binding.
+				if key.text == "cwd" && !constructor {
 					dirs = append(dirs, "")
 				}
 				if tokens[i].text == "," {
@@ -79,7 +85,20 @@ func interpreterObjectCwds(tokens []interpreterToken) []string {
 				continue
 			}
 			if i >= len(tokens) || tokens[i].literal || tokens[i].text != ":" {
-				return append(dirs, "")
+				if !constructor {
+					return append(dirs, "")
+				}
+				// Match constructor argv extraction: unrelated spreads and
+				// methods cannot erase a literal cwd witness on either side.
+				end, known := interpreterObjectValueEnd(tokens, i-1)
+				if !known {
+					return dirs
+				}
+				i = end
+				if tokens[i].text == "," {
+					i++
+				}
+				continue
 			}
 			i++
 			valueStart = i
@@ -118,7 +137,8 @@ func interpreterObjectCwds(tokens []interpreterToken) []string {
 
 func (a *analyzer) interpreterLaunchCwds(tokens []interpreterToken, start int, name, language, cwd string) []string {
 	php := language == "php" && strings.EqualFold(name, "proc_open")
-	javascript := javascriptInterpreter(language) && optionIn("spawn spawnSync exec execSync execFile execFileSync", name)
+	constructor := name == "Deno.Command"
+	javascript := javascriptInterpreter(language) && (constructor || optionIn("spawn spawnSync exec execSync execFile execFileSync", name))
 	if !php && !javascript {
 		return nil
 	}
@@ -145,13 +165,13 @@ func (a *analyzer) interpreterLaunchCwds(tokens []interpreterToken, start int, n
 		}
 	} else {
 		option := 2
-		if optionIn("exec execSync", name) || len(args) > 0 && len(args[0]) > 0 && !args[0][0].literal && args[0][0].text == "[" {
+		if constructor || optionIn("exec execSync", name) || len(args) > 0 && len(args[0]) > 0 && !args[0][0].literal && args[0][0].text == "[" {
 			option = 1
 		}
 		if len(args) <= option {
 			return nil
 		}
-		dirs = interpreterObjectCwds(args[option])
+		dirs = interpreterObjectCwds(args[option], constructor)
 	}
 	for i, dir := range dirs {
 		if dir != "" {
@@ -232,6 +252,17 @@ func javascriptPropertyIdentifier(name string) bool {
 	return true
 }
 
+// A computed property with one fully static string is the same key as a quoted
+// property. Dynamic expressions and interpolated templates are not key witnesses.
+func interpreterComputedProperty(tokens []interpreterToken, start int) (interpreterToken, int, bool) {
+	if start+3 < len(tokens) && !tokens[start].literal && tokens[start].text == "[" &&
+		tokens[start+1].literal && !tokens[start+2].literal && tokens[start+2].text == "]" &&
+		!tokens[start+3].literal && tokens[start+3].text == ":" {
+		return tokens[start+1], start + 3, true
+	}
+	return interpreterToken{}, start, false
+}
+
 // Deno.Command takes its executable separately from options.args. Inspect every
 // literal args occurrence rather than letting a later option erase a witness.
 // Other option values are not argv, even when they contain an args-like key.
@@ -246,7 +277,11 @@ func constructorArguments(tokens []interpreterToken, start int) [][]string {
 			return launches
 		}
 		key := tokens[i]
-		i++
+		if computed, after, known := interpreterComputedProperty(tokens, i); known {
+			key, i = computed, after
+		} else {
+			i++
+		}
 		if !key.literal && strings.HasSuffix(key.text, ":") {
 			key.text = strings.TrimSuffix(key.text, ":")
 		} else {

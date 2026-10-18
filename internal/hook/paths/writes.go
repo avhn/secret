@@ -16,6 +16,9 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 		return true
 	}
 	raw := StreamBase(Resolve(expandXDG(name, home, xdg), cwd, workdir, home))
+	if inheritedGitRootTarget(raw, cwd, workdir, home) {
+		return true
+	}
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
 	if check(raw) {
 		return true
@@ -34,6 +37,42 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 		}
 	}
 	return check(raw)
+}
+
+// Inherited roots are protected independently of Git metadata. In particular,
+// an unborn legacy symbolic HEAD need not resolve to an existing regular file.
+// Retain lexical intent as well as physical aliases, including missing leaves.
+func inheritedGitRootTarget(name, cwd, workdir, home string) bool {
+	normalize := func(value string) string { return strings.ToLower(filepath.ToSlash(filepath.Clean(value))) }
+	within := func(target, root string) bool {
+		target, root = normalize(target), normalize(root)
+		return target == root || strings.HasPrefix(target, strings.TrimRight(root, "/")+"/")
+	}
+	resolved := ""
+	for _, key := range []string{"GIT_DIR", "GIT_COMMON_DIR"} {
+		value := os.Getenv(key)
+		if value == "" {
+			continue
+		}
+		root := Resolve(value, cwd, workdir, home)
+		if within(name, root) {
+			return true
+		}
+		physicalRoot, err := physical(root)
+		if err != nil {
+			return true
+		}
+		if resolved == "" {
+			resolved, err = physical(name)
+			if err != nil {
+				return true
+			}
+		}
+		if within(name, physicalRoot) || within(resolved, root) || within(resolved, physicalRoot) {
+			return true
+		}
+	}
+	return false
 }
 
 func gitConfigTarget(name, cwd, home, xdg, global string) bool {

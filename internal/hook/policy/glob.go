@@ -107,7 +107,7 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 	}
 	parts := strings.Split(filepath.ToSlash(remainder), "/")
 	dirs := []string{base}
-	for _, part := range parts {
+	for index, part := range parts {
 		if part == "" || part == "." {
 			continue
 		}
@@ -118,7 +118,7 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 					if err != nil {
 						return err
 					}
-					if p != dir && entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+					if p != dir && entry.IsDir() {
 						next = append(next, p)
 					}
 					if len(next) > 200 || time.Now().After(deadline) {
@@ -150,7 +150,11 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 				return nil, false
 			}
 			for _, entry := range entries {
-				if strings.HasPrefix(entry.Name(), ".") && !strings.HasPrefix(part, ".") {
+				// Directory components may match hidden stores under dotglob,
+				// GLOBIGNORE or a child shell's options. Retain those possible
+				// matches without borrowing a default-shell option proof. Final
+				// basename matching keeps its existing dotfile semantics.
+				if index == len(parts)-1 && strings.HasPrefix(entry.Name(), ".") && !strings.HasPrefix(part, ".") {
 					continue
 				}
 				if matcher.MatchString(entry.Name()) {

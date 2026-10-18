@@ -1535,3 +1535,260 @@ Bash 4+; stock Bash 3.2 inventory checks omit only the seven named positive
 controls that the suites cannot parse there. Denials and every other inventory
 key remain mandatory. Synthetic inventory tests verify both runtime paths and
 reject attempts to overwrite the canonical inventory from Bash 3.2.
+
+## Confirmation audit 29: bounded launch, patch and syntax witnesses
+
+U0 recognizes static computed Deno argument keys, retaining witnesses across
+surrounding spreads. U5 applies constructor cwd only to the classified child;
+U6 preserves executable paths containing `@` when peeling package launchers.
+Dynamic constructor options do not become static allow proofs.
+
+U1/U4 validate effective patch stdin after bounded non-executing expansion.
+Unresolved parameters, arithmetic and command substitutions deny; quoted heredoc
+payloads remain literal. A separate static-parameter Git-header check retains
+Bash's conservative quoted Git-write denial without expanding literal payloads.
+U14 protects inherited GIT_DIR and GIT_COMMON_DIR roots lexically and physically,
+including absent metadata, missing leaves, symlink aliases and tool workdirs.
+
+U7 reparses opaque extglob patterns and denies malformed or unsupported active
+substitution syntax. U10 denies escaped backquote residue that the shell parser
+cannot faithfully represent. U12 conservatively tracks possible arithmetic
+values independently of ordinary variable uncertainty: every loop item,
+assignment, append and branch remains visible, including identifier chains and
+compound declarations. Numeric/inert controls and child-state isolation remain
+covered. Unsupported active reevaluation is a deliberate tightening, not shell
+execution by the guard.
+
+U18 caps raw literal extraction before path metadata work and checks the shared
+deadline between bounded raw-body regex windows. Literal limits apply to decoded
+interpreter source, not shell quoting fragments; the existing 256-literal
+boundary remains valid for inline, heredoc, here-string, pipe and argv forms.
+Template exemptions, long protected-name witnesses and inert large writer bodies
+retain their roles. Go's two-second analysis budget is unchanged. The separate
+two-second input-read budget is not a strict two-second end-to-end guarantee.
+
+U9/U19 conservatively include hidden intermediate glob directories and globstar
+matches, even without a local dotglob/GLOBIGNORE witness. This intentionally
+closes the two default-hidden-glob U13 differences as denials rather than losing
+a real protected match under child-shell options. Literal quoted globs and final
+basename dotfile semantics retain their existing behavior.
+
+U2, U3, U8, U11, U15, U16 and U17 retain named M2.1 review entries in ROADMAP.md.
+Some share closures above or the earlier patch-stdin review; remaining malformed
+input and raw-limit differences are not claimed fixed by these synthetic tests.
+Applicable CI and installed-host failure evidence remain separate gates.
+
+## Confirmation audit 29: public Parallel pipelines (U22)
+
+Bash recognizes Parallel `-0` and `--null` without changing the command template.
+The fd producer parser consumes separate and attached `-t`/`--type` values for
+file, directory and symlink filters. These filters do not certify exclusions:
+the existing bounded, symlink-aware scan still checks every producer root.
+A single literal read-only metadata command, such as `parallel stat`, retains
+its metadata role rather than acquiring an outer `sh -c` reader role. Templates
+with arguments, shell syntax or source lists still receive full shell analysis;
+mutating commands do not receive the new metadata exemption.
+
+These confirmed commands now allow in Bash, matching Go:
+
+```sh
+find public -type f -print0 | parallel -0 cat
+fd --type f . public | parallel cat
+find ~/.aws -type f | parallel stat
+```
+
+Here `public` contains only public files. The permanent `audit29_u22_` cases in
+both host suites exercise string and explicit-shell argv envelopes, null-option
+spellings, fd type-option spellings, public xargs, protected roots and symlink
+aliases, additional roots, missing operands and compound metadata templates.
+Protected reader and printer children still deny. Analysis budgets are unchanged.
+These are synthetic decisions, not installed-host or cross-platform evidence.
+
+The supplemental public attached-type control `fd -tf . audit29_public |
+parallel cat` exposes an existing conservative Go denial, not a protected read.
+Bash now allows it. Exact test keys are `audit29_u22_fd_type_attached` and
+`audit29_u22_fd_type_attached_argv`. Both names are exact
+`deliberate-tightening` rows; the public expectations remain unchanged.
+The other supplemental differences are reviewed below.
+
+## Reviewed bash over-denials
+
+### Audit 29 review boundaries
+
+U13, U20, U21 and U23 are reviewed Go-allow differences, not reasons to tighten
+Go. The audit 13 directional convergence rule explicitly excludes making Go
+match a provably harmless Bash over-denial. The exceptions below are limited to
+the exact forms and fixture conditions stated; protected reads, credential
+printers, malformed syntax and exhausted budgets are not exempted.
+
+The divergence generator and checker admit `reviewed-bash-over-denial` only
+for the four named U22 supplemental assertions below, in each host suite.
+Their expected Bash decisions remain deny, and synthetic tests reject any
+protected, near-name or opposite-direction exception. U13, U20, U21 and U23
+remain exact documented review cases rather than unmeasured TSV rows. Bash
+continues to deny those forms; this is not a blanket Go-allow exception.
+
+### U3 public ancestor-heredoc control
+
+The original U3 script now denies its malformed pipe-fed patches in both guards.
+Its valid public control, `{ env apply_patch; } <<'PATCH'` with only a complete
+Add File public.txt patch in the ancestor heredoc, still denies in Bash because
+that scope cannot certify patch framing. Go preserves the actual inherited
+heredoc witness and allows it. This exact public fixture is a retained Bash
+over-denial after the a3b0306 stdin review, not an exception for pipeline, file,
+unknown or malformed patch bytes. It is documented rather than tightening Go.
+
+### U13: non-reader command names, default hidden globs and arithmetic counts
+
+Exact reviewed source strings:
+
+```sh
+eval "cat\ .env"
+eval 'cat\ .env'
+eval \"cat\ .env\"
+IFS=; c="cat .env"; $c
+cat ~/*/credentials
+cat ~/?aws/credentials
+echo $(( $(grep -c . .env) ))
+x=$(( $(grep -c . ~/.aws/credentials) ))
+```
+
+The first four forms preserve a single executable name containing a space,
+not a `cat` invocation with a protected operand. The two globs use default Bash
+semantics: neither dotglob nor nonempty GLOBIGNORE is active, and no selected
+visible path is protected or aliases a protected file. The audit-29 U9/U19
+closure now conservatively includes hidden intermediate directories even without
+an explicit option witness, so these two original default-glob examples deny
+in both guards. They are no longer retained Go-allow exceptions. This deliberate
+Go tightening avoids losing a protected match when options or child-shell
+semantics cannot be certified. Final basename dotfile semantics are unchanged.
+`grep -c` does read its input, but emits only counts, consistent with the
+existing top-level non-content grep exemption; calling these forms non-reading
+would be inaccurate.
+
+A safe Bash fix needs quote/splitting provenance through eval and empty IFS,
+component-aware hidden-glob handling, and role-preserving arithmetic child
+analysis. Removing the raw-name or unresolved-command checks would also remove
+protected-read witnesses. Retain the conservative Bash result rather than
+making those broad changes in this convergence patch. Ordinary `eval "cat .env"`,
+default-IFS `$c` readers, dotglob-enabled protected matches and arithmetic
+substitutions that print protected content are outside this review.
+
+### U20: literal public interpreter launches
+
+The independent confirmation narrowed the original eight-case report to these
+three reproducible source strings:
+
+```sh
+python3 -c 'import subprocess; subprocess.run("git status", shell=True)'
+php -r 'proc_open(["cat","README.md"],[1=>STDOUT,2=>STDERR],$pipes);'
+php -r 'proc_open(array("cat","README.md"),[1=>STDOUT,2=>STDERR],$pipes);'
+```
+
+`git status` is a modeled metadata operation; each PHP literal argv launches
+`cat` on the public README.md fixture. Neither launch requests protected input,
+environment output or a configuration write. Bash loses the shell-string or
+PHP array/descriptor roles during heuristic source scanning, whereas Go keeps
+the literal launch roles. Adjusting the broad interpreter fallback or treating
+PHP descriptor arrows as inert globally could discard actual execution and
+write witnesses, so these precise forms retain the documented Bash over-denial.
+The independently replayed Node, Deno and Python list-argv public controls
+already allowed in both guards; they are not blanket interpreter exceptions.
+
+### U21: sudo child assignments do not configure a later sibling
+
+Exact reviewed source strings, with a public custom.cfg and README.md and no
+inherited configuration selecting custom.cfg:
+
+```sh
+sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+sudo --non-interactive -- KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+sudo --non-interactive -- AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+sudo --non-interactive -- AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+sudo -u synthetic KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+sudo -u synthetic AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+sudo -u synthetic AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+command sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+command sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+command sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+env SYNTHETIC=yes sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+env SYNTHETIC=yes sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+env SYNTHETIC=yes sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+timeout 5 sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+timeout 5 sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+timeout 5 sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+nice -n 1 sudo -n KUBECONFIG=custom.cfg cat README.md; cat custom.cfg
+nice -n 1 sudo -n AWS_CONFIG_FILE=custom.cfg cat README.md; cat custom.cfg
+nice -n 1 sudo -n AWS_SHARED_CREDENTIALS_FILE=custom.cfg cat README.md; cat custom.cfg
+```
+
+Each assignment belongs to the sudo child, which reads only README.md. The
+following shell sibling does not inherit it. Go restores the parent credential
+context; Bash registers assignment-looking words in its enclosing analysis
+context before wrapper peeling. Simply skipping that registration would lose
+the protected-child checks; restoring only the variable values would leave
+cached configured paths and assignment-resolution state behind. A proper Bash
+fix must isolate all of that state while preserving conditional assignment
+unions, so the retained deny is documented instead. Reading custom.cfg inside
+the configured child, or assigning the variable persistently before the sudo
+command and later reading custom.cfg, remains protected in both guards.
+
+### U22 supplemental controls: invalid fd type and mutating metadata child
+
+Two supplemental controls retain Bash-deny/Go-allow differences:
+
+```sh
+fd --type unknown . audit29_public | parallel cat
+find ~/.aws -type f | parallel touch
+```
+
+The first is `audit29_u22_unknown_type` (and `_argv`): the invalid type value
+causes fd to fail without producing protected file names. Bash does not certify
+unsupported type values. This is an external tool option error, not malformed
+shell or hook-envelope framing. The second is `audit29_u22_metadata_write` (and
+`_argv`): touch changes timestamps but prints no credential content, consistent
+with the existing metadata-child policy. Bash deliberately retains full template
+analysis for mutating children because removing it generically would also need
+an implicit protected Git-write target proof. These exact controls are reviewed
+Bash over-denials rather than permission to tighten Go or weaken the tests.
+Neither review covers credential content output or writes to Git configuration.
+The exact `reviewed-bash-over-denial` keys, on both hosts, are
+`audit29_u22_unknown_type`, `audit29_u22_unknown_type_argv`,
+`audit29_u22_metadata_write` and `audit29_u22_metadata_write_argv`.
+Integration regeneration measures 5,722 guard assertions (48 reviewed
+differences), 2,653 Codex assertions (29 reviewed differences), 76 permanent
+audit denials (three stricter than Bash) and 374 audit-19 outcomes. The resulting
+80 exact divergence rows add only these eight reviewed Bash-over-denial rows
+and four attached-fd Go-tightening rows to the prior 68. No existing expected
+decision changes. The macOS guard inventory receives the same 52 new case keys;
+that metadata update does not establish a macOS runtime pass.
+
+### U23: repeated literal public Make recipes
+
+Exact reviewed source strings, with README.md public:
+
+```sh
+make --eval 'audit:; echo public' --eval 'audit:; echo public'
+make --eval 'audit:; echo public' --eval 'audit:; cat README.md'
+make -E 'audit:; echo public' -sE'audit:; echo public'
+make -E 'audit:; echo public' -sE'audit:; cat README.md'
+make -E 'audit:; echo public' -nsE'audit:; echo public'
+make -E 'audit:; echo public' -nsE'audit:; cat README.md'
+gmake --eval 'audit:; echo public' --eval 'audit:; echo public'
+gmake --eval 'audit:; echo public' --eval 'audit:; cat README.md'
+gmake -E 'audit:; echo public' -sE'audit:; echo public'
+gmake -E 'audit:; echo public' -sE'audit:; cat README.md'
+gmake -E 'audit:; echo public' -nsE'audit:; echo public'
+gmake -E 'audit:; echo public' -nsE'audit:; cat README.md'
+```
+
+Go checks every literal recipe occurrence. Their only recipe commands print a
+public literal or read the public README.md. Bash unconditionally denies Make
+eval after executable-option normalization. Removing that deny without a
+bounded Make grammar could allow Make expansions, directives or later executable
+options that launch a protected reader. The exception is not a general approval
+of Make eval, nonliteral expansion or unrelated Makefile execution. Replacing
+the second recipe with `cat .env` or `printenv TOKEN` must still deny, even when
+the first recipe is public; no protected expectation is weakened here.
