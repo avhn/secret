@@ -149,6 +149,15 @@ option normalization across interpreter analysis, including Ruby encoding operan
 and numeric clusters. Synthetic deadline, protected-launch and must-allow controls
 cover both adapters; native runtime CI and installed-host checks remain required.
 
+Confirmation audit 27 covers S0-S22 with source/data-aware interpreter scanning,
+child-local launch directories, redirected filename provenance, Docker bind
+aliases, complete assignment traversal and bounded field splitting. Both guards
+validate malformed framing and bounded input preprocessing; harmless literal
+nested eval is certified without execution. Patch EOF markers retain valid
+update-hunk behavior. The existing cwd-resolution cache and BSD wc correction
+remain in place. Synthetic replay, refreshed inventories and exact differential
+records are local evidence, not a green CI matrix or installed-host protection.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

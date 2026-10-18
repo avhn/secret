@@ -20,7 +20,7 @@ canonical_target() {
 }
 expect_calls() {
     local count
-    count="$(wc -l <"$TMP/calls")"
+    count="$(wc -l <"$TMP/calls" | tr -d " ")"
     [[ "$count" == "$1" ]] || { printf 'expected %s resolver calls, got %s\n' "$1" "$count" >&2; exit 1; }
 }
 git_write_context

@@ -110,6 +110,29 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   and header files, and gh API input files use protected path checks. Curl
   literal option values, `--data-raw`, `--form-string` and `name=content` URL-encoded
   payloads remain data, not implicit file reads.
+- **Bounded audit-27 source and input checks.** Interpreter executable source and
+  stdin reject unterminated recognized literals; ordinary script arguments remain
+  data with protected-path witnesses. Required interpreter operands must exist,
+  while documented optional operands and explicitly empty source stay supported.
+  Go anchors modeled PHP, Node and Bun literal launch readers at their child
+  directories. It maps Docker directory binds back to host reader paths and
+  handles UV and systemd-run child directories; this does not model arbitrary
+  container code. These Go models do not establish equivalent Bash coverage.
+  File-backed xargs names remain uncertified through wrappers and compound
+  redirects, but a pipe replacing stdin replaces inherited filename provenance.
+  Unquoted static scalar expansions undergo bounded field splitting; a known
+  empty IFS disables splitting, and uncertain mutations cannot certify it.
+  Literal recursive eval may preserve shell state only after bounded syntax and
+  child analysis; dynamic source, protected reads and excessive recursion deny.
+  No candidate source is executed to establish these decisions.
+  Bash preprocessing uses linear CRLF normalization and alarm-bounded helpers.
+  Decoded argv is capped at 256 arguments and 8 KiB including separators, with
+  the existing multiline explicit-shell allowance; Go applies the same argv
+  preparation caps. File-tool paths are bounded before expensive matching.
+  Decoded tool-name controls deny before unsupported-tool dispatch. Patches
+  require complete bounded framing, typed workdirs and ordered path sections;
+  an End of File marker is valid only at the end of an update hunk. The previous
+  Bash malformed-patch exception is closed. Both Go adapters validate apply_patch.
 - **Nonempty malformed envelopes deny explicitly.** Only zero-byte input has no
   tool call. Whitespace-only input, raw NUL, invalid UTF-8, duplicate JSON object
   keys, missing or mistyped shell commands and workdirs, missing tool names,

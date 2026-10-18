@@ -303,11 +303,17 @@ func indirectStaticAssignment(source string) bool {
 // staticVariable resolves only literal assignments made in this command and
 // the two explicitly permitted home locations from the hook environment.
 func (a *analyzer) staticVariable(name string) (string, bool) {
-	if a.source != "" {
+	source := a.source
+	if name == "IFS" && a.ifsSource != "" {
+		// Nested shell text has its own assignment positions, not offsets in
+		// the outer quoted command argument that supplied it.
+		source = a.ifsSource
+	}
+	if source != "" {
 		// Only one plain assignment may establish the value. Every other
 		// identifier run, apart from parameter expansions, invalidates it.
 		assigned := regexp.MustCompile(`(^|[;\n])\s*` + regexp.QuoteMeta(name) + `=`)
-		matches := assigned.FindAllStringIndex(a.source, -1)
+		matches := assigned.FindAllStringIndex(source, -1)
 		if len(matches) != 1 || a.assignments[name] != 1 {
 			if !(name == "HOME" || name == "XDG_CONFIG_HOME") || len(matches) != 0 {
 				return "", false
@@ -315,16 +321,16 @@ func (a *analyzer) staticVariable(name string) (string, bool) {
 		}
 
 		bare := regexp.MustCompile(`(^|[^a-zA-Z0-9_])` + regexp.QuoteMeta(name) + `([^a-zA-Z0-9_]|$)`)
-		for _, loc := range bare.FindAllStringSubmatchIndex(a.source, -1) {
+		for _, loc := range bare.FindAllStringSubmatchIndex(source, -1) {
 			start := loc[3]
 			end := start + len(name)
-			if len(matches) == 1 && start >= matches[0][0] && end <= matches[0][1] || start > 0 && a.source[start-1] == '$' || start > 1 && a.source[start-2:start] == "${" && end < len(a.source) && a.source[end] == '}' {
+			if len(matches) == 1 && start >= matches[0][0] && end <= matches[0][1] || start > 0 && source[start-1] == '$' || start > 1 && source[start-2:start] == "${" && end < len(source) && source[end] == '}' {
 				continue
 			}
 			return "", false
 		}
 		// Indirect assignment options can overwrite any previously static name.
-		if indirectStaticAssignment(a.source) {
+		if indirectStaticAssignment(source) {
 			return "", false
 		}
 	}
@@ -336,7 +342,9 @@ func (a *analyzer) staticVariable(name string) (string, bool) {
 	if !ok && name == "XDG_CONFIG_HOME" {
 		value, ok = os.LookupEnv(name)
 	}
-	return value, ok && value != "" && !strings.ContainsAny(value, "$`")
+	// An explicitly empty IFS disables splitting. Both the syntax and reached
+	// assignment must certify it, never an unresolved value's empty placeholder.
+	return value, ok && (value != "" || name == "IFS" && a.ifsEmpty && a.assignments[name] == 1) && !strings.ContainsAny(value, "$`")
 }
 
 // writePatternWord catches unquoted globs before the command's argv expansion

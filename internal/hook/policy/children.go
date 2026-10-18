@@ -10,31 +10,53 @@ import (
 // metadataChild is an allowlist, not a list of known readers. Wrappers do not
 // change whether the underlying child consumes the supplied file contents.
 func (a *analyzer) metadataChild(words []string, depth int, cwd string) bool {
-	return a.nonReadingChild(words, depth, cwd, false)
+	return a.nonReadingChild(words, depth, cwd, false, false)
 }
 
 // xargs and Parallel also retain explicit output-data roles. Find's existing
 // metadata-only proof remains narrower, including its protected-name witness.
 func (a *analyzer) dataChild(words []string, depth int, cwd string) bool {
-	return a.nonReadingChild(words, depth, cwd, true)
+	return a.nonReadingChild(words, depth, cwd, true, false)
 }
 
-func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data bool) bool {
+// File-supplied names need full child unwrapping even in a clean cwd. Keep this
+// proof separate from the existing scope proof so no cwd-based denial loosens.
+func (a *analyzer) filenameDataChild(words []string, depth int, cwd string) bool {
+	return a.nonReadingChild(words, depth, cwd, true, true)
+}
+
+func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data, filenames bool) bool {
 	if depth > 4 || len(words) == 0 {
 		return false
 	}
 	name, args := path.Base(words[0]), words[1:]
+	if filenames {
+		name = strings.ToLower(name)
+	}
+	if filenames && (name == "busybox" || name == "toybox") {
+		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
+	}
+	if filenames && name == "setsid" {
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			args = args[1:]
+		}
+		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
+	}
 	if _, ok := utilityTable[name]; ok {
+		if name == "systemd-run" && !filenames {
+			return false
+		}
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		return !shell && a.nonReadingChild(child, depth+1, dir, data)
+		return !shell && a.nonReadingChild(child, depth+1, dir, data, filenames)
 	}
 	if name == "command" || name == "builtin" {
 		if len(args) > 0 && args[0] == "--" {
 			args = args[1:]
 		}
-		return a.nonReadingChild(args, depth+1, cwd, data)
+		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
 	}
 	if name == "env" {
+		base := cwd
 		for len(args) > 0 {
 			if args[0] == "--" {
 				args = args[1:]
@@ -48,11 +70,21 @@ func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data b
 				args = args[1:]
 				continue
 			}
-			if args[0] == "-u" || args[0] == "--unset" {
+			if optionIn("-u --unset", args[0]) || filenames && optionIn("-C --chdir", args[0]) {
 				if len(args) < 2 {
 					return false
 				}
+				if optionIn("-C --chdir", args[0]) {
+					cwd = a.resolve(args[1], base)
+				}
 				args = args[2:]
+				continue
+			}
+			if filenames && (strings.HasPrefix(args[0], "--unset=") || strings.HasPrefix(args[0], "--chdir=")) {
+				if strings.HasPrefix(args[0], "--chdir=") {
+					cwd = a.resolve(strings.TrimPrefix(args[0], "--chdir="), base)
+				}
+				args = args[1:]
 				continue
 			}
 			if strings.HasPrefix(args[0], "-") {
@@ -60,7 +92,7 @@ func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data b
 			}
 			break
 		}
-		return a.nonReadingChild(args, depth+1, cwd, data)
+		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
 	}
 	if data && name == "secret" && len(args) > 0 && optionIn("list show help --help -h", args[0]) {
 		return true

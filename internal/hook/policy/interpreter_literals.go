@@ -130,6 +130,12 @@ func unextractedRecursiveGrep(tokens []interpreterToken) bool {
 // addition to file literals. Reader programs such as sed do not execute these
 // strings and continue to use the file-only classifier.
 func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
+	return a.interpreterArgumentProtected(code, cwd, name, true)
+}
+
+// Data arguments retain positive path and command witnesses, but source-language
+// quoting is required to balance only in actual executable source operands.
+func (a *analyzer) interpreterArgumentProtected(code, cwd, name string, source bool) bool {
 	// Count decoded literals against the existing 256-word analysis budget,
 	// retaining the scanner's separator and record-length ceilings. Faster Go
 	// analysis cannot certify unbounded literal work in any input adapter.
@@ -139,7 +145,7 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 	tokens := interpreterBodyTokens(code, name, a.regexBody)
 	literals := 0
 	for _, token := range tokens {
-		if token.indeterminate || a.expired() {
+		if source && token.indeterminate || a.expired() {
 			a.reason = roles.Indeterminate
 			return true
 		}
@@ -176,7 +182,7 @@ func (a *analyzer) executableInterpreterProtected(code, cwd, name string) bool {
 		// Numeric data words consume work too, without certifying them as
 		// string argv elements for the precise launch recognizers.
 		numeric := token.text != "" && token.text[0] >= '0' && token.text[0] <= '9'
-		if token.literal || token.witness || numeric {
+		if token.literal || token.witness || token.indeterminate || numeric {
 			literals++
 			if literals > 256 || len(token.text) > 8192 {
 				return true
@@ -295,8 +301,12 @@ func (a *analyzer) literalChild(cwd string) *analyzer {
 	if a.configWrites == nil {
 		a.configWrites = make(map[[4]string]bool)
 	}
+	if a.cwdPaths == nil {
+		a.cwdPaths = make(map[string]string)
+	}
 	return &analyzer{protected: a.protected, cwd: cwd, home: a.home,
 		deadline: a.deadline, now: a.now, metadata: a.pathMetadata(),
+		cwdPaths: a.cwdPaths, cwdPathCheck: a.cwdPathCheck,
 		configWrites: a.configWrites, configWriteCheck: a.configWriteCheck,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}

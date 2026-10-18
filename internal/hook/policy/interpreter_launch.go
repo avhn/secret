@@ -2,6 +2,165 @@ package policy
 
 import "strings"
 
+// Split a call at top-level commas, keeping nested descriptors, callbacks and
+// option values in their own argument. No expression is evaluated.
+func interpreterCallArguments(tokens []interpreterToken, start int) ([][]interpreterToken, bool) {
+	var args [][]interpreterToken
+	var closes []string
+	first := start
+	for i := start; i < len(tokens); i++ {
+		token := tokens[i]
+		if token.literal || token.witness || token.opaque || token.regexCode {
+			continue
+		}
+		if token.indeterminate {
+			return nil, false
+		}
+		if len(closes) == 0 {
+			switch token.text {
+			case ",":
+				args = append(args, tokens[first:i])
+				first = i + 1
+				continue
+			case ")":
+				if i > first {
+					args = append(args, tokens[first:i])
+				}
+				return args, true
+			}
+		}
+		switch token.text {
+		case "(", "[", "{":
+			if len(closes) >= 64 {
+				return nil, false
+			}
+			closes = append(closes, map[string]string{"(": ")", "[": "]", "{": "}"}[token.text])
+		case ")", "]", "}":
+			if len(closes) == 0 || closes[len(closes)-1] != token.text {
+				return nil, false
+			}
+			closes = closes[:len(closes)-1]
+		}
+	}
+	return nil, false
+}
+
+// Literal cwd options are child-local. Retain every cwd witness, including an
+// unknown cwd when a recognized value cannot be certified. Nested option keys
+// and literal punctuation must not be mistaken for the launch's cwd.
+func interpreterObjectCwds(tokens []interpreterToken) []string {
+	if len(tokens) == 0 || tokens[0].literal || tokens[0].text != "{" {
+		return nil
+	}
+	var dirs []string
+	for i := 1; i < len(tokens); {
+		if !tokens[i].literal && tokens[i].text == "}" {
+			return dirs
+		}
+		key := tokens[i]
+		i++
+		valueStart, embedded := i, ""
+		if colon := strings.IndexByte(key.text, ':'); !key.literal && colon >= 0 {
+			embedded = key.text[colon+1:]
+			key.text = key.text[:colon]
+			if embedded != "" {
+				// The lexer retains unspaced identifier values in this token.
+				// Include that token in balanced skipping, not in the key name.
+				valueStart = i - 1
+			}
+		} else {
+			if i < len(tokens) && !key.literal && javascriptPropertyIdentifier(key.text) && !tokens[i].literal && optionIn(", }", tokens[i].text) {
+				if key.text == "cwd" {
+					dirs = append(dirs, "")
+				}
+				if tokens[i].text == "," {
+					i++
+				}
+				continue
+			}
+			if i >= len(tokens) || tokens[i].literal || tokens[i].text != ":" {
+				return append(dirs, "")
+			}
+			i++
+			valueStart = i
+		}
+		end, known := interpreterObjectValueEnd(tokens, valueStart)
+		if !known {
+			return append(dirs, "")
+		}
+		if key.text == "cwd" {
+			if embedded != "" {
+				if end == i && embedded == "null" {
+					dirs = append(dirs, ".")
+				} else {
+					dirs = append(dirs, "")
+				}
+			} else if end == i+1 && tokens[i].literal {
+				dir := tokens[i].text
+				if dir == "" {
+					dir = "."
+				}
+				dirs = append(dirs, dir)
+			} else if end == i+1 && tokens[i].text == "null" {
+				// Omitted/default cwd does not move the child.
+				dirs = append(dirs, ".")
+			} else {
+				dirs = append(dirs, "")
+			}
+		}
+		i = end
+		if tokens[i].text == "," {
+			i++
+		}
+	}
+	return append(dirs, "")
+}
+
+func (a *analyzer) interpreterLaunchCwds(tokens []interpreterToken, start int, name, language, cwd string) []string {
+	php := language == "php" && strings.EqualFold(name, "proc_open")
+	javascript := javascriptInterpreter(language) && optionIn("spawn spawnSync exec execSync execFile execFileSync", name)
+	if !php && !javascript {
+		return nil
+	}
+	args, complete := interpreterCallArguments(tokens, start)
+	if !complete {
+		return []string{""}
+	}
+	var dirs []string
+	if php {
+		if len(args) < 4 {
+			return nil
+		}
+		value := args[3]
+		if len(value) == 1 && value[0].literal {
+			dir := value[0].text
+			if dir == "" {
+				dir = "."
+			}
+			dirs = append(dirs, dir)
+		} else if len(value) == 1 && strings.EqualFold(value[0].text, "null") {
+			return nil
+		} else {
+			return []string{""}
+		}
+	} else {
+		option := 2
+		if optionIn("exec execSync", name) || len(args) > 0 && len(args[0]) > 0 && !args[0][0].literal && args[0][0].text == "[" {
+			option = 1
+		}
+		if len(args) <= option {
+			return nil
+		}
+		dirs = interpreterObjectCwds(args[option])
+	}
+	for i, dir := range dirs {
+		if dir != "" {
+			dirs[i] = a.canonicalCWD(a.resolve(dir, cwd))
+		}
+	}
+	return dirs
+}
+
 // Ruby's [executable, argv0] first operand selects an executable independently
 // of its display name. Only complete literal pairs and argv tails are witnesses.
 func rubyExecutableArguments(tokens []interpreterToken, start int, statement bool) ([]string, bool) {

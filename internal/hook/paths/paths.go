@@ -26,8 +26,23 @@ func unresolved(name, cwd, workdir, home string) string {
 			break
 		}
 	}
+	name = expandXDG(name, home, os.Getenv("XDG_CONFIG_HOME"))
 	if !filepath.IsAbs(name) {
 		name = join(cwd, name)
+	}
+	return name
+}
+
+// File tools share the retained guard's literal XDG prefix normalization. This
+// is path-policy parity, not a claim that host tools expand environment values.
+func expandXDG(name, home, xdg string) string {
+	for _, prefix := range []string{"$XDG_CONFIG_HOME/", "${XDG_CONFIG_HOME}/"} {
+		if strings.HasPrefix(name, prefix) {
+			if xdg == "" {
+				xdg = filepath.Join(home, ".config")
+			}
+			return xdg + string(os.PathSeparator) + strings.TrimPrefix(name, prefix)
+		}
 	}
 	return name
 }

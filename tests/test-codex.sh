@@ -19,6 +19,195 @@ printf '%s\n' 'synthetic-only' >"$TMP/work/.env"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.envrc"
 ln -s .env "$TMP/work/alias.txt"
 
+# Audit 27 input/deadline regressions. Only submit synthetic JSON to the guard;
+# no candidate shell command or patch is ever executed or applied.
+audit27_case() {
+    local name="$1" expected="$2" filter="$3" output got=invalid started elapsed
+    # shellcheck disable=SC2053  # match the focused synthetic-case glob
+    if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
+    [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
+    jq -cn --arg w "$TMP/work" '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:"Bash",tool_input:{command:"true"}} | '"$filter" >"$TMP/audit27-envelope"
+    started="$(perl -MTime::HiRes=time -e 'print time')"
+    output="$(PATH="${4:-$PATH}" perl -e 'alarm 4; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit27-envelope" 2>"$TMP/audit27-error")" || output=invalid
+    elapsed="$(perl -MTime::HiRes=time -e 'printf "%.3f", time - $ARGV[0]' "$started")"
+    if [[ ! -s "$TMP/audit27-error" ]]; then
+        if [[ -z "$output" ]]; then got=allow
+        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        fi
+    fi
+    if [[ "$got" == "$expected" ]]; then
+        PASSED=$((PASSED + 1))
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tpass\n' codex "$name" >>"$SECRET_TEST_RESULTS"
+        [[ "${SECRET_TEST_TIMING:-0}" != 1 ]] || printf '%s %s %ss\n' "$name" "$got" "$elapsed"
+    else
+        FAILED=$((FAILED + 1))
+        printf 'FAIL %s: got %s, expected %s within four seconds without stderr (%ss)\n' "$name" "$got" "$expected" "$elapsed"
+        printf '%s\n' "$output"
+        cat "$TMP/audit27-error"
+        [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' codex "$name" >>"$SECRET_TEST_RESULTS"
+    fi
+}
+# Bounded literal eval recurses as source; arguments never run in this suite.
+audit27_case audit27_s20_literal allow '.tool_input.command = "eval \u0027eval true\u0027"'
+audit27_case audit27_s20_literal_argv allow '.tool_input.command = ["eval", "eval true"]'
+audit27_case audit27_s20_wrapped allow '.tool_input.command = "builtin eval \u0027command eval true\u0027"'
+audit27_case audit27_s20_public allow '.tool_input.command = "eval \u0027eval \"cat public.txt\"\u0027"'
+audit27_case audit27_s20_protected deny '.tool_input.command = "eval \u0027eval \"cat .env\"\u0027"'
+audit27_case audit27_s20_protected_argv deny '.tool_input.command = ["eval", "eval \"cat .env\""]'
+# shellcheck disable=SC2016  # the unresolved variable is candidate source data
+audit27_case audit27_s20_dynamic deny '.tool_input.command = "eval \u0027eval \"$UNKNOWN\"\u0027"'
+audit27_case audit27_s20_state deny '.tool_input.command = "eval \u0027eval \"cd ~/.aws\"\u0027; cat credentials"'
+# Tool names are validated before NUL extraction or unsupported-tool dispatch.
+for control in 0000 0001 0009 000a 000d 001b 001f 007f; do
+    audit27_case "audit27_s2_control_$control" deny ".tool_name = \"\\u$control\" | .tool_input.command = \"cat .env\""
+    audit27_case "audit27_s21_bearing_$control" deny ".tool_name = \"Bash\\u$control\" | .tool_input.command = \"cat .env\""
+done
+audit27_case audit27_s2_two_nuls deny '.tool_name = "\u0000\u0000"'
+audit27_case audit27_s21_unknown allow '.tool_name = "synthetic_unsupported" | .tool_input.command = "cat .env"'
+audit27_case audit27_s21_safe allow '.tool_input.command = "printf public"'
+audit27_case audit27_s4_crlf_public allow '.tool_input.command = ("python3 <<\u0027CODE\u0027\r\n" + ("x = 1\r\n" * 128) + "CODE")'
+# Linear CRLF normalization, including the large inert-heredoc allowance.
+audit27_case audit27_s4_crlf_deadline deny '.tool_input.command = ("python3 <<\u0027CODE\u0027\r\n" + ("x = 1\r\n" * 12000) + "print(open(\".env\").read())\r\nCODE")'
+audit27_case audit27_s4_crlf_cap_deadline allow '.tool_input.command = ("cat > notes.md <<\u0027TEXT\u0027\r\n" + (("public" * 10000 + "\r\n") * 17) + "TEXT")'
+# Literal argv still rejects CR controls before command preparation.
+audit27_case audit27_s4_crlf_argv deny '.tool_input.command = ["bash","-c","printf public\r\n"]'
+audit27_case audit27_s4_embedded_cr deny '.tool_input.command = "printf pub\rlic"'
+# A stalled preprocessing jq must emit a denial before the host timeout.
+mkdir -p "$TMP/audit27-bin"
+printf '#!%s\nexec %q -e %q\n' "$BASH" "$(command -v perl)" 'sleep 10' >"$TMP/audit27-bin/jq"
+chmod +x "$TMP/audit27-bin/jq"
+audit27_case audit27_s4_preanalysis_deadline deny '.tool_input.command = "true"' "$TMP/audit27-bin:$PATH"
+# bash -n alone accepts these expansion-time grammar errors.
+# shellcheck disable=SC2016  # expansions are literal JSON test input
+{
+    for bad in 'echo $((1+))' 'echo ${x!a}' 'echo ${x[}'; do
+        case "$bad" in *'$(('* ) label=arithmetic ;; *'!a}'*) label=operator ;; *) label=index ;; esac
+        encoded="$(jq -cn --arg c "$bad" '$c')"
+        audit27_case "audit27_s16_$label" deny ".tool_input.command = $encoded"
+        audit27_case "audit27_s16_${label}_shell" deny ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+    done
+    # Expansion-time variants missed by bash -n and the first grammar pass.
+    for entry in \
+        'bare_transform:echo ${x@}' \
+        'length_default:echo ${#x:-abc}' \
+        'length_replace:echo ${#x/a/b}' \
+        'constant_assignment:echo $((1=2))' \
+        'expression_assignment:echo $((x+1=2))' \
+        'constant_increment:echo $((++1))' \
+        'legacy_operand:echo $[1+]' \
+        'legacy_assignment:echo $[1=2]' \
+        'nested_bad_parameter:echo $(( ${x@} + 1 ))' \
+        'nested_bad_arithmetic:echo $((1 + $((2+))))'; do
+        label="${entry%%:*}"
+        encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+        audit27_case "audit27_s16_$label" deny ".tool_input.command = $encoded"
+        audit27_case "audit27_s16_${label}_shell" deny ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+    done
+    # Nested operands remain syntax, never evaluated or erased before child analysis.
+    for entry in \
+        'nested_parameter:echo $(( ${x:-0} + 1 ))' \
+        'nested_command:echo $(( $(printf 1) + 2 ))' \
+        'nested_arithmetic:echo $((1 + $((2+3))))' \
+        'nested_parameter_command:echo $(( ${x:-$(printf 1)} + 2 ))' \
+        'legacy_valid:echo $[1+2]' \
+        'legacy_nested:echo $[1+$[2+3]]' \
+        'legacy_command:echo $[1+$(printf 2)]' \
+        'assignment_valid:echo $((x=1+2))' \
+        'assignment_chain:echo $((x=y=2))' \
+        'array_assignment:echo $((a[1]=2))' \
+        'indirect_names:echo ${!x@}' \
+        'length_array:echo ${#a[@]}' \
+        'transform_valid:echo ${x@Q}'; do
+        label="${entry%%:*}"
+        encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+        audit27_case "audit27_s16_$label" allow ".tool_input.command = $encoded"
+        audit27_case "audit27_s16_${label}_shell" allow ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+    done
+    audit27_case audit27_s16_nested_child deny '.tool_input.command = "echo $(( $(cat .env) + 2 ))"'
+    audit27_case audit27_s16_nested_parameter_child deny '.tool_input.command = "echo $(( ${x:-$(cat .env)} + 2 ))"'
+    audit27_case audit27_s16_legacy_child deny '.tool_input.command = "echo $[1+$(cat .env)]"'
+    audit27_case audit27_s16_unquoted_legacy deny '.tool_input.command = "cat > notes.md <<TEXT\n$[1+]\nTEXT"'
+    audit27_case audit27_s16_quoted_legacy allow '.tool_input.command = ("printf %s " + ([39] | implode) + "$[1+]" + ([39] | implode))'
+    # Valid expansions and literal malformed-looking prose must keep allowing.
+    audit27_case audit27_s16_arithmetic_valid allow '.tool_input.command = "echo $((1 + 2 - 3))"'
+    audit27_case audit27_s16_arithmetic_zero allow '.tool_input.command = "echo $((0))"'
+    audit27_case audit27_s16_arithmetic_ternary allow '.tool_input.command = "echo $((x ? 1 : 2))"'
+    audit27_case audit27_s16_parameter_default allow '.tool_input.command = "echo ${x:-public}"'
+    audit27_case audit27_s16_parameter_array allow '.tool_input.command = "echo ${a[@]}"'
+    audit27_case audit27_s16_parameter_slice allow '.tool_input.command = "echo ${x:1:2}"'
+    audit27_case audit27_s16_parameter_nested allow '.tool_input.command = "echo ${x:-${y:-public}}"'
+    audit27_case audit27_s16_parameter_length allow '.tool_input.command = "echo ${#x}"'
+    audit27_case audit27_s16_parameter_replace allow '.tool_input.command = "echo ${x//old/new}"'
+    audit27_case audit27_s16_quoted_literal allow '.tool_input.command = "printf %s \u0027$((1+)) ${x!a} ${x[}\u0027"'
+    audit27_case audit27_s16_escaped_literal allow '.tool_input.command = "echo \\$\\(\\(1+\\)\\)"'
+    audit27_case audit27_s16_heredoc_literal allow '.tool_input.command = "cat > notes.md <<\u0027TEXT\u0027\n$((1+)) ${x!a} ${x[}\nTEXT"'
+    # Unquoted heredoc expansion is active even in quote-looking body text.
+    audit27_case audit27_s16_unquoted_parameter deny '.tool_input.command = "cat > notes.md <<TEXT\n${x!a}\nTEXT"'
+    audit27_case audit27_s16_unquoted_arithmetic deny '.tool_input.command = "cat > notes.md <<TEXT\n$((1+))\nTEXT"'
+    audit27_case audit27_s16_unquoted_quoted_parameter deny '.tool_input.command = "cat > notes.md <<TEXT\n\u0027${x!a}\u0027\nTEXT"'
+    audit27_case audit27_s16_unquoted_escaped allow '.tool_input.command = "cat > notes.md <<TEXT\n\\${x!a}\nTEXT"'
+}
+# Bound argv before preparation; ordinary empty and newline argv retain bytes.
+audit27_case audit27_s18_count_deadline deny '.tool_input.command = (["printf","%s"] + [range(4096) | "x"])'
+audit27_case audit27_s18_bytes_deadline deny '.tool_input.command = (["printf","%s"] + [range(200) | "public" * 100])'
+audit27_case audit27_s18_utf8_bytes deny '.tool_input.command = ["printf","%s",("é" * 5000)]'
+audit27_case audit27_s18_small allow '.tool_input.command = ["printf","%s","","public\n"]'
+audit27_case audit27_s18_protected deny '.tool_input.command = ["cat",".env"]'
+audit27_case audit27_s18_quoted_literal allow '.tool_input.command = ["printf","%s","cat .env"]'
+# Filesystem component limits are checked before any whole-string Bash match.
+audit27_case audit27_s19_read_deadline deny '.tool_name = "Read" | .tool_input = {file_path:("a" * 100000)}'
+audit27_case audit27_s19_write_deadline deny '.tool_name = "Write" | .tool_input = {file_path:("a" * 100000),content:"public"}'
+audit27_case audit27_s19_component_256 deny '.tool_name = "Read" | .tool_input = {file_path:("a" * 256)}'
+audit27_case audit27_s19_component_255 allow '.tool_name = "Read" | .tool_input = {file_path:("a" * 255)}'
+audit27_case audit27_s19_utf8_256 deny '.tool_name = "Read" | .tool_input = {file_path:("é" * 128)}'
+audit27_case audit27_s19_utf8_254 allow '.tool_name = "Read" | .tool_input = {file_path:("é" * 127)}'
+# Patch framing was a reviewed Go tightening. P22 now requires Bash to
+# reject the malformed inputs too; these expectations tighten, never loosen.
+audit27_case audit27_s22_public allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n+public\n*** End Patch"}'
+audit27_case audit27_s22_protected deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: .env\n+synthetic\n*** End Patch"}'
+audit27_case audit27_s22_config deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: .git/config\n+synthetic\n*** End Patch"}'
+label=0
+for input in null '[]' '"public"' '{}' '{"command":null}' '{"command":1}' '{"command":true}' '{"command":[]}' '{"command":{}}'; do
+    label=$(( ${label:-0} + 1 ))
+    audit27_case "audit27_s22_schema_$label" deny ".tool_name = \"apply_patch\" | .tool_input = $input"
+done
+for workdir in null false 1 '[]' '{}'; do
+    label=$((label + 1))
+    audit27_case "audit27_s22_workdir_$label" deny ".tool_name = \"apply_patch\" | .tool_input = {command:\"*** Begin Patch\\n*** Add File: public.txt\\n*** End Patch\",workdir:$workdir}"
+done
+audit27_case audit27_s22_missing_input deny '.tool_name = "apply_patch" | del(.tool_input)'
+audit27_case audit27_s22_empty deny '.tool_name = "apply_patch" | .tool_input = {command:""}'
+audit27_case audit27_s22_missing_begin deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Add File: public.txt\n*** End Patch"}'
+audit27_case audit27_s22_missing_end deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n+public"}'
+audit27_case audit27_s22_duplicate_end deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n*** End Patch\n*** End Patch"}'
+audit27_case audit27_s22_no_section deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** End Patch"}'
+audit27_case audit27_s22_empty_path deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: \n*** End Patch"}'
+audit27_case audit27_s22_ambiguous_header deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n*** Bogus: other.txt\n*** End Patch"}'
+audit27_case audit27_s22_data_after_end deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n*** End Patch\n+public"}'
+audit27_case audit27_s22_two_final_newlines deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n*** End Patch\n\n"}'
+audit27_case audit27_s22_final_newline allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n*** End Patch\n"}'
+audit27_case audit27_s22_move_without_update deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Move to: public.txt\n*** End Patch"}'
+audit27_case audit27_s22_move allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n*** Move to: other.txt\n*** End Patch"}'
+audit27_case audit27_s22_oversized deny '.tool_name = "apply_patch" | .tool_input = {command:("*** Begin Patch\n*** Add File: public.txt\n+" + ("p" * 40960) + "\n*** End Patch")}'
+audit27_case audit27_s22_bounded_body allow '.tool_name = "apply_patch" | .tool_input = {command:("*** Begin Patch\n*** Add File: public.txt\n+" + ("p" * 40000) + "\n*** End Patch")}'
+audit27_case audit27_s22_crlf allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\r\n*** Add File: public.txt\r\n*** End Patch\r\n"}'
+# End of File closes an update hunk, but is neither a path nor End Patch.
+audit27_case audit27_s22_update_eof allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n-old\n+new\n*** End of File\n*** End Patch"}'
+audit27_case audit27_s22_update_eof_next allow '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n-old\n+new\n*** End of File\n*** Add File: other.txt\n+public\n*** End Patch\n"}'
+audit27_case audit27_s22_update_eof_protected deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: .env\n@@\n-old\n+new\n*** End of File\n*** End Patch"}'
+audit27_case audit27_s22_eof_no_hunk deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n*** End of File\n*** End Patch"}'
+audit27_case audit27_s22_eof_add deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Add File: public.txt\n+public\n*** End of File\n*** End Patch"}'
+audit27_case audit27_s22_eof_after_end deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n+public\n*** End Patch\n*** End of File"}'
+audit27_case audit27_s22_eof_duplicate deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n+public\n*** End of File\n*** End of File\n*** End Patch"}'
+audit27_case audit27_s22_eof_more_body deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n+public\n*** End of File\n+other\n*** End Patch"}'
+audit27_case audit27_s22_eof_missing_end deny '.tool_name = "apply_patch" | .tool_input = {command:"*** Begin Patch\n*** Update File: public.txt\n@@\n+public\n*** End of File"}'
+# A focused audit27 filter runs this block only, not historical suites.
+if [[ "${SECRET_TEST_FILTER:-}" == audit27_* ]]; then
+    printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
+    [[ "$FAILED" -eq 0 ]]
+    exit
+fi
+
 # manifest_case NAME COMMAND [ARGS]: record a manifest assertion.
 manifest_case() {
     local name="$1"
@@ -183,10 +372,10 @@ patch_case ordinary_patch allow '*** Begin Patch
 +test
 *** End Patch'
 patch_case malformed_named deny '*** Add File: .env'
-patch_case malformed_safe allow '*** Add File: src/app.ts'
+patch_case malformed_safe deny '*** Add File: src/app.ts'
 patch_case oversized_named deny "$(printf 'x%.0s' {1..9000})
 *** Delete File: .env"
-patch_case oversized_safe allow "$(printf 'x%.0s' {1..9000})
+patch_case oversized_safe deny "$(printf 'x%.0s' {1..9000})
 *** Update File: src/app.ts"
 shell_case audit13_tail_flag deny '"tail -f .env"'
 shell_case audit13_php_info deny '"php -i"'

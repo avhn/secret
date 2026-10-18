@@ -173,11 +173,7 @@ func (a *analyzer) cwdUnion(groups ...[]string) []string {
 	for _, group := range groups {
 		for _, dir := range group {
 			if dir != "" {
-				if physical, err := filepath.EvalSymlinks(dir); err == nil {
-					dir = physical
-				} else {
-					dir = filepath.Clean(dir)
-				}
+				dir = a.canonicalCWD(dir)
 			}
 			if !seen[dir] {
 				seen[dir] = true
@@ -190,6 +186,30 @@ func (a *analyzer) cwdUnion(groups ...[]string) []string {
 		return nil
 	}
 	return result
+}
+
+// Branch success/failure joins repeatedly canonicalize the same directories.
+// Retain the existing physical-or-clean result for this analysis, including
+// failed lookups. Key the raw spelling so symlink/.. paths remain distinct.
+func (a *analyzer) canonicalCWD(dir string) string {
+	if canonical, ok := a.cwdPaths[dir]; ok {
+		return canonical
+	}
+	check := a.cwdPathCheck
+	if check == nil {
+		check = filepath.EvalSymlinks
+	}
+	canonical, err := check(dir)
+	if err != nil {
+		canonical = filepath.Clean(dir)
+	}
+	if a.cwdPaths == nil {
+		a.cwdPaths = make(map[string]string)
+	}
+	if len(a.cwdPaths) < 4096 {
+		a.cwdPaths[dir] = canonical
+	}
+	return canonical
 }
 
 func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) cwdFlow {

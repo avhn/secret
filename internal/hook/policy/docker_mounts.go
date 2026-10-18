@@ -1,8 +1,13 @@
 package policy
 
 import (
+	"maps"
+	"path"
+	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -15,6 +20,24 @@ const dockerDataOptions = "--label -l --env -e --env-file --name --hostname -h -
 	"--stop-timeout --tmpfs --context --config --host -H --tlskey --tlscert --tlscacert " +
 	"--opt -o"
 
+// dockerOption finds the value-taking short option inside a cluster. Flags
+// before it do not consume operands; the remaining suffix is its value.
+func dockerOption(arg string) (key, value string, attached bool) {
+	if !strings.HasPrefix(arg, "-") {
+		return arg, "", false
+	}
+	if strings.HasPrefix(arg, "--") {
+		return strings.Cut(arg, "=")
+	}
+	for i := 1; i < len(arg); i++ {
+		key = "-" + arg[i:i+1]
+		if optionIn(dockerDataOptions+" -v", key) {
+			return key, strings.TrimPrefix(arg[i+1:], "="), i+1 < len(arg)
+		}
+	}
+	return arg, "", false
+}
+
 // uncertainDockerMount checks uncertainty in mount inputs, not unrelated label,
 // message or env-file data. Known inputs still undergo the normal path checks.
 func uncertainDockerMount(operands []expandedOperand, knownCWD bool) bool {
@@ -25,8 +48,11 @@ func uncertainDockerMount(operands []expandedOperand, knownCWD bool) bool {
 		if !operand.known {
 			value = declarationPrefix(operand.source.Parts)
 		}
-		if operand.known && optionIn(dockerDataOptions, value) {
-			i++ // The next field is data, even when it starts with a mount option.
+		key, _, attached := dockerOption(value)
+		if operand.known && optionIn(dockerDataOptions, key) {
+			if !attached {
+				i++ // The next field is data, even when it starts with a mount option.
+			}
 			continue
 		}
 		if operand.known && value == "--" {
@@ -39,12 +65,12 @@ func uncertainDockerMount(operands []expandedOperand, knownCWD bool) bool {
 		if !strings.HasPrefix(value, "-") {
 			break // The image/service and its command operands are not host options.
 		}
-		volume := value == "-v" || strings.HasPrefix(value, "-v") && !strings.HasPrefix(value, "--") || value == "--volume" || strings.HasPrefix(value, "--volume=")
-		mount := value == "--mount" || strings.HasPrefix(value, "--mount=")
+		volume := optionIn("-v --volume", key)
+		mount := key == "--mount"
 		if !volume && !mount {
 			continue
 		}
-		if operand.known && optionIn("-v --volume --mount", value) {
+		if operand.known && !attached {
 			i++
 			if i >= len(operands) {
 				return true
@@ -56,6 +82,138 @@ func uncertainDockerMount(operands []expandedOperand, knownCWD bool) bool {
 		}
 	}
 	return false
+}
+
+type dockerBind struct{ source, target string }
+
+// dockerBindReaders retains container-to-host aliases while the ordinary child
+// dispatcher classifies reader operands. It never opens mount or reader inputs.
+func (a *analyzer) dockerBindReaders(args []string, depth int, cwd string) {
+	// Global options precede the action; their values are not action words.
+	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+		key, _, attached := dockerOption(args[0])
+		args = args[1:]
+		if !attached && optionIn(dockerDataOptions, key) {
+			if len(args) == 0 {
+				a.reason = roles.Indeterminate
+				return
+			}
+			args = args[1:]
+		}
+	}
+	if len(args) == 0 || !optionIn("run create", args[0]) {
+		return
+	}
+	args = args[1:]
+	containerCWD := "/"
+	var binds []dockerBind
+	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+		arg := args[0]
+		args = args[1:]
+		if arg == "--" {
+			break
+		}
+		key, value, attached := dockerOption(arg)
+		if !optionIn(dockerDataOptions+" -v --volume --mount --pull", key) {
+			continue
+		}
+		if !attached {
+			if len(args) == 0 {
+				a.reason = roles.Indeterminate
+				return
+			}
+			value, args = args[0], args[1:]
+		}
+		if optionIn("-w --workdir", key) {
+			containerCWD = path.Join("/", value)
+			continue
+		}
+		var source, target string
+		if optionIn("-v --volume", key) {
+			source, target = dockerVolumePaths(value)
+			// A named Docker volume is not a host bind source.
+			if !filepath.IsAbs(source) && !strings.HasPrefix(source, ".") && !strings.HasPrefix(source, "~/") {
+				continue
+			}
+		} else if key == "--mount" {
+			kind := ""
+			for _, field := range strings.Split(value, ",") {
+				fieldKey, fieldValue, _ := strings.Cut(field, "=")
+				switch fieldKey {
+				case "type":
+					kind = fieldValue
+				case "src", "source":
+					source = fieldValue
+				case "dst", "destination", "target":
+					target = fieldValue
+				}
+			}
+			if kind != "bind" || source == "" {
+				// No host source was supplied to this option. Do not borrow
+				// CSV fields from later argv words after brace expansion.
+				continue
+			}
+		} else {
+			continue
+		}
+		if source == "" || !path.IsAbs(target) {
+			a.reason = roles.Indeterminate
+			return
+		}
+		if a.inputProtected(source, cwd) {
+			a.reason = roles.FileInput
+			return
+		}
+		binds = append(binds, dockerBind{a.resolve(source, cwd), path.Clean(target)})
+	}
+	if len(binds) == 0 || len(args) < 2 {
+		return
+	}
+	probe := *a
+	probe.env = maps.Clone(a.env)
+	probe.credentialConfigs = slices.Clone(a.credentialConfigs)
+	probe.interpreterNames = nil // Host-path literal proofs do not certify container aliases.
+	probe.protected = func(name, childCWD string) bool {
+		containerPath := name
+		if !path.IsAbs(containerPath) {
+			containerPath = path.Join(childCWD, containerPath)
+		}
+		containerPath = path.Clean(containerPath)
+		best := -1
+		for i, bind := range binds {
+			if (containerPath == bind.target || strings.HasPrefix(containerPath, strings.TrimSuffix(bind.target, "/")+"/")) && (best < 0 || len(bind.target) >= len(binds[best].target)) {
+				best = i
+			}
+		}
+		if best >= 0 {
+			bind := binds[best]
+			suffix := strings.TrimPrefix(strings.TrimPrefix(containerPath, bind.target), "/")
+			return a.inputProtected(filepath.Join(bind.source, filepath.FromSlash(suffix)), cwd)
+		}
+		return a.protected(name, childCWD)
+	}
+	probe.command(args[1:], depth+1, containerCWD, false)
+	a.words, a.globs, a.flowSteps = probe.words, probe.globs, probe.flowSteps
+	a.uncertain = a.uncertain || probe.uncertain
+	a.structuralUncertain = a.structuralUncertain || probe.structuralUncertain
+	if probe.reason != "" {
+		a.reason = probe.reason
+	}
+}
+
+// A Windows host drive's colon is part of the source, not the mount separator.
+func dockerVolumePaths(value string) (string, string) {
+	start := 0
+	if len(value) > 2 && value[1] == ':' && (value[2] == '/' || value[2] == '\\') {
+		start = 2
+	}
+	index := strings.IndexByte(value[start:], ':')
+	if index < 0 {
+		return "", ""
+	}
+	index += start
+	target, _, _ := strings.Cut(value[index+1:], ":")
+	return value[:index], target
 }
 
 // cwdVolumeWord recognizes the existing cwd-only Docker volume idioms without
@@ -70,8 +228,11 @@ func cwdVolumeWord(word *syntax.Word) bool {
 		}
 	}
 	if len(parts) > 0 {
-		if prefix, ok := parts[0].(*syntax.Lit); ok && optionIn("-v --volume=", prefix.Value) {
-			parts = parts[1:]
+		if prefix, ok := parts[0].(*syntax.Lit); ok {
+			key, value, attached := dockerOption(prefix.Value)
+			if value == "" && (key == "-v" || key == "--volume" && attached) {
+				parts = parts[1:]
+			}
 		}
 	}
 	if len(parts) < 2 {

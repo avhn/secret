@@ -3,6 +3,7 @@ package hook
 import (
 	"encoding/json"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/input"
@@ -27,6 +28,19 @@ func bashDecision(e input.Envelope, cwd string, _ func(string) bool) string {
 	if raw := e.Fields["command"]; len(raw) != 0 && raw[0] == '[' {
 		var argv []string
 		if json.Unmarshal(raw, &argv) != nil {
+			return "command too complex to analyse for secret access; split it or use secret run"
+		}
+		// Match the retained guard's decoded argv preparation budget. Explicit
+		// shell source keeps its separate multiline/heredoc allowance.
+		limit := 8192
+		if len(argv) >= 3 && (path.Base(argv[0]) == "bash" || path.Base(argv[0]) == "sh") && (argv[1] == "-c" || argv[1] == "-lc") {
+			limit = (1 << 20) + 256
+		}
+		bytes := 0
+		for _, arg := range argv {
+			bytes += len(arg) + 1
+		}
+		if len(argv) > 256 || bytes > limit {
 			return "command too complex to analyse for secret access; split it or use secret run"
 		}
 		return policy.AnalyzeArgv(argv, cwdFor(e, cwd), home, check)

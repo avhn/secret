@@ -59,9 +59,6 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 	case "Glob":
 		reason = search.ToolGlob(e.String("path"), cwd, os.Getenv("HOME"))
 	case "apply_patch":
-		if host != "codex" {
-			break
-		}
 		reason = patch.Decision(e.String("command"), cwd, workdir, os.Getenv("HOME"))
 	case "Grep":
 		if host != "claude" {

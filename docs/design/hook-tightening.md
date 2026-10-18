@@ -134,7 +134,7 @@ indeterminate-input or audited input/output policy tightening.
 | `audit-arithmetic-unknown`                                                                                                                                                         | deliberate-tightening | `(( $(cat file) ))` contains a content-producing substitution and cannot be certified from arithmetic syntax.                                                                                |
 | `audit-cases5-6`                                                                                                                                                                   | deliberate-tightening | Ripgrep names mode with `--pre cat` invokes a content-producing child and cannot use the names-only shortcut.                                                                                |
 | `audit-cases7-2`                                                                                                                                                                   | deliberate-tightening | A symlinked ancestor can reach an actual credential file before `..`; a final-symlink alias exception cannot certify that input.                                                             |
-| `malformed_safe`, `oversized_safe`                                                                                                                                                 | deliberate-tightening | An absent framing pair, ambiguous header, or patch above the 40 KiB limit cannot certify safe target paths. Recognized protected headers deny even without framing.                          |
+| `audit27_s4_preanalysis_deadline` | deliberate-find-shim | Injected stalled jq denies in Bash; Go has no jq subprocess and checks deadlines independently. Applies to both adapters. |
 | `active_safe_command`                                                                                                                                                              | deliberate-tightening | `$c package.json` does not establish the executable or its input and output roles.                                                                                                           |
 | `deep_safe`                                                                                                                                                                        | deliberate-tightening | Six nested `shell -c` layers exceed the Go analysis depth and deny.                                                                                                                          |
 | `audit6_sed_comment`, `audit6_sed_text_line`, `audit6_sed_insert_line`, `audit6_sed_change_line`                                                                                   | deliberate-tightening | GNU sed reads these as a comment or as a/i/c text, so Bash allows them; Go denies any script whose later commands follow a comment or text command on one line.                              |
@@ -1367,3 +1367,67 @@ controls. Tests analyze candidate source only, with synthetic metadata and a fak
 HOME. Bash R1 coverage is retained in `tests/test-guard.sh` and
 `tests/test-codex.sh`. Existing expectations are unchanged. Synthetic checks do
 not establish installed-host protection or native macOS/Windows behavior.
+
+## Confirmation audit 27: bounded source roles, launch provenance and framing
+
+All evidence is synthetic JSON supplied to guards, never executed candidate code.
+Existing two-second Go analysis and Bash phase/overall budgets remain unchanged.
+The cwd-resolution cache and BSD wc correction predate this integration and are
+preserved. Applicable platform CI and installed-host failure checks remain gates.
+
+- S0/S1: normalize qualified Deno constructors and reject missing required
+  interpreter operands. Empty source, optional Perl -F and LuaJIT -O values,
+  script boundaries and ordinary argv data keep their roles.
+- S2/S21: validate decoded tool-name controls before extraction and unsupported
+  dispatch. Genuine unsupported names still allow; malformed names deny.
+- S3/S17: protect Git configuration directory equality, including linked gitdirs,
+  and share XDG prefix normalization for file tools, with the HOME fallback and
+  effective write-classifier overrides. This is policy parity, not host expansion.
+- S4: linear CRLF normalization and alarm-bounded preprocessing share the overall
+  deadline. Near-cap inert writer bodies retain their multiline allowance.
+- S5/S6: literal PHP proc_open cwd (including case-insensitive function names)
+  and Node/Bun cwd options anchor child argv and shell-string reads. Child state
+  does not affect siblings. Public launches retain existing parent-cwd checks.
+- S7/S8: file-backed xargs provenance reaches the unwrapped child. Metadata-only
+  exemptions remain. Pipeline recipients replace inherited stdin provenance,
+  without dropping explicit recipient redirects or uncertain producer checks.
+- S9/S10: UV and systemd-run select the actual child with option arities and
+  child-local directories; attached short values and UV --only-group are data.
+- S11: Docker volume/mount mappings translate reader operands to protected host
+  paths, including workdirs, short clusters and mount precedence. Public project
+  mounts and env-file consumers still allow. Split CSV fields from brace
+  expansion never become a mount source supplied in a later argv word.
+- S12/S13: complete assignment nodes expose array/index substitutions. Bounded
+  unquoted scalar field splitting precedes dispatch and globs. Empty IFS is
+  known separately from unknown values; comments and literal IFS text are inert.
+  IFS assignment proofs use the nested shell's source positions, not offsets in
+  the outer quoted command argument. Child-shell IFS state and proofs do not
+  escape into later parent commands. Unknown and indirect mutations still deny.
+- S14/S16: validate Bash function/time framing, including the time -- terminator,
+  arithmetic operand roles and parameter operators without evaluation. Nested
+  expansion operands and valid standalone time remain supported. Constant
+  increments deny in Go as well as Bash; protected nested children still deny.
+- S15: unterminated recognized executable literals carry indeterminate status and
+  remain budgeted, including Python strings. Script/data arguments keep path
+  witnesses without being rejected as malformed executable source.
+- S18/S19: cap decoded argv count/UTF-8 bytes before preparation and file-tool
+  path/component bytes before matching. Both Go adapters match the argv caps;
+  explicit shell source retains the existing multiline/heredoc allowance.
+- S20 differential record: Bash now certifies bounded harmless literal nested
+  eval, matching Go rather than copying a safe-command over-denial into Go.
+  Protected reads, unresolved source, caller-state mutations in Bash and excessive
+  depth still deny. Go may track literal cwd effects precisely; subsequent
+  protected reads deny. These paired controls create no remaining divergence row.
+- S22 differential record: Bash now rejects malformed patch framing, section/move
+  order and mistyped workdirs. Remove the former `malformed_safe`/`oversized_safe`
+  exception from the exact divergence inventory. Both Go adapters check patch
+  framing and accept End of File only within a completed update hunk, retaining
+  malformed, protected-target and post-marker denials.
+
+Permanent coverage is in audit27 Go policy, paths, patch and adapter tests,
+plus the audit27_ shell cases. Tests retain must-allow data arguments, optional
+operands, public pipelines, empty IFS and valid EOF markers as well as denials.
+The denied-corpus callback now matches the production lexical-store check before
+its missing-bare-operand exception, retaining all regenerated nested-eval variants.
+`audit27_s4_preanalysis_deadline` is the only new injected-dependency distinction;
+it is named above and is not a Go-looser policy outcome.

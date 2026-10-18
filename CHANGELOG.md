@@ -4,6 +4,29 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Close confirmation audit 27 guard differences with bounded interpreter source
+  roles, qualified Deno constructors, case-insensitive PHP launches and literal
+  PHP/Node/Bun child directories. Reject missing required interpreter operands
+  and unterminated executable literals without treating script arguments as code.
+  Retain optional Perl -F and LuaJIT -O operands and ordinary quoted data.
+- Carry xargs filename-input provenance through wrappers and redirects, replacing
+  inherited stdin provenance at pipeline recipients. Model UV and systemd-run
+  child directories and Docker directory-bind reader aliases, including short
+  option clusters, while retaining public mounts and env-file consumers.
+- Inspect full array assignments and bounded unquoted field splitting, including
+  known empty IFS, without treating inert IFS text as a mutation. Validate Bash
+  function, time-pipeline and arithmetic increment framing in Go. Protect Git
+  directory destinations and share XDG file-tool path normalization.
+- Bound Bash CRLF normalization, preprocessing, decoded argv and file-tool paths
+  before expensive analysis. Reject control-bearing tool names and malformed
+  arithmetic, parameter expansions and patch envelopes. Certify harmless literal
+  recursive eval without execution, retaining protected, dynamic and depth-limit
+  denials. Validate patch EOF markers in update hunks on both Go adapters and
+  reconcile the former Bash malformed-patch exception. Keep existing deadlines.
+- Retain the per-analysis Go cwd-resolution cache and normalize BSD wc padding in
+  synthetic guard-context checks. Refresh inventories and denied-command metadata;
+  native platform CI and installed-host evidence remain separate release gates.
+
 - Probe each Bash Git write-target candidate once and cache Git-path anchor
   context per decision, removing duplicate metadata work that exhausted the
   shared deadline on stock macOS Bash 3.2 for Ruby interpolated-regex literals.

@@ -158,7 +158,7 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 			if ch == '`' && javascriptInterpreter(name) && strings.Contains(value.String(), "${") {
 				known = false
 			}
-			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, witness: closed, shell: shell, expressions: expressions})
+			tokens = append(tokens, interpreterToken{text: value.String(), literal: known && closed, witness: closed, shell: shell, indeterminate: !closed, expressions: expressions})
 			continue
 		}
 		start := i
@@ -352,6 +352,10 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 		if dot := strings.LastIndexAny(name, ".:"); dot >= 0 {
 			name = name[dot+1:]
 		}
+		if language == "php" {
+			// PHP function names are case-insensitive, unlike JavaScript members.
+			name = strings.ToLower(name)
+		}
 		start := i + 2
 		if language == "ruby" && optionIn("system exec spawn", name) {
 			statement := tokens[i+1].literal || tokens[i+1].text != "("
@@ -366,7 +370,7 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			}
 			start = i + 2
 		}
-		if javascriptInterpreter(language) && tokens[i].text == "Deno.Command" && !tokens[i+1].literal && tokens[i+1].text == "(" {
+		if javascriptInterpreter(language) && (tokens[i].text == "Deno.Command" || strings.HasSuffix(tokens[i].text, ".Deno.Command")) && !tokens[i+1].literal && tokens[i+1].text == "(" {
 			for _, words := range constructorArguments(tokens, start) {
 				if a.literalCommandProtected(words, cwd, true) {
 					return true
@@ -391,15 +395,22 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 		}
 		// These APIs accept a shell-command literal as their first argument.
 		// Later options or callbacks do not change that literal witness.
-		shellAPI := optionIn("run call check_call check_output Popen system exec execSync", name)
+		shellAPI := optionIn("run call check_call check_output Popen system exec execSync", name) || language == "php" && name == "proc_open"
 		if pythonInterpreter(language) {
 			// Python exec evaluates Python source; os.popen launches a shell.
 			shellAPI = name != "exec" && (shellAPI || name == "popen")
 		}
 		if shellAPI && tokens[start].literal && start+1 < len(tokens) && !tokens[start+1].literal && optionIn(", )", tokens[start+1].text) {
 			shell := !optionIn("system exec", name) || optionIn("node nodejs", language) || tokens[start+1].text == ")"
-			if shell && a.literalShellProtected(tokens[start].text, cwd) {
-				return true
+			if shell {
+				if a.literalShellProtected(tokens[start].text, cwd) {
+					return true
+				}
+				for _, dir := range a.interpreterLaunchCwds(tokens, start, name, language, cwd) {
+					if a.literalShellProtected(tokens[start].text, dir) {
+						return true
+					}
+				}
 			}
 		}
 		switch name {
@@ -434,8 +445,15 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 				words, _, known = literalArguments(tokens, start, ")")
 			}
 		}
-		if known && a.literalCommandProtected(words, cwd, true) {
-			return true
+		if known {
+			if a.literalCommandProtected(words, cwd, true) {
+				return true
+			}
+			for _, dir := range a.interpreterLaunchCwds(tokens, start, name, language, cwd) {
+				if a.literalCommandProtected(words, dir, true) {
+					return true
+				}
+			}
 		}
 	}
 	return false

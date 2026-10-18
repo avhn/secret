@@ -64,7 +64,7 @@ func pythonLiteralToken(code string, start int) (interpreterToken, int, bool) {
 		value.WriteByte(ch)
 		i++
 	}
-	return interpreterToken{text: value.String()}, i, true
+	return interpreterToken{text: value.String(), indeterminate: true}, i, true
 }
 
 // Escape rules differ from Go: Python permits escaped opposite quotes, one to

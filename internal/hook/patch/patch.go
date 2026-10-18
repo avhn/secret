@@ -25,6 +25,7 @@ func Decision(text, cwd, workdir, home string) string {
 	lines := strings.Split(text, "\n")
 	started, ended, section, moved, invalid := false, false, false, false, false
 	kind := ""
+	hunk, eof := false, false
 	for i, line := range lines {
 		if strings.HasSuffix(line, "\r") {
 			line = strings.TrimSuffix(line, "\r")
@@ -58,7 +59,7 @@ func Decision(text, cwd, workdir, home string) string {
 				invalid = true
 			}
 			if prefix == "*** Move to: " {
-				if kind != "*** Update File: " || moved {
+				if kind != "*** Update File: " || moved || hunk || eof {
 					invalid = true
 				}
 				moved = true
@@ -66,13 +67,22 @@ func Decision(text, cwd, workdir, home string) string {
 				kind = prefix
 				section = true
 				moved = false
+				hunk, eof = false, false
 			}
+		case line == "*** End of File":
+			if !started || ended || kind != "*** Update File: " || !hunk || eof {
+				invalid = true
+			}
+			eof = true
 		case strings.HasPrefix(line, "***"):
 			invalid = true
 		default:
 			// One final newline after End Patch is harmless.
-			if !started || !section || ended && !(i == len(lines)-1 && line == "") {
+			if !started || !section || (ended || eof) && !(ended && i == len(lines)-1 && line == "") {
 				invalid = true
+			}
+			if kind == "*** Update File: " && (line == "@@" || strings.HasPrefix(line, "@@ ")) {
+				hunk = true
 			}
 		}
 	}

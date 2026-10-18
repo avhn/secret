@@ -268,13 +268,16 @@ func TestGuardDeniedCorpus(t *testing.T) {
 			t.Setenv("RIPGREP_CONFIG_PATH", replace.Replace(tc.Config))
 			t.Setenv("KUBECONFIG", replace.Replace(tc.Kubeconfig))
 			home := replace.Replace(tc.Home)
+			metadata := new(paths.Metadata)
 			check := func(name, dir string) bool {
-				if !strings.Contains(name, "/") {
+				// Match the host callback: lexical store names remain protected
+				// before the ordinary missing-bare-operand exception.
+				if !strings.Contains(name, "/") && !metadata.LexicalProtected(name, dir, home) {
 					if _, err := os.Lstat(paths.Resolve(name, dir, "", home)); os.IsNotExist(err) {
 						return false
 					}
 				}
-				return paths.Protected(name, dir, "", home)
+				return metadata.Protected(name, dir, "", home)
 			}
 			for i, decision := range replayCorpus(t, tc, replace, check) {
 				count++

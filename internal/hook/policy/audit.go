@@ -275,8 +275,14 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 	if interpreter(name) || name == "sed" || name == "vim" || name == "vi" || name == "nvim" || name == "ex" {
 		codeArgs := args
 		if interpreter(name) {
-			codeArgs = interpreterCodeArgs(name, args)
+			var complete bool
+			codeArgs, complete = interpreterCodeArgsComplete(name, args)
+			if !complete {
+				a.reason = roles.Indeterminate
+				return true
+			}
 		}
+		sourceArgs := interpreterSourceArgs(name, codeArgs)
 		skip := 0
 		for i, code := range codeArgs {
 			if skip > 0 {
@@ -294,7 +300,7 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 				a.reason = roles.Printer
 				return true
 			}
-			if name != "jq" && name != "yq" && (a.interpreterProtected(code, cwd) || interpreter(name) && a.executableInterpreterProtected(code, cwd, name)) {
+			if name != "jq" && name != "yq" && (a.interpreterProtected(code, cwd) || interpreter(name) && a.interpreterArgumentProtected(code, cwd, name, sourceArgs[i])) {
 				a.reason = roles.FileInput
 				return true
 			}

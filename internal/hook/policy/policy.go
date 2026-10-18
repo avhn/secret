@@ -92,6 +92,8 @@ type analyzer struct {
 	literalFallback     bool // Unidentified source strings are not unknown launcher slots.
 	literalDepth        int
 	metadata            *paths.Metadata
+	cwdPaths            map[string]string
+	cwdPathCheck        func(string) (string, error)
 	interpreterNames    map[interpreterName]bool
 	configWrites        map[[4]string]bool
 	configWriteCheck    func(name, cwd, workdir, home, xdg, global string) bool
@@ -116,9 +118,13 @@ type analyzer struct {
 	gitRoots            []string
 	source              string
 	assignments         map[string]int
+	ifsModified         bool
+	ifsEmpty            bool
+	ifsSource           string
 	loopVars            map[string]string
 	messageSubst        bool
 	xargsIDs            bool
+	filenameStdin       bool // File-supplied xargs operands cannot borrow a clean cwd proof.
 	heredoc             map[*syntax.Word]string
 	cdpath              bool
 	indirect            bool
@@ -186,7 +192,7 @@ func (a *analyzer) fragment(source string, depth int) {
 		return
 	}
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(source), "")
-	if err != nil {
+	if err != nil || !bashFraming(file) {
 		// A failed parse has no operand roles that could certify an allow.
 		a.reason = roles.Indeterminate
 		return
@@ -213,6 +219,7 @@ func (a *analyzer) fragment(source string, depth int) {
 			return
 		}
 	}
+	a.noteIFS(file, source)
 	a.stmts(file.Stmts, depth, a.cwd)
 }
 
@@ -221,13 +228,18 @@ func (a *analyzer) fragment(source string, depth int) {
 func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) string {
 	for _, stmt := range stmts {
 		prior := a.interpreterInputs
+		priorFilenameStdin := a.filenameStdin
 		for _, redirect := range stmt.Redirs {
+			if stdinRedirect(redirect) {
+				a.filenameStdin = true
+			}
 			if redirect.Hdoc != nil || redirect.Op == syntax.WordHdoc {
 				a.interpreterInputs = append(a.interpreterInputs, interpreterInput{redirect: redirect, cwd: cwd})
 			}
 		}
 		cwd = a.singleStmtInput([]*syntax.Stmt{stmt}, depth, cwd)
 		a.interpreterInputs = prior
+		a.filenameStdin = priorFilenameStdin
 		if a.reason != "" {
 			break
 		}
@@ -332,7 +344,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					}
 					if assign.Append {
 						a.hookAppend(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
-					} else if assign.Value != nil {
+					} else if assign.Value != nil || assign.Name.Value == "IFS" && assign.Array == nil && assign.Index == nil {
 						a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 					}
 				}
@@ -356,7 +368,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			}
 			if len(cmd.Args) == 0 {
 				for _, assign := range cmd.Assigns {
-					if assign.Name != nil && !assign.Append && literal(assign.Value) != "" {
+					if assign.Name != nil && !assign.Append && (literal(assign.Value) != "" || assign.Name.Value == "IFS" && assign.Array == nil && assign.Index == nil && emptyLiteralWord(assign.Value)) {
 						if a.assignments == nil {
 							a.assignments = make(map[string]int)
 						}
@@ -364,12 +376,12 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					}
 				}
 				for _, assign := range cmd.Assigns {
-					a.walkWord(assign.Value, depth, cwd)
+					a.walkNode(assign, depth, cwd)
 				}
 				continue
 			}
 			for _, assign := range cmd.Assigns {
-				a.walkWord(assign.Value, depth, cwd)
+				a.walkNode(assign, depth, cwd)
 			}
 			if len(cmd.Args) > 1 && path.Base(literal(cmd.Args[0])) == "secret" && literal(cmd.Args[1]) == "run" {
 				for i, w := range cmd.Args {
@@ -489,7 +501,15 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					}
 				}
 				if len(args) == 1 && args[0] != "-" && !unknown && !a.cdpath && cwd != "" && name == "cd" && !strings.HasPrefix(args[0], "~") {
-					cwd = a.resolve(args[0], cwd)
+					target := a.resolve(args[0], cwd)
+					// Keep a gitfile target protected after leaving its worktree.
+					if a.configPath(args[0], cwd) {
+						root := a.canonicalCWD(target)
+						if !slices.Contains(a.gitRoots, root) {
+							a.gitRoots = append(a.gitRoots, root)
+						}
+					}
+					cwd = target
 				} else {
 					cwd = ""
 					a.uncertain = true
@@ -552,7 +572,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 						continue
 					}
-					if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd, name) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+					if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterArgumentProtected(code, cwd, name, false) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 						a.reason = "interpreter argument names a protected file or credential operation"
 						break
 					}
@@ -591,18 +611,18 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				prior := a.xargsIDs
 				a.xargsIDs = true
-				a.pipelineRecipient(cmd, depth, cwd)
+				a.filenamePipelineRecipient(cmd, depth, cwd)
 				a.xargsIDs = prior
 				break
 			}
 			if cmd.Op.String() == "|" && inertMessageStdin(cmd.Y) && inertMessagePipe(cmd.X) {
-				a.pipelineRecipient(cmd, depth, cwd)
+				a.filenamePipelineRecipient(cmd, depth, cwd)
 				break
 			}
 			if cmd.Op.String() == "|" && dockerPIDPipe(cmd.X, cmd.Y) {
 				a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
 				a.xargsIDs = true
-				a.pipelineRecipient(cmd, depth, cwd)
+				a.filenamePipelineRecipient(cmd, depth, cwd)
 				a.xargsIDs = false
 				break
 			}
@@ -612,7 +632,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			}
 			if a.inRun && cmd.Op.String() == "|" && commandName(cmd.X) == "printf" && commandName(cmd.Y) == "curl" && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
-				a.pipelineRecipient(cmd, depth, cwd)
+				a.filenamePipelineRecipient(cmd, depth, cwd)
 				break
 			}
 			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
@@ -626,7 +646,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					if reason := roles.PrinterReason(decl.Variant.Value, nil, true); reason != "" {
 						a.reason = reason
 					}
-					a.pipelineRecipient(cmd, depth, cwd)
+					a.filenamePipelineRecipient(cmd, depth, cwd)
 					break
 				}
 			}
@@ -637,7 +657,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			if cmd.Op.String() == "|" && credentialSink(cmd.Y) && !stdoutRedirect(cmd.X) {
 				a.printerPipe(cmd.X, depth, cwd)
 				if a.reason == "" {
-					a.pipelineRecipient(cmd, depth, cwd)
+					a.filenamePipelineRecipient(cmd, depth, cwd)
 				}
 			} else {
 				leftCWD := a.stmts([]*syntax.Stmt{cmd.X}, depth, cwd)
@@ -646,16 +666,16 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 						leftCWD = joinedCWD(cwd, leftCWD)
 					}
 					if cmd.Op.String() == "||" && leftCWD != cwd && cwd != "" {
-						a.pipelineRecipient(cmd, depth, cwd)
+						a.filenamePipelineRecipient(cmd, depth, cwd)
 					}
-					rightCWD := a.pipelineRecipient(cmd, depth, leftCWD)
+					rightCWD := a.filenamePipelineRecipient(cmd, depth, leftCWD)
 					if cmd.Op.String() == "&&" {
 						cwd = rightCWD
 					} else {
 						cwd = joinedCWD(cwd, rightCWD)
 					}
 				} else {
-					a.pipelineRecipient(cmd, depth, cwd)
+					a.filenamePipelineRecipient(cmd, depth, cwd)
 				}
 			}
 		case *syntax.Subshell:
@@ -1201,6 +1221,9 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 	}
+	if name == "uv" && a.uvRunChild(args, depth, cwd, direct) {
+		return
+	}
 	if a.packageExec(name, args, depth, cwd, direct) || a.audit13Printer(name, args, cwd) {
 		return
 	}
@@ -1310,6 +1333,11 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if _, ok := utilityTable[name]; ok {
+		if name == "systemd-run" {
+			// Child cwd modeling adds protection without dropping the launcher's
+			// existing positive findings in opaque option values.
+			a.unknownExecution(args, depth, cwd)
+		}
 		child, dir, shell := a.utilityChild(name, args, cwd)
 		if name == "sudo" {
 			// sudo assignments belong to its child, not the calling shell.
@@ -1322,7 +1350,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		if a.reason == "" && name == "xargs" && !a.xargsIDs && !xargsHasArgFile(args) && !(len(child) > 0 && strings.EqualFold(path.Base(child[0]), "echo")) && !a.dataChild(child, depth+1, dir) && a.treeProtectedAll(".", dir) {
 			a.reason = roles.FileInput
 		}
-		if a.reason == "" && name == "xargs" && xargsHasArgFile(args) && len(child) > 0 && roles.KnownReader(strings.ToLower(path.Base(child[0]))) {
+		if a.reason == "" && name == "xargs" && (xargsHasArgFile(args) || a.filenameStdin) && !a.filenameDataChild(child, depth+1, dir) {
 			a.reason = roles.Indeterminate
 			return
 		}
@@ -1368,7 +1396,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			if strings.Trim(code, "'\"") == "from dotenv import load_dotenv; load_dotenv(); import app" {
 				continue
 			}
-			if witness(code) || a.inlineGitDir(code, cwd) || a.executableInterpreterProtected(code, cwd, name) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
+			if witness(code) || a.inlineGitDir(code, cwd) || a.interpreterArgumentProtected(code, cwd, name, false) || strings.Contains(code, "ENV") || strings.Contains(strings.ToLower(code), "getenv") || strings.Contains(code, ".environ") || strings.Contains(code, "process.env") {
 				a.reason = "interpreter argument names a protected file or credential operation"
 				return
 			}
@@ -1668,6 +1696,12 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				return
 			}
 		}
+		if name == "docker" {
+			a.dockerBindReaders(args, depth, cwd)
+			if a.reason != "" {
+				return
+			}
+		}
 		a.unknownExecution(dockerArgs, depth, cwd)
 		return
 	}
@@ -1920,29 +1954,21 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 		if !ok {
 			return nil, false
 		}
-		quoted := false
-		syntax.Walk(field, func(node syntax.Node) bool {
-			switch node.(type) {
-			case *syntax.SglQuoted, *syntax.DblQuoted:
-				quoted = true
-			}
-			return true
-		})
-		for _, value := range fields {
-			if value != "" || quoted {
-				values = append(values, value)
-			}
+		if len(values)+len(fields) > 256 {
+			a.reason = roles.Indeterminate
+			return nil, false
 		}
+		values = append(values, fields...)
 	}
 	return values, true
 }
 func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
-	result := []string{""}
-	patterns := []string{""}
+	var fields []literalField
 	unquotedGlob := false
 	for _, part := range w.Parts {
 		var piece string
 		var globPiece string
+		quoted, split := false, false
 		switch n := part.(type) {
 		case *syntax.Lit:
 			piece = strings.ReplaceAll(n.Value, `\`, ``)
@@ -1953,6 +1979,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 			globPiece = literalGlobPattern(n.Value)
 			unquotedGlob = unquotedGlob || unescapedGlob(n.Value)
 		case *syntax.SglQuoted:
+			quoted = true
 			piece = n.Value
 			if n.Dollar {
 				var ok bool
@@ -1963,6 +1990,7 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				}
 			}
 		case *syntax.DblQuoted:
+			quoted = true
 			for _, child := range n.Parts {
 				switch x := child.(type) {
 				case *syntax.Lit:
@@ -2006,8 +2034,9 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 				a.uncertain = true
 				return nil, false
 			}
-			// An unquoted scalar expansion undergoes pathname expansion even
-			// when the assignment that supplied it was quoted.
+			// Unquoted scalars split fields before pathname expansion, even
+			// when the assignment that supplied the value was quoted.
+			split = true
 			globPiece = piece
 			unquotedGlob = unquotedGlob || unescapedGlob(piece)
 
@@ -2018,14 +2047,18 @@ func (a *analyzer) literalWord(w *syntax.Word, cwd string) ([]string, bool) {
 		if globPiece == "" {
 			globPiece = escapeGlob(piece)
 		}
-		for i := range result {
-			result[i] += piece
-			patterns[i] += globPiece
+		var ok bool
+		fields, ok = a.appendLiteralFields(fields, piece, globPiece, quoted, split)
+		if !ok {
+			return nil, false
 		}
 	}
-	expanded := make([]string, 0, len(result))
-	for i, v := range result {
-		pattern := patterns[i]
+	expanded := make([]string, 0, len(fields))
+	for _, field := range fields {
+		v, pattern := field.value, field.pattern
+		if v == "" && !field.quoted {
+			continue
+		}
 		if strings.HasPrefix(v, "~/") {
 			v = a.home + "/" + v[2:]
 			pattern = a.home + "/" + strings.TrimPrefix(pattern, "~/")

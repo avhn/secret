@@ -108,6 +108,24 @@ func shellArguments(name string, args []string) (bool, int, []string, bool) {
 }
 
 func (a *analyzer) shellCommand(name string, args []string, depth int, cwd string) {
+	// A child shell's IFS assignments cannot change the caller's word splitting
+	// or reuse its source-position proof for later sibling commands.
+	modified, empty, source := a.ifsModified, a.ifsEmpty, a.ifsSource
+	value, assigned := a.env["IFS"]
+	count, counted := a.assignments["IFS"]
+	defer func() {
+		a.ifsModified, a.ifsEmpty, a.ifsSource = modified, empty, source
+		if assigned {
+			a.env["IFS"] = value
+		} else {
+			delete(a.env, "IFS")
+		}
+		if counted {
+			a.assignments["IFS"] = count
+		} else {
+			delete(a.assignments, "IFS")
+		}
+	}()
 	code, index, init, bad := shellArguments(name, args)
 	if name == "fish" && index >= 0 && code {
 		for i := index + 1; i < len(args); i++ {
@@ -178,7 +196,9 @@ func modelledCommand(name string) bool {
 // unmodelledCommand has no operand grammar; only these argv data operands
 // receive the P18 raw-token check, including the host's direct argv route.
 func unmodelledCommand(name string) bool {
-	return !modelledCommand(name) && !shellName(name) && !roles.KnownReader(name) &&
+	// systemd-run keeps its opaque-argument protection in addition to precise
+	// child and working-directory parsing.
+	return name == "systemd-run" || !modelledCommand(name) && !shellName(name) && !roles.KnownReader(name) &&
 		!optionIn("tar bsdtar unzip cpio 7z 7za split dotenv eval docker openssl zip rsync scp du realpath readlink basename dirname chmod chown chgrp rm find [ [[", name)
 }
 

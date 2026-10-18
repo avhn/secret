@@ -1,8 +1,11 @@
 package policy
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/avhn/secret/internal/hook/roles"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -12,6 +15,172 @@ type expandedOperand struct {
 	value  string
 	source *syntax.Word
 	known  bool
+}
+
+type literalField struct {
+	value, pattern string
+	quoted         bool
+}
+
+var ifsIdentifier = regexp.MustCompile(`(^|[^a-zA-Z0-9_])IFS([^a-zA-Z0-9_]|$)`)
+
+// Only syntax that can modify IFS disqualifies default whitespace splitting.
+// Comments and ordinary literal arguments do not change the shell's state.
+func (a *analyzer) noteIFS(file *syntax.File, source string) {
+	var empty *syntax.Assign
+	for _, stmt := range file.Stmts {
+		if call, ok := stmt.Cmd.(*syntax.CallExpr); ok && len(call.Args) == 0 {
+			for _, assign := range call.Assigns {
+				if assign.Name != nil && assign.Name.Value == "IFS" && !assign.Append && assign.Array == nil && assign.Index == nil && emptyLiteralWord(assign.Value) {
+					empty = assign
+				}
+			}
+		}
+	}
+	changes := 0
+	syntax.Walk(file, func(node syntax.Node) bool {
+		switch n := node.(type) {
+		case *syntax.Assign:
+			if n.Name != nil && n.Name.Value == "IFS" {
+				changes++
+				if n != empty {
+					empty = nil
+				}
+			}
+		case *syntax.WordIter:
+			if n.Name != nil && n.Name.Value == "IFS" {
+				changes++
+			}
+		case *syntax.ParamExp:
+			if n.Param != nil && n.Param.Value == "IFS" && n.Exp != nil && (n.Exp.Op == syntax.AssignUnset || n.Exp.Op == syntax.AssignUnsetOrNull) {
+				changes++
+			}
+		case *syntax.CallExpr:
+			call := unwrapCall(n)
+			if len(call.Args) == 0 {
+				break
+			}
+			name := literal(call.Args[0])
+			if name == "printf" {
+				assigns := false
+				for _, arg := range call.Args[1:] {
+					option := literal(arg)
+					if option == "--" || !strings.HasPrefix(option, "-") {
+						break
+					}
+					assigns = assigns || strings.Contains(option[1:], "v")
+				}
+				if !assigns {
+					break
+				}
+			}
+			switch name {
+			case "read", "mapfile", "readarray", "unset", "getopts", "let", "printf":
+				for _, arg := range call.Args[1:] {
+					value := literal(arg)
+					if name == "printf" {
+						value = strings.TrimPrefix(value, "-v")
+					}
+					if ifsIdentifier.MatchString(value) {
+						changes++
+						break
+					}
+				}
+			}
+		case *syntax.ArithmCmd, *syntax.CStyleLoop:
+			found := false
+			syntax.Walk(node, func(child syntax.Node) bool {
+				if word, ok := child.(*syntax.Word); ok && word.Lit() == "IFS" {
+					found = true
+				}
+				return !found
+			})
+			if found {
+				changes++
+			}
+		}
+		return true
+	})
+	if changes > 0 {
+		a.ifsSource = source
+		a.ifsModified = true
+		// Certify empty IFS from its syntax as well as its reached assignment.
+		// This also covers argv shells, which have no outer source to rescan.
+		a.ifsEmpty = changes == 1 && empty != nil && !indirectStaticAssignment(source)
+	}
+}
+
+// A missing scalar value or literal empty quotes are known empty assignments,
+// unlike substitutions and array assignments whose literal value is also "".
+func emptyLiteralWord(word *syntax.Word) bool {
+	if word == nil {
+		return true
+	}
+	empty := true
+	syntax.Walk(word, func(node syntax.Node) bool {
+		switch n := node.(type) {
+		case nil, *syntax.Word, *syntax.DblQuoted:
+		case *syntax.Lit:
+			empty = empty && n.Value == ""
+		case *syntax.SglQuoted:
+			empty = empty && n.Value == ""
+		default:
+			empty = false
+		}
+		return empty
+	})
+	return empty
+}
+
+// Only unquoted parameter values split fields. Literal and quoted whitespace
+// stays in its field, and a trailing delimiter separates a later word part.
+// Non-whitespace IFS grammars remain indeterminate rather than certifying a
+// single executable name that may actually hide a reader and its operands.
+func (a *analyzer) appendLiteralFields(fields []literalField, value, pattern string, quoted, split bool) ([]literalField, bool) {
+	if len(fields) == 0 {
+		fields = append(fields, literalField{})
+	}
+	appendValue := func(value, pattern string) {
+		last := &fields[len(fields)-1]
+		last.value += value
+		last.pattern += pattern
+		last.quoted = last.quoted || quoted
+	}
+	if !split {
+		appendValue(value, pattern)
+		return fields, true
+	}
+	ifs := " \t\n"
+	if _, assigned := a.env["IFS"]; assigned || a.ifsModified {
+		var known bool
+		ifs, known = a.staticVariable("IFS")
+		if !known {
+			a.reason = roles.Indeterminate
+			return nil, false
+		}
+	}
+	if strings.Trim(ifs, " \t\n") != "" && strings.ContainsAny(value, ifs) {
+		a.reason = roles.Indeterminate
+		return nil, false
+	}
+	for value != "" {
+		index := strings.IndexAny(value, ifs)
+		if index < 0 {
+			appendValue(value, value)
+			break
+		}
+		appendValue(value[:index], value[:index])
+		value = strings.TrimLeft(value[index:], ifs)
+		last := fields[len(fields)-1]
+		if last.value != "" || last.quoted {
+			if len(fields) >= 256 {
+				a.reason = roles.Indeterminate
+				return nil, false
+			}
+			fields = append(fields, literalField{})
+		}
+	}
+	return fields, true
 }
 
 // braceWordCount bounds alternatives before the lazy AST-only expansion. Sequence

@@ -15,7 +15,7 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 	if cwd == "" && !filepath.IsAbs(name) {
 		return true
 	}
-	raw := StreamBase(Resolve(name, cwd, workdir, home))
+	raw := StreamBase(Resolve(expandXDG(name, home, xdg), cwd, workdir, home))
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
 	if check(raw) {
 		return true
@@ -40,10 +40,10 @@ func gitConfigTarget(name, cwd, home, xdg, global string) bool {
 	normalize := func(value string) string { return strings.ToLower(filepath.ToSlash(filepath.Clean(value))) }
 	rawName, rawHome := name, home
 	name, home = normalize(name), normalize(home)
-	if strings.HasSuffix(name, "/.gitmodules") || strings.Contains(name, "/.git/") || strings.HasSuffix(name, "/.git") || name == home+"/.gitconfig" || strings.HasPrefix(name, home+"/.config/git/") {
+	if strings.HasSuffix(name, "/.gitmodules") || strings.Contains(name, "/.git/") || strings.HasSuffix(name, "/.git") || name == home+"/.gitconfig" || name == home+"/.config/git" || strings.HasPrefix(name, home+"/.config/git/") {
 		return true
 	}
-	if xdg != "" && strings.HasPrefix(name, normalize(filepath.Join(xdg, "git"))+"/") {
+	if xdg != "" && (name == normalize(filepath.Join(xdg, "git")) || strings.HasPrefix(name, normalize(filepath.Join(xdg, "git"))+"/")) {
 		return true
 	}
 	if global != "" && name == normalize(Resolve(global, cwd, "", rawHome)) {
@@ -66,7 +66,7 @@ func gitConfigTarget(name, cwd, home, xdg, global string) bool {
 					if !filepath.IsAbs(target) {
 						target = filepath.Join(dir, target)
 					}
-					if strings.HasPrefix(name, normalize(target)+"/") {
+					if name == normalize(target) || strings.HasPrefix(name, normalize(target)+"/") {
 						return true
 					}
 				}

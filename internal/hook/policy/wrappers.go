@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/roles"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 // utilityOptions mirrors the retained guard's option arities. A short option
@@ -12,23 +13,24 @@ import (
 type utilityOptions struct{ values, flags, longValues, longFlags, optional string }
 
 var utilityTable = map[string]utilityOptions{
-	"time":       {"fo", "pavq", "format output", "portability append verbose quiet help version", ""},
-	"ionice":     {"cnpPu", "t", "class classdata pid pgid uid", "ignore help version", ""},
-	"chrt":       {"PTD", "afmorRbiIpv", "sched-runtime sched-period sched-deadline", "all-tasks fifo max other pid rr reset-on-fork batch idle verbose help version", ""},
-	"taskset":    {"", "acp", "", "all-tasks cpu-list pid help version", ""},
-	"doas":       {"uC", "Lns", "", "", ""},
-	"watch":      {"n", "bcdetpxw", "interval", "beep color errexit precise exec no-title no-wrap help version", "differences"},
-	"flock":      {"wE", "suxnFo", "timeout conflict-exit-code", "shared exclusive unlock nonblock no-fork close verbose help version", ""},
-	"unbuffer":   {"", "p", "", "", ""},
-	"timeout":    {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
-	"gtimeout":   {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
-	"nice":       {"n", "", "adjustment", "help version", ""},
-	"exec":       {"a", "cl", "", "", ""},
-	"stdbuf":     {"ioe", "", "input output error", "help version", ""},
-	"caffeinate": {"tw", "dimsu", "", "", ""},
-	"nohup":      {"", "", "", "help version", ""},
-	"xargs":      {"nLIsPEJdRSa", "0rtpxo", "max-args max-chars max-procs delimiter arg-file", "null no-run-if-empty verbose interactive exit open-tty help version", "max-lines replace eof"},
-	"sudo":       {"ughpCDRTU", "AbEHKklnPSVvsi", "user group host prompt close-from chdir chroot command-timeout other-user", "askpass background preserve-env set-home reset-timestamp remove-timestamp list non-interactive preserve-groups stdin version validate help shell login", ""},
+	"time":        {"fo", "pavq", "format output", "portability append verbose quiet help version", ""},
+	"ionice":      {"cnpPu", "t", "class classdata pid pgid uid", "ignore help version", ""},
+	"chrt":        {"PTD", "afmorRbiIpv", "sched-runtime sched-period sched-deadline", "all-tasks fifo max other pid rr reset-on-fork batch idle verbose help version", ""},
+	"taskset":     {"", "acp", "", "all-tasks cpu-list pid help version", ""},
+	"doas":        {"uC", "Lns", "", "", ""},
+	"watch":       {"n", "bcdetpxw", "interval", "beep color errexit precise exec no-title no-wrap help version", "differences"},
+	"flock":       {"wE", "suxnFo", "timeout conflict-exit-code", "shared exclusive unlock nonblock no-fork close verbose help version", ""},
+	"unbuffer":    {"", "p", "", "", ""},
+	"timeout":     {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
+	"gtimeout":    {"sk", "v", "signal kill-after", "foreground preserve-status verbose help version", ""},
+	"nice":        {"n", "", "adjustment", "help version", ""},
+	"exec":        {"a", "cl", "", "", ""},
+	"stdbuf":      {"ioe", "", "input output error", "help version", ""},
+	"caffeinate":  {"tw", "dimsu", "", "", ""},
+	"nohup":       {"", "", "", "help version", ""},
+	"systemd-run": {"uHM", "PGqtd", "unit host machine description slice service-type working-directory uid gid nice setenv expand-environment", "user system scope pipe wait collect quiet pty send-sighup no-block remain-after-exit same-dir help version", ""},
+	"xargs":       {"nLIsPEJdRSa", "0rtpxo", "max-args max-chars max-procs delimiter arg-file", "null no-run-if-empty verbose interactive exit open-tty help version", "max-lines replace eof"},
+	"sudo":        {"ughpCDRTU", "AbEHKklnPSVvsi", "user group host prompt close-from chdir chroot command-timeout other-user", "askpass background preserve-env set-home reset-timestamp remove-timestamp list non-interactive preserve-groups stdin version validate help shell login", ""},
 }
 
 // optionIn matches complete option names, never substrings of another option.
@@ -36,10 +38,31 @@ func optionIn(list, name string) bool {
 	return strings.Contains(" "+list+" ", " "+name+" ") && name != ""
 }
 
+// filenamePipelineRecipient replaces inherited file-input provenance when a pipe
+// supplies stdin. The recipient's own redirects are applied by singleStmt.
+func (a *analyzer) filenamePipelineRecipient(cmd *syntax.BinaryCmd, depth int, cwd string) string {
+	prior := a.filenameStdin
+	if cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll {
+		a.filenameStdin = false
+	}
+	defer func() { a.filenameStdin = prior }()
+	return a.pipelineRecipient(cmd, depth, cwd)
+}
+
 // utilityChild returns the real child after consuming known options. It also
 // checks xargs input lists and propagates sudo's scoped directory and shell mode.
 func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]string, string, bool) {
 	table := utilityTable[name]
+	if name == "systemd-run" {
+		// Retain the existing opaque-launcher literal protection while adding
+		// precise child selection and cwd handling.
+		for _, arg := range args {
+			if hasProtectedLiteral(arg) {
+				a.reason = roles.FileInput
+				return nil, cwd, false
+			}
+		}
+	}
 	base := cwd
 	shell, watchExec := false, false
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
@@ -64,7 +87,7 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 				if name == "xargs" && key == "arg-file" && a.protected(value, cwd) {
 					a.reason = "xargs arg-file reads a protected store"
 				}
-				if name == "sudo" && key == "chdir" {
+				if name == "sudo" && key == "chdir" || name == "systemd-run" && key == "working-directory" {
 					cwd = a.resolve(value, base)
 				}
 			} else if optionIn(table.optional, key) {
@@ -168,7 +191,16 @@ func (a *analyzer) childAssignments(args []string, depth int, cwd string) ([]str
 	return args, cwd
 }
 
-// An explicit safe argument file supplies operands instead of cwd/stdin.
+// stdinRedirect retains file-supplied filename uncertainty through wrappers and
+// compound commands. Redirects of other descriptors do not supply xargs stdin.
+func stdinRedirect(redirect *syntax.Redirect) bool {
+	if redirect.N != nil && strings.TrimLeft(redirect.N.Value, "0") != "" {
+		return false
+	}
+	return optionIn("< <> <& << <<- <<<", redirect.Op.String())
+}
+
+// An explicit argument file supplies operands instead of cwd/stdin.
 // Inspect only xargs options before the child, not a child's own -a flag.
 func xargsHasArgFile(args []string) bool {
 	table := utilityTable["xargs"]

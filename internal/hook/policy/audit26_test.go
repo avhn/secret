@@ -91,7 +91,7 @@ func TestAudit26CodeOptions(t *testing.T) {
 		{"node", []string{"--env-file", "-eexec(1)", "--require", "-pspawn(1)"}, nil},
 		{"ruby", []string{"-I", "-esystem(1)", "-e", "-eexec(1)"}, nil},
 		{"ruby", []string{"-I", "--", "-esystem(1)"}, []string{"-I", "--", "-e", "system(1)"}},
-		{"perl", []string{"-F", "-esystem(1)", "-Eexec(1)"}, []string{"-F", "-esystem(1)", "-E", "exec(1)"}},
+		{"perl", []string{"-F", "-esystem(1)", "-Eexec(1)"}, []string{"-F", "-e", "system(1)", "-E", "exec(1)"}},
 		{"python3", []string{"-W", "-cprint(1)", "-cprint(2)"}, []string{"-W", "-cprint(1)", "-c", "print(2)"}},
 		{"ruby", []string{"--", "-esystem(1)"}, nil},
 		{"ruby", []string{"public.rb", "-esystem(1)"}, nil},
