@@ -133,6 +133,34 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   require complete bounded framing, typed workdirs and ordered path sections;
   an End of File marker is valid only at the end of an update hunk. The previous
   Bash malformed-patch exception is closed. Both Go adapters validate apply_patch.
+- **Bounded audit-28 launch, search and patch checks.** Go retains literal Deno
+  executable/argv witnesses across unrelated option properties, recognizes PHP
+  literal `array(...)` argv with consecutive numeric keys, and preserves trailing
+  operands of attached env split-string options. systemd-run configured credential
+  assignments apply to its child only. Invalid timeout/taskset launches and
+  unsupported setsid options deny. Hidden substitutions in double-quoted
+  parameter words are inspected, and quoted arithmetic operands, misplaced
+  reserved words and commandless coprocess redirects deny conservatively.
+  Go retains stricter arithmetic/function/time controls listed in
+  `docs/design/hook-tightening.md`; these are not claims of full shell semantics.
+  Shell-fed apply_patch bodies use bounded framing and protected-target checks
+  after wrapper dispatch. Go uses the child cwd and effective redirect scope,
+  so a child stdin redirect shadows an ancestor patch body without masking
+  existing same-command denials. Grep is classified on either host; only an
+  absent output mode defaults to names-only, while empty or unknown strings
+  receive content checks. Go checks whitespace/comma selector alternatives as
+  well as the original selector, retaining conservative order-sensitive denials.
+  Configured credential paths compare case-insensitively on every OS. Grep
+  glob/type values are capped at 4,096 bytes and 128 slash separators, including
+  names-only calls. Invalid or over-budget brace selectors deny, and root-glob
+  recursion requires progress. Bash bounds first-line extraction before copying
+  oversized source, cumulative credential-selector suffix work, and brace scan
+  steps and nesting (64 levels). Go also bounds unquoted shell brace depth at
+  64; quoted data remains inert. Bash arithmetic commands and C-style loop
+  clauses receive non-evaluating operand validation after bounded quote removal
+  and continuation normalization, with original substitutions still inspected.
+  Existing phase, analysis and overall deadlines remain unchanged. Evidence is
+  synthetic guard input only, not installed-host timeout or containment evidence.
 - **Nonempty malformed envelopes deny explicitly.** Only zero-byte input has no
   tool call. Whitespace-only input, raw NUL, invalid UTF-8, duplicate JSON object
   keys, missing or mistyped shell commands and workdirs, missing tool names,
@@ -224,6 +252,13 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
 These are outside the threat model. Reports about them are welcome as
 documentation or hardening suggestions, but they are not vulnerabilities:
 
+- **Known audit-28 coverage limits.** The retained Bash guard does not cover all
+  explicit-shell positional argv forms, awk pipe/getline readers, whitespace-list
+  Grep selectors, attached systemd-run configured credential assignments or
+  recursive grep through protected symlinks. Shared gaps include UV tool-runner
+  directory options and relocated gh hosts.yml selected by XDG_CONFIG_HOME or
+  GH_CONFIG_DIR. These remain coverage backlog items, not evidence of protection;
+  Go-specific closures do not imply equivalent installed Bash coverage.
 - **Project Yarn configuration.** A project `.yarnrc.yml` remains readable,
   even though an `npmAuthToken` entry can contain a secret. Only the user's
   `~/.yarnrc.yml` is protected by this filename rule. Keep project tokens out

@@ -37,10 +37,8 @@ func (a *analyzer) nonReadingChild(words []string, depth int, cwd string, data, 
 		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
 	}
 	if filenames && name == "setsid" {
-		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
-			args = args[1:]
-		}
-		return a.nonReadingChild(args, depth+1, cwd, data, filenames)
+		child := a.setsidChild(args)
+		return a.reason == "" && a.nonReadingChild(child, depth+1, cwd, data, filenames)
 	}
 	if _, ok := utilityTable[name]; ok {
 		if name == "systemd-run" && !filenames {

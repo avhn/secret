@@ -94,6 +94,13 @@ def generate():
     return 0
 }'''
     source = source[:start] + replacement + source[end:]
+    # Audit 28 uses the timed direct-envelope runner, not invoke_guard(). Capture
+    # its exact expected-deny inputs after the real decision, keeping public
+    # controls out of the deny corpus and preserving the named regression key.
+    source = source.replace('audit28_case() { audit27_case "$@"; }', '''audit28_case() {
+    audit27_case "$@"
+    "$VARIANT_PYTHON" -I "$VARIANT_GENERATOR" --direct "$TMP" "$VARIANT_ROWS" "$2" "$1" <"$TMP/audit27-envelope"
+}''', 1)
     with tempfile.TemporaryDirectory(prefix="hook-variant-extract-") as directory:
         tmp = pathlib.Path(directory)
         script, rows = tmp / "suite.sh", tmp / "rows.jsonl"
@@ -162,7 +169,9 @@ def direct():
         return
     command = fields.get("command")
     if envelope.get("tool_name") == "Bash" and isinstance(command, str):
-        name = "fixed_complexity_reason" if command == "cat .env '" else "control_byte_" + json.dumps(command, separators=(",", ":"))
+        name = (sys.argv[5] if len(sys.argv) > 5 else
+                "fixed_complexity_reason" if command == "cat .env '" else
+                "control_byte_" + json.dumps(command, separators=(",", ":")))
         capture(dict(name=name, want="deny", tool="Bash", command=command,
                      cwd=envelope.get("cwd", str(pathlib.Path(sys.argv[2]) / "search")),
                      config=os.environ.get("RIPGREP_CONFIG_PATH", ""),

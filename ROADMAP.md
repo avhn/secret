@@ -158,6 +158,20 @@ update-hunk behavior. The existing cwd-resolution cache and BSD wc correction
 remain in place. Synthetic replay, refreshed inventories and exact differential
 records are local evidence, not a green CI matrix or installed-host protection.
 
+Confirmation audit 28 covers T0-T19 with retained Deno launch witnesses, PHP
+literal array argv and indexed entries, complete env split-string children,
+child-local systemd-run credential paths and strict launcher grammar. Go checks
+hidden parameter substitutions, arithmetic quotes, reserved words and coprocess
+framing. Wrapped patch validation follows effective stdin scope and cwd. Grep
+uses both adapters, explicit mode semantics, case-folded configured paths and
+bounded selector unions without dropping prior whole-selector denials. Bash
+bounds first-line, credential-selector and brace work and validates arithmetic
+commands and continued loops without execution. Integration adds matching Go
+selector/component and raw brace-depth limits, isolates patch fixtures from
+later search controls, and records retained Go arithmetic/function/time
+conservatism as exact divergences. Native platform CI and installed-host failure
+checks remain required; local integration does not complete M2.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or
@@ -171,6 +185,13 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 ### M2 coverage backlog (class i, non-blocking under P22)
 
 - [ ] Track future shared or Bash-only coverage findings under the P22 class (i) rule
+- [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
+- [ ] Audit 28: Bash awk pipe/getline protected child reads
+- [ ] Audit 28: shared UV tool-runner directory options and Bash attached
+  systemd-run --setenv configured credential paths
+- [ ] Audit 28: Bash whitespace-listed Grep selectors (Go now checks their union)
+- [ ] Audit 28: shared relocated gh hosts.yml under XDG_CONFIG_HOME/GH_CONFIG_DIR
+- [ ] Audit 28: Bash recursive grep following protected symlink targets
 
 ### M2 follow-ups (over-denials, non-blocking)
 
@@ -181,6 +202,11 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 - [ ] `kubectl -o custom-columns` and curl uploads of unresolved variables (documented limits, P8)
 - [ ] Bash two-second budget on long chains (P20, documented)
 - [ ] Go denies long conditional-cd chains past the cwd-set cap
+- [ ] Audit 28: Go retains conservative quoted arithmetic-command operands,
+  parenthesis-free arithmetic function bodies and `time --` arithmetic framing;
+  exact controls are recorded in the hook tightening table and divergence inventory
+- [ ] Audit 28: Bash PHP descriptor syntax over-denies public proc_open array
+  launches; Go public controls stay allowed rather than copying that over-denial
 
 ## M3: Operator workflow
 

@@ -101,6 +101,7 @@ type analyzer struct {
 	credentialConfigs   []credentialConfig
 	credentialBranch    bool
 	interpreterInputs   []interpreterInput
+	patchInputStart     int // First input in the innermost scope that redirects stdin.
 	protected           func(string, string) bool
 	cwd, home, reason   string
 	words, globs        int
@@ -228,7 +229,16 @@ func (a *analyzer) fragment(source string, depth int) {
 func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) string {
 	for _, stmt := range stmts {
 		prior := a.interpreterInputs
+		priorPatchInputStart := a.patchInputStart
 		priorFilenameStdin := a.filenameStdin
+		for _, redirect := range stmt.Redirs {
+			if stdinRedirect(redirect) {
+				// Child stdin shadows ancestor patch bodies. Keep all redirects
+				// from this scope so direct-command denials stay unchanged.
+				a.patchInputStart = len(a.interpreterInputs)
+				break
+			}
+		}
 		for _, redirect := range stmt.Redirs {
 			if stdinRedirect(redirect) {
 				a.filenameStdin = true
@@ -239,6 +249,7 @@ func (a *analyzer) singleStmt(stmts []*syntax.Stmt, depth int, cwd string) strin
 		}
 		cwd = a.singleStmtInput([]*syntax.Stmt{stmt}, depth, cwd)
 		a.interpreterInputs = prior
+		a.patchInputStart = priorPatchInputStart
 		a.filenameStdin = priorFilenameStdin
 		if a.reason != "" {
 			break
@@ -351,20 +362,6 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			}
 			if len(cmd.Args) > 2 && literal(cmd.Args[0]) == "docker" && literal(cmd.Args[1]) == "cp" && strings.Contains(a.raw(cmd.Args[2]), ":/") && hasProtectedLiteral(a.raw(cmd.Args[2])) {
 				a.reason = roles.FileInput
-			}
-			if len(cmd.Args) > 0 && path.Base(literal(cmd.Args[0])) == "apply_patch" {
-				found := false
-				for _, r := range s.Redirs {
-					if r.Hdoc != nil {
-						found = true
-						if reason := patch.Decision(a.raw(r.Hdoc), cwd, "", a.home); reason != "" {
-							a.reason = reason
-						}
-					}
-				}
-				if !found {
-					a.reason = roles.Indeterminate
-				}
 			}
 			if len(cmd.Args) == 0 {
 				for _, assign := range cmd.Assigns {
@@ -1040,6 +1037,24 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	name := strings.ToLower(path.Base(words[0]))
 	args := words[1:]
+	if name == "apply_patch" {
+		// Wrappers retain redirect provenance. Validate only the effective stdin
+		// scope at the child, using its scoped cwd for patch targets.
+		found := false
+		for _, input := range a.interpreterInputs[a.patchInputStart:] {
+			if r := input.redirect; r != nil && r.Hdoc != nil {
+				found = true
+				if reason := patch.Decision(a.raw(r.Hdoc), cwd, "", a.home); reason != "" {
+					a.reason = reason
+					return
+				}
+			}
+		}
+		if !found {
+			a.reason = roles.Indeterminate
+			return
+		}
+	}
 	if name == "bun" {
 		// Runtime code, stdin and package children share Bun's leading options.
 		// Consume directory operands before interpreter analysis sees them as code.
@@ -1094,10 +1109,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if name == "setsid" {
-		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
-			args = args[1:]
-		}
-		a.command(args, depth+1, cwd, direct)
+		a.command(a.setsidChild(args), depth+1, cwd, direct)
 		return
 	}
 	if name == "systemd-run" && (launcherShellOption(args) || slices.Contains(args, "-S") || slices.Contains(args, "--shell")) {
@@ -1339,8 +1351,8 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			a.unknownExecution(args, depth, cwd)
 		}
 		child, dir, shell := a.utilityChild(name, args, cwd)
-		if name == "sudo" {
-			// sudo assignments belong to its child, not the calling shell.
+		if name == "sudo" || name == "systemd-run" {
+			// Launcher assignments belong to the child, not the calling shell.
 			// Reuse the environment assignment checks before selecting a reader.
 			parentEnv, parentCDPath := a.env, a.cdpath
 			a.env = maps.Clone(a.env)
@@ -1538,7 +1550,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 				if strings.HasPrefix(args[0], "-S") {
 					code = args[0][2:]
 				}
-				a.fragmentAt("env "+splitEnv(code), depth+1, cwd)
+				a.fragmentAt(envSplitCommand(code, args[1:]), depth+1, cwd)
 				return
 			}
 			// Strip only known option operands, then analyze the actual child.
@@ -1871,6 +1883,12 @@ func (a *analyzer) walkNode(node syntax.Node, depth int, cwd string) {
 	}
 	syntax.Walk(node, func(node syntax.Node) bool {
 		switch n := node.(type) {
+		case *syntax.DblQuoted:
+			a.walkDoubleQuotedParameters(n, depth, cwd)
+		case *syntax.ParamExp:
+			if n.Index != nil {
+				a.walkQuotedParameter(n.Index, depth, cwd)
+			}
 		case *syntax.CmdSubst:
 			parent := a.aliases
 			a.aliases = maps.Clone(parent)
@@ -1916,6 +1934,11 @@ func (a *analyzer) expandWord(w *syntax.Word, cwd string) ([]string, bool) {
 					i++
 				case '{':
 					braces++
+					if braces > 64 {
+						a.structuralUncertain = true
+						a.reason = roles.Indeterminate
+						return nil, false
+					}
 				case '}':
 					braces--
 				}

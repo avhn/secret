@@ -9,6 +9,60 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// Inside double-quoted parameter words and array indices, single quotes are
+// literal characters, not a barrier to command substitution. The parser models
+// them as SglQuoted, so reparse only those expansion-bearing parts as document
+// words. Document never executes code or treats the surrounding text as commands.
+func (a *analyzer) walkQuotedParameter(node syntax.Node, depth int, cwd string) {
+	syntax.Walk(node, func(node syntax.Node) bool {
+		if a.reason != "" {
+			return false
+		}
+		switch n := node.(type) {
+		case *syntax.CmdSubst, *syntax.ProcSubst:
+			// Their inner commands start a new quoting context and are visited
+			// by walkNode; do not reparse their inert quoted arguments here.
+			return false
+		case *syntax.Word:
+			quoted := false
+			for _, part := range n.Parts {
+				_, single := part.(*syntax.SglQuoted)
+				quoted = quoted || single
+			}
+			if !quoted {
+				return true
+			}
+			// Reparse the whole word: a substitution's own quotes may split
+			// it across multiple incorrectly single-quoted parser parts.
+			source := a.raw(n)
+			if !strings.Contains(source, "$(") && !strings.ContainsRune(source, '`') {
+				return false
+			}
+			if depth > 4 || len(source) > 40<<10 || a.expired() {
+				a.reason = roles.Indeterminate
+				return false
+			}
+			word, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Document(strings.NewReader(source))
+			if err != nil || !bashFraming(word) {
+				a.reason = roles.Indeterminate
+				return false
+			}
+			a.walkQuotedParameter(word, depth+1, cwd)
+			a.walkNode(word, depth+1, cwd)
+			return false
+		}
+		return true
+	})
+}
+
+func (a *analyzer) walkDoubleQuotedParameters(quoted *syntax.DblQuoted, depth int, cwd string) {
+	for _, part := range quoted.Parts {
+		if parameter, ok := part.(*syntax.ParamExp); ok {
+			a.walkQuotedParameter(parameter, depth, cwd)
+		}
+	}
+}
+
 // expandedOperand keeps role classification aligned with the actual argv fields,
 // including brace-expanded option words and unresolved operand placeholders.
 type expandedOperand struct {

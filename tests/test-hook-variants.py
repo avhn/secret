@@ -39,6 +39,16 @@ class VariantExtractionTests(unittest.TestCase):
                 self.assertEqual(output.getvalue(), "")
                 self.assertEqual(capture.call_count, int(captured))
 
+    def test_named_direct_cases_keep_public_controls_out(self):
+        envelope = dict(tool_name="Bash", cwd="/synthetic", tool_input=dict(command="((1++))"))
+        for expected in ["allow", "deny"]:
+            with mock.patch.object(sys, "argv", [str(GENERATOR), "--direct", "/synthetic", "/synthetic/rows", expected, "audit28_named"]):
+                with mock.patch.object(sys, "stdin", io.TextIOWrapper(io.BytesIO(json.dumps(envelope).encode()))), mock.patch.object(variants, "capture") as capture:
+                    variants.direct()
+            self.assertEqual(capture.call_count, int(expected == "deny"))
+            if expected == "deny":
+                self.assertEqual(capture.call_args.args[0]["name"], "audit28_named")
+
     def test_direct_preserves_malformed_field_types(self):
         for value in [None, 1, True, {}, []]:
             envelope = dict(tool_name="Bash", cwd="/synthetic", tool_input=dict(command="true", workdir=value))

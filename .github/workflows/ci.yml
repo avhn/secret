@@ -15,6 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - run: shellcheck bin/secret hooks/guard-secrets tests/*.sh testdata/store/gen.sh testdata/cli/gen.sh
       - run: python3 -I tests/test-go-divergence.py
+      - run: python3 -I tests/test-go-hook-divergence.py
+      - run: python3 -I tests/test-hook-variants.py
+      - run: python3 -I tests/test-inventory.py
 
   libsecret:
     name: libsecret (ubuntu-latest)

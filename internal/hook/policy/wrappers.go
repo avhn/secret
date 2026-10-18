@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -50,7 +51,8 @@ func (a *analyzer) filenamePipelineRecipient(cmd *syntax.BinaryCmd, depth int, c
 }
 
 // utilityChild returns the real child after consuming known options. It also
-// checks xargs input lists and propagates sudo's scoped directory and shell mode.
+// checks xargs input lists and propagates scoped directory/environment operands
+// and sudo's shell mode.
 func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]string, string, bool) {
 	table := utilityTable[name]
 	if name == "systemd-run" {
@@ -64,7 +66,8 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 		}
 	}
 	base := cwd
-	shell, watchExec := false, false
+	var assignments []string
+	shell, watchExec, tasksetList, tasksetPID := false, false, false, false
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
 		arg := args[0]
 		args = args[1:]
@@ -90,6 +93,15 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 				if name == "sudo" && key == "chdir" || name == "systemd-run" && key == "working-directory" {
 					cwd = a.resolve(value, base)
 				}
+				// A bare --setenv name inherits user configuration (P8), not a
+				// command-text value. Register only explicit assignments.
+				if name == "systemd-run" && key == "setenv" && strings.Contains(value, "=") {
+					if _, _, appendValue, known := declarationOperand(value); !known || appendValue {
+						a.reason = roles.Indeterminate
+						return nil, cwd, shell
+					}
+					assignments = append(assignments, value)
+				}
 			} else if optionIn(table.optional, key) {
 				// GNU optional long arguments attach with = only.
 			} else if !optionIn(table.longFlags, key) || attached {
@@ -101,6 +113,10 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 			}
 			if name == "sudo" && (key == "shell" || key == "login") {
 				shell = true
+			}
+			if name == "taskset" {
+				tasksetList = tasksetList || key == "cpu-list"
+				tasksetPID = tasksetPID || key == "pid"
 			}
 			continue
 		}
@@ -133,6 +149,10 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 			if name == "sudo" && (flag == 's' || flag == 'i') {
 				shell = true
 			}
+			if name == "taskset" {
+				tasksetList = tasksetList || flag == 'c'
+				tasksetPID = tasksetPID || flag == 'p'
+			}
 		}
 	}
 	if name == "watch" {
@@ -157,16 +177,72 @@ func (a *analyzer) utilityChild(name string, args []string, cwd string) ([]strin
 				return nil, cwd, shell
 			}
 		}
+		if name == "taskset" {
+			// A PID query has no child. Launch mode requires both a valid
+			// hexadecimal mask/CPU list and a remaining executable.
+			if tasksetPID && len(args) == 1 && tasksetDecimal.MatchString(args[0]) {
+				return nil, cwd, shell
+			}
+			valid := tasksetMask.MatchString(args[0])
+			if tasksetList {
+				valid = tasksetCPUs.MatchString(args[0])
+			}
+			if len(args) < 2 || !valid {
+				a.reason = roles.Indeterminate
+				return nil, cwd, shell
+			}
+		}
 		args = args[1:] // scheduling priority, CPU mask/list, or lock file/fd
 	}
 	if name == "timeout" || name == "gtimeout" {
-		if len(args) == 0 {
+		if len(args) < 2 {
 			a.reason = roles.Indeterminate
 			return nil, cwd, shell
 		}
 		args = args[1:] // the duration belongs to timeout, not its child
 	}
+	// systemd-run's environment options become child-local assignment operands,
+	// consumed by the dispatcher just like sudo's environment operands.
+	if len(assignments) > 0 {
+		args = append(assignments, args...)
+	}
 	return args, cwd, shell
+}
+
+var (
+	tasksetDecimal = regexp.MustCompile(`^[0-9]+$`)
+	tasksetMask    = regexp.MustCompile(`^(0[xX])?[0-9a-fA-F]+$`)
+	tasksetCPUs    = regexp.MustCompile(`^[0-9]+(-[0-9]+)?(:[0-9]+)?(,[0-9]+(-[0-9]+)?(:[0-9]+)?)*$`)
+)
+
+// setsid has only these inert options. Unknown flags must not hide a child.
+func (a *analyzer) setsidChild(args []string) []string {
+	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+		arg := args[0]
+		args = args[1:]
+		if arg == "--" {
+			break
+		}
+		if !optionIn("-w --wait -c --ctty -f --fork", arg) {
+			a.reason = roles.Indeterminate
+			return nil
+		}
+	}
+	return args
+}
+
+// env appends trailing argv after splitting its option value. Those operands
+// are literal data, never another opportunity for shell expansion.
+func envSplitCommand(value string, tail []string) string {
+	var code strings.Builder
+	code.WriteString("env ")
+	code.WriteString(splitEnv(value))
+	for _, arg := range tail {
+		code.WriteString(" '")
+		code.WriteString(strings.ReplaceAll(arg, "'", "'\\''"))
+		code.WriteByte('\'')
+	}
+	return code.String()
 }
 
 // Child environment operands are already expanded argv, not shell source.

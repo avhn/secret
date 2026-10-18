@@ -152,6 +152,156 @@ audit27_case() {
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' guard "$name" >>"$SECRET_TEST_RESULTS"
     fi
 }
+# Audit 28 regressions use the four-second, stderr-free envelope runner above.
+# Every candidate remains JSON data, including arithmetic and patch contents.
+audit28_case() { audit27_case "$@"; }
+mkdir -p "$HOME/.aws"
+printf '%s\n' 'synthetic-only' >"$HOME/.aws/credentials"
+ln -s "$HOME/.aws" "$TMP/search/audit28_cfg"
+for entry in 'direct:' 'env:env ' 'env_empty:env -i ' 'timeout:timeout 5 ' 'nice:nice '; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg p "${entry#*:}" '$p')"
+    audit28_case "audit28_t1_${label}_malformed" deny ".tool_input.command = ($encoded + \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: public.txt\\n+public\\nPATCH\")"
+    audit28_case "audit28_t1_${label}_public" allow ".tool_input.command = ($encoded + \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: public.txt\\n+public\\n*** End Patch\\nPATCH\")"
+    audit28_case "audit28_t1_${label}_alias" deny ".tool_input.command = ($encoded + \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Delete File: audit28_cfg/credentials\\n*** End Patch\\nPATCH\")"
+    audit28_case "audit28_t1_${label}_config" deny ".tool_input.command = ($encoded + \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: .git/config\\n+public\\n*** End Patch\\nPATCH\")"
+done
+audit28_case audit28_t1_native_malformed deny '.tool_name = "apply_patch" | .tool_input.command = "*** Begin Patch\n*** Add File: public.txt\n+public"'
+audit28_case audit28_t1_native_public allow '.tool_name = "apply_patch" | .tool_input.command = "*** Begin Patch\n*** Add File: public.txt\n+public\n*** End Patch"'
+audit28_case audit28_t1_two_patches allow '.tool_input.command = "apply_patch <<\u0027ONE\u0027\n*** Begin Patch\n*** Add File: one.txt\n+public\n*** End Patch\nONE\nenv apply_patch <<\u0027TWO\u0027\n*** Begin Patch\n*** Add File: two.txt\n+public\n*** End Patch\nTWO"'
+# The patch-only directory alias must not change later search-scope controls.
+rm "$TMP/search/audit28_cfg"
+for size in 760000 1000000; do
+    for first in echo comment; do
+        if [[ "$first" == echo ]]; then prefix='echo '; else prefix='#'; fi
+        encoded="$(jq -cn --arg p "$prefix" '$p')"
+        audit28_case "audit28_t5_${first}_${size}_deadline" deny ".tool_input.command = ($encoded + (\"a\" * $size) + \"\\ncat .env\")"
+        audit28_case "audit28_t5_${first}_${size}_argv_deadline" deny ".tool_input.command = [\"bash\",\"-c\",($encoded + (\"a\" * $size) + \"\\ntrue\")]"
+    done
+done
+# The oversized inert-heredoc allowance must not be lost with header bounding.
+audit28_case audit28_t5_inert_public allow '.tool_input.command = ("cat > notes.md <<\u0027TEXT\u0027\n" + ("public\n" * 15000) + "TEXT")'
+for count in 2500 4000; do
+    audit28_case "audit28_t6_grep_${count}_deadline" deny ".tool_name = \"Grep\" | .tool_input = {pattern:\"x\",path:.cwd,glob:((\"./\" * $count) + \"*.env\"),output_mode:\"content\"}"
+    audit28_case "audit28_t6_rg_${count}_deadline" deny ".tool_input.command = (\"rg -g \" + (\"./\" * $count) + \"*.env TOKEN\")"
+done
+audit28_case audit28_t6_slashes_deadline deny '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:(("/" * 4000) + ".env"),output_mode:"content"}'
+for mode in content files_with_matches; do
+    for shape in components slashes literal spaces; do
+        case "$shape" in
+            components) glob='("./" * 20000) + "*.ts"' ;;
+            slashes) glob='("/" * 40000) + "*.ts"' ;;
+            literal) glob='("a" * 40000) + "*.ts"' ;;
+            spaces) glob='"*.ts " * 8000' ;;
+        esac
+        audit28_case "audit28_t17_${shape}_${mode}_deadline" deny ".tool_name = \"Grep\" | .tool_input = {pattern:\"x\",path:.cwd,glob:($glob),output_mode:\"$mode\"}"
+    done
+done
+audit28_case audit28_t17_components_bounded_deadline deny '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:(("./" * 256) + "*.ts"),output_mode:"files_with_matches"}'
+audit28_case audit28_t17_type_deadline deny '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,type:("a" * 40000),output_mode:"content"}'
+audit28_case audit28_t17_public allow '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:"*.ts",output_mode:"content"}'
+audit28_case audit28_t17_public_names allow '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:"*.ts",output_mode:"files_with_matches"}'
+# shellcheck disable=SC2016  # candidate arithmetic is literal JSON data
+for entry in 'increment:(( 1++ ))' 'decrement:(( --1 ))' 'loop_init:for ((1++;0;0)); do :; done' 'assignment:((1 += 1))' 'index:((a[]))' 'loop_cond:for ((i=0;1++;i++)); do :; done' 'loop_post:for ((i=0;i<1;--1)); do :; done' 'expansion:echo $((1++))' 'expansion_decrement:echo $((--1))'; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_$label" deny ".tool_input.command = $encoded"
+    audit28_case "audit28_t13_${label}_argv" deny ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+done
+# shellcheck disable=SC2016  # candidate substitutions must never execute
+for entry in 'command:((i++))' 'assignment:((i += 1))' 'index:((a[0]++))' 'loop:for ((i=0;i<2;i++)); do :; done' 'empty_loop:for ((;;)); do :; done' 'nested_loop:for ((i=$(printf 0);i<2;i++)); do :; done' 'regex:[[ public =~ ((public)) ]]' 'literal:printf %s "((1++))"'; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_valid_$label" allow ".tool_input.command = $encoded"
+done
+# shellcheck disable=SC2016  # protected child is source data only
+audit28_case audit28_t13_loop_child deny '.tool_input.command = "for ((i=$(cat .env);i<2;i++)); do :; done"'
+# Arithmetic commands remain active inside reserved-word compound forms.
+for entry in 'if:if ((1++)); then :; fi' 'subshell:( ((1++)) )' 'function:f() { ((1++)); }; true' 'time:time ((1++))' 'time_posix:time -p ((1++))' 'time_end:time -- ((1++))' 'coproc:coproc ((1++))' 'named_coproc:coproc worker ((1++))'; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_compound_$label" deny ".tool_input.command = $encoded"
+    # Stock Bash 3.2 cannot parse coproc or time --, even with valid operands.
+    # Keep malformed denials there, but reserve these positive controls for 4+.
+    if ((BASH_VERSINFO[0] < 4)); then
+        case "$label" in time_end | coproc | named_coproc) continue ;; esac
+    fi
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c | gsub("1\\+\\+"; "i++")')"
+    audit28_case "audit28_t13_compound_${label}_public" allow ".tool_input.command = $encoded"
+done
+audit28_case audit28_t13_nested_regex_public allow '.tool_input.command = "[[ public =~ (((1++))) ]]"'
+# Review regressions: function bodies without (), continued loop keywords and
+# shell quote removal must use the same non-evaluating operand validation.
+for entry in \
+    'function_increment:function f ((1++)); f' \
+    'function_decrement:function f ((--1)); f' \
+    'function_assignment:function f ((1 += 1)); f' \
+    'function_index:function f ((a[])); f' \
+    $'continued_init:for \\\n((1++;0;0)); do :; done' \
+    $'continued_cond:for \\\n((i=0;--1;i++)); do :; done' \
+    $'continued_post:for \\\n((i=0;i<2;1+=1)); do :; done' \
+    $'continued_index:for \\\n((i=0;i<2;a[])); do :; done' \
+    'quoted_increment:(("1"++))' \
+    'quoted_index_empty:((a[""]++))' \
+    'quoted_loop_separators:for (("0;1;2")); do :; done'; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_review_$label" deny ".tool_input.command = $encoded"
+    audit28_case "audit28_t13_review_${label}_argv" deny ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+done
+# shellcheck disable=SC2016  # arithmetic children remain candidate source data
+for entry in \
+    'function:function f ((i++)); f' \
+    'function_index:function f ((a["0"]++)); f' \
+    $'continued_loop:for \\\n((i=0;i<2;i++)); do :; done' \
+    $'continued_keyword:fo\\\nr ((i=0;i<2;i++)); do :; done' \
+    $'continued_empty:for \\\n((;;)); do :; done' \
+    'quoted_number:(( "1" + 2 ))' \
+    'single_quoted_number:(( '\''1'\'' + 2 ))' \
+    'quoted_index:((a["0"]++))' \
+    'quoted_loop:for ((i="0";i<"2";a["0"]++)); do :; done' \
+    'quoted_child:(( "$(printf 1)" + 2 ))'; do
+    label="${entry%%:*}"
+    # Bash 3.2 rejects a bare arithmetic function body without name parentheses
+    # in its noexec parser, before operand validation. Native 4+ covers it below.
+    if ((BASH_VERSINFO[0] < 4)); then
+        case "$label" in function | function_index) continue ;; esac
+    fi
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_review_${label}_public" allow ".tool_input.command = $encoded"
+    audit28_case "audit28_t13_review_${label}_public_argv" allow ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+done
+# Quote normalization must not hide active children or loosen expansion grammar.
+# shellcheck disable=SC2016  # protected substitutions are never executed
+for entry in \
+    'quoted_child:(( "$(cat .env)" + 2 ))' \
+    'quoted_index_child:((a["$(cat .env)"]++))' \
+    'quoted_loop_child:for ((i="$(cat .env)";i<2;i++)); do :; done' \
+    'quoted_expansion:echo $(( "1" + 2 ))'; do
+    label="${entry%%:*}"
+    encoded="$(jq -cn --arg c "${entry#*:}" '$c')"
+    audit28_case "audit28_t13_review_${label}_protected" deny ".tool_input.command = $encoded"
+    audit28_case "audit28_t13_review_${label}_protected_argv" deny ".tool_input.command = [\"bash\",\"-c\",$encoded]"
+done
+audit28_case audit28_t19_find_deadline deny '.tool_input.command = ("find . -name \u0027" + ("{a," * 1900) + ".env" + ("}" * 1900) + "\u0027 -exec cat {} +")'
+audit28_case audit28_t19_grep_deadline deny '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:(("{a," * 4000) + ".env" + ("}" * 4000))}'
+audit28_case audit28_t19_grep_nested_deadline deny '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:(("{a," * 300) + ".env" + ("}" * 300))}'
+audit28_case audit28_t19_echo_deadline deny '.tool_input.command = ("echo " + ("{," * 2700) + "b" + ("}" * 2700))'
+audit28_case audit28_t19_interpreter_deadline deny '.tool_input.command = ("python3 -c \u0027import os; os.system(\"echo " + ("{a," * 300) + "b" + ("}" * 300) + "\")\u0027")'
+audit28_case audit28_t19_depth_65_deadline deny '.tool_input.command = ("echo " + ("{" * 65) + "x" + ("}" * 65))'
+audit28_case audit28_t19_depth_64_public allow '.tool_input.command = ("echo " + ("{" * 64) + "x" + ("}" * 64))'
+audit28_case audit28_t19_quoted_public allow '.tool_input.command = ("printf %s \u0027" + ("{a," * 80) + "x" + ("}" * 80) + "\u0027")'
+audit28_case audit28_t19_shallow_public allow '.tool_input.command = "echo {a,{b,c}}"'
+audit28_case audit28_t19_shallow_protected deny '.tool_input.command = "cat {public,.env}"'
+audit28_case audit28_t19_grep_public allow '.tool_name = "Grep" | .tool_input = {pattern:"x",path:.cwd,glob:"*.{ts,tsx}",output_mode:"content"}'
+# Keep focused audit runs independent of the older suites' fixture generation.
+case "${SECRET_TEST_FILTER:-}" in audit28_*)
+    printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
+    [[ "$FAILED" -eq 0 ]]
+    exit "$?"
+    ;;
+esac
+
 # Tool names are validated before NUL extraction or unsupported-tool dispatch.
 for control in 0000 0001 0009 000a 000d 001b 001f 007f; do
     audit27_case "audit27_s2_control_$control" deny ".tool_name = \"\\u$control\" | .tool_input.command = \"cat .env\""

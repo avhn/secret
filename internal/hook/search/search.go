@@ -90,7 +90,11 @@ func neutral(s string) bool {
 
 // Selector tests synthetic candidate names, never contents.
 func Selector(glob string) bool {
-	if len(glob) > 4096 {
+	return selectorAt(glob, 0)
+}
+
+func selectorAt(glob string, depth int) bool {
+	if len(glob) > 4096 || depth > 16 {
 		return true
 	}
 	glob = strings.ReplaceAll(glob, "[!", "[^")
@@ -100,7 +104,7 @@ func Selector(glob string) bool {
 			return true
 		}
 		for _, alternative := range alternatives {
-			if Selector(alternative) {
+			if selectorAt(alternative, depth+1) {
 				return true
 			}
 		}
@@ -132,7 +136,8 @@ func Selector(glob string) bool {
 	if len(base) > 256 && strings.ContainsAny(base, "*?[") {
 		return true
 	}
-	if strings.Contains(glob, "/") && Selector(path.Base(glob)) {
+	// Root selectors have themselves as a basename; only recurse on progress.
+	if base != glob && selectorAt(base, depth+1) {
 		return true
 	}
 	g := strings.ToLower(strings.TrimPrefix(glob, "!"))
@@ -161,13 +166,15 @@ func ToolGlob(root, cwd, home string) string {
 	return ""
 }
 
-// ToolGrep checks Claude Grep names and content modes.
+// ToolGrep checks Grep names and content modes. Callers default an absent mode;
+// an explicitly empty or unknown mode is not a names-only request.
 func ToolGrep(root, glob, typ, mode, cwd, home string) string {
+	// Match Bash's preprocessing limits before names mode or selector proofs.
+	if len(glob) > 4096 || len(typ) > 4096 || strings.Count(glob, "/") > 128 || strings.Count(typ, "/") > 128 {
+		return UncertainReason
+	}
 	if root == "" {
 		root = cwd
-	}
-	if mode == "" {
-		mode = "files_with_matches"
 	}
 	names := mode == "files_with_matches"
 	switch strings.ToLower(typ) {
@@ -176,8 +183,21 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			return "Grep type targets protected names"
 		}
 	}
+	// Splitting adds host alternatives, but must not remove a denial from the
+	// original selector (including its order-sensitive directory spelling).
 	if positiveGlob(glob) && !CanNarrow(glob) && Selector(glob) && (!names || !strings.ContainsAny(glob, "*?[")) {
 		return "Grep selector targets protected names"
+	}
+	selectors, ok := grepGlobs(glob)
+	if !ok {
+		return UncertainReason
+	}
+	narrow := len(selectors) > 0
+	for _, selector := range selectors {
+		if positiveGlob(selector) && !CanNarrow(selector) && Selector(selector) && (!names || !strings.ContainsAny(selector, "*?[")) {
+			return "Grep selector targets protected names"
+		}
+		narrow = narrow && CanNarrow(selector)
 	}
 	if paths.Protected(root, cwd, "", home) {
 		p := paths.Resolve(root, cwd, "", home)
@@ -186,8 +206,16 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			return "Grep targets a protected store"
 		}
 	}
-	if !names && (CanNarrow(glob) || glob == "" && typeGlob(typ) != "") {
-		return FilteredScope(root, glob, typ, cwd, home)
+	if !names && (narrow || glob == "" && typeGlob(typ) != "") {
+		filter := glob
+		if len(selectors) == 1 {
+			filter = selectors[0]
+		} else if len(selectors) > 1 {
+			// One bounded walk checks the union, rather than granting each
+			// selector a separate filesystem scan and deadline.
+			filter = "{" + strings.Join(selectors, ",") + "}"
+		}
+		return filteredScopeConfigured(root, filter, typ, cwd, home, "", narrow)
 	}
 	if !names && paths.TreeProtectedScope(root, cwd, home, glob != "") {
 		return "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"

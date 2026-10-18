@@ -243,10 +243,7 @@ func constructorArguments(tokens []interpreterToken, start int) [][]string {
 	var launches [][]string
 	for i := start + 3; i < len(tokens); {
 		if !tokens[i].literal && tokens[i].text == "}" {
-			if i+1 < len(tokens) && !tokens[i+1].literal && tokens[i+1].text == ")" {
-				return launches
-			}
-			return nil
+			return launches
 		}
 		key := tokens[i]
 		i++
@@ -262,13 +259,24 @@ func constructorArguments(tokens []interpreterToken, start int) [][]string {
 				continue
 			}
 			if i >= len(tokens) || tokens[i].literal || tokens[i].text != ":" {
-				return nil
+				// Spreads, computed keys and methods are unrelated properties.
+				// Skip them as balanced expressions without erasing literal argv
+				// already collected, or hiding args properties that follow them.
+				end, known := interpreterObjectValueEnd(tokens, i-1)
+				if !known {
+					return launches
+				}
+				i = end
+				if tokens[i].text == "," {
+					i++
+				}
+				continue
 			}
 			i++
 		}
 		end, known := interpreterObjectValueEnd(tokens, i)
 		if !known {
-			return nil
+			return launches
 		}
 		if key.text == "args" && i < len(tokens) && !tokens[i].literal && tokens[i].text == "[" {
 			args, after, literal := literalArguments(tokens, i+1, "]")
@@ -281,5 +289,5 @@ func constructorArguments(tokens []interpreterToken, start int) [][]string {
 			i++
 		}
 	}
-	return nil
+	return launches
 }

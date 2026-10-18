@@ -279,6 +279,13 @@ func interpreterIdentifier(ch byte) bool {
 // The returned index points after the closing delimiter. Empty and trailing-
 // comma lists are valid, but concatenation and expressions are not argv.
 func literalArguments(tokens []interpreterToken, start int, close string) ([]string, int, bool) {
+	return literalArrayArguments(tokens, start, close, false)
+}
+
+// PHP argv arrays may spell out consecutive decimal integer keys, including
+// mixed explicit and implicit entries. Only the next positional key is accepted;
+// reordered, duplicate or computed keys are not certified as literal argv.
+func literalArrayArguments(tokens []interpreterToken, start int, close string, phpKeys bool) ([]string, int, bool) {
 	var words []string
 	for start < len(tokens) {
 		if tokens[start].text == "\n" && !tokens[start].literal {
@@ -287,6 +294,10 @@ func literalArguments(tokens []interpreterToken, start int, close string) ([]str
 		}
 		if tokens[start].text == close && !tokens[start].literal {
 			return words, start + 1, true
+		}
+		if phpKeys && start+3 < len(tokens) && !tokens[start].literal && tokens[start].text == strconv.Itoa(len(words)) &&
+			!tokens[start+1].literal && tokens[start+1].text == "=" && !tokens[start+2].literal && tokens[start+2].text == ">" {
+			start += 3
 		}
 		if !tokens[start].literal {
 			return nil, start, false
@@ -420,8 +431,14 @@ func (a *analyzer) interpreterArgvProtected(code, cwd, language string) bool {
 			}
 			if tokens[start].text == "[" && !tokens[start].literal {
 				var end int
-				words, end, known = literalArguments(tokens, start+1, "]")
+				words, end, known = literalArrayArguments(tokens, start+1, "]", language == "php" && name == "proc_open")
 				known = known && end < len(tokens) && !tokens[end].literal && (tokens[end].text == "," || tokens[end].text == ")")
+			} else if name == "proc_open" && !tokens[start].literal && strings.EqualFold(tokens[start].text, "array") && start+1 < len(tokens) && !tokens[start+1].literal && tokens[start+1].text == "(" {
+				// PHP's array(...) constructor is the same literal argv container
+				// as [...]. Keep its closing delimiter separate from proc_open's.
+				var end int
+				words, end, known = literalArrayArguments(tokens, start+2, ")", true)
+				known = known && end < len(tokens) && !tokens[end].literal && optionIn(", )", tokens[end].text)
 			}
 		case "execv", "execvp", "execve", "execvpe", "spawn", "spawnSync", "execFile", "execFileSync":
 			if tokens[start].text == "[" && !tokens[start].literal {

@@ -77,7 +77,8 @@ func ConfiguredTreeProtected(root, cwd, home, config string, literals ...string)
 			continue
 		}
 		target := physicalOrClean(unresolved(entry, cwd, "", home))
-		relative, err := filepath.Rel(root, target)
+		// Match Bash's case-folded witnesses even on a case-sensitive host.
+		relative, err := filepath.Rel(strings.ToLower(root), strings.ToLower(target))
 		if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
 			return true
 		}
@@ -86,5 +87,5 @@ func ConfiguredTreeProtected(root, cwd, home, config string, literals ...string)
 }
 
 func sameCredentialPath(a, b string) bool {
-	return a == b || runtime.GOOS == "windows" && strings.EqualFold(a, b)
+	return strings.EqualFold(a, b)
 }

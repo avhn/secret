@@ -61,10 +61,11 @@ func Decide(host string, in io.Reader, out io.Writer) (err error) {
 	case "apply_patch":
 		reason = patch.Decision(e.String("command"), cwd, workdir, os.Getenv("HOME"))
 	case "Grep":
-		if host != "claude" {
-			break
+		mode := e.String("output_mode")
+		if _, present := e.Fields["output_mode"]; !present {
+			mode = "files_with_matches"
 		}
-		reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), e.String("output_mode"), cwd, os.Getenv("HOME"))
+		reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), mode, cwd, os.Getenv("HOME"))
 	case "Bash":
 		reason = bashDecision(e, cwd, protected)
 	}

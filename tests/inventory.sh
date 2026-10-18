@@ -30,6 +30,8 @@ esac
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 FAILED=0
+# shellcheck disable=SC2016  # Query the suite runtime, not the calling shell.
+RUNTIME_MAJOR="$("${BASH_BIN:-bash}" -c 'printf "%s" "${BASH_VERSINFO[0]}"')"
 if [[ -n "$SUITE" ]]; then
     SUITES=("$SUITE")
 else
@@ -95,6 +97,11 @@ for suite in "${SUITES[@]}"; do
         dest="$ROOT/testdata/inventory/$suite.darwin.tsv"
     fi
     if [[ "$MODE" == --write ]]; then
+        if ((RUNTIME_MAJOR < 4)) && [[ "$suite" == guard || "$suite" == codex ]]; then
+            printf '%s: regenerate the canonical inventory with Bash 4+\n' "$suite" >&2
+            FAILED=1
+            continue
+        fi
         dest="${SECRET_INVENTORY_DIR:-$ROOT/testdata/inventory}/$suite.tsv"
         mkdir -p "$(dirname "$dest")"
         cp "$TMP/$suite.tsv" "$dest"
@@ -102,11 +109,24 @@ for suite in "${SUITES[@]}"; do
     elif [[ ! -f "$dest" ]]; then
         printf '%s: inventory missing, see artifact\n' "$suite" >&2
         if [[ "$suite" != keychain || "${SECRET_INVENTORY_STRICT:-}" == 1 ]]; then FAILED=1; fi
-    elif ! diff -u "$dest" "$TMP/$suite.tsv"; then
-        printf '%s: inventory differs (missing, changed or added cases); regenerate only after review\n' "$suite" >&2
-        FAILED=1
     else
-        printf '%s: %s cases match\n' "$suite" "$(wc -l <"$dest" | tr -d ' ')"
+        expected="$dest"
+        if ((RUNTIME_MAJOR < 4)) && [[ "$suite" == guard || "$suite" == codex ]]; then
+            # These exact positive controls are parser-version conditional in
+            # both suites. Malformed denials and all other keys remain required.
+            expected="$TMP/$suite.expected"
+            awk -F '\t' '
+                $4 == "allow" && $2 ~ /^audit28_t13_compound_(time_end|coproc|named_coproc)_public$/ { next }
+                $4 == "allow" && $2 ~ /^audit28_t13_review_function(_index)?_public(_argv)?$/ { next }
+                { print }
+            ' "$dest" >"$expected"
+        fi
+        if ! diff -u "$expected" "$TMP/$suite.tsv"; then
+            printf '%s: inventory differs (missing, changed or added cases); regenerate only after review\n' "$suite" >&2
+            FAILED=1
+        else
+            printf '%s: %s cases match\n' "$suite" "$(wc -l <"$expected" | tr -d ' ')"
+        fi
     fi
 done
 exit "$FAILED"

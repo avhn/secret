@@ -20,14 +20,25 @@ func FilteredScope(root, glob, typ, cwd, home string) string {
 // FilteredScopeConfigured also classifies Kubernetes path lists and singular AWS
 // alternatives known to the analyzer, without changing the process environment.
 func FilteredScopeConfigured(root, glob, typ, cwd, home, config string, literals ...string) string {
+	return filteredScopeConfigured(root, glob, typ, cwd, home, config, false, literals...)
+}
+
+// certifiedSelectors is used only for a Grep union whose individual selectors
+// have passed CanNarrow, including directory selectors such as src/**.
+func filteredScopeConfigured(root, glob, typ, cwd, home, config string, certifiedSelectors bool, literals ...string) string {
 	protected := func(name string) bool {
 		return paths.ConfiguredProtected(name, cwd, "", home, config, literals...) || paths.Protected(name, cwd, "", home)
 	}
 	if glob == "" {
 		glob = typeGlob(typ)
 	}
-	if !CanNarrow(glob) || strings.Count(glob, "**") > 3 || len(glob) > 1024 {
+	if !certifiedSelectors && !CanNarrow(glob) || strings.Count(glob, "**") > 3 || len(glob) > 1024 {
 		return ScopeReason
+	}
+	if certifiedSelectors {
+		if _, ok := selectorBraces(glob, 64); !ok {
+			return ScopeReason
+		}
 	}
 	root = paths.Resolve(root, cwd, "", home)
 	if dir, ok := globDirectory(glob); ok {

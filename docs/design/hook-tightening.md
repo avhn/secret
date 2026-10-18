@@ -142,6 +142,16 @@ indeterminate-input or audited input/output policy tightening.
 | `grep_find_exit`, `grep_find_exit_count`, `grep_timeout`, `grep_timeout_count`, `rg_find_exit`, `rg_timeout`                                                                       | deliberate-find-shim  | Bash denies when the injected `find` exits or times out. Go does not execute `find`; its walk errors, permissions, loops, budgets, and deadlines deny under dedicated fault-injection tests. |
 | `unresolved_file_safe`, `unresolved_listing_safe`, `unresolved_literal_safe`, `unresolved_no_eval`, `unresolved_positional_safe`, `unresolved_redirect_safe`, `unresolved_wc_safe` | deliberate-tightening | Unknown parameter or substitution output cannot certify a non-protected content-producing input. The analyzer never executes a substitution to decide.                                       |
 
+Audit 28 adds these exact retained Go-stricter controls on both adapters. They
+never permit a Go allow where the shell suite requires deny.
+
+| Cases | Category | Reason |
+| --- | --- | --- |
+| `audit28_t13_compound_time_end_public` | deliberate-tightening | Go retains its conservative `time --` framing denial for an arithmetic command. |
+| `audit28_t13_review_function_public`, `audit28_t13_review_function_public_argv`, `audit28_t13_review_function_index_public`, `audit28_t13_review_function_index_public_argv` | deliberate-tightening | Go's parser/framing checks retain denial of arithmetic function bodies without name parentheses. Native Bash 4+ accepts these controls; Bash 3.2 does not. |
+| `audit28_t13_review_quoted_number_public`, `audit28_t13_review_quoted_number_public_argv`, `audit28_t13_review_single_quoted_number_public`, `audit28_t13_review_single_quoted_number_public_argv` | deliberate-tightening | Quoted arithmetic operands remain indeterminate in Go, even when Bash command quote removal yields a valid constant expression. |
+| `audit28_t13_review_quoted_index_public`, `audit28_t13_review_quoted_index_public_argv`, `audit28_t13_review_quoted_loop_public`, `audit28_t13_review_quoted_loop_public_argv`, `audit28_t13_review_quoted_child_public`, `audit28_t13_review_quoted_child_public_argv` | deliberate-tightening | Go retains conservative quote rejection in arithmetic indices, loop clauses and substitution operands. Bash validates bounded quote-removed command operands without evaluating them. |
+
 ## Permanent synthetic evidence
 
 Audit fixtures are synthetic and permanent in `testdata/hook/audit-cases.json`
@@ -1431,3 +1441,68 @@ The denied-corpus callback now matches the production lexical-store check before
 its missing-bare-operand exception, retaining all regenerated nested-eval variants.
 `audit27_s4_preanalysis_deadline` is the only new injected-dependency distinction;
 it is named above and is not a Go-looser policy outcome.
+
+## Confirmation audit 28: launch witnesses, effective patches and bounded selectors
+
+All cases are synthetic JSON guard submissions; candidate commands are never run.
+The existing two-second Go policy deadline and Bash phase/overall budgets remain
+unchanged. Neither these tests nor refreshed fixtures establish installed-host
+protection or native macOS/Windows behavior.
+
+- T0/T7: retain Deno executable/args witnesses before unsupported options, including
+  spreads, computed properties, methods and incomplete trailing fields. Recognize
+  PHP literal argv in both `[...]` and `array(...)`, including consecutive decimal
+  integer keys and mixed explicit/implicit entries; apply existing child cwd
+  checks. Dynamic values and nonconsecutive keys are not certified as literal
+  argv. Public PHP controls stay allowed despite Bash's descriptor over-denial.
+- T1: apply complete patch framing and protected physical-target checks after
+  wrapper dispatch. Go uses child-local cwd and innermost stdin redirect scope;
+  ancestor bodies shadowed by child redirects are not extra patches. Same-command
+  redirects retain existing denials, wrappers retain input provenance and sibling
+  scopes restore correctly. Native and valid public patch controls remain.
+- T2/T3: inspect active substitutions hidden by single-quoted AST parts inside
+  double-quoted parameter words and array indices. Go rejects quotes throughout
+  arithmetic operands, including nested parameter defaults/replacements and
+  substring offsets/lengths; substitution bodies retain their own quote context.
+- T4: selector basename recursion requires progress and has a depth limit, so
+  root globs cannot exhaust the Go stack. Protected re-includes still deny.
+- T5/T6: Bash extracts oversized first lines linearly and bounds credential
+  selector bytes, cumulative suffix work and deadline checks before costly scans.
+- T8/T9: preserve safely quoted trailing operands of attached env split-string
+  options and register separated/attached systemd-run configured credential
+  assignments in the Go child's environment/path state, without sibling leakage.
+  Bash's attached --setenv coverage is not claimed by this Go-only addition.
+- T10: require children for timeout and taskset launch modes; validate taskset
+  masks/lists and allowlist setsid options while retaining taskset PID queries.
+- T11/T12: reject misplaced unquoted else/in calls, duplicate else branches and
+  commandless coprocess redirects. Quoted/escaped words, ordinary argument
+  positions and valid simple/named compound coprocesses retain their roles.
+- T13: Bash validates arithmetic commands and C-style loop clauses with bounded,
+  non-evaluating quote removal, normalized loop tokens and original-source
+  substitution checks, including function bodies. Continued loops and quoted
+  command constants/indices remain valid. Go's stricter quoted arithmetic and
+  function/time framing controls are named in the divergence table above.
+- T14/T18: classify Grep on either host; default only an absent output_mode to
+  files_with_matches. Explicit empty or unknown strings receive content checks.
+- T15: configured credential path equality and containment fold case on every
+  OS, preserving lexical boundaries and physical alias checks.
+- T16: Go checks whitespace/comma selector alternatives without dropping the
+  original whole-selector denial, including order-sensitive forms. Brace tokens
+  retain their host semantics; safe selector unions share one bounded metadata
+  walk and expansion budget. Bash whitespace-list coverage is not claimed.
+- T17/T19: Bash bounds Grep glob/type bytes and components before all selector
+  processing, and bounds brace depth, scan/split steps and deadline checks. Go
+  mirrors the 128-separator Grep bound, rejects failed brace enumeration even in
+  names-only mode and caps unquoted shell brace depth at 64. Inert quoted data
+  and public shallow selectors retain their controls. Patch-only symlink
+  fixtures are removed before later shell search controls to avoid altering
+  their scope; no protected-read expectation is removed or weakened.
+
+Permanent coverage is in audit28 policy, paths and adapter tests, the integration
+boundary tests and audit28_ cases in both shell suites. Regeneration tests require
+all 15 new Go-stricter names to be exact and directional; no class-ii difference
+can use their allowlist to certify an allow. Canonical shell inventories use
+Bash 4+; stock Bash 3.2 inventory checks omit only the seven named positive
+controls that the suites cannot parse there. Denials and every other inventory
+key remain mandatory. Synthetic inventory tests verify both runtime paths and
+reject attempts to overwrite the canonical inventory from Bash 3.2.

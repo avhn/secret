@@ -4,6 +4,24 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Close confirmation audit 28 launch and syntax parity gaps: preserve Deno argv
+  witnesses across unrelated options, recognize PHP literal array constructors
+  and consecutive numeric argv keys, retain attached env split-string operands,
+  and scope systemd-run configured credential paths to its child. Reject invalid
+  timeout, taskset and setsid launches, hidden substitutions in parameter words,
+  quoted arithmetic operands, misplaced reserved words and commandless coprocesses.
+- Validate shell-fed patches after wrapper dispatch with effective cwd and stdin
+  scope, retaining protected symlink targets and valid shadowed-heredoc controls.
+  Apply Grep checks on both hosts, default only absent output modes, split selector
+  lists without dropping whole-selector denials, and fold configured-path case
+  comparisons on every OS. Bound root-glob recursion, Grep selectors and braces.
+- Bound Bash first-line extraction, credential-selector suffix work and brace
+  enumeration within existing deadlines. Validate arithmetic commands and loop
+  clauses without evaluation, preserving quote removal and continued loops.
+  Refresh exact inventories and denied-command fixtures; retain named Go
+  arithmetic/function/time over-denials rather than weakening existing denials.
+  Synthetic replay does not establish installed-host or cross-platform protection.
+
 - Close confirmation audit 27 guard differences with bounded interpreter source
   roles, qualified Deno constructors, case-insensitive PHP launches and literal
   PHP/Node/Bun child directories. Reject missing required interpreter operands
