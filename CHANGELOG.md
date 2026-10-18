@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Preserve literal glob ancestors for native OS lookup, including Windows 8.3
+  aliases and case variants, before enumerating wildcard components. This retains
+  protected hidden-directory matches under a sibling HOME and public-glob controls.
+  Add an alias/listing mismatch regression that runs on every OS; native Windows
+  CI remains a separate gate, with no installed-host protection claim.
+
 - Close confirmation audit 29 protected-read parity gaps in computed Deno argv
   keys, constructor child directories and package executable paths containing
   `@`. Validate expanded patch headers without executing expansions, retain

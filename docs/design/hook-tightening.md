@@ -1571,7 +1571,12 @@ U9/U19 conservatively include hidden intermediate glob directories and globstar
 matches, even without a local dotglob/GLOBIGNORE witness. This intentionally
 closes the two default-hidden-glob U13 differences as denials rather than losing
 a real protected match under child-shell options. Literal quoted globs and final
-basename dotfile semantics retain their existing behavior.
+basename dotfile semantics retain their existing behavior. Literal glob ancestors
+use native OS lookup instead of directory-entry regex matching: Windows 8.3 aliases
+such as RUNNER~1 need not appear in a parent's long-name listing. This preserves
+matches when HOME is outside cwd without changing wildcard or dotfile rules. A
+synthetic alias/listing mismatch runs on every OS; it does not replace native
+Windows CI or installed-host checks.
 
 U2, U3, U8, U11, U15, U16 and U17 retain named M2.1 review entries in ROADMAP.md.
 Some share closures above or the earlier patch-stdin review; remaining malformed

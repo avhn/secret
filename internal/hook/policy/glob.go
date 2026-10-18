@@ -87,6 +87,10 @@ func globRegexp(part string) (*regexp.Regexp, error) {
 
 // shellGlobMatches never executes the shell or follows an unbounded tree.
 func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) {
+	return shellGlobMatchesWith(pattern, cwd, deadline, os.ReadDir)
+}
+
+func shellGlobMatchesWith(pattern, cwd string, deadline time.Time, readDir func(string) ([]os.DirEntry, error)) ([]string, bool) {
 	// Work with native separators before removing the volume. Windows temp
 	// paths can use extended-length volumes (\\?\C:), whose separator is
 	// a backslash even when the shell supplies forward slashes elsewhere.
@@ -106,6 +110,25 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 		remainder = strings.TrimPrefix(pattern, volume)
 	}
 	parts := strings.Split(filepath.ToSlash(remainder), "/")
+	// Resolve literal ancestors through the OS, not directory-entry regexes.
+	// Windows accepts short aliases such as RUNNER~1 (and case variants) that
+	// ReadDir does not return. A sibling HOME must keep that literal prefix
+	// even when the cwd-relative shortcut above cannot anchor its glob.
+	// Leave the final component for normal existence and dotfile checks, and
+	// retain quoted metacharacters for the matcher's literal decoding.
+	for len(parts) > 1 {
+		if time.Now().After(deadline) {
+			return nil, false
+		}
+		part := parts[0]
+		if strings.ContainsAny(part, "*?[") || strings.IndexFunc(part, func(r rune) bool {
+			return r >= quotedGlobBase && r < quotedGlobBase+5
+		}) >= 0 {
+			break
+		}
+		base = filepath.Join(base, part)
+		parts = parts[1:]
+	}
 	dirs := []string{base}
 	for index, part := range parts {
 		if part == "" || part == "." {
@@ -142,7 +165,7 @@ func shellGlobMatches(pattern, cwd string, deadline time.Time) ([]string, bool) 
 			if time.Now().After(deadline) {
 				return nil, false
 			}
-			entries, err := os.ReadDir(dir)
+			entries, err := readDir(dir)
 			if os.IsNotExist(err) || errors.Is(err, syscall.ENOTDIR) {
 				continue
 			}

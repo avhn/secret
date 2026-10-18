@@ -172,6 +172,76 @@ func TestProtectedGlobMissingCredentialContext(t *testing.T) {
 	}
 }
 
+// Windows resolves RUNNER~1 in a literal path even though ReadDir lists the
+// user's long name. Simulate that mismatch on every OS without native aliases.
+func TestGlobLiteralWindowsAliasPrefix(t *testing.T) {
+	root := t.TempDir()
+	alias := filepath.Join(root, "RUNNER~1")
+	home, work := filepath.Join(alias, "home"), filepath.Join(alias, "work")
+	for _, dir := range []string{work, filepath.Join(root, "runneradmin")} {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{".aws/credentials", ".ssh/id_rsa", ".docker/config.json", ".config/gh/hosts.yml", "public/README.md"} {
+		name = filepath.Join(home, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	readDir := func(dir string) ([]os.DirEntry, error) {
+		entries, err := os.ReadDir(dir)
+		if dir == root {
+			visible := make([]os.DirEntry, 0, len(entries))
+			for _, entry := range entries {
+				if entry.Name() != "RUNNER~1" {
+					visible = append(visible, entry)
+				}
+			}
+			entries = visible
+		}
+		return entries, err
+	}
+	for _, tc := range []struct {
+		pattern, want string
+		protected     bool
+	}{
+		{"*/credentials", ".aws/credentials", true},
+		{"?aws/credentials", ".aws/credentials", true},
+		{"[.]aws/credentials", ".aws/credentials", true},
+		{"*/id_rsa", ".ssh/id_rsa", true},
+		{"*/config.json", ".docker/config.json", true},
+		{"*/gh/hosts.yml", ".config/gh/hosts.yml", true},
+		{"*/*/hosts.yml", ".config/gh/hosts.yml", true},
+		{"**/credentials", ".aws/credentials", true},
+		{"public/*", "public/README.md", false},
+		{"public/README.md", "public/README.md", false},
+		{"public/missing", "", false},
+	} {
+		native := filepath.Join(home, filepath.FromSlash(tc.pattern))
+		for _, pattern := range []string{native, filepath.ToSlash(native)} {
+			got, ok := shellGlobMatchesWith(pattern, work, time.Now().Add(time.Second), readDir)
+			if tc.want == "" {
+				if !ok || len(got) != 0 {
+					t.Errorf("%q: matches=%q valid=%v, want no matches", pattern, got, ok)
+				}
+				continue
+			}
+			want := filepath.Join(home, filepath.FromSlash(tc.want))
+			if !ok || len(got) != 1 || got[0] != want {
+				t.Errorf("%q: matches=%q valid=%v, want %q", pattern, got, ok, want)
+				continue
+			}
+			if protected := paths.Protected(got[0], work, "", home); protected != tc.protected {
+				t.Errorf("%q: protected=%v want %v", pattern, protected, tc.protected)
+			}
+		}
+	}
+}
+
 func TestGlobVolumeLikeComponent(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("colon is a native Windows volume separator")

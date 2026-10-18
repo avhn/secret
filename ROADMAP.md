@@ -183,6 +183,10 @@ The owner adopted the convergence rule on 2026-10-18: close real Go-looser reads
 and Go crashes, record harmless reviewed differences and track the remaining
 malformed-syntax and raw-limit work in M2.1. This is not a claim that every audit
 29 item is fixed or that applicable CI and installed-host gates have passed.
+The Windows glob follow-up preserves literal ancestors for OS lookup rather than
+matching short aliases such as RUNNER~1 against long directory-entry names. A
+cross-platform simulated alias/listing mismatch covers protected hidden-directory
+globs and public controls under a sibling HOME. Native Windows CI is still required.
 
 The a3b0306 follow-up review certifies effective patch stdin independently from
 other heredoc descriptors, rejects opaque patch streams on both guards and keeps
