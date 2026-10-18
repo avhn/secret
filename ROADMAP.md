@@ -143,6 +143,12 @@ controls cover both adapters; exact inventory, divergence and denied-variant
 refreshes remain integration gates. Native runtime CI and installed-host failure
 checks are still required before declaring M2 complete.
 
+Confirmation audit 26 bounds Bash raw protected-name scans and removes repeated
+suffix matching on long dotted literals. Go shares member-chain and executable
+option normalization across interpreter analysis, including Ruby encoding operands
+and numeric clusters. Synthetic deadline, protected-launch and must-allow controls
+cover both adapters; native runtime CI and installed-host checks remain required.
+
 Merge rule P22: M2 merges when every applicable CI job is green and a full
 three-angle confirmation audit finds no Go-looser split (class ii) and no crash,
 hang past budget, fail-open or malformed-input allow (class iv). Shared or

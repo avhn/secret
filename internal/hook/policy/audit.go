@@ -273,8 +273,12 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 		return true
 	}
 	if interpreter(name) || name == "sed" || name == "vim" || name == "vi" || name == "nvim" || name == "ex" {
+		codeArgs := args
+		if interpreter(name) {
+			codeArgs = interpreterCodeArgs(name, args)
+		}
 		skip := 0
-		for i, code := range args {
+		for i, code := range codeArgs {
 			if skip > 0 {
 				skip--
 				continue
@@ -283,7 +287,7 @@ func (a *analyzer) auditCommand(name string, args []string, depth int, cwd strin
 				skip = 2
 				continue
 			}
-			if (name == "node" || name == "nodejs") && (code == "--env-file" || strings.HasPrefix(code, "--env-file=") || i > 0 && args[i-1] == "--env-file") {
+			if (name == "node" || name == "nodejs") && (code == "--env-file" || strings.HasPrefix(code, "--env-file=") || i > 0 && codeArgs[i-1] == "--env-file") {
 				continue
 			}
 			if interpreter(name) && name != "jq" && environmentCode(code) && !direct {

@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Probe each Bash Git write-target candidate once and cache Git-path anchor
+  context per decision, removing duplicate metadata work that exhausted the
+  shared deadline on stock macOS Bash 3.2 for Ruby interpolated-regex literals.
+  Add synthetic cache, scope, failure and deadline controls in CI.
+
+- Normalize Go interpreter member chains across spaces and newlines before
+  literal launch classification. Split attached and clustered executable-code
+  options through a shared interpreter grammar, retaining both JavaScript -pe
+  witnesses and stopping at value-taking flags, including Ruby encoding operands
+  and optional numeric clusters. Cover Python/PyPy, Ruby, Perl,
+  JavaScript runtimes, Lua/LuaJIT, PHP, Rscript and awk/gawk, while preserving
+  positional jq/yq filters. Add protected-launch and must-allow regressions for
+  both host adapters, string/argv envelopes, env wrappers and executable stdin,
+  with quoted API text, comments, regex data and public commands kept inert.
+
 - Share Go interpreter literal metadata and Git configuration-path proofs across
   sibling child analyses, avoiding repeated filesystem lookups at the 256-literal
   boundary on slow runners. Keep cwd and effective configuration paths in cache
@@ -12,9 +27,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
   witnesses. Add deterministic simulated-slow-resolver and cache-scope controls
   without raising work limits or changing the boundary allow expectations.
 
-- Bound Bash interpreter Git-path extraction and physical ancestor resolution
-  with subprocess alarms and the shared decision deadline. Cap unnormalized
-  envelope paths before filesystem work. Validate confirmed shell framing with
+- Bound Bash raw protected-name scanning, interpreter Git-path extraction and
+  physical ancestor resolution with subprocess alarms and the shared decision
+  deadline. Match filename word runs once rather than retrying every suffix of
+  long dotted-call literals, and deny incomplete raw scans in every caller.
+  Preserve public literal, filename-suffix and inert writer controls, with
+  four-second Node/Python heredoc regressions and injected scanner timeouts.
+  Cap unnormalized envelope paths before filesystem work. Validate confirmed
+  shell framing with
   a bounded noexec parser, denying unfinished operators and compound commands
   without executing source. Keep heuristic literal scans best effort, retaining
   printer witnesses before malformed trailing text and allowing printed prose

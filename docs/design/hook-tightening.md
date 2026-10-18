@@ -1331,3 +1331,39 @@ witnesses. Both shell suites add 28 stdin/inline deny and public-data controls f
 the launch corpus. Existing broad Bash environment-name and indirect-write
 policies remain unchanged; these targeted controls do not claim parity for every
 safe source-language spelling.
+
+## Confirmation audit 26: bounded Bash scans and shared Go source normalization
+
+- R1: bound raw protected-name scans with a 200 ms subprocess alarm and the
+  shared analysis deadline. Match filename word runs once, without retrying
+  every suffix of long literals. Incomplete scans deny in every caller.
+  Synthetic Node/Python dotted-call heredocs include ordinary public literals,
+  protected names, inert writer data and injected scanner timeouts on both
+  adapters. Oversized source denies within the subprocess test deadline.
+- R2: normalize unquoted member-access chains before literal launch recognition
+  in the shared interpreter tokenizer. Spaces, tabs and newlines around a dot
+  do not hide Deno.Command or another recognized member API. Literal strings,
+  regex data and unrelated Ruby/Perl statement newlines remain separate tokens.
+  Numeric words stay separate so member normalization cannot reduce work counts.
+  Inline source, heredocs, here-strings, producer input and argv share the rule.
+- R3: split attached executable-code options into option and source before the
+  shared interpreter audit. The option grammar covers Python/PyPy -c, Ruby -e,
+  Perl -e/-E, JavaScript -e/-p/--eval=/--print=, Lua/LuaJIT -e, PHP -r/-B/-R/-E
+  and their long forms, Rscript -e and awk/gawk -e/--source=. Recognized
+  short-option clusters retain the code suffix with optional numeric Perl/Ruby
+  flags, including Ruby -0/-0777 record separators. Value-taking flags consume
+  their operands and stop cluster parsing, including Ruby -E encoding operands
+  in attached and separate forms. Script operands and -- end option normalization;
+  positional jq/yq filters retain their data roles.
+  JavaScript -pe retains both code-bearing interpretations as positive witnesses
+  so a source word starting with e cannot be truncated out of recognition.
+
+Permanent coverage is `internal/hook/policy/audit26_test.go` and
+`internal/hook/audit26_test.go`. Both Claude and Codex adapters replay string and
+argv envelopes, env wrappers, separate/attached option forms and protected/public
+launch pairs. Member-chain cases also cover all executable stdin forms. Printed
+API text, comments, regexes, ordinary output and public jq/yq data remain must-allow
+controls. Tests analyze candidate source only, with synthetic metadata and a fake
+HOME. Bash R1 coverage is retained in `tests/test-guard.sh` and
+`tests/test-codex.sh`. Existing expectations are unchanged. Synthetic checks do
+not establish installed-host protection or native macOS/Windows behavior.

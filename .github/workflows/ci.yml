@@ -118,6 +118,8 @@ jobs:
         run: '"$BASH_BIN" tests/test-guard.sh'
       - name: Codex guard matrix
         run: '"$BASH_BIN" tests/test-codex.sh'
+      - name: Guard Git context cache
+        run: '"$BASH_BIN" tests/test-guard-context.sh'
       - name: Go Claude hook divergence matrix
         if: runner.os == 'Linux'
         run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh guard "$RUNNER_TEMP/secret-go" claude
@@ -133,6 +135,7 @@ jobs:
           /bin/bash tests/test-backends.sh
           /bin/bash tests/test-guard.sh
           /bin/bash tests/test-codex.sh
+          /bin/bash tests/test-guard-context.sh
           BASH_BIN=/bin/bash bash tests/inventory.sh --check
 
   go:

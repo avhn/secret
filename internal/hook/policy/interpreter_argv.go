@@ -171,7 +171,64 @@ func interpreterBodyTokens(code, name string, regexBody bool) []interpreterToken
 		}
 		tokens = append(tokens, interpreterToken{text: code[start:i]})
 	}
-	return tokens
+	return normalizeInterpreterMembers(tokens)
+}
+
+// Member-access whitespace is syntax, not part of an API name. Normalize only
+// unquoted identifier chains so strings, regexes and statement boundaries remain
+// data. All interpreter entry points use these same tokens before launch checks.
+func normalizeInterpreterMembers(tokens []interpreterToken) []interpreterToken {
+	identifier := func(token interpreterToken) bool {
+		if token.literal || token.witness || token.opaque || token.regexCode || token.indeterminate || token.text == "" || !interpreterIdentifier(token.text[0]) {
+			return false
+		}
+		// Numeric words have their own work-budget role. Do not merge them
+		// into a member name and accidentally reduce the literal count.
+		if token.text[0] >= '0' && token.text[0] <= '9' {
+			return false
+		}
+		for i := range token.text {
+			if !interpreterIdentifier(token.text[i]) && token.text[i] != '.' && token.text[i] != ':' {
+				return false
+			}
+		}
+		return true
+	}
+	next := func(i int) int {
+		for i < len(tokens) && tokens[i].text == "\n" && !tokens[i].literal {
+			i++
+		}
+		return i
+	}
+	out := tokens[:0]
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if identifier(token) {
+			var member strings.Builder
+			member.WriteString(token.text)
+			for {
+				j := next(i + 1)
+				dot := !strings.HasSuffix(tokens[i].text, ".")
+				if dot {
+					if j >= len(tokens) || tokens[j].literal || tokens[j].text != "." {
+						break
+					}
+					j = next(j + 1)
+				}
+				if j >= len(tokens) || !identifier(tokens[j]) {
+					break
+				}
+				if dot {
+					member.WriteByte('.')
+				}
+				member.WriteString(tokens[j].text)
+				i = j
+			}
+			token.text = member.String()
+		}
+		out = append(out, token)
+	}
+	return out
 }
 
 // Slash-delimited regex literals are opaque data, including escaped slashes,

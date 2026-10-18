@@ -143,6 +143,11 @@ print-access-token`, AWS credential and ECR/STS/SSO token output, Azure access
   normalization failure cannot certify a safe file target. Physical ancestor
   resolution checks that deadline before and after its alarm-bounded Perl
   subprocess, which also caps path separators before filesystem work.
+  Raw protected-name scanning has its own 200 ms subprocess alarm and checks
+  the shared budget before and after scanning. Filename word runs match only
+  from their start without backtracking, rather than retrying every suffix of
+  long public literals in dotted interpreter calls. Incomplete raw scans deny,
+  including oversized heredocs; inert quoted writer data retains its role.
   Interpreter Git-path and credential-literal scans use alarm-bounded extraction
   rather than whole-body Bash regex matching, check the shared budget while
   consuming literals, and deny incomplete extraction, including oversized

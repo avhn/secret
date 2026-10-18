@@ -4282,6 +4282,67 @@ for shape in argv triple print paths inline herestring inline_parameters herestr
     done
 done
 
+# Audit 26 R1: dotted calls must not make the raw protected-name matcher retry
+# every suffix of a long literal. Ordinary public literals and inert writer
+# bodies retain their allows; oversized interpreter literals still deny.
+for interpreter in node python3; do
+    for quote_style in single double; do
+        for shape in public secret suffix aws; do
+            for size in ordinary excessive; do
+                perl -MJSON::PP -e '
+                    my ($interpreter, $style, $shape, $size, $cwd) = @ARGV;
+                    my $quote = $style eq "single" ? chr(39) : chr(34);
+                    my $literal = "a" x ($size eq "ordinary" ? 1000 : 100000);
+                    $literal .= ".secret" if $shape eq "secret";
+                    $literal .= ".secretary" if $shape eq "suffix";
+                    $literal .= "/.aws/config" if $shape eq "aws";
+                    my $call = $interpreter eq "node" ? "console.log" : "sys.stdout.write";
+                    my $command = "$interpreter <<" . chr(39) . "CODE" . chr(39) .
+                        "\n$call($quote$literal$quote)\nCODE";
+                    print encode_json({tool_name => "Bash", cwd => $cwd,
+                        tool_input => {command => $command}});
+                ' "$interpreter" "$quote_style" "$shape" "$size" "$TMP" >"$TMP/audit23-envelope"
+                expected=allow
+                [[ "$shape" != secret && "$shape" != aws && "$size" != excessive ]] || expected=deny
+                audit23_envelope "audit26_r1_${interpreter}_${quote_style}_${shape}_$size" "$expected"
+            done
+        done
+    done
+done
+for writer in cat tee; do
+    perl -MJSON::PP -e '
+        my ($writer, $cwd) = @ARGV;
+        my $header = $writer eq "cat" ? "cat > notes.md" : "tee notes.md";
+        my $command = "$header <<" . chr(39) . "DATA" . chr(39) .
+            "\nconsole.log(\"" . ("a" x 100000) . ".secret\")\nDATA";
+        print encode_json({tool_name => "Bash", cwd => $cwd,
+            tool_input => {command => $command}});
+    ' "$writer" "$TMP" >"$TMP/audit23-envelope"
+    audit23_envelope "audit26_r1_inert_$writer" allow
+done
+
+# Delay only the raw-text scanner after it installs its own alarm. A timeout
+# must propagate as indeterminate in both oversized-body and argument scans.
+mkdir -p "$TMP/audit26-bin"
+# shellcheck disable=SC2016  # Perl source belongs to the synthetic dependency wrapper.
+printf '#!%s\nfor (@ARGV) {\n    next unless index($_, q{my $protected = qr}) >= 0;\n    s/alarm 0\\.2;/alarm 0.2; select undef, undef, undef, 0.4;/ or die "missing scanner alarm";\n}\nexec {%s} %s, @ARGV or die "exec failed";\n' \
+    "$(command -v perl)" "'$(command -v perl)'" "'$(command -v perl)'" >"$TMP/audit26-bin/perl"
+chmod +x "$TMP/audit26-bin/perl"
+printf '#!%s\nexport PATH=%q\nexec %q %q\n' "$BASH" "$TMP/audit26-bin:$PATH" "$BASH" "$REPO_ROOT/hooks/guard-secrets" >"$TMP/audit26-guard"
+for shape in oversized unknown body; do
+    perl -MJSON::PP -e '
+        my ($shape, $cwd) = @ARGV;
+        my $command = "unfamiliar public.txt";
+        $command = "node <<" . chr(39) . "CODE" . chr(39) .
+            "\nconsole.log(\"" . ("a" x 100000) . "\")\nCODE" if $shape eq "oversized";
+        $command = "cat > notes.md <<" . chr(39) . "DATA" . chr(39) .
+            "\npublic.txt\nDATA" if $shape eq "body";
+        print encode_json({tool_name => "Bash", cwd => $cwd,
+            tool_input => {command => $command}});
+    ' "$shape" "$TMP" >"$TMP/audit23-envelope"
+    audit23_envelope "audit26_r1_alarm_$shape" deny "$TMP/audit26-guard"
+done
+
 # Audit 25 Q9-Q11: every request is synthetic JSON, never executed source.
 # The subprocess alarm requires a decision before four seconds, including for
 # a single long regex witness and paths that have not yet been normalized.
