@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/avhn/secret/internal/cli"
 )
 
 func TestBashGoldens(t *testing.T) {
@@ -98,6 +100,11 @@ func TestBashGoldens(t *testing.T) {
 				want, er := os.ReadFile(filepath.Join(goldenDir, name+"."+ext))
 				if er != nil {
 					t.Fatal(er)
+				}
+				// M3 adds Go-only commands and corrects supervisor documentation.
+				// Keep the Bash help fixture frozen for its own compatibility gate.
+				if name == "help" && ext == "stdout" {
+					want = []byte(cli.UsageForTest)
 				}
 				if !bytes.Equal(got, want) {
 					t.Errorf("%s: got %q, want %q", ext, got, want)

@@ -3,19 +3,31 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/avhn/secret/internal/backend"
+	"github.com/avhn/secret/internal/feature"
+	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 )
 
 var launchKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// Unix supplies a signal-aware supervisor; Windows rejects before rendering.
+// Keeping one channel from creation through cleanup avoids a pre-spawn signal gap.
+type templateSupervisor interface {
+	runTemplateChild(args, env []string, values [][]byte, signals <-chan os.Signal) int
+}
+
 type launchOptions struct {
 	files, required, optional, args []string
 	selectors                       store.Selectors
+	templateFile                    string
 }
 
 func parseLaunch(args []string, loc store.Locator) (launchOptions, error) {
@@ -30,18 +42,18 @@ func parseLaunch(args []string, loc store.Locator) (launchOptions, error) {
 		}
 		value := ""
 		switch option {
-		case "-f", "--key", "--optional-key", "--env", "--label":
+		case "-f", "--key", "--optional-key", "--env", "--label", "--template-file":
 			if len(args) < 2 {
 				return o, errOptionArgument
 			}
 			value = args[1]
 			args = args[2:]
 		default:
-			if strings.HasPrefix(option, "--env=") || strings.HasPrefix(option, "--label=") {
+			if strings.HasPrefix(option, "--env=") || strings.HasPrefix(option, "--label=") || strings.HasPrefix(option, "--template-file=") {
 				option, value, _ = strings.Cut(option, "=")
 				args = args[1:]
 			} else {
-				return o, errors.New("expected -f, --key, --optional-key, --env, --label, or --")
+				return o, errors.New("expected -f, --key, --optional-key, --env, --label, --template-file, or --")
 			}
 		}
 		switch option {
@@ -55,6 +67,11 @@ func parseLaunch(args []string, loc store.Locator) (launchOptions, error) {
 			o.required = append(o.required, value)
 		case "--optional-key":
 			o.optional = append(o.optional, value)
+		case "--template-file":
+			if value == "" || o.templateFile != "" {
+				return o, feature.ErrTemplate
+			}
+			o.templateFile = value
 		default:
 			if e := o.selectors.AddSelector(option, value); e != nil {
 				return o, e
@@ -120,7 +137,7 @@ func childEnvironment(ambient []string, selection store.Selection, required, opt
 	return result, nil
 }
 
-func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err error) {
+func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, selected map[string][]byte, err error) {
 	var selections []store.Selection
 	var owned [][]byte
 	defer func() {
@@ -141,11 +158,11 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err
 		if providerRef(ref) {
 			records, e := backend.ListNames(c.dir, ref)
 			if e != nil {
-				return nil, nil, e
+				return nil, nil, nil, e
 			}
 			p, _, service, e := backend.Dispatch(ref)
 			if e != nil {
-				return nil, nil, e
+				return nil, nil, nil, e
 			}
 			// Read every registered record before selecting any export. A failed read
 			// must never silently reduce the redaction set.
@@ -153,25 +170,25 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err
 			for _, r := range records {
 				v, er := p.Get(service, r.Account)
 				if er != nil {
-					return nil, nil, errors.New("backend lookup failed")
+					return nil, nil, nil, errors.New("backend lookup failed")
 				}
 				owned = append(owned, v)
 				parsed = append(parsed, store.Record{Key: r.Key, Value: v, Labels: r.Labels})
 			}
 			selected, e := store.Select(parsed, o.selectors)
 			if e != nil {
-				return nil, nil, e
+				return nil, nil, nil, e
 			}
 			selections = append(selections, selected)
 		} else {
 			path := strings.TrimPrefix(ref, "file:")
 			info, e := os.Stat(path)
 			if e != nil || !info.Mode().IsRegular() {
-				return nil, nil, fmt.Errorf("%s is missing or not a regular file", path)
+				return nil, nil, nil, fmt.Errorf("%s is missing or not a regular file", path)
 			}
 			data, e := os.ReadFile(path)
 			if e != nil {
-				return nil, nil, errors.New("cannot open store")
+				return nil, nil, nil, errors.New("cannot open store")
 			}
 			parsed, warnings := store.Parse(data)
 			for _, w := range warnings {
@@ -181,7 +198,7 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err
 			if er != nil {
 				clearRecords(parsed)
 				clear(data)
-				return nil, nil, er
+				return nil, nil, nil, er
 			}
 			// Parser owns copies of every value; source bytes can be cleared now.
 			clear(data)
@@ -191,12 +208,23 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, err
 	selection := store.Merge(selections...)
 	env, err = childEnvironment(os.Environ(), selection, o.required, o.optional, c.loc.SecretsEnv)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return env, selection.AllValues, nil
+	selected = make(map[string][]byte)
+	for key, record := range selection.Matched {
+		if len(o.required)+len(o.optional) == 0 {
+			selected[key] = record.Value
+		}
+	}
+	for _, key := range append(append([]string(nil), o.required...), o.optional...) {
+		if record, ok := selection.Matched[key]; ok {
+			selected[key] = record.Value
+		}
+	}
+	return env, selection.AllValues, selected, nil
 }
 
-func (c command) launch(mode string, args []string) int {
+func (c command) launch(mode string, args []string) (status int) {
 	o, e := parseLaunch(args, c.loc)
 	if e != nil {
 		if errors.Is(e, errOptionArgument) {
@@ -207,7 +235,10 @@ func (c command) launch(mode string, args []string) int {
 	if launchUnsupported() {
 		return c.fail("run and exec are unsupported on Windows before M5a", 1)
 	}
-	env, values, e := c.prepareLaunch(o)
+	if mode == "exec" && o.templateFile != "" {
+		return c.fail("templates require supervised run", 1)
+	}
+	env, values, selected, e := c.prepareLaunch(o)
 	if e != nil {
 		return c.failure(e)
 	}
@@ -222,5 +253,73 @@ func (c command) launch(mode string, args []string) int {
 		}
 		return c.execChild(o.args, env)
 	}
+	if o.templateFile != "" {
+		supervisor, ok := any(c).(templateSupervisor)
+		if !ok {
+			return c.fail("templates require a supported supervisor", 1)
+		}
+		signals := make(chan os.Signal, 4)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+		defer signal.Stop(signals)
+		data, err := readLaunchTemplate(o.templateFile)
+		if err != nil {
+			return c.failure(err)
+		}
+		rendered, err := feature.RenderTemplate(c.loc.Home, data, selected)
+		secure.Clear(data)
+		if err != nil {
+			return c.failure(err)
+		}
+		defer func() {
+			if err := rendered.Close(); err != nil {
+				status = c.failure(err)
+			}
+			select {
+			case s := <-signals:
+				if status == 0 {
+					status = 128 + int(s.(syscall.Signal))
+				}
+			default:
+			}
+		}()
+		// Neither ambient nor selected store values can override the dedicated
+		// path. Contents never enter argv or this environment entry.
+		filtered := make([]string, 0, len(env)+1)
+		for _, entry := range env {
+			if !strings.HasPrefix(entry, "SECRET_TEMPLATE_FILE=") {
+				filtered = append(filtered, entry)
+			}
+		}
+		env = append(filtered, "SECRET_TEMPLATE_FILE="+rendered.Path())
+		if err := rendered.Validate(); err != nil {
+			if cleanupErr := rendered.Close(); cleanupErr != nil {
+				return c.failure(cleanupErr)
+			}
+			return c.failure(err)
+		}
+		return supervisor.runTemplateChild(o.args, env, values, signals)
+	}
 	return c.runChild(o.args, env, values)
+}
+
+func readLaunchTemplate(path string) ([]byte, error) {
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() || before.Size() > feature.MaxTemplateBytes {
+		return nil, feature.ErrTemplate
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, feature.ErrTemplate
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || !os.SameFile(before, info) || info.Size() > feature.MaxTemplateBytes {
+		return nil, feature.ErrTemplate
+	}
+	data, err := io.ReadAll(io.LimitReader(file, feature.MaxTemplateBytes+1))
+	if err != nil || len(data) > feature.MaxTemplateBytes {
+		secure.Clear(data)
+		return nil, feature.ErrTemplate
+	}
+	return data, nil
 }

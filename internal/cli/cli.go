@@ -98,7 +98,8 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 		if !isTerminal(out) {
 			return c.fail("get is human-terminal-only; use show or run instead", 1)
 		}
-	case "list", "show", "stash", "clip", "run", "exec":
+	case "list", "show", "stash", "clip", "run", "exec",
+		"import", "export", "rename", "rotate", "delete", "diff", "doctor", "completion", "audit", "mcp":
 	default:
 		return c.fail("unknown subcommand; use secret help", 1)
 	}
@@ -113,6 +114,9 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	}
 	c.dir = dir
 	c.loc = store.Locator{Home: home, SecretsDir: dir, SecretsEnv: env, IsFile: func(p string) bool { s, e := os.Stat(p); return e == nil && s.Mode().IsRegular() }, Glob: filepath.Glob}
+	if status, handled := c.featureCommand(sub, args); handled {
+		return status
+	}
 	if sub == "run" || sub == "exec" {
 		return c.launch(sub, args)
 	}

@@ -43,7 +43,7 @@ jobs:
       - name: Isolated Go libsecret integration
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
-        run: go test -v ./internal/backend -run '^TestLibsecretIntegration$' -count=1
+        run: go test -v ./internal/backend -run '^(TestLibsecretIntegration|TestOperatorLibsecretIntegration)$' -count=1
       - name: Check libsecret inventory
         run: bash tests/inventory.sh --check --suite libsecret
 
@@ -71,7 +71,7 @@ jobs:
       - name: Isolated Go Keychain integration
         env:
           SECRET_REQUIRE_KEYCHAIN: "1"
-        run: go test -v ./internal/backend -run '^TestKeychainIntegration$' -count=1
+        run: go test -v ./internal/backend -run '^(TestKeychainIntegration|TestOperatorKeychainIntegration)$' -count=1
       - name: Check keychain inventory
         env:
           SECRET_INVENTORY_STRICT: "1"
@@ -109,6 +109,8 @@ jobs:
         run: |
           go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
           go build -tags secretstub -o "$RUNNER_TEMP/secret-go-stub" ./cmd/secret
+      - name: Go operator terminal integration
+        run: python3 -I tests/test-operator.py "$RUNNER_TEMP/secret-go"
       - name: Go CLI matrix
         run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh secret "$RUNNER_TEMP/secret-go"
       - name: Go backend matrix
@@ -201,6 +203,13 @@ jobs:
           else
             go test -race -timeout 30m ./...
           fi
+      - name: Bounded feature fuzzing
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
+            go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
+          done
       - name: Check module files
         shell: bash
         run: go mod tidy && git diff --exit-code -- go.mod go.sum

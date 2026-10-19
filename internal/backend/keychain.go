@@ -6,10 +6,10 @@ import (
 	"errors"
 	"os"
 	"regexp"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 )
 
@@ -53,10 +53,13 @@ func parseKeychainPassword(raw []byte) ([]byte, error) {
 			if len(word) == 0 || len(word[0]) <= 2 {
 				break
 			}
-			value, err := hex.DecodeString(string(word[0][2:]))
-			if err == nil {
+			encoded := word[0][2:]
+			value := make([]byte, hex.DecodedLen(len(encoded)))
+			if _, err := hex.Decode(value, encoded); err == nil {
 				return value, nil
 			}
+			// Decode may have written a prefix before encountering invalid hex.
+			secure.Clear(value)
 			break
 		}
 		if len(line) >= 2 && line[0] == '"' && line[len(line)-1] == '"' {
@@ -72,7 +75,9 @@ func (p keychain) Get(service, account string) ([]byte, error) {
 	if !p.valid || !validProviderPair(service, account) {
 		return nil, errors.New("backend lookup failed")
 	}
-	_, raw, err := p.run("security", p.args("find-generic-password", "-s", service, "-a", account, "-g"), nil)
+	out, raw, err := p.run("security", p.args("find-generic-password", "-s", service, "-a", account, "-g"), nil)
+	defer secure.Clear(out)
+	defer secure.Clear(raw)
 	if err != nil {
 		return nil, errors.New("backend lookup failed")
 	}
@@ -80,8 +85,10 @@ func (p keychain) Get(service, account string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer secure.Clear(value)
 	normal, err := store.NormalizeValue(value)
 	if err != nil || !bytes.Equal(value, normal) {
+		secure.Clear(normal)
 		return nil, errors.New("backend lookup failed")
 	}
 	return normal, nil
@@ -89,13 +96,12 @@ func (p keychain) Get(service, account string) ([]byte, error) {
 
 // keychainText rejects bytes security cannot reliably return through its text API.
 func keychainText(value []byte) bool {
-	if !utf8.Valid(value) {
-		return false
-	}
-	for _, r := range string(value) {
-		if unicode.IsControl(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
+	for len(value) > 0 {
+		r, size := utf8.DecodeRune(value)
+		if (r == utf8.RuneError && size == 1) || unicode.IsControl(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r) {
 			return false
 		}
+		value = value[size:]
 	}
 	return true
 }
@@ -106,35 +112,47 @@ func (p keychain) Put(service, account, label string, value []byte) error {
 		return errors.New("backend put failed")
 	}
 	value, err := store.NormalizeValue(value)
+	defer secure.Clear(value)
 	if err != nil || !keychainText(value) {
 		return errors.New("backend put failed")
 	}
 	if len(value) > 1800 {
 		return ErrValueTooLarge
 	}
-	var line strings.Builder
-	line.Grow(128 + 2*len(value) + len(p.path))
-	line.WriteString("add-generic-password -U -s ")
-	line.WriteString(service)
-	line.WriteString(" -a ")
-	line.WriteString(account)
-	line.WriteString(" -l ")
-	line.WriteString(label)
-	line.WriteString(" -X ")
-	line.WriteString(hex.EncodeToString(value))
+	const prefix = "add-generic-password -U -s "
+	lineSize := len(prefix) + len(service) + len(" -a ") + len(account) + len(" -l ") + len(label) + len(" -X ") + hex.EncodedLen(len(value)) + 1
 	if p.path != "" {
-		line.WriteByte(' ')
-		line.WriteString(p.path)
+		lineSize += 1 + len(p.path)
 	}
-	line.WriteByte('\n')
-	if line.Len() > 4000 {
+	if lineSize > 4000 {
 		return ErrValueTooLarge
 	}
-	_, _, err = p.run("security", []string{"-i"}, []byte(line.String()))
+	// Allocate once so growing the command cannot abandon encoded value bytes.
+	line := make([]byte, 0, lineSize)
+	defer secure.Clear(line)
+	line = append(line, prefix...)
+	line = append(line, service...)
+	line = append(line, " -a "...)
+	line = append(line, account...)
+	line = append(line, " -l "...)
+	line = append(line, label...)
+	line = append(line, " -X "...)
+	start := len(line)
+	line = line[:start+hex.EncodedLen(len(value))]
+	hex.Encode(line[start:], value)
+	if p.path != "" {
+		line = append(line, ' ')
+		line = append(line, p.path...)
+	}
+	line = append(line, '\n')
+	out, raw, err := p.run("security", []string{"-i"}, line)
+	secure.Clear(out)
+	secure.Clear(raw)
 	if err != nil {
 		return errors.New("backend put failed")
 	}
 	got, err := p.Get(service, account)
+	defer secure.Clear(got)
 	if err != nil || !bytes.Equal(got, value) {
 		return errors.New("backend put failed")
 	}
@@ -146,7 +164,9 @@ func (p keychain) Delete(service, account string) error {
 	if !p.valid || !validProviderPair(service, account) {
 		return errors.New("backend delete failed")
 	}
-	_, _, err := p.run("security", p.args("delete-generic-password", "-s", service, "-a", account), nil)
+	out, raw, err := p.run("security", p.args("delete-generic-password", "-s", service, "-a", account), nil)
+	defer secure.Clear(out)
+	defer secure.Clear(raw)
 	if err != nil {
 		return errors.New("backend delete failed")
 	}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 )
 
@@ -58,6 +59,7 @@ func (w *limitedOutput) Write(p []byte) (int, error) {
 // ReadFrom routes exec's optimized pipe copy through the same output bound.
 func (w *limitedOutput) ReadFrom(r io.Reader) (int64, error) {
 	chunk := make([]byte, 8192)
+	defer secure.Clear(chunk)
 	var total int64
 	for {
 		n, err := r.Read(chunk)
@@ -93,10 +95,12 @@ func runProvider(name string, args []string, input []byte) ([]byte, []byte, erro
 	if errors.Is(err, exec.ErrWaitDelay) {
 		stopProviderProcess(cmd)
 	}
-	if stdout.exceeded || stderr.exceeded {
-		return nil, nil, errors.New("provider output limit exceeded")
-	}
-	if err != nil {
+	if stdout.exceeded || stderr.exceeded || err != nil {
+		secure.Clear(stdout.Bytes())
+		secure.Clear(stderr.Bytes())
+		if stdout.exceeded || stderr.exceeded {
+			return nil, nil, errors.New("provider output limit exceeded")
+		}
 		return nil, nil, errors.New("provider call failed")
 	}
 	return stdout.Bytes(), stderr.Bytes(), nil

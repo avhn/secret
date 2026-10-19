@@ -1,11 +1,15 @@
 package store
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/avhn/secret/internal/secure"
 )
 
 func TestManifestValidation(t *testing.T) {
@@ -115,5 +119,157 @@ func TestManifestPublish(t *testing.T) {
 		}
 	} else {
 		t.Log("Windows file ACLs do not expose Unix permission bits")
+	}
+}
+
+func TestWholeManifestPublication(t *testing.T) {
+	mutationPlatform(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "synthetic.keys")
+	prior := []ManifestRecord{{Key: "KEY", Account: "11111111111111111111111111111111"}}
+	if err := WithWriteLock(dir, func() error { return PublishManifestLocked(path, "libsecret", prior) }); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, records := range [][]ManifestRecord{
+		{{Key: "BAD-KEY", Account: prior[0].Account}},
+		{{Key: "KEY", Account: "not-an-account"}},
+		{prior[0], prior[0]},
+		{prior[0], {Key: "OTHER", Account: prior[0].Account}},
+		{prior[0], {Key: "KEY", Account: "22222222222222222222222222222222"}},
+	} {
+		if err := WithWriteLock(dir, func() error { return PublishManifestLocked(path, "libsecret", records) }); err == nil {
+			t.Error("invalid whole inventory accepted")
+		}
+		got, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(got, original) {
+			t.Fatal("failed batch changed the previous manifest")
+		}
+	}
+	if err := WithWriteLock(dir, func() error { return PublishManifestLocked(path, "libsecret", nil) }); err != nil {
+		t.Fatal(err)
+	}
+	records, err := ReadManifest(path, "libsecret")
+	if err != nil || len(records) != 0 {
+		t.Fatal("empty whole inventory was not published")
+	}
+}
+
+func TestManifestEditorRecoveryProtocol(t *testing.T) {
+	mutationPlatform(t)
+	path := filepath.Join(t.TempDir(), "synthetic.keys")
+	prepared := ManifestRecord{Key: "NEW", Labels: map[string]string{"env": "dev"}, Account: "22222222222222222222222222222222"}
+	intent := RecoveryIntent{Version: MetadataVersion, Backend: "keychain", Prepared: []ManifestRecord{prepared}}
+	var expired *ManifestEditor
+	if err := WithManifestLock(path, "keychain", func(editor *ManifestEditor) error {
+		expired = editor
+		if err := editor.Publish([]ManifestRecord{prepared}); err != secure.ErrRecovery {
+			t.Fatal("publish before recovery was accepted")
+		}
+		if err := editor.PersistRecovery(intent); err != nil {
+			return err
+		}
+		if err := editor.ClearRecovery(); err != secure.ErrRecovery {
+			t.Fatal("cleared recovery before publication")
+		}
+		got, err := ReadRecovery(path, "keychain")
+		if err != nil || len(got.Prepared) != 1 || got.Prepared[0].Account != prepared.Account {
+			t.Fatal("persisted recovery intent differs")
+		}
+		info, err := os.Stat(path + ".recovery")
+		if err != nil || info.Mode().Perm() != 0600 {
+			t.Fatal("recovery intent is not private")
+		}
+		if err := editor.PersistRecovery(intent); err != secure.ErrRecovery {
+			t.Fatal("overwrote existing recovery")
+		}
+		if err := editor.Publish([]ManifestRecord{prepared}); err != nil {
+			return err
+		}
+		return editor.ClearRecovery()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if expired.Publish(nil) != secure.ErrRecovery || expired.PersistRecovery(intent) != secure.ErrRecovery || expired.ClearRecovery() != secure.ErrRecovery {
+		t.Fatal("expired editor accepted mutation")
+	}
+	if _, err := ReadRecovery(path, "keychain"); !os.IsNotExist(err) {
+		t.Fatal("completed transaction left recovery intent")
+	}
+	// Retaining incomplete intent can never report a successful transaction.
+	if err := WithManifestLock(path, "keychain", func(editor *ManifestEditor) error {
+		return editor.PersistRecovery(intent)
+	}); err != secure.ErrRecovery {
+		t.Fatalf("incomplete transaction result: %v", err)
+	}
+	called := false
+	if err := WithManifestLock(path, "keychain", func(*ManifestEditor) error { called = true; return nil }); err != secure.ErrRecovery || called {
+		t.Fatal("pending recovery did not block callback")
+	}
+}
+
+func TestRecoveryValidationAndAliases(t *testing.T) {
+	mutationPlatform(t)
+	for _, tc := range []struct {
+		name, body string
+		mode       os.FileMode
+	}{
+		{"invalid version", `{"version":2,"backend":"keychain","prepared":[],"obsolete":[]}`, 0600},
+		{"backend mismatch", `{"version":1,"backend":"libsecret","prepared":[],"obsolete":[]}`, 0600},
+		{"unexpected field", `{"version":1,"backend":"keychain","value":"synthetic-sentinel"}`, 0600},
+		{"trailing document", `{"version":1,"backend":"keychain"} {}`, 0600},
+		{"unprotected", `{"version":1,"backend":"keychain"}`, 0644},
+		{"oversize", strings.Repeat(" ", recoveryLimit+1), 0600},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "synthetic.keys")
+			if err := os.WriteFile(path+".recovery", []byte(tc.body), tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ReadRecovery(path, "keychain"); err != secure.ErrRecovery {
+				t.Fatalf("invalid recovery result: %v", err)
+			}
+		})
+	}
+	path := filepath.Join(t.TempDir(), "synthetic.keys")
+	if err := os.Symlink("missing", path+".recovery"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadRecovery(path, "keychain"); err != secure.ErrRecovery {
+		t.Fatal("followed aliased recovery")
+	}
+	if err := WithManifestLock(path, "keychain", func(*ManifestEditor) error { t.Fatal("aliased recovery allowed mutation"); return nil }); err != secure.ErrRecovery {
+		t.Fatal("aliased recovery did not block transaction")
+	}
+	// Recovery validates exact names and cross-phase account uniqueness.
+	record := ManifestRecord{Key: "KEY", Account: "11111111111111111111111111111111"}
+	if validateRecovery(RecoveryIntent{Version: MetadataVersion, Backend: "keychain", Prepared: []ManifestRecord{record}, Obsolete: []ManifestRecord{record}}, "keychain") != secure.ErrRecovery {
+		t.Fatal("recovery account collision accepted")
+	}
+	data, err := json.Marshal(RecoveryIntent{Version: MetadataVersion, Backend: "keychain", Prepared: []ManifestRecord{record}})
+	if err != nil || bytes.Contains(data, []byte("synthetic-sentinel")) || bytes.Contains(data, []byte("value")) || bytes.Contains(data, []byte("length")) || bytes.Contains(data, []byte("digest")) {
+		t.Fatal("recovery contains value-bearing metadata")
+	}
+}
+
+func TestManifestOperatorWindowsRefusal(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows early refusal")
+	}
+	path := filepath.Join(t.TempDir(), "missing", "synthetic.keys")
+	if err := WithManifestLock(path, "keychain", func(*ManifestEditor) error { t.Fatal("Windows callback invoked"); return nil }); err != secure.ErrUnsupported {
+		t.Fatal("Windows lock did not reject")
+	}
+	if err := PublishManifestLocked(path, "keychain", nil); err != secure.ErrUnsupported {
+		t.Fatal("Windows publisher did not reject")
+	}
+	if _, err := ReadRecovery(path, "keychain"); err != secure.ErrUnsupported {
+		t.Fatal("Windows recovery did not reject")
+	}
+	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
+		t.Fatal("unsupported operator created a directory")
 	}
 }

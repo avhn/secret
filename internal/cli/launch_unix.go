@@ -90,14 +90,27 @@ func (w timedWriter) Write(p []byte) (int, error) {
 	}
 }
 
+// A stalled stderr consumer must not hold template cleanup behind diagnostics.
+func (c command) runFailure(message string) int {
+	_, _ = (timedWriter{c.errOut}).Write([]byte("secret: " + message + "\n"))
+	return 1
+}
+
 func (c command) runChild(args, env []string, values [][]byte) int {
+	signals := make(chan os.Signal, 4)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	defer signal.Stop(signals)
+	return c.runTemplateChild(args, env, values, signals)
+}
+
+func (c command) runTemplateChild(args, env []string, values [][]byte, signals <-chan os.Signal) int {
 	matcher, e := transport.NewMatcher(values)
 	if e != nil {
-		return c.failure(e)
+		return c.runFailure(e.Error())
 	}
 	path, e := childPath(args[0], env)
 	if e != nil {
-		return c.fail("child launch failed", 1)
+		return c.runFailure("child launch failed")
 	}
 	cmd := exec.Command(path, args[1:]...)
 	cmd.Args[0] = args[0]
@@ -106,60 +119,74 @@ func (c command) runChild(args, env []string, values [][]byte) int {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdout, outWrite, e := os.Pipe()
 	if e != nil {
-		return c.fail("redaction filter failed", 1)
+		return c.runFailure("redaction filter failed")
 	}
 	stderr, errWrite, e := os.Pipe()
 	if e != nil {
 		stdout.Close()
 		outWrite.Close()
-		return c.fail("redaction filter failed", 1)
+		return c.runFailure("redaction filter failed")
 	}
 	cmd.Stdout = outWrite
 	cmd.Stderr = errWrite
-	signals := make(chan os.Signal, 2)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	defer signal.Stop(signals)
+	select {
+	case s := <-signals:
+		stdout.Close()
+		stderr.Close()
+		outWrite.Close()
+		errWrite.Close()
+		return 128 + int(s.(syscall.Signal))
+	default:
+	}
 	if e = cmd.Start(); e != nil {
 		stdout.Close()
 		stderr.Close()
 		outWrite.Close()
 		errWrite.Close()
-		return c.fail("child launch failed", 1)
+		return c.runFailure("child launch failed")
 	}
 	outWrite.Close()
 	errWrite.Close()
 	defer stdout.Close()
 	defer stderr.Close()
-	done := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case s := <-signals:
-				_ = syscall.Kill(-cmd.Process.Pid, s.(syscall.Signal))
-			case <-done:
-				return
-			}
-		}
-	}()
-	defer close(done)
+	// A descendant can close both pipes and outlive the direct child. Always
+	// stop the process group before returning, including successful completion,
+	// so the caller can remove a template only after explicit group shutdown.
+	defer func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }()
 	filters := make(chan error, 2)
 	go func() { filters <- matcher.Filter(stdout, timedWriter{c.out}) }()
 	go func() { filters <- matcher.Filter(stderr, timedWriter{c.errOut}) }()
 	waited := make(chan error, 1)
 	go func() { waited <- cmd.Wait() }()
-	var drain <-chan time.Time
-	var timeout *time.Timer
+	var drain, terminate <-chan time.Time
+	var timeout, signalTimeout *time.Timer
 	defer func() {
 		if timeout != nil {
 			timeout.Stop()
+		}
+		if signalTimeout != nil {
+			signalTimeout.Stop()
 		}
 	}()
 	received := 0
 	failed := false
 	var status error
 	waitDone := false
+	interrupted := 0
 	for received < 2 || !waitDone {
 		select {
+		case s := <-signals:
+			sig := s.(syscall.Signal)
+			_ = syscall.Kill(-cmd.Process.Pid, sig)
+			if interrupted == 0 {
+				interrupted = 128 + int(sig)
+				signalTimeout = time.NewTimer(2 * time.Second)
+				terminate = signalTimeout.C
+			}
+		case <-terminate:
+			// Do not let an ignored catchable signal keep plaintext alive.
+			terminate = nil
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		case er := <-filters:
 			received++
 			if er != nil {
@@ -178,11 +205,14 @@ func (c command) runChild(args, env []string, values [][]byte) int {
 			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 			_ = stdout.Close()
 			_ = stderr.Close()
-			return c.fail("redaction filter failed", 1)
+			return c.runFailure("redaction filter failed")
 		}
 	}
 	if failed {
-		return c.fail("redaction filter failed", 1)
+		return c.runFailure("redaction filter failed")
+	}
+	if interrupted != 0 {
+		return interrupted
 	}
 	return childStatus(status)
 }

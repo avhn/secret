@@ -1,0 +1,180 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 0,
+    "result": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {
+        "tools": {}
+      },
+      "serverInfo": {
+        "name": "secret-metadata",
+        "version": "1"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "tools": [
+        {
+          "name": "list",
+          "description": "List names and labels in explicitly allowlisted stores",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "openWorldHint": false
+          }
+        },
+        {
+          "name": "show",
+          "description": "Show names-only metadata for one allowlisted store",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "reference": {
+                "type": "string"
+              },
+              "selectors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "reference"
+            ],
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "openWorldHint": false
+          }
+        },
+        {
+          "name": "diff",
+          "description": "Compare selected names, labels, presence and backend only",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "left": {
+                "type": "string"
+              },
+              "right": {
+                "type": "string"
+              },
+              "left_selectors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "right_selectors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "left",
+              "right"
+            ],
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "openWorldHint": false
+          }
+        },
+        {
+          "name": "health",
+          "description": "Report configured metadata service readiness, not host protection",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "annotations": {
+            "readOnlyHint": true,
+            "destructiveHint": false,
+            "openWorldHint": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"version\":1,\"stores\":[{\"reference\":\"libsecret:synthetic\",\"backend\":\"libsecret\",\"records\":[{\"key\":\"TOKEN\",\"labels\":{},\"present\":true,\"account\":\"0123456789abcdef0123456789abcdef\"},{\"key\":\"TOKEN\",\"labels\":{\"env\":\"prod\"},\"present\":true,\"account\":\"fedcba9876543210fedcba9876543210\"},{\"key\":\"ONLY_PROD\",\"labels\":{\"env\":\"prod\"},\"present\":true,\"account\":\"11111111111111111111111111111111\"}]}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"version\":1,\"stores\":[{\"reference\":\"libsecret:synthetic\",\"backend\":\"libsecret\",\"records\":[{\"key\":\"TOKEN\",\"labels\":{},\"present\":true,\"account\":\"0123456789abcdef0123456789abcdef\"},{\"key\":\"ONLY_PROD\",\"labels\":{},\"present\":false}]}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"version\":1,\"left\":{\"reference\":\"libsecret:synthetic\",\"backend\":\"libsecret\",\"selectors\":{\"env\":\"prod\"}},\"right\":{\"reference\":\"libsecret:synthetic\",\"backend\":\"libsecret\",\"selectors\":{\"env\":\"dev\"}},\"records\":[{\"key\":\"TOKEN\",\"left\":{\"present\":true,\"labels\":{\"env\":\"prod\"}},\"right\":{\"present\":true,\"labels\":{}}},{\"key\":\"ONLY_PROD\",\"left\":{\"present\":true,\"labels\":{\"env\":\"prod\"}},\"right\":{\"present\":false,\"labels\":{}}}]}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"version\":1,\"status\":\"ready\",\"stores\":1}"
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 6,
+    "error": {
+      "code": -32602,
+      "message": "Metadata tool is not available"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "error": {
+      "code": -32602,
+      "message": "Store is not allowlisted"
+    }
+  }
+]

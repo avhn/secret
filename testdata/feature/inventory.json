@@ -1,0 +1,181 @@
+{
+  "inventory": {
+    "version": 1,
+    "stores": [
+      {
+        "reference": "file:/synthetic/team.secret",
+        "backend": "file",
+        "records": [
+          {
+            "key": "TOKEN",
+            "labels": {},
+            "present": true
+          },
+          {
+            "key": "TOKEN",
+            "labels": {},
+            "present": true
+          },
+          {
+            "key": "EMPTY",
+            "labels": {},
+            "present": true
+          },
+          {
+            "key": "TOKEN",
+            "labels": {
+              "env": "prod"
+            },
+            "present": true
+          },
+          {
+            "key": "ONLY_PROD",
+            "labels": {
+              "env": "prod"
+            },
+            "present": true
+          },
+          {
+            "key": "DEV",
+            "labels": {
+              "env": "dev"
+            },
+            "present": true
+          }
+        ]
+      }
+    ]
+  },
+  "selected": {
+    "version": 1,
+    "stores": [
+      {
+        "reference": "file:/synthetic/team.secret",
+        "backend": "file",
+        "records": [
+          {
+            "key": "TOKEN",
+            "labels": {
+              "env": "prod"
+            },
+            "present": true
+          },
+          {
+            "key": "EMPTY",
+            "labels": {},
+            "present": true
+          },
+          {
+            "key": "ONLY_PROD",
+            "labels": {
+              "env": "prod"
+            },
+            "present": true
+          },
+          {
+            "key": "DEV",
+            "labels": {},
+            "present": false
+          }
+        ]
+      }
+    ]
+  },
+  "diff": {
+    "version": 1,
+    "left": {
+      "reference": "file:/synthetic/team.secret",
+      "backend": "file",
+      "selectors": {
+        "env": "prod"
+      }
+    },
+    "right": {
+      "reference": "file:/synthetic/team.secret",
+      "backend": "file",
+      "selectors": {
+        "env": "dev"
+      }
+    },
+    "records": [
+      {
+        "key": "TOKEN",
+        "left": {
+          "present": true,
+          "labels": {
+            "env": "prod"
+          }
+        },
+        "right": {
+          "present": true,
+          "labels": {}
+        }
+      },
+      {
+        "key": "EMPTY",
+        "left": {
+          "present": true,
+          "labels": {}
+        },
+        "right": {
+          "present": true,
+          "labels": {}
+        }
+      },
+      {
+        "key": "ONLY_PROD",
+        "left": {
+          "present": true,
+          "labels": {
+            "env": "prod"
+          }
+        },
+        "right": {
+          "present": false,
+          "labels": {}
+        }
+      },
+      {
+        "key": "DEV",
+        "left": {
+          "present": false,
+          "labels": {}
+        },
+        "right": {
+          "present": true,
+          "labels": {
+            "env": "dev"
+          }
+        }
+      }
+    ]
+  },
+  "empty": {
+    "version": 1,
+    "stores": []
+  },
+  "provider": {
+    "version": 1,
+    "stores": [
+      {
+        "reference": "libsecret:synthetic",
+        "backend": "libsecret",
+        "records": [
+          {
+            "key": "TOKEN",
+            "labels": {
+              "env": "prod"
+            },
+            "present": true,
+            "account": "0123456789abcdef0123456789abcdef"
+          }
+        ]
+      },
+      {
+        "reference": "file:/synthetic/team.secret",
+        "backend": "file",
+        "records": []
+      }
+    ]
+  }
+}

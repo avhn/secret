@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "kind": "compatibility",
+      "target": "<platform>",
+      "status": "limited",
+      "detail": "Go operators are staged; the installed Bash CLI and guard remain unchanged"
+    },
+    {
+      "kind": "alias",
+      "target": "<root>/private.env",
+      "status": "direct",
+      "detail": "metadata-only ancestor inspection; concurrent changes remain possible"
+    },
+    {
+      "kind": "mode",
+      "target": "<root>/private.env",
+      "status": "private",
+      "detail": "mode 0600; owner identity and host trust are not certified"
+    },
+    {
+      "kind": "alias",
+      "target": "<root>/insecure.env",
+      "status": "direct",
+      "detail": "metadata-only ancestor inspection; concurrent changes remain possible"
+    },
+    {
+      "kind": "mode",
+      "target": "<root>/insecure.env",
+      "status": "insecure",
+      "detail": "mode 0644; owner identity and host trust are not certified"
+    },
+    {
+      "kind": "alias",
+      "target": "<root>/alias",
+      "status": "alias",
+      "detail": "metadata-only ancestor inspection; concurrent changes remain possible"
+    },
+    {
+      "kind": "mode",
+      "target": "<root>/alias",
+      "status": "unavailable",
+      "detail": "mode not certified for missing, aliased or inaccessible paths"
+    },
+    {
+      "kind": "alias",
+      "target": "<root>/stores",
+      "status": "direct",
+      "detail": "metadata-only ancestor inspection; concurrent changes remain possible"
+    },
+    {
+      "kind": "mode",
+      "target": "<root>/stores",
+      "status": "private",
+      "detail": "mode 0700; owner identity and host trust are not certified"
+    },
+    {
+      "kind": "artifact",
+      "target": "bash_guard",
+      "status": "present",
+      "detail": "presence and mode are not activation or provenance verification"
+    },
+    {
+      "kind": "checksum",
+      "target": "bash_guard",
+      "status": "matched",
+      "detail": "matches supplied digest only; provenance and host trust require separate verification"
+    },
+    {
+      "kind": "artifact",
+      "target": "go_launcher",
+      "status": "not_installed",
+      "detail": "explicit artifact path does not exist"
+    },
+    {
+      "kind": "checksum",
+      "target": "go_launcher",
+      "status": "unavailable",
+      "detail": "artifact is not installed"
+    },
+    {
+      "kind": "artifact",
+      "target": "claude_config",
+      "status": "unavailable",
+      "detail": "no explicit installed artifact supplied"
+    },
+    {
+      "kind": "checksum",
+      "target": "claude_config",
+      "status": "unavailable",
+      "detail": "no trusted pinned checksum supplied"
+    },
+    {
+      "kind": "artifact",
+      "target": "codex_config",
+      "status": "unavailable",
+      "detail": "no explicit installed artifact supplied"
+    },
+    {
+      "kind": "checksum",
+      "target": "codex_config",
+      "status": "unavailable",
+      "detail": "no trusted pinned checksum supplied"
+    },
+    {
+      "kind": "hook_activation",
+      "target": "claude",
+      "status": "unverified",
+      "detail": "host activation and failure blocking require actual-host evidence"
+    },
+    {
+      "kind": "hook_activation",
+      "target": "codex",
+      "status": "unverified",
+      "detail": "Bash guard retained; host hook failures are not proven to block"
+    },
+    {
+      "kind": "trust",
+      "target": "m4",
+      "status": "unavailable",
+      "detail": "release provenance and verified launcher cutover are not installed by M3"
+    },
+    {
+      "kind": "config_certification",
+      "target": "ripgrep",
+      "status": "unavailable",
+      "detail": "no explicit ripgrep config supplied"
+    },
+    {
+      "kind": "backend",
+      "target": "libsecret",
+      "status": "<platform>",
+      "detail": "<platform>"
+    },
+    {
+      "kind": "backend",
+      "target": "keychain",
+      "status": "<platform>",
+      "detail": "<platform>"
+    },
+    {
+      "kind": "alias",
+      "target": "<root>/stores/tracked.keys",
+      "status": "direct",
+      "detail": "metadata-only ancestor inspection; concurrent changes remain possible"
+    },
+    {
+      "kind": "mode",
+      "target": "<root>/stores/tracked.keys",
+      "status": "private",
+      "detail": "mode 0600; owner identity and host trust are not certified"
+    },
+    {
+      "kind": "recovery",
+      "target": "libsecret:tracked",
+      "status": "manual_verification",
+      "detail": "compare tracked accounts with the current manifest and provider before any manual removal; never blindly delete"
+    }
+  ],
+  "candidates": [
+    {
+      "reference": "libsecret:tracked",
+      "phase": "prepared",
+      "key": "TOKEN",
+      "labels": {
+        "env": "prod"
+      },
+      "account": "22222222222222222222222222222222"
+    },
+    {
+      "reference": "libsecret:tracked",
+      "phase": "obsolete",
+      "key": "TOKEN",
+      "labels": {},
+      "account": "11111111111111111111111111111111"
+    }
+  ]
+}

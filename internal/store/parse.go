@@ -12,6 +12,8 @@ var assignment = regexp.MustCompile(`^[ \t\r\n\v\f]*(?:export[ \t\r\n\v\f]+)?([A
 var header = regexp.MustCompile(`^\[((?:[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_][A-Za-z0-9_.-]*(?:,[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_][A-Za-z0-9_.-]*)*)?)\]$`)
 
 // Record retains byte values, labels and source line, including repeated identities.
+// Parse gives the caller independently owned Value bytes and Labels maps. The
+// caller must clear Value when finished; selection helpers borrow these bytes.
 type Record struct {
 	Key          string
 	Value        []byte
@@ -29,6 +31,12 @@ type Warning struct {
 // Parse reads LF-delimited bytes like the Bash CLI's Perl reader. Warnings
 // contain names and line numbers only, never source values.
 func Parse(data []byte) ([]Record, []Warning) {
+	return parse(data, true)
+}
+
+// parse validates the same byte grammar in both modes. Metadata mode borrows
+// source bytes for validation only and never allocates or retains a value copy.
+func parse(data []byte, retainValues bool) ([]Record, []Warning) {
 	var records []Record
 	var warnings []Warning
 	var ignored []string
@@ -96,7 +104,11 @@ func Parse(data []byte) ([]Record, []Warning) {
 			for k, v := range labels {
 				copyLabels[k] = v
 			}
-			records = append(records, Record{Key: key, Value: append([]byte(nil), value...), Labels: copyLabels, Line: n})
+			record := Record{Key: key, Labels: copyLabels, Line: n}
+			if retainValues {
+				record.Value = append([]byte(nil), value...)
+			}
+			records = append(records, record)
 			continue
 		}
 		if bytes.IndexByte(line, '=') >= 0 {
