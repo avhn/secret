@@ -138,6 +138,15 @@ func TestOperatorPTYHelper(t *testing.T) {
 		t.Fatal("synthetic PTY diagnostic sentinel")
 	}
 	fmt.Println("OPERATOR_PTY_OK")
+	if mode == "exit-drain" {
+		// Exceed the PTY output queue after the marker. Waiting for exit without
+		// draining now deadlocks even on Linux, independent of packet timing.
+		_, _ = os.Stdout.Write(bytes.Repeat([]byte{'d'}, 128<<10))
+		fmt.Println("OPERATOR_PTY_DRAINED")
+	}
+	if mode == "exit-timeout" {
+		time.Sleep(time.Hour) // Synthetic stalled exit; the driver must kill and reap.
+	}
 }
 
 func TestOperatorPTY(t *testing.T) {
@@ -152,15 +161,30 @@ func TestOperatorPTY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"long-value", "limit", "overflow", "overflow-edit", "cancel", "long-confirmation", "confirmation-overflow", "diagnostic-failure"} {
+	for _, mode := range []string{"long-value", "limit", "overflow", "overflow-edit", "cancel", "long-confirmation", "confirmation-overflow", "exit-drain", "diagnostic-failure", "input-timeout", "exit-timeout"} {
 		t.Run(mode, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			// The driver has a 20-second overall deadline, including writes and
+			// exit draining. Leave time for its bounded kill/reap diagnostics.
+			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, python, "-I", "-c", operatorPTYDriver, binary, mode)
 			// Even accidental future discovery in the helper stays in a disposable HOME.
 			home := t.TempDir()
 			cmd.Env = append(os.Environ(), "HOME="+home, "SECRETS_DIR="+filepath.Join(home, ".secrets"), "SECRETS_ENV="+filepath.Join(home, ".secrets.env"))
 			output, err := cmd.CombinedOutput()
+			if ctx.Err() != nil {
+				t.Fatalf("disposable PTY driver exceeded its overall deadline: %v\n%s", ctx.Err(), output)
+			}
+			if mode == "input-timeout" || mode == "exit-timeout" {
+				marker := "input timed out"
+				if mode == "exit-timeout" {
+					marker = "helper exit timed out"
+				}
+				if err == nil || !bytes.Contains(output, []byte(marker)) || !bytes.Contains(output, []byte("helper exit code: -9")) || bytes.Contains(output, bytes.Repeat([]byte{'s'}, 32)) {
+					t.Fatalf("disposable PTY timeout diagnostic missing or unsafe: %v\n%s", err, output)
+				}
+				return
+			}
 			if mode == "diagnostic-failure" {
 				if err == nil || bytes.Contains(output, bytes.Repeat([]byte{'s'}, 32)) {
 					t.Fatalf("disposable PTY failure diagnostic missing or unsafe: %v\n%s", err, output)
@@ -196,26 +220,44 @@ if pid == 0:
     env = dict(os.environ, SECRET_SYNTHETIC_OPERATOR_PTY=mode)
     os.execve(binary, [binary, "-test.run=^TestOperatorPTYHelper$"], env)
 
+os.set_blocking(master, False)
 transcript = bytearray()
-deadline = time.monotonic() + 25
+deadline = time.monotonic() + (1 if mode in ("input-timeout", "exit-timeout") else 20)
 reaped = False
+closed = False
+status = None
+
+def remaining(phase):
+    timeout = deadline - time.monotonic()
+    if timeout <= 0:
+        raise RuntimeError("disposable PTY " + phase + " timed out")
+    return min(timeout, 0.05)
+
+def receive(timeout):
+    global closed
+    if closed or not select.select([master], [], [], timeout)[0]:
+        return False
+    try:
+        chunk = os.read(master, 65536)
+    except BlockingIOError:
+        return False
+    except OSError as exc:
+        if exc.errno != errno.EIO:
+            raise
+        chunk = b""
+    if not chunk:
+        closed = True
+        return False
+    transcript.extend(chunk)
+    if len(transcript) > 1 << 20:
+        raise RuntimeError("disposable PTY output exceeded test bound")
+    return True
 
 def receive_until(marker):
     while marker not in transcript:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0 or not select.select([master], [], [], max(0, remaining))[0]:
-            raise RuntimeError("disposable PTY prompt timed out")
-        try:
-            chunk = os.read(master, 65536)
-        except OSError as exc:
-            if exc.errno == errno.EIO:
-                raise RuntimeError("disposable PTY helper exited before completing") from None
-            raise
-        if not chunk:
-            raise RuntimeError("disposable PTY helper closed before completing")
-        transcript.extend(chunk)
-        if len(transcript) > 1 << 20:
-            raise RuntimeError("disposable PTY output exceeded test bound")
+        receive(remaining("prompt"))
+        if closed and marker not in transcript:
+            raise RuntimeError("disposable PTY helper exited before completing")
 
 def send(data):
     flags = termios.tcgetattr(master)[3]
@@ -223,8 +265,35 @@ def send(data):
         raise RuntimeError("hidden prompt appeared before noncanonical, no-echo mode")
     view = memoryview(data)
     while view:
-        count = os.write(master, view)
-        view = view[count:]
+        readable, writable, _ = select.select([master], [master], [], remaining("input"))
+        if readable:
+            receive(0)
+        if writable:
+            try:
+                count = os.write(master, view[:4096])
+            except BlockingIOError:
+                continue
+            view = view[count:]
+
+def reap_until(until):
+    global reaped, status
+    while not reaped:
+        waited, status = os.waitpid(pid, os.WNOHANG)
+        reaped = bool(waited)
+        if reaped:
+            while receive(0):
+                pass
+            return True
+        timeout = min(until - time.monotonic(), 0.05)
+        if timeout <= 0:
+            return False
+        # Darwin drains a session leader's controlling-terminal output during
+        # exit. Keep consuming after the success marker, including Go's PASS.
+        if closed:
+            time.sleep(timeout)
+        else:
+            receive(timeout)
+    return True
 
 try:
     receive_until(b"> ")
@@ -238,7 +307,11 @@ try:
         send(challenge + b"\n")
         if mode != "long-confirmation":
             receive_until(b"New value (hidden): ")
-            if mode == "limit":
+            if mode == "input-timeout":
+                # Leave the hidden reader stopped so the raw input queue fills.
+                os.kill(pid, signal.SIGSTOP)
+                data = b"s" * (2 << 20)
+            elif mode == "limit":
                 data = b"s" * 65536 + b"\n"
             elif mode == "overflow":
                 data = b"s" * 70000 + b"\n"
@@ -250,52 +323,44 @@ try:
                 data = b"s" * 5000 + b"\n"
             send(data)
     receive_until(b"OPERATOR_PTY_OK")
+    if not reap_until(deadline):
+        raise RuntimeError("disposable PTY helper exit timed out")
     if b"s" * 32 in transcript:
         raise RuntimeError("synthetic hidden value was echoed")
-    waited, status = os.waitpid(pid, 0)
-    reaped = True
+    if mode == "exit-drain" and b"OPERATOR_PTY_DRAINED" not in transcript:
+        raise RuntimeError("disposable PTY trailing output was not drained")
     if status != 0:
         raise RuntimeError("disposable PTY helper failed")
 except Exception:
     if not reaped:
-        # EOF can precede waitable exit status. Let an exiting helper report its
-        # own status before terminating a genuinely stalled child.
-        exit_deadline = time.monotonic() + 1
-        while True:
-            waited, status = os.waitpid(pid, os.WNOHANG)
-            if waited or time.monotonic() >= exit_deadline:
-                break
-            time.sleep(0.01)
-        if not waited:
+        # EOF can precede waitable exit status. Drain while giving a failing
+        # helper a brief chance to exit before killing a genuinely stalled one.
+        if not reap_until(time.monotonic() + 0.2):
             try:
                 os.kill(pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            _, status = os.waitpid(pid, 0)
-        reaped = True
-    # stdout and stderr share this disposable PTY. Drain queued failure output
-    # after exit, redact repeated synthetic input, and report only a bounded tail.
-    os.set_blocking(master, False)
-    while len(transcript) <= 1 << 20:
-        try:
-            chunk = os.read(master, 65536)
-        except OSError as exc:
-            if exc.errno in (errno.EIO, errno.EAGAIN):
-                break
-            raise
-        if not chunk:
-            break
-        transcript.extend(chunk)
+            reap_until(time.monotonic() + 2)
+    # stdout and stderr share this disposable PTY. Redact synthetic input and
+    # report only a bounded tail, never the input being sent on a stalled write.
     diagnostic = re.sub(b"s{32,}", b"<synthetic input redacted>", bytes(transcript))
-    print("disposable PTY helper exit code:", os.waitstatus_to_exitcode(status), file=sys.stderr)
+    code = os.waitstatus_to_exitcode(status) if reaped else "not reaped before cleanup deadline"
+    print("disposable PTY helper exit code:", code, file=sys.stderr)
     print("helper stdout/stderr tail:", repr(diagnostic[-4096:]), file=sys.stderr)
     raise
 finally:
+    # Closing the master also releases Darwin's exit drain if bounded cleanup
+    # could not reap. Never introduce another blocking wait in a failure path.
+    os.close(master)
     if not reaped:
         try:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        os.waitpid(pid, 0)
-    os.close(master)
+        cleanup_deadline = time.monotonic() + 0.5
+        while not reaped and time.monotonic() < cleanup_deadline:
+            waited, _ = os.waitpid(pid, os.WNOHANG)
+            reaped = bool(waited)
+            if not reaped:
+                time.sleep(0.01)
 `

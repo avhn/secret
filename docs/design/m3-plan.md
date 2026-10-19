@@ -46,6 +46,8 @@ controlling-terminal target and key confirmation for destructive or value-moving
 piped confirmation or operator JSON.
 
 Acceptance: labels, malformed assignments, duplicates, refusal-before-access spies, hidden input and cleanup.
+Hidden input uses noncanonical, no-echo terminal mode with userspace editing, a 64 KiB value bound and a 16 KiB
+confirmation challenge bound; platform canonical line limits must not truncate pasted input.
 CI: go matrix; Unix PTY confirmation in item 8.
 
 ### 2. Transactional mutations
@@ -151,6 +153,13 @@ Wire dispatch and audit events. Hosted Unix PTY tests run with `python3 -I` thro
 and template cleanup. Extend the isolated required-provider jobs, sampling argv without real credentials, and keep
 every shell, Bash 3.2, inventory and exact hook gate. Add bounded feature fuzzing on Ubuntu. Local work is gofmt and
 focused tests; milestone acceptance requires green applicable Actions jobs.
+
+The disposable operator helper driver keeps draining stdout/stderr while polling for exit, even after its success
+marker. Darwin drains session-leader controlling-terminal output before exit, so a blocking wait without reads
+can deadlock on trailing Go test output ([XNU exit path](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_exit.c),
+[`ttywait`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/tty.c)). Nonblocking writes and exit
+polling share a 20-second deadline, with bounded kill/reap cleanup and redacted diagnostics. Synthetic regressions
+force trailing output beyond the PTY queue and stop input/exit progress; these do not replace native macOS CI.
 
 ## Parallel ownership
 

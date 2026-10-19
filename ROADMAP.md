@@ -279,6 +279,8 @@ Status: implemented, pending CI (branch `go/m3`, plan in `docs/design/m3-plan.md
 
 Gate: human-only operator path; import/export mocks and implemented real backends; normal/error/catchable-signal rendered-file cleanup; typed JSON goldens; fuzz/race and prior matrix green. SIGKILL, crashes or power loss can leave protected plaintext; no secure-erasure claim. Audit remains opt-in and MCP disabled until configured. Metadata may include paths and provider account IDs, never values, hashes or lengths.
 
+The synthetic operator PTY driver drains output through helper exit, including after its success marker, to avoid Darwin controlling-terminal exit-drain deadlocks. Nonblocking input and exit waits share an overall deadline, with forced trailing-output and stalled-input/exit regressions. Native macOS confirmation remains a hosted gate.
+
 Pending evidence: Ubuntu/macOS PTY and isolated provider operator runs, bounded feature fuzzing, native Windows unsupported-feature tests and every retained shell, Bash 3.2, inventory, exact hook and Go race gate. The Bash CLI, installed hooks, manifests and M2 policy are unchanged; local checks and cross-vet do not prove hosted or installed protection.
 
 ## M4: Releasable Linux/macOS core
