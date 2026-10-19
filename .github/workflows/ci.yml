@@ -176,9 +176,11 @@ jobs:
       - name: Test Go packages
         shell: bash
         # Policy has its own Windows step; other packages retain the same deadline.
+        # Caching makes cmd/go replay millions of logged fixture stats after each
+        # package on Windows; -count=1 removes that replay without skipping tests.
         run: |
           if [ "$RUNNER_OS" = Windows ]; then
-            go list ./... | grep -v '^github.com/avhn/secret/internal/hook/policy$' | xargs go test -timeout 30m
+            go list ./... | grep -v '^github.com/avhn/secret/internal/hook/policy$' | xargs go test -count=1 -timeout 30m
           else
             go test -timeout 30m ./...
           fi
@@ -199,7 +201,7 @@ jobs:
         # The corpus replay is single-goroutine; Windows race builds run it too slowly to be useful.
         run: |
           if [ "$RUNNER_OS" = Windows ]; then
-            go test -race -timeout 30m -skip '^TestGuardDeniedCorpus$' ./...
+            go test -race -count=1 -timeout 30m -skip '^TestGuardDeniedCorpus$' ./...
           else
             go test -race -timeout 30m ./...
           fi
