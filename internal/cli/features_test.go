@@ -17,7 +17,12 @@ import (
 
 func featureFixture(t *testing.T) (string, string) {
 	t.Helper()
-	home := t.TempDir()
+	// Audit rejects ancestor aliases, including the system /var alias on macOS.
+	// Use the physical disposable root rather than relaxing production checks.
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := filepath.Join(home, "stores")
 	if err := os.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -199,5 +204,40 @@ func TestOperatorCLIIntegration(t *testing.T) {
 	}
 	if c.operateTerminal("rotate", []string{ref, "TOKEN", "--format=json"}, terminal) != 1 {
 		t.Fatal("operator JSON accepted")
+	}
+}
+
+func TestOperatorCLIAuditAncestorAlias(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix operator persistence")
+	}
+	dir, ref := featureFixture(t)
+	parent := filepath.Dir(dir)
+	alias := filepath.Join(parent, "alias")
+	if err := os.Symlink(parent, alias); err != nil {
+		t.Fatal(err)
+	}
+	path := strings.TrimPrefix(ref, "file:")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := OperatorRequest{Action: store.ActionRename, Target: ref, Keys: []string{"TOKEN", "RENAMED"}}
+	challenge, err := operatorChallenge(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal := &OperatorTerminal{console: &fakeOperatorConsole{inputs: [][]byte{challenge}}}
+	var out, diagnostic bytes.Buffer
+	c := command{out: &out, errOut: &diagnostic, dir: dir}
+	if c.operateTerminal("rename", []string{ref, "TOKEN", "RENAMED", "--audit-dir", filepath.Join(alias, "audit")}, terminal) != 1 || !strings.Contains(diagnostic.String(), secure.ErrAudit.Error()) {
+		t.Fatal("operator accepted an audit ancestor alias")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("rejected audit configuration mutated the store")
+	}
+	if _, err := os.Lstat(filepath.Join(parent, "audit")); !os.IsNotExist(err) {
+		t.Fatal("rejected audit configuration created the audit directory")
 	}
 }

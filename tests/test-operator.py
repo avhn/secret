@@ -13,12 +13,22 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 try:
     import pty
     import termios
 except ImportError:
     pty = None
+
+
+def terminal_settings(state):
+    state = list(state)
+    if sys.platform == "darwin":
+        # TIOCSETA restoring ICANON sets this kernel-managed pending-input bit.
+        # It is not a mode setting; retain every other flag, control byte and speed.
+        state[3] &= ~termios.PENDIN
+    return state
 
 
 class Terminal:
@@ -103,7 +113,8 @@ class Terminal:
         # Drain bytes queued just before exit as well.
         self.drain(0)
         self.case.assertEqual(self.status, expected, "unexpected terminal exit status")
-        self.case.assertEqual(termios.tcgetattr(self.fd), self.state, "terminal mode not restored")
+        self.case.assertEqual(terminal_settings(termios.tcgetattr(self.fd)), terminal_settings(self.state),
+                              "terminal mode not restored")
         return bytes(self.output)
 
     def close(self):
@@ -152,6 +163,24 @@ class OperatorTests(unittest.TestCase):
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20, check=False)
         self.assertEqual(result.returncode, expected, "unexpected CLI exit status")
         return result.stdout
+
+    def test_terminal_settings_comparison(self):
+        before = [termios.ICRNL, termios.OPOST, termios.CS8,
+                  termios.ECHO | termios.ICANON, 9600, 9600, [b"\x00"] * termios.NCCS]
+        pending = list(before)
+        pending[3] |= termios.PENDIN
+        for platform in ("linux", "darwin"):
+            with self.subTest(platform=platform), patch("sys.platform", platform):
+                self.assertEqual(terminal_settings(before) == terminal_settings(pending), platform == "darwin")
+                for index, flag in ((0, termios.ICRNL), (1, termios.OPOST), (2, termios.CS8),
+                                    (3, termios.ECHO), (3, termios.ICANON), (4, 1), (5, 1)):
+                    after = list(before)
+                    after[index] ^= flag
+                    self.assertNotEqual(terminal_settings(before), terminal_settings(after))
+                after = list(before)
+                after[6] = list(before[6])
+                after[6][termios.VMIN] = b"\x01"
+                self.assertNotEqual(terminal_settings(before), terminal_settings(after))
 
     def test_nonterminal_refusal_before_access(self):
         absent = self.root / "not-created"

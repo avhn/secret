@@ -15,7 +15,6 @@ import (
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
-	"golang.org/x/term"
 )
 
 func TestReadOperatorLine(t *testing.T) {
@@ -76,7 +75,7 @@ func TestOperatorPTYHelper(t *testing.T) {
 	if mode == "" {
 		return
 	}
-	before, err := term.GetState(int(os.Stdin.Fd()))
+	before, err := operatorTerminalState(int(os.Stdin.Fd()))
 	if err != nil {
 		t.Fatal("cannot inspect disposable terminal")
 	}
@@ -96,7 +95,7 @@ func TestOperatorPTYHelper(t *testing.T) {
 	err = terminal.Confirm(request)
 	assertRestored := func() {
 		t.Helper()
-		after, err := term.GetState(int(os.Stdin.Fd()))
+		after, err := operatorTerminalState(int(os.Stdin.Fd()))
 		if err != nil || !reflect.DeepEqual(before, after) {
 			t.Fatal("hidden input did not restore the terminal state")
 		}
@@ -132,6 +131,12 @@ func TestOperatorPTYHelper(t *testing.T) {
 	if err := terminal.Close(); err != nil {
 		t.Fatal("disposable terminal close failed")
 	}
+	if mode == "diagnostic-failure" {
+		// Fault injection proves stderr capture and synthetic input redaction.
+		fmt.Fprintln(os.Stderr, "synthetic stderr diagnostic sentinel")
+		_, _ = os.Stderr.Write(bytes.Repeat([]byte{'s'}, 64))
+		t.Fatal("synthetic PTY diagnostic sentinel")
+	}
 	fmt.Println("OPERATOR_PTY_OK")
 }
 
@@ -147,7 +152,7 @@ func TestOperatorPTY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"long-value", "limit", "overflow", "overflow-edit", "cancel", "long-confirmation", "confirmation-overflow"} {
+	for _, mode := range []string{"long-value", "limit", "overflow", "overflow-edit", "cancel", "long-confirmation", "confirmation-overflow", "diagnostic-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 			defer cancel()
@@ -156,6 +161,17 @@ func TestOperatorPTY(t *testing.T) {
 			home := t.TempDir()
 			cmd.Env = append(os.Environ(), "HOME="+home, "SECRETS_DIR="+filepath.Join(home, ".secrets"), "SECRETS_ENV="+filepath.Join(home, ".secrets.env"))
 			output, err := cmd.CombinedOutput()
+			if mode == "diagnostic-failure" {
+				if err == nil || bytes.Contains(output, bytes.Repeat([]byte{'s'}, 32)) {
+					t.Fatalf("disposable PTY failure diagnostic missing or unsafe: %v\n%s", err, output)
+				}
+				for _, marker := range []string{"helper exit code: 1", "synthetic PTY diagnostic sentinel", "synthetic stderr diagnostic sentinel", "<synthetic input redacted>"} {
+					if !bytes.Contains(output, []byte(marker)) {
+						t.Fatalf("disposable PTY failure diagnostic missing %q: %s", marker, output)
+					}
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("disposable PTY check failed: %v\n%s", err, output)
 			}
@@ -167,6 +183,7 @@ const operatorPTYDriver = `
 import errno
 import os
 import pty
+import re
 import select
 import signal
 import sys
@@ -197,6 +214,8 @@ def receive_until(marker):
         if not chunk:
             raise RuntimeError("disposable PTY helper closed before completing")
         transcript.extend(chunk)
+        if len(transcript) > 1 << 20:
+            raise RuntimeError("disposable PTY output exceeded test bound")
 
 def send(data):
     flags = termios.tcgetattr(master)[3]
@@ -237,6 +256,40 @@ try:
     reaped = True
     if status != 0:
         raise RuntimeError("disposable PTY helper failed")
+except Exception:
+    if not reaped:
+        # EOF can precede waitable exit status. Let an exiting helper report its
+        # own status before terminating a genuinely stalled child.
+        exit_deadline = time.monotonic() + 1
+        while True:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+            if waited or time.monotonic() >= exit_deadline:
+                break
+            time.sleep(0.01)
+        if not waited:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            _, status = os.waitpid(pid, 0)
+        reaped = True
+    # stdout and stderr share this disposable PTY. Drain queued failure output
+    # after exit, redact repeated synthetic input, and report only a bounded tail.
+    os.set_blocking(master, False)
+    while len(transcript) <= 1 << 20:
+        try:
+            chunk = os.read(master, 65536)
+        except OSError as exc:
+            if exc.errno in (errno.EIO, errno.EAGAIN):
+                break
+            raise
+        if not chunk:
+            break
+        transcript.extend(chunk)
+    diagnostic = re.sub(b"s{32,}", b"<synthetic input redacted>", bytes(transcript))
+    print("disposable PTY helper exit code:", os.waitstatus_to_exitcode(status), file=sys.stderr)
+    print("helper stdout/stderr tail:", repr(diagnostic[-4096:]), file=sys.stderr)
+    raise
 finally:
     if not reaped:
         try:
