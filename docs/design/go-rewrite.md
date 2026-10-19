@@ -116,6 +116,34 @@ paths rather than a volume-less Unix cwd. Full native Windows policy results are
 still required; cross-vet and synthetic sequence tests do not establish host
 protection or prove a production hang.
 
+### M3 integration status
+
+M3 is implemented, pending CI, under [the owner-approved M3 plan](m3-plan.md).
+The staged Go CLI dispatches positional `rotate REF KEY`, `delete REF KEY` and
+`rename REF OLD NEW` through stdin/stdout TTY checks and exact hidden
+controlling-terminal consent for each identity. Provider batches use fresh verified
+accounts and names-only recovery intent, not overwritten-account rollback. Import
+and export preflight remains names-only and export requires `--on-conflict=fail`.
+Private templates use exact `{{KEY}}` placeholders and give the child only
+`SECRET_TEMPLATE_FILE` under the fixed `HOME/.secrets/.rendered` namespace.
+Normal/error/catchable-signal cleanup follows process-group shutdown; SIGKILL,
+crashes and power loss can leave protected plaintext. No secure erasure is claimed.
+
+The configured MCP allowlist may reveal names, labels, backend kind, store paths
+and provider account IDs, never values or mutation. Audit remains opt-in. Existing
+Bash CLI behavior, installed hooks, plugin manifests and M2 denial are unchanged;
+new secret subcommands remain conservatively denied through agent tools.
+
+Hosted acceptance adds `python3 -I tests/test-operator.py ABSOLUTE_GO_BINARY` on
+Ubuntu/macOS (clean PTY-unavailable skips), platform-scoped
+`TestOperatorLibsecretIntegration`/`TestOperatorKeychainIntegration` behind the
+existing required-provider gates, and bounded Ubuntu feature fuzzing of metadata
+selection, private importer JSON and MCP framing. Real provider tests run only in
+isolated CI with synthetic values and provider-boundary argv sampling. Every prior
+shell, Bash 3.2, inventory, exact hook, native OS Go and race gate remains required.
+Cross-vet and local synthetic results are not native runtime or installed-host
+evidence. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for commands and isolation.
+
 ## 8. Git-installed plugins, releases and update
 
 Plugins install source from git and have no Go build step. Keep `hooks/guard-secrets` as the original Bash guard for existing Codex installs and explicit operator rollback. Add a separate POSIX-compatible `hooks/guard-go` launcher; switch **only the Claude hook entries** to that path after verifying Claude failure-blocking settings, and keep Codex's manifest pointing to `hooks/guard-secrets` until its host independently supports fail-closed hook failure handling. Only then may Codex's manifest switch to `hooks/guard-go`, followed by its trust re-prompt and real-host tests. `bin/secret` is an executable `#!/bin/sh` script, not Go source: keep its existing executable bit, retain the Bash CLI at `compat/secret` for explicit rollback, and invoke the verified Go binary only after bootstrap. Both POSIX launchers locate the checkout from the **script's symlink target**, not `$0` or `PWD`: follow relative/absolute symlinks with portable `readlink` in a bounded loop, resolve each relative target against the link's containing directory, reject cycles or unreadable targets, then use `cd -P`/`pwd -P` on the resolved script directory and find the repo root before reading `dist/` metadata. Quote every path (including spaces), reject symlinked or group/world-writable checksum manifests, validate their format and expected pinned release identity, and never source checkout files. The documented `ln -s ~/.local/share/secret/bin/secret ~/.local/bin/secret` works from any cwd and with a relative symlink chain; add an end-to-end test that clones/installs that symlink into disposable HOME, runs `secret version|show` using synthetic data, changes cwd, then tests an offline cache failure without executing Bash CLI silently. Native Windows uses a committed executable `.cmd` shim and `%~dp0`/resolved target to find the checkout, subject to host execution tests. The hook launcher locates pinned cache by embedded release version and host OS/arch, verifies the release artifact's SHA-256 against a committed `dist/checksums-v<version>.txt`, then `exec`s `secret hook claude|codex` (host fixed by plugin hook entry or envelope), with **no user-controlled command substitution**. Choose `exec` rather than a supervising script to avoid an extra parser process and preserve the host's direct timeout/cancellation relationship with Go: once exec succeeds, the launcher cannot catch a Go crash, so the verified host `onFailure: "block"` behavior, not a promised launcher response, is the crash/timeout protection. Read checksum manifest as untrusted metadata but verify it was installed from a trusted pinned git revision; HTTPS download from `github.com/avhn/secret/releases/download/<exact-tag>/<exact-asset>` into a 0700 fresh temp, bounded size/redirect hosts/time, checksum verification before atomic move and mode change. Use exclusive lock, deny symlinked cache or download destination. On detected offline/cache/checksum/unsupported-architecture failure **before exec**, emit fixed valid denial JSON for every supported call, and return exit 2 with fixed stderr if JSON emission fails; for an exec syscall failure or a Go panic/crash/timeout **at or after exec**, require the host to block unexpected exit/timeout, and test actual missing/invalid output and nonzero statuses. A Go process that exits 0 with no/incorrect output can appear to allow: require its hook entry point to send a valid decision or nonzero failure for every supported request, with crash/fault injection; the host setting is not a substitute for correct policy. NEVER run the bash guard automatically: its analysis failures without protected witnesses may allow what Go intentionally denies (`hooks/guard-secrets:2187-2191`). If even the launcher cannot start or is killed by timeout, only Claude's installed `onFailure: "block"` or a future verified Codex failure-blocking host can prevent dispatch. On Codex versions without that capability, do not assert fail-closed installation or complete Codex cutover. `bin/secret` CLI launcher fails with a value-free install error if Go binary is unavailable (no silent Bash CLI behavior switch). Windows launcher is a committed `.cmd`/PowerShell shim: verified native binary or fixed denial without pretending a shim can handle its own spawn failure. Test host recognition of script path/extension before Windows plugin cutover. Users may preinstall binary from release, Homebrew or Scoop and point plugin launcher to verified cache; never trust an arbitrary PATH binary without version+digest check.

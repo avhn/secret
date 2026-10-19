@@ -173,6 +173,72 @@ only when you ask for the clipboard, and reading the clipboard back is denied.
 
 Run `secret help` for the full reference, including exit statuses.
 
+## Staged Go operator workflow (M3)
+
+These commands are implemented in the Go CLI, pending hosted CI. The shipped
+`bin/secret` remains Bash; this is not a CLI or plugin cutover. Build
+`go build -o /absolute/private/build/secret-go ./cmd/secret` to try the staged CLI.
+The examples below use `secret-go` for that binary and placeholder store paths.
+Invoke operators directly in your own terminal, never through agent tools.
+
+```bash
+secret-go import --from dotenv:/absolute/source.env --into file:/absolute/team.secret
+secret-go import --from op:OPAQUE_ID --into file:/absolute/team.secret --map password=API_TOKEN
+secret-go export --from file:/absolute/team.secret --to libsecret:team --on-conflict=fail
+secret-go rotate file:/absolute/team.secret API_TOKEN --env prod
+secret-go rename file:/absolute/team.secret API_TOKEN SERVICE_TOKEN --env prod
+secret-go delete file:/absolute/team.secret SERVICE_TOKEN --env prod
+secret-go show --format=json file:/absolute/team.secret
+secret-go diff --format=json --env dev --env prod file:/absolute/team.secret
+secret-go doctor --format=json libsecret:team
+```
+
+Operators require both stdin and stdout terminals before store access, then exact
+hidden confirmation of every target/key/label identity on the controlling terminal.
+There is no `--yes`, piped confirmation or operator JSON. Rotation reads the new
+value hidden, never in argv. Lifecycle labels identify the exact record. References
+must be explicit `file:ABS_PATH`, `keychain:NAME` or `libsecret:NAME`. Import/export
+are insert-only; op/bw imports require explicit field mappings. Export requires
+`--on-conflict=fail`, a different implemented keystore destination and explicit
+selectors for labeled records; without selectors only unlabeled records qualify.
+`--dry-run` lists names/conflicts only and still requires real terminals. Doctor
+reports tracked recovery candidates and manual verification guidance, not a proven
+or complete historical orphan inventory or installed-host trust.
+
+Private templates use literal `{{KEY}}` placeholders and selected keys only:
+
+```bash
+secret-go run -f file:/absolute/team.secret --key API_TOKEN \
+  --template-file /absolute/client.template -- ./consumer
+```
+
+The child receives the rendered path in `SECRET_TEMPLATE_FILE`, never file contents
+in argv. Output still redacts every loaded literal value. Files live under the fixed
+`HOME/.secrets/.rendered/<random>/payload`, independent of `SECRETS_DIR`, with 0700
+directories and a 0600 payload. Missing/unselected placeholders, unsafe aliases,
+`exec` and output-directory options are rejected. The supervisor stops its process
+group before normal/error/catchable-signal cleanup. SIGKILL, crashes or power loss
+can leave protected plaintext; cleanup is best effort, not secure erasure.
+
+`list/show --format=json`, diff, doctor, completion and audit queries expose only
+metadata, never values, hashes or lengths. Metadata may reveal key names, labels,
+backend kind, store paths and provider account IDs. Legacy text `show` retains its
+masked byte lengths and ordering. Completion emits literal candidates, not shell
+code, and reads only explicit `-f` scopes. Audit is off unless an operator receives
+`--audit-dir ABS_PATH`; query with `audit --directory ABS_PATH --format=json`.
+Names-only events rotate across four private 0600 files capped at 1 MiB each.
+
+MCP is off until explicitly allowlisted, for example
+`secret-go mcp --store file:/absolute/team.secret --store libsecret:team`.
+The stdio server exposes only list/show/diff/health, never values or mutation;
+requests cannot expand that exact allowlist. Configuring it permits the path and
+account metadata above to reach its clients. No network listener or ambient store
+discovery is enabled. The unchanged installed hooks conservatively deny new
+subcommands, including names-only ones; this feature does not grant an agent a
+hook exception. Windows operator/persistence support and installed-host protection
+are not claimed. See [CONTRIBUTING.md](CONTRIBUTING.md) for the synthetic and hosted
+gates and [the M3 plan](docs/design/m3-plan.md) for the implementation contract.
+
 ## Tests
 
 ```bash

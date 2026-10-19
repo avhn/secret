@@ -267,16 +267,19 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 ## M3: Operator workflow
 
-Status: planned. Estimate: 5-8 days. Goal: add names-only inventory and consent-gated operator features.
+Status: implemented, pending CI (branch `go/m3`, plan in `docs/design/m3-plan.md`). Estimate: 5-8 days. Goal: add names-only inventory and consent-gated operator features. The milestone is not complete until all applicable hosted gates pass.
 
-- [ ] feat(cli): add name-only diff and structured inventory
-- [ ] feat(cli): add import and keystore export
-- [ ] feat(cli): add rename rotate delete and orphan doctor
-- [ ] feat(run): add private template injection
-- [ ] feat(cli): add completion audit and names-only mcp
-- [ ] test(feature): enforce names-only and no-value transport
+- [x] feat(cli): add names-only diff and versioned list/show inventory, preserving legacy text
+- [x] feat(cli): add insert-only dotenv/op/bw import and implemented keystore export with collision preflight
+- [x] feat(cli): add positional rename/rotate/delete, exact terminal consent and tracked recovery doctor
+- [x] feat(run): add anchored private `{{KEY}}` templates, `SECRET_TEMPLATE_FILE` and process-group cleanup
+- [x] feat(cli): add names-only completion, opt-in bounded audit and explicit MCP allowlisting
+- [x] test(feature): add JSON goldens, byte ownership, fault injection, no-value transport and template guard assertions
+- [x] test(integration): wire hosted Unix PTY coverage, isolated provider operator tests with argv sampling and bounded Ubuntu feature fuzzing
 
-Gate: human-only operator path; import/export mocks and implemented real backends; no persistent rendered plaintext; typed JSON goldens; fuzz/race and prior matrix green. Audit remains opt-in and MCP disabled until configured.
+Gate: human-only operator path; import/export mocks and implemented real backends; normal/error/catchable-signal rendered-file cleanup; typed JSON goldens; fuzz/race and prior matrix green. SIGKILL, crashes or power loss can leave protected plaintext; no secure-erasure claim. Audit remains opt-in and MCP disabled until configured. Metadata may include paths and provider account IDs, never values, hashes or lengths.
+
+Pending evidence: Ubuntu/macOS PTY and isolated provider operator runs, bounded feature fuzzing, native Windows unsupported-feature tests and every retained shell, Bash 3.2, inventory, exact hook and Go race gate. The Bash CLI, installed hooks, manifests and M2 policy are unchanged; local checks and cross-vet do not prove hosted or installed protection.
 
 ## M4: Releasable Linux/macOS core
 

@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Implement the staged Go M3 operator workflow, pending applicable hosted CI.
+  Add positional `rotate REF KEY`, `delete REF KEY` and `rename REF OLD NEW`,
+  exact hidden controlling-terminal confirmation and hidden rotation input.
+  Import dotenv/op/bw with explicit mappings for provider fields; export only to
+  implemented Keychain/libsecret destinations with `--on-conflict=fail`.
+  Transactions prepare fresh verified accounts, publish the manifest, then remove
+  exact obsolete accounts; names-only recovery intent supports manual verification.
+- Add versioned names-only inventory, diff, doctor, completion, opt-in rotated audit
+  and explicitly allowlisted stdio MCP list/show/diff/health. Metadata may expose
+  paths, labels and provider account IDs, never values, hashes or lengths. Preserve
+  legacy text show and frozen Bash help fixtures. Clear owned Keychain transport
+  buffers and decode byte-oriented provider output without secret string copies.
+- Add private `run --template-file` rendering of literal `{{KEY}}` placeholders
+  under `HOME/.secrets/.rendered`, independent of `SECRETS_DIR`; pass only
+  `SECRET_TEMPLATE_FILE` to the child. Stop the supervised process group before
+  normal/error/catchable-signal cleanup. SIGKILL, crashes and power loss can leave
+  protected plaintext; cleanup is not secure erasure.
+- Add hosted Unix PTY tests, isolated provider operator/argv checks and bounded
+  feature fuzzing without replacing existing CI jobs. No Bash CLI, installed-hook,
+  M2 policy, plugin or Windows support cutover is included.
+
 - Complete M2: the Go hook (`secret hook claude|codex`) reaches parity with the
   Bash guard under the owner's convergence rule, with 80 reviewed divergences and
   all CI jobs green. The installed Bash hook remains active until the M4 cutover.
