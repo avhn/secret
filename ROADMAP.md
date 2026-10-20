@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M0, parity substrate (in progress). This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
+**Current milestone:** M4, releasable Linux/macOS core (in progress). M0 to M3 are done. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -267,7 +267,7 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 ## M3: Operator workflow
 
-Status: implemented, pending CI (branch `go/m3`, plan in `docs/design/m3-plan.md`). Estimate: 5-8 days. Goal: add names-only inventory and consent-gated operator features. The milestone is not complete until all applicable hosted gates pass.
+Status: done (2026-10-20, PR #8, plan in `docs/design/m3-plan.md`). Estimate: 5-8 days. Goal: add names-only inventory and consent-gated operator features.
 
 - [x] feat(cli): add names-only diff and versioned list/show inventory, preserving legacy text
 - [x] feat(cli): add insert-only dotenv/op/bw import and implemented keystore export with collision preflight
@@ -281,7 +281,7 @@ Gate: human-only operator path; import/export mocks and implemented real backend
 
 The synthetic operator PTY driver drains output through helper exit, including after its success marker, to avoid Darwin controlling-terminal exit-drain deadlocks. Nonblocking input and exit waits share an overall deadline, with forced trailing-output and stalled-input/exit regressions. Native macOS confirmation remains a hosted gate.
 
-Pending evidence: Ubuntu/macOS PTY and isolated provider operator runs, bounded feature fuzzing, native Windows unsupported-feature tests and every retained shell, Bash 3.2, inventory, exact hook and Go race gate. The Bash CLI, installed hooks, manifests and M2 policy are unchanged; local checks and cross-vet do not prove hosted or installed protection.
+Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](https://github.com/avhn/secret/actions/runs/39264874201): lint, Ubuntu/macOS shell suites with macOS Bash 3.2, isolated libsecret and Keychain including `TestOperatorLibsecretIntegration` and `TestOperatorKeychainIntegration`, Ubuntu/macOS PTY operator tests, bounded feature fuzzing, and Go on Ubuntu, macOS and Windows with race tests. Windows Go test and race steps run with `-count=1` because cached runs replay millions of logged fixture stats. The Bash CLI, installed hooks, manifests and M2 policy are unchanged; this is not an installed-protection claim.
 
 ## M4: Releasable Linux/macOS core
 

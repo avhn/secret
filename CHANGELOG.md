@@ -7,7 +7,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Fix staged Go operator PTY tests to drain output through helper exit on macOS,
   with bounded nonblocking input, exit waits and redacted timeout diagnostics.
 
-- Implement the staged Go M3 operator workflow, pending applicable hosted CI.
+- Implement the staged Go M3 operator workflow; all applicable hosted CI jobs are green (PR #8).
   Add positional `rotate REF KEY`, `delete REF KEY` and `rename REF OLD NEW`,
   exact hidden controlling-terminal confirmation and hidden rotation input.
   Import dotenv/op/bw with explicit mappings for provider fields; export only to
