@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "tag": "v0.2.0",
+  "assets": [
+    "secret-v0.2.0-darwin-amd64",
+    "secret-v0.2.0-darwin-arm64",
+    "secret-v0.2.0-linux-amd64",
+    "secret-v0.2.0-linux-arm64"
+  ],
+  "manifests": {
+    ".claude-plugin/plugin.json": ["version"],
+    ".claude-plugin/marketplace.json": ["plugins", 0, "version"],
+    ".codex-plugin/plugin.json": ["version"],
+    ".agents/plugins/marketplace.json": ["plugins", 0, "version"]
+  },
+  "codex_commands": {
+    ".codex-plugin/hooks.json": "\"${PLUGIN_ROOT}/hooks/guard-secrets\"",
+    "codex/hooks.json": "REPLACE_WITH_CHECKOUT/hooks/guard-secrets"
+  },
+  "bootstrap_denial": {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny",
+      "permissionDecisionReason": "secret: verified binary unavailable; run scripts/install-release.sh"
+    }
+  },
+  "synthetic_store": "PLUGIN_TOKEN=synthetic-plugin-matrix-value\n"
+}

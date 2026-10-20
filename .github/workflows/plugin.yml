@@ -1,0 +1,165 @@
+name: plugin install
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      published:
+        description: Repeat against published v0.2.0 assets from final checksum commit C
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  plugin-manifest-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # M4.1 enables --stage m4.1 only after sponsored host evidence.
+      - name: Check M4 shipped manifests and retained Bash paths
+        run: python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP" --manifest-only
+      - name: Check portable shell syntax
+        run: |
+          sh -n scripts/build-release.sh
+          sh -n scripts/verify-release.sh
+          sh -n scripts/install-release.sh
+          sh -n hooks/guard-go
+          sh -n bin/secret-go
+          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh hooks/guard-go bin/secret-go
+
+  plugin-install-linux:
+    permissions:
+      contents: read
+      attestations: read
+    name: plugin-install-linux (${{ matrix.runner }}, native ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Require final checksum commit C for published verification
+        if: github.event_name == 'workflow_dispatch' && inputs.published
+        run: |
+          test "$(git rev-parse --is-shallow-repository)" = false
+          test "$(git cat-file -t refs/tags/v0.2.0)" = tag
+          test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.0^{commit}')"
+          test -f dist/checksums-v0.2.0.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.2.0.txt
+          sh scripts/verify-release.sh --source
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.0
+          cache: false
+      - name: Record native runner evidence
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          uname -srm
+          gh --version
+          printf 'image=%s version=%s runner_arch=%s\n' "${ImageOS:?}" "${ImageVersion:?}" "$RUNNER_ARCH"
+          test "$(uname -m)" = "$EXPECTED_ARCH"
+          test ! -e .secret-release-test-fixture
+      - name: Build candidate assets in isolated directories
+        run: |
+          test_root="$(mktemp -d "$RUNNER_TEMP/plugin.XXXXXX")"
+          mkdir -m 700 "$test_root/home" "$test_root/tmp" "$test_root/assets"
+          printf 'PLUGIN_TEST_ROOT=%s\n' "$test_root" >> "$GITHUB_ENV"
+          HOME="$test_root/home" TMPDIR="$test_root/tmp" GOCACHE="$test_root/go-cache" \
+            sh scripts/build-release.sh "$test_root/assets"
+      - name: Native synthetic install and failure matrix
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets"
+      - name: Repeat public release installation before promotion
+        if: github.event_name == 'workflow_dispatch' && inputs.published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --published
+
+  plugin-install-macos:
+    permissions:
+      contents: read
+      attestations: read
+    name: plugin-install-macos (${{ matrix.runner }}, native ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          # macos-13 is retired. The explicit Intel label prevents an arm64
+          # alias from silently becoming the purported amd64 evidence.
+          - runner: macos-15-intel
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Require final checksum commit C for published verification
+        if: github.event_name == 'workflow_dispatch' && inputs.published
+        run: |
+          test "$(git rev-parse --is-shallow-repository)" = false
+          test "$(git cat-file -t refs/tags/v0.2.0)" = tag
+          test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.0^{commit}')"
+          test -f dist/checksums-v0.2.0.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.2.0.txt
+          sh scripts/verify-release.sh --source
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 1.26.0
+          cache: false
+      - name: Record native runner and stock Bash evidence
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          uname -srm
+          gh --version
+          sw_vers
+          /bin/bash --version
+          printf 'image=%s version=%s runner_arch=%s\n' "${ImageOS:?}" "${ImageVersion:?}" "$RUNNER_ARCH"
+          test "$(uname -m)" = "$EXPECTED_ARCH"
+          test ! -e .secret-release-test-fixture
+          /bin/bash -c 'test "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" = 3.2'
+      - name: Install ShellCheck
+        run: command -v shellcheck >/dev/null || brew install shellcheck
+      - name: Check portable launchers and retained Bash 3.2
+        run: |
+          sh -n scripts/build-release.sh
+          sh -n scripts/verify-release.sh
+          sh -n scripts/install-release.sh
+          sh -n hooks/guard-go
+          sh -n bin/secret-go
+          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh hooks/guard-go bin/secret-go tests/test-launchers.sh
+      - name: Build candidate assets in isolated directories
+        run: |
+          test_root="$(mktemp -d "$RUNNER_TEMP/plugin.XXXXXX")"
+          mkdir -m 700 "$test_root/home" "$test_root/tmp" "$test_root/assets"
+          printf 'PLUGIN_TEST_ROOT=%s\n' "$test_root" >> "$GITHUB_ENV"
+          HOME="$test_root/home" TMPDIR="$test_root/tmp" GOCACHE="$test_root/go-cache" \
+            /bin/bash scripts/build-release.sh "$test_root/assets"
+      - name: Stock Bash 3.2 launcher tests
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" /bin/bash tests/test-launchers.sh
+      - name: Native synthetic install and failure matrix
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets"
+      - name: Repeat public release installation before promotion
+        if: github.event_name == 'workflow_dispatch' && inputs.published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --published
