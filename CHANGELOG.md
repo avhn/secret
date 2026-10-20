@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Prepare M4 v0.2.0 Linux/macOS reproducible assets, checksum-only source identity
   checks, scoped final-tag provenance verification and owner-approved draft workflow
-  (pending hosted CI and publication approval).
+  (candidate CI green in PR #9; tag and publication pending owner approval).
 - Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
   with digest/provenance checks, private cache, offline preinstallation and no
   automatic Bash fallback. Add native install, launcher and synthetic release tests.
@@ -22,7 +22,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
   Go hook output contract. The installed CLI, hooks, manifests and M2 policy
   remain unchanged in M4.
 - Tighten staged Go hook raw path limits to 4096 UTF-8 bytes per envelope path
-  and patch target, with 255-byte components before normalization (pending CI).
+  and patch target, with 255-byte components before normalization (PR #10).
   Reject C0/DEL patch-header controls, including CRLF, and malformed Add/Delete/
   Update/Move bodies, incomplete hunks and misplaced EOF markers. Match upstream
   Codex's optional first @@ marker, empty context lines, public indented headers
@@ -33,11 +33,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
   retaining independent two-second read and shell-analysis budgets. Delayed stdin
   and late-analysis tests cover fixed single denials; process startup and blocked
   output writes are excluded. The Bash CLI, installed guard and host failure
-  behavior are unchanged; applicable hosted CI remains required.
+  behavior are unchanged; hosted CI is green (PR #10).
 
 - Fix staged Go hook over-denials for `python3 -m env`, explicit-file
   `git grep --no-index -q`, and ripgrep quiet/names-only searches with
-  `--passthru` (pending CI). Preserve protected pattern-file, content-output and
+  `--passthru` (PR #10). Preserve protected pattern-file, content-output and
   credential-module denials. Document the existing match-status/count oracle
   limit and retain conservative mixed-brace selector denial under protective
   ripgrep config. The Bash CLI and installed guard are unchanged.

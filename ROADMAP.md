@@ -236,11 +236,11 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   retain paired malformed-language regression coverage
 - [ ] U11: malformed nested backquotes; Go now denies deep residue, while Bash
   still permits some malformed nesting
-- [x] U15: Bash/Go raw path-byte and component-byte limit parity (pending CI)
-- [x] U16: native apply_patch control-byte validation parity (pending CI)
+- [x] U15: Bash/Go raw path-byte and component-byte limit parity (b19f0b9)
+- [x] U16: native apply_patch control-byte validation parity (b19f0b9)
 - [x] U17: full malformed apply_patch body grammar, beyond header/EOF validation;
   preserve upstream implicit first chunks, empty context and public indentation
-  (Go implementation, pending CI; installed Bash remains unchanged)
+  (Go implementation, b19f0b9; installed Bash remains unchanged)
 - [ ] Preserve the audit 27 to 29 class (i) backlog: shared and Bash-only coverage
   gaps are not closures merely because Go denies the same command
 - [ ] Audit 29 class (i): Bash explicit-shell argv option terminators; interpreter
@@ -251,20 +251,22 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   their named witnesses, not every shared or Bash-only variant
 - [x] Audit 29: distinguish the two-second Go analysis budget from the four-second
   input-read, decode and analysis bound, with delayed-stdin synthetic checks
-  (pending CI; process startup and blocked host output excluded)
+  (b19f0b9; process startup and blocked host output excluded)
+
+Hosted CI for ede0b3b and b19f0b9: [ci 39468276188](https://github.com/avhn/secret/actions/runs/39468276188), [release 39468275873](https://github.com/avhn/secret/actions/runs/39468275873), [plugin install 39468275869](https://github.com/avhn/secret/actions/runs/39468275869) (PR #10).
 
 ### M2 follow-ups (over-denials, non-blocking)
 
 - [x] Go: permit `git grep --no-index -q T .env` consistently with existing
   quiet/names-only search exemptions; match-status oracles remain a documented
-  policy limit (pending CI)
+  policy limit (ede0b3b)
 - [x] Go: classify `python3 -m env` as a module, not the shell env printer,
-  without exempting protected arguments or known credential modules (pending CI)
+  without exempting protected arguments or known credential modules (ede0b3b)
 - [x] Go: retain quiet/names-only modes for `rg --passthru -q` and
-  `rg -l --passthru` on explicit `.env` inputs (pending CI)
+  `rg -l --passthru` on explicit `.env` inputs (ede0b3b)
 - [x] Review `rg -g '{!*.md,*.secret}'`: retained as an intended conservative
   denial, not a pure-exclusion glob; see documented intended denials below
-  (pending CI)
+  (ede0b3b)
 - [ ] `kubectl -o custom-columns` and curl uploads of unresolved variables (documented limits, P8)
 - [ ] Bash two-second budget on long chains (P20, documented)
 - [ ] Go denies long conditional-cd chains past the cwd-set cap
