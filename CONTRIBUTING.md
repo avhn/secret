@@ -22,7 +22,8 @@ In isolated provider environments, run `SECRET_REQUIRE_LIBSECRET=1 bash tests/te
 
 ## M3 operator and metadata tests
 
-M3 is implemented in the staged Go CLI, pending hosted CI, not in `bin/secret`.
+M3 passed its hosted CI gate (PR #8) and is implemented in the staged Go CLI,
+not in the installed Bash `bin/secret`.
 Use disposable synthetic files and HOME directories; never use an actual store.
 
 ```bash
@@ -64,6 +65,64 @@ metadata names-only, audit opt-in and MCP explicitly allowlisted. The M2 guard
 still conservatively denies new secret subcommands; do not relax it for tests.
 Hosted PTY/provider results, native OS tests and all prior shell, Bash 3.2,
 inventory, exact hook and race gates are required before calling M3 complete.
+
+## M4 release, launcher and offline host tests
+
+M4 prepares opt-in release tooling; the installed Bash CLI, Claude/Codex hooks
+and four manifest versions remain unchanged. M4.1 owns all version bumps,
+`onFailure: "block"`, `guard-go` activation, the `bin/secret`/`compat/secret`
+switch and Go hook output-contract changes. See [the M4 plan](docs/design/m4-plan.md),
+[installation](docs/install.md) and [release approvals](docs/release.md).
+
+New production files are `scripts/build-release.sh`, `scripts/verify-release.sh`,
+`scripts/install-release.sh`, `hooks/guard-go` and `bin/secret-go`. New workflows
+are `release.yml`, `plugin.yml` and inactive `host-hooks.yml`. Synthetic fixtures
+live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.go`
+is test-only under `-tags hosthookfixture`, never a shipped binary.
+
+Use exactly Go 1.26.0, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
+builds. Run tests from the trusted checkout, keeping downloads in fresh empty
+directories and readers/scripts outside them. Never install into your real HOME.
+
+```bash
+export GOTOOLCHAIN=local
+python3 -I tests/test-release.py
+bash tests/test-launchers.sh
+assets="$(mktemp -d)"
+sh scripts/build-release.sh "$assets"
+python3 -I tests/test-plugin.py "$PWD" "$assets" --manifest-only
+python3 -I tests/test-plugin.py "$PWD" "$assets"
+python3 -I tests/test-host-hooks.py # offline classification, no model calls
+shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go scripts/*.sh tests/*.sh
+# On macOS, also run the launcher suite with stock Bash 3.2:
+/bin/bash tests/test-launchers.sh
+```
+
+CI runs independent release builds and native Linux/macOS amd64/arm64 install
+jobs. `plugin-manifest-check` uses the default M4 shipped-state contract.
+`--stage m4.1` preserves the stronger activation assertions for that milestone;
+do not enable it on the M4 workflow or weaken other assertions. Tests assert
+statuses, JSON and filesystem execution witnesses, not diagnostics alone.
+`.secret-release-test-fixture` is forbidden in the shipped tree, S and C,
+including dangling symlinks. Only disposable synthetic checkout copies may use
+it with `SECRET_RELEASE_TEST_ROOT`; environment alone must never bypass trust.
+
+The real-host harness is inactive pending sponsorship, not an M4 required check.
+`python3 -I tests/test-host-hooks.py` runs offline tests without credentials or
+models. To include test-only compiled faults, build
+`go build -tags hosthookfixture -o ABSOLUTE_FIXTURE tests/host-hook-fixture.go`
+and pass `--fixture ABSOLUTE_FIXTURE`. See
+[host evidence](docs/design/host-failure-evidence.md) for pins and spend limits.
+Owner-approved activation requires protected `host-hook-tests` reviewers and
+trusted refs, `vars.SECRET_HOST_TESTS == 'enabled'`, and applicable
+`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` environment secrets provisioned by the owner.
+Only then dispatch trusted refs manually; never add model calls to PR checks.
+Missing auth, absent healthy controls or model outages leave M4.1 incomplete.
+
+Creating/pushing tags, creating release drafts, publishing releases, promoting
+installed defaults/manifests, changing default branches and publishing external
+package metadata each require separate explicit owner go-ahead. No successful
+local check, workflow or earlier approval authorizes those outward actions.
 
 ## Propose changes
 

@@ -5,7 +5,7 @@
       "kind": "compatibility",
       "target": "<platform>",
       "status": "limited",
-      "detail": "Go operators are staged; the installed Bash CLI and guard remain unchanged"
+      "detail": "M4 release tooling is staged; the installed default CLI and hooks remain Bash until M4.1"
     },
     {
       "kind": "alias",
@@ -107,7 +107,7 @@
       "kind": "hook_activation",
       "target": "claude",
       "status": "unverified",
-      "detail": "host activation and failure blocking require actual-host evidence"
+      "detail": "Bash guard retained until M4.1; Go activation and failure blocking require actual-host evidence"
     },
     {
       "kind": "hook_activation",
@@ -118,8 +118,8 @@
     {
       "kind": "trust",
       "target": "m4",
-      "status": "unavailable",
-      "detail": "release provenance and verified launcher cutover are not installed by M3"
+      "status": "unverified",
+      "detail": "release tooling is staged; launcher or cache presence and matching digests do not prove provenance or activation"
     },
     {
       "kind": "config_certification",

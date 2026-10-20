@@ -28,6 +28,12 @@ Treat it as one layer, not the boundary.
 
 ## Install
 
+The installed CLI and Claude/Codex hooks remain Bash until M4.1. M4 adds opt-in
+verified Go launchers without activating them. See [installation and rollback](docs/install.md)
+for checkout/release pins, platform evidence, dependencies, offline preinstallation
+and failure recovery, and [the release procedure](docs/release.md) for approval gates.
+The v0.2.0 release is in progress, not yet published.
+
 Requirements: bash 3.2 or newer (stock macOS bash works), perl, and jq for the
 guard.
 
@@ -175,8 +181,8 @@ Run `secret help` for the full reference, including exit statuses.
 
 ## Staged Go operator workflow (M3)
 
-These commands are implemented in the Go CLI, pending hosted CI. The shipped
-`bin/secret` remains Bash; this is not a CLI or plugin cutover. Build
+M3 passed its hosted CI gate (PR #8). These commands are implemented in the Go
+CLI, while the shipped `bin/secret` remains Bash; this is not a CLI or plugin cutover. Build
 `go build -o /absolute/private/build/secret-go ./cmd/secret` to try the staged CLI.
 The examples below use `secret-go` for that binary and placeholder store paths.
 Invoke operators directly in your own terminal, never through agent tools.

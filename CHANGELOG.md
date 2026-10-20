@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Prepare M4 v0.2.0 Linux/macOS reproducible assets, checksum-only source identity
+  checks, scoped final-tag provenance verification and owner-approved draft workflow
+  (pending hosted CI and publication approval).
+- Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
+  with digest/provenance checks, private cache, offline preinstallation and no
+  automatic Bash fallback. Add native install, launcher and synthetic release tests.
+- Add the inactive, sponsorship-gated real-host harness and PR-only offline
+  synthetic classification. No model sessions or installed-host evidence claimed.
+- Document installation pins, failure recovery, Bash rollback and release approvals;
+  doctor now reports staged tooling without inferring provenance or activation.
+- Move all installed-default changes to M4.1: four manifest version bumps,
+  `onFailure: "block"`, Claude hook path, `bin/secret` plus `compat/secret`, and
+  Go hook output contract. The installed CLI, hooks, manifests and M2 policy
+  remain unchanged in M4.
+
 - Fix staged Go operator PTY tests to drain output through helper exit on macOS,
   with bounded nonblocking input, exit waits and redacted timeout diagnostics.
 
@@ -30,7 +45,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Complete M2: the Go hook (`secret hook claude|codex`) reaches parity with the
   Bash guard under the owner's convergence rule, with 80 reviewed divergences and
-  all CI jobs green. The installed Bash hook remains active until the M4 cutover.
+  all CI jobs green. The installed Bash hook remains active until the M4.1 cutover.
 
 - Preserve physical `..` traversal after symlinked glob components, including
   wildcard prefixes and missing credential-name context. Apply the same ordering

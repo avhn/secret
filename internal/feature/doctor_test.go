@@ -129,8 +129,8 @@ func TestDoctorMetadataOnlyAndNoInventedVerification(t *testing.T) {
 		if check.Kind == "checksum" && check.Status != "unavailable" {
 			t.Fatal("doctor invented checksum verification")
 		}
-		if check.Kind == "trust" && check.Status != "unavailable" {
-			t.Fatal("doctor invented M4 trust")
+		if check.Kind == "trust" && (check.Status != "unverified" || !strings.Contains(check.Detail, "do not prove provenance or activation")) {
+			t.Fatal("doctor invented M4 trust or omitted the evidence boundary")
 		}
 	}
 	data, _ := json.Marshal(report)
@@ -156,7 +156,13 @@ func TestDoctorArtifactChecksumAndAliases(t *testing.T) {
 	if err := os.WriteFile(protected, []byte("TOKEN=synthetic-value-sentinel"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	digest := sha256.Sum256([]byte("synthetic public artifact"))
+	cache := filepath.Join(root, ".cache", "secret", "v0.2.0")
+	if err := os.MkdirAll(cache, 0700); err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct{ name, path, digest, want string }{
+		{"matching digest", path, hex.EncodeToString(digest[:]), "matched"},
 		{"missing digest", path, "", "unavailable"},
 		{"mismatch", path, strings.Repeat("0", 64), "mismatch"},
 		{"alias", alias, strings.Repeat("0", 64), "unavailable"},
@@ -164,12 +170,15 @@ func TestDoctorArtifactChecksumAndAliases(t *testing.T) {
 		{"not installed", filepath.Join(root, "missing"), strings.Repeat("0", 64), "unavailable"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			report, err := runDoctor(DoctorOptions{Home: root, Cwd: root, Artifacts: []DoctorArtifact{{Kind: "go_launcher", Path: test.path, ExpectedSHA256: test.digest}}}, func(string) (string, error) { return "", os.ErrNotExist })
+			report, err := runDoctor(DoctorOptions{Home: root, Cwd: root, Paths: []string{cache}, Artifacts: []DoctorArtifact{{Kind: "go_launcher", Path: test.path, ExpectedSHA256: test.digest}}}, func(string) (string, error) { return "", os.ErrNotExist })
 			if err != nil {
 				t.Fatal(err)
 			}
 			found := false
 			for _, check := range report.Checks {
+				if (check.Kind == "trust" || check.Kind == "hook_activation") && check.Status != "unverified" {
+					t.Fatal("artifact digest or cache presence invented provenance or activation")
+				}
 				if check.Kind == "checksum" && check.Target == "go_launcher" {
 					found = true
 					if check.Status != test.want {

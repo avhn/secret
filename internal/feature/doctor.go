@@ -58,8 +58,8 @@ type DoctorReport struct {
 	Candidates []DoctorCandidate `json:"candidates"`
 }
 
-// RunDoctor emits versioned metadata-only evidence. M4 launcher/config trust and
-// host failure behavior are explicitly unavailable or unverified here. Backend
+// RunDoctor emits versioned metadata-only evidence. Release tooling is staged;
+// launcher/config presence cannot certify provenance or host activation. Backend
 // availability means executable presence only, never an unlocked service probe.
 func RunDoctor(options DoctorOptions) (DoctorReport, error) {
 	return runDoctor(options, exec.LookPath)
@@ -99,7 +99,7 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 	if runtime.GOOS == "windows" {
 		add("compatibility", "windows", "unsupported", "private operator persistence awaits the Windows permission gate")
 	} else {
-		add("compatibility", runtime.GOOS, "limited", "Go operators are staged; the installed Bash CLI and guard remain unchanged")
+		add("compatibility", runtime.GOOS, "limited", "M4 release tooling is staged; the installed default CLI and hooks remain Bash until M4.1")
 	}
 	for _, path := range options.Paths {
 		doctorPath(path, add)
@@ -122,9 +122,9 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			doctorArtifact(*selected, options, add)
 		}
 	}
-	add("hook_activation", "claude", "unverified", "host activation and failure blocking require actual-host evidence")
+	add("hook_activation", "claude", "unverified", "Bash guard retained until M4.1; Go activation and failure blocking require actual-host evidence")
 	add("hook_activation", "codex", "unverified", "Bash guard retained; host hook failures are not proven to block")
-	add("trust", "m4", "unavailable", "release provenance and verified launcher cutover are not installed by M3")
+	add("trust", "m4", "unverified", "release tooling is staged; launcher or cache presence and matching digests do not prove provenance or activation")
 	if options.RipgrepConfig == "" {
 		add("config_certification", "ripgrep", "unavailable", "no explicit ripgrep config supplied")
 	} else if doctorAlias(options.RipgrepConfig) != "direct" {

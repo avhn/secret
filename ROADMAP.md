@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4, releasable Linux/macOS core (in progress). M0 to M3 are done. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M5a-M5e are independent optional extensions.
+**Current milestone:** M4, releasable Linux/macOS core (in progress). M0 to M3 are done. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -53,11 +53,11 @@ Gate: map and pass ~201 CLI, ~63 stub, ~85 libsecret and ~129 keychain cases on 
 
 Result: the four shell suites run against the Go binary through `SECRET_CLI` on the same runners as Bash. CLI 183 passed with 18 deliberate divergences (Bash-only Perl fault injection, covered by Go supervision tests), stub 63/63, libsecret 85/85, keychain 129/129. `tests/go-cli.sh` fails on any unlisted divergence or a listed case that passes, against `testdata/inventory/go-expected-divergence.tsv`. The directory stub exists only under the `secretstub` build tag.
 
-Known differences, kept deliberately: Go run uses separate stdout and stderr pipes with no PTY, so terminal buffering and merged ordering can differ from an interactive session; Unix exec is unfiltered, as in Bash; Windows rejects run and exec until M5a. A sol review found a hanging stalled writer, unbounded provider calls, quadratic redaction, ambient PATH lookup, a pre-start signal gap and usage exit codes, all fixed in `d0baff2`. The Bash CLI remains the shipped CLI until the M4 cutover.
+Known differences, kept deliberately: Go run uses separate stdout and stderr pipes with no PTY, so terminal buffering and merged ordering can differ from an interactive session; Unix exec is unfiltered, as in Bash; Windows rejects run and exec until M5a. A sol review found a hanging stalled writer, unbounded provider calls, quadratic redaction, ambient PATH lookup, a pre-start signal gap and usage exit codes, all fixed in `d0baff2`. The Bash CLI remains the shipped CLI until the M4.1 cutover.
 
 ## M2: Go hook parity and tightening
 
-Status: done (2026-10-19, merged from `go/m2` under the owner's convergence rule). Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax. The installed Bash hook stays active until the M4 cutover; open malformed-syntax, raw-limit and coverage items are tracked under M2.1 below.
+Status: done (2026-10-19, merged from `go/m2` under the owner's convergence rule). Goal: replace tokenizer with bounded Bash AST analysis and classify host calls without executing syntax. The installed Bash hook stays active until the M4.1 cutover; open malformed-syntax, raw-limit and coverage items are tracked under M2.1 below.
 
 - [x] feat(hook): decode host envelopes and path roles
 - [x] feat(hook): analyse bash AST and bounded expansions
@@ -285,17 +285,30 @@ Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](htt
 
 ## M4: Releasable Linux/macOS core
 
-Status: planned. Estimate: 4-6 days. Goal: ship verified binaries and gate Claude Code cutover on real host failure behavior.
+Status: in progress (branch go/m4, plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
 
-- [ ] build(release): add deterministic artifacts and attestations
-- [ ] feat(plugin): add symlink-safe verified launchers with bootstrap-denial and symlink assertions
-- [ ] test(plugin): extend cold offline corruption timeout and concurrent-install matrix
-- [ ] docs(install): document pins host versions and failure modes
-- [ ] chore(plugin): add claude onFailure block and bump manifests
-- [ ] feat(hook): stage claude activation on release branch before S
-- [ ] test(codex): record host failure behavior before codex cutover
+- [x] docs(release): freeze v0.2.0 assets, toolchain, checksum and cache contracts (pending CI)
+- [x] build(release): add deterministic artifacts and final-tag attestation workflow (pending CI)
+- [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (pending CI)
+- [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (pending CI)
+- [x] test(host): build deferred real-host harness and offline synthetic classification (pending CI)
+- [x] docs(install): document pins, host limits, release sequence and failure modes; update doctor (pending CI)
 
-Gate: two green candidates, source commit S, checksum commit C and final tag at C; reproducible final-tag artifacts with verified repository/workflow/commit/ref/subject attestations; symlink install from another cwd; Claude Code v2.1.295+ blocks missing/failed executable, post-exec crash, invalid output and timeout with `onFailure: "block"` on both entries; pre-exec failures return fixed denial. Linux/macOS CI, corpus, providers and race green before default-branch switch. Codex stays on Bash; no Windows release or protection claim.
+Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. `bin/secret`, Claude and Codex hooks and all four manifest versions remain on the existing Bash installation state. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.
+
+## M4.1: Host evidence and Claude cutover
+
+Status: planned, blocked on sponsorship for model usage. Goal: prove real host failure behavior before changing what main installs.
+
+- [ ] test(host): enable sponsored protected host sessions and record Linux/macOS Claude failure evidence
+- [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
+- [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.0 and add Claude onFailure block
+- [ ] feat(hook): switch hooks/hooks.json to guard-go after host evidence
+- [ ] feat(cli): stage bin/secret as the verified launcher with byte-identical executable compat/secret
+- [ ] fix(hook): adopt host-tested neutral output and output-failure contract in internal/hook
+- [ ] test(compat): retain explicit Bash rollback, exact divergence and stock Bash 3.2 CI
+
+Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks missing/failed launchers, exec errors, post-exec crashes, malformed/schema-invalid output and timeouts on both synchronous groups. Healthy controls must execute the identical tool requests. Configure `vars.SECRET_HOST_TESTS == 'enabled'` and protected secrets only with owner approval; missing authentication or model evidence is incomplete. Enable `tests/test-plugin.py --stage m4.1` only here. Repeat applicable candidate/release gates for the changed source identity before owner-approved promotion; never mutate the M4 tag. Codex stays on Bash.
 
 ## M5a: Windows CLI and Credential Manager
 
@@ -345,7 +358,7 @@ Gate: host/version/workdir contract, static literals/pipelines/redirects/nested 
 
 ## M6: Bash compatibility
 
-Status: planned (after two green M4 releases). Estimate: 2-3 days. Goal: maintain explicit rollback until supported hosts can safely retire it.
+Status: planned (after M4.1 cutover and two green shipped releases). Estimate: 2-3 days. Goal: maintain explicit rollback until supported hosts can safely retire it.
 
 - [ ] docs(compat): mark bash implementation maintenance-only
 - [ ] test(compat): retain differential corpus and explicit rollback CI
@@ -355,4 +368,4 @@ Gate: host-by-host docs and manifests, green rollback tests; never remove the in
 
 ## Keeping this tracker current
 
-Tick each commit item in the same PR as the change and append its commit hash, for example `- [x] type(scope): summary (abc1234)`. When a milestone gate passes, set status to `done` and record links to the passing GitHub Actions runs alongside its gate. Do not mark gates passed from local tests alone; keep [CHANGELOG.md](CHANGELOG.md) aligned with shipped behavior.
+Tick implemented M4 items with `(pending CI)` until hosted evidence exists. For completed milestones, tick each commit item in the same PR as the change and append its commit hash, for example `- [x] type(scope): summary (abc1234)`. When a milestone gate passes, set status to `done` and record links to the passing GitHub Actions runs alongside its gate. Do not mark gates passed from local tests alone; keep [CHANGELOG.md](CHANGELOG.md) aligned with shipped behavior.
