@@ -68,7 +68,9 @@ func TestAudit23PathBounds(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = Decode(strings.NewReader(string(body)))
-				if valid := n <= MaxPathSeparators; (err == nil) != valid {
+				// U15 retains the separator cap and additionally bounds raw bytes;
+				// the old 4096-separator allowance is now intentionally denied.
+				if valid := n <= MaxPathSeparators && len(value) <= 4096; (err == nil) != valid {
 					t.Fatalf("valid=%v, error=%v", valid, err)
 				}
 			})

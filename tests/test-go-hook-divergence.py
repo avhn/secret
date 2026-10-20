@@ -69,6 +69,24 @@ class EnvelopeTighteningTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unreviewed difference"):
                     self.measure(suite, name, "deny")
 
+    def test_m21_patch_tightenings_are_exact_and_directional(self):
+        for name in ("audit27_s22_move", "audit27_s22_crlf", "audit19_yarn_project_patch"):
+            with self.subTest(name=name):
+                self.assertEqual(self.measure("codex", name, "allow"), [("codex", name, "deliberate-tightening")])
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure("codex", name, "deny")
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure("guard", name, "allow")
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure("codex", name + "_other", "allow")
+
+    def test_implicit_first_hunks_are_not_tightening_exceptions(self):
+        for name in ("ordinary_patch",):
+            self.assertNotIn(name, divergence.CODEX_TIGHTENING)
+            for decision in ("allow", "deny"):
+                with self.assertRaisesRegex(ValueError, "unreviewed difference"):
+                    self.measure("codex", name, decision)
+
     def test_checker_rejects_unreviewed_allow_categories(self):
         checker = GENERATOR.with_name("check-go-hook-divergence.py")
         for suite in ("guard", "codex"):

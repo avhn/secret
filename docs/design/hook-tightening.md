@@ -1613,10 +1613,102 @@ matches when HOME is outside cwd without changing wildcard or dotfile rules. A
 synthetic alias/listing mismatch runs on every OS; it does not replace native
 Windows CI or installed-host checks.
 
-U2, U3, U8, U11, U15, U16 and U17 retain named M2.1 review entries in ROADMAP.md.
-Some share closures above or the earlier patch-stdin review; remaining malformed
-input and raw-limit differences are not claimed fixed by these synthetic tests.
-Applicable CI and installed-host failure evidence remain separate gates.
+U2, U3, U8 and U11 retain named M2.1 review entries in ROADMAP.md. Some share
+closures above or the earlier patch-stdin review; their remaining malformed-input
+differences are not claimed fixed by these synthetic tests. Go-side U15-U17 and
+timing follow-ups are described below, pending applicable CI. Installed-host
+failure evidence remains a separate gate.
+
+### M2.1 U15-U17 raw paths and patch grammar (pending CI)
+
+U15 checks raw UTF-8 bytes before normalization or filesystem metadata: at most
+4096 bytes total and 255 bytes per component. These are the retained Bash
+whole-envelope and patch-header limits, not rune counts. All envelope path roles
+(cwd, workdir, file_path, notebook_path and path) are checked, including fields
+unused by the selected tool and names-only requests. Every Add/Update/Delete
+source and Move to destination shares the same check, through native apply_patch
+and shell/heredoc or explicit-shell argv routes. Native Windows separators also
+split components. Dot/dotdot cleanup cannot erase an over-limit raw spelling.
+These are path-role limits, not limits on arbitrary prose or patch body lines.
+The prior TestAudit23PathBounds 4096-separator inputs remain unchanged but now
+deny: their redundant spellings exceed 4096 raw bytes even before resolution.
+
+U16 rejects every C0 and DEL byte in native patch headers, hunk headers and paths.
+LF separates lines; it is not permitted within a path. CRLF now denies instead of
+stripping CR. Tabs in prefixed body data remain data, not header indentation.
+Malformed-byte and raw-limit errors use the existing fixed recovery guidance,
+without repeating the path or body. Existing NUL/CR body denials remain.
+
+U17 validates body grammar against upstream Codex
+[parser.rs](https://github.com/openai/codex/blob/main/codex-rs/apply-patch/src/parser.rs)
+and its delegated
+[streaming_parser.rs](https://github.com/openai/codex/blob/main/codex-rs/apply-patch/src/streaming_parser.rs),
+reviewed 2026-10-20. Body bytes are syntax only, never applied, opened as files,
+evaluated or included in output. This is a bounded security-policy subset, not a
+claim of identical acceptance of every lenient upstream input.
+
+| Rule | Upstream comparison and Go decision |
+| --- | --- |
+| First Update chunk | An explicit @@ marker is optional. Accept initial +/-/space lines and unprefixed empty context, including after Move to. Later explicit chunks use @@ markers. The upstream test explicitly requires this allowance. |
+| Empty chunks | Empty Update sections, move-only updates, consecutive empty @@ chunks and a final empty @@ chunk reject in both parsers. An empty context line counts as actual chunk content, not an empty hunk. |
+| Add/Delete | Empty Add files and plus-prefixed Add data accept; unprefixed Add data and any Delete body reject, matching the implementation rather than only its abbreviated Lark grammar. |
+| Context and anchors | Space-prefixed context, unprefixed empty context, multiple chunks and @@ with trailing spaces accept. Nonempty unprefixed prose and malformed @@ markers reject in both parsers. |
+| Header indentation | Public indented section headers outside Update bodies and spaces around Begin/End markers accept. Inside an Update, an ASCII-space-prefixed public header is context, matching upstream. Protected header-looking lines retain the older conservative path-role denial because adapters and parser states can disagree whether they name a target; never erase an existing protected-header witness as whitespace normalization. |
+| Literal heredoc wrappers | Accept exactly <<EOF, <<'EOF' and <<\"EOF\" with an exact EOF closing line, including one final newline. They are literal native framing, not shell source: never expand their contents. Upstream's broader closing ends_with(\"EOF\") rule is intentionally not used because a suffix such as otherEOF disagrees with a shell delimiter and cannot certify the same frame across adapters. Unknown delimiters and trailing material reject. |
+| End of File | Accept a nonempty Update chunk followed by EOF, empty/whitespace-only lines after EOF and a following file section. Retain the existing single terminal EOF policy: missing chunks, duplicate EOF, new chunks or nonempty data after EOF deny. Upstream permits some ignored/restarted EOF forms, but the guard requires one unambiguous chunk terminator before it can certify that no later body is being reinterpreted as target metadata; the prior audit-27 denials remain unchanged. |
+| Path whitespace | Keep rejecting empty or edge-whitespace target names rather than choosing between raw, trim and trim_end path interpretations across native and shell adapters. Raw-byte limits and control checks precede normalization and metadata work. |
+| Outer framing | Preserve the existing requirement for one complete target-bearing envelope and at most one trailing newline. Upstream trims additional outer whitespace and accepts targetless patches; Go requires a classified target and exact complete framing rather than certifying ignored prefix/suffix material. Existing no-section and two-final-newline denials remain unchanged. |
+| Environment ID | Upstream supports an optional environment selector. Go rejects it because the hook cannot certify a different execution environment or its filesystem anchor from the supplied cwd/workdir; treating it as inert prose could misclassify every target. |
+| Controls and budgets | U15/U16 deliberately remain stricter than upstream: raw path and envelope budgets prevent unbounded metadata work, and C0/DEL header controls, including CRLF and tab indentation, deny to prevent differing decoded target spellings. Existing NUL/CR body denials remain. |
+
+The initial required-@@ rule was an over-denial, not a security tightening.
+`ordinary_patch` now allows normally and has no exception in the generator or
+inventory. Protected implicit-hunk counterparts still deny through every route.
+The earlier indented-safe unit control likewise retains its original allowance.
+The actual `audit19_yarn_project_patch` fixture in tests/test-codex.sh contains
+only Begin Patch, Update File: .yarnrc.yml and End Patch, with no chunk at all.
+It is not an implicit-first-chunk example: upstream rejects that empty Update.
+Keep its existing allow fixture and classify the Go denial honestly rather than
+adding body data or weakening empty-update validation to make a row disappear.
+A separate public project Yarn fixture with a real implicit chunk must allow.
+
+Exact retained Codex-suite differences are named here without changing any shell
+expectation or admitting a Go allow for a Bash denial:
+
+| Case | Category | Reason |
+| --- | --- | --- |
+| `audit27_s22_move` | deliberate-tightening | A move-only Update section is empty; upstream rejects it too, unlike the retained Bash framing checker. |
+| `audit27_s22_crlf` | deliberate-tightening | U16 rejects native patch-header CR bytes to avoid differing decoded header/path spellings instead of silently stripping them as upstream does. |
+| `audit19_yarn_project_patch` | deliberate-tightening | The actual retained public project Yarn fixture is an empty Update with no body; upstream rejects empty updates too. This is not a missing-@@ or protected-name denial. |
+
+Tests are table-driven and synthetic in internal/hook/input/m21_limits_test.go,
+internal/hook/paths/limits_test.go, internal/hook/patch/m21_test.go,
+internal/hook/patch/m21_upstream_test.go and internal/hook/m21_boundaries_test.go.
+They include upstream compatibility controls, multibyte boundaries, every
+path role, both host adapters, native and shell patch routes, and C0/DEL controls.
+
+### Audit 29 input-read and total decision timing (pending CI)
+
+The two-second policy deadline starts at shell analysis, not at process launch
+or the first stdin read. The existing independent two-second read deadline still
+requires EOF, not merely complete JSON. Decide now also starts one four-second
+timer before input reading, covering read, decode and every tool's analysis.
+The timer never resets at a phase boundary. Expiry returns one fixed denial;
+late workers can write only to a private buffer, never the host channel. A late
+result cannot win an allow when both result and timer channels are ready.
+
+The four-second bound excludes process startup, scheduler delays and a blocked
+host-output writer. It is not a two-second end-to-end promise or evidence of
+host failure blocking. An arbitrary io.Reader or blocked metadata syscall cannot
+be forcibly cancelled; library callers must release blocked readers. The
+single-decision CLI exits after publishing its decision. Existing five-second
+host configuration and installed Bash behavior are unchanged.
+
+internal/hook/m21_timing_test.go checks delayed first bytes, delayed complete
+JSON, held-open EOF and both adapters with synthetic pipes. Scaled shared-timer
+checks cover stalled reads, stalled analysis and combined phase delays, and prove
+that late completion cannot append another decision. Native hosted CI and real
+host failure tests remain separate gates.
 
 ## Confirmation audit 29: public Parallel pipelines (U22)
 

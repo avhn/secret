@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/avhn/secret/internal/hook/input"
 	"github.com/avhn/secret/internal/hook/patch"
@@ -13,14 +14,64 @@ import (
 	"github.com/avhn/secret/internal/hook/search"
 )
 
+// DecisionTimeout bounds input reading, decoding and analysis together. The
+// existing two-second read and policy budgets remain independently enforced.
+// Process startup and a blocked host output writer are outside this bound.
+const DecisionTimeout = 4 * time.Second
+
 // Decide writes one supported denial or no decision after bounded analysis.
 // The installed Bash guard is unchanged; this entry point is the Go hook.
-func Decide(host string, in io.Reader, out io.Writer) (err error) {
-	defer func() {
-		if recover() != nil {
-			_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
-		}
+func Decide(host string, in io.Reader, out io.Writer) error {
+	return decideWithin(out, DecisionTimeout, func(buffer io.Writer) error {
+		return decide(host, in, buffer)
+	})
+}
+
+// Only this caller writes to the host. An arbitrary Reader or metadata syscall
+// cannot be cancelled; a late worker can write only to its private buffer. The
+// single-decision CLI exits, and library callers must release blocked readers.
+func decideWithin(out io.Writer, timeout time.Duration, analyze func(io.Writer) error) error {
+	type result struct {
+		data []byte
+		err  error
+	}
+	done := make(chan result, 1)
+	deadline := time.Now().Add(timeout)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	go func() {
+		var buffer bytes.Buffer
+		var decision result
+		defer func() {
+			if recover() != nil {
+				decision = result{data: input.Deny("command too complex to analyse for secret access; split it or use secret run", false)}
+			}
+			done <- decision
+		}()
+		decision.err = analyze(&buffer)
+		decision.data = buffer.Bytes()
 	}()
+	select {
+	case decision := <-done:
+		if !time.Now().Before(deadline) {
+			_, err := out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
+			return err
+		}
+		if decision.err != nil {
+			return decision.err
+		}
+		if len(decision.data) == 0 {
+			return nil
+		}
+		_, err := out.Write(decision.data)
+		return err
+	case <-timer.C:
+		_, err := out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
+		return err
+	}
+}
+
+func decide(host string, in io.Reader, out io.Writer) (err error) {
 	data, readErr := input.Read(in)
 	if readErr == nil && len(data) == 0 {
 		return nil

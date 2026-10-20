@@ -19,7 +19,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 FIND_SHIMS = {"grep_find_exit", "grep_find_exit_count", "rg_find_exit", "grep_timeout", "grep_timeout_count", "rg_timeout", "git_grep_timeout"}
 # This preprocessing fault is exercised by both host suites; Go never runs jq.
 PREPROCESS_SHIMS = {"audit27_s4_preanalysis_deadline"}
-CODEX_TIGHTENING = {"cwd_safe", "audit19_allow#14", "audit19_allow#15", "audit19_allow#16", "audit19_allow#17"}
+# M2.1 rejects empty updates (including the body-free project Yarn fixture)
+# and native patch-header controls. Valid implicit first chunks need no exception.
+CODEX_TIGHTENING = {"cwd_safe", "audit19_allow#14", "audit19_allow#15", "audit19_allow#16", "audit19_allow#17",
+                    "audit27_s22_move", "audit27_s22_crlf", "audit19_yarn_project_patch"}
 # Existing Go path-field controls remain stricter than Bash's valid LF paths.
 ENVELOPE_TIGHTENING = {"audit23_o8_workdir_newline", "audit23_o8_cwd_newline"}
 # Audit 28 retains Go's conservative arithmetic and function/time framing denials.

@@ -236,9 +236,11 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   retain paired malformed-language regression coverage
 - [ ] U11: malformed nested backquotes; Go now denies deep residue, while Bash
   still permits some malformed nesting
-- [ ] U15: Bash/Go raw path-byte and component-byte limit parity
-- [ ] U16: native apply_patch control-byte validation parity
-- [ ] U17: full malformed apply_patch body grammar, beyond header/EOF validation
+- [x] U15: Bash/Go raw path-byte and component-byte limit parity (pending CI)
+- [x] U16: native apply_patch control-byte validation parity (pending CI)
+- [x] U17: full malformed apply_patch body grammar, beyond header/EOF validation;
+  preserve upstream implicit first chunks, empty context and public indentation
+  (Go implementation, pending CI; installed Bash remains unchanged)
 - [ ] Preserve the audit 27 to 29 class (i) backlog: shared and Bash-only coverage
   gaps are not closures merely because Go denies the same command
 - [ ] Audit 29 class (i): Bash explicit-shell argv option terminators; interpreter
@@ -247,8 +249,9 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   reevaluation; Bash syntax/redirect/producer/static-variable gaps; nested
   backquotes; final-component dotglob matches. U10/U12 Go closures cover only
   their named witnesses, not every shared or Bash-only variant
-- [ ] Audit 29: distinguish the two-second Go analysis budget from end-to-end
-  input-read plus analysis timing, including delayed-stdin synthetic checks
+- [x] Audit 29: distinguish the two-second Go analysis budget from the four-second
+  input-read, decode and analysis bound, with delayed-stdin synthetic checks
+  (pending CI; process startup and blocked host output excluded)
 
 ### M2 follow-ups (over-denials, non-blocking)
 

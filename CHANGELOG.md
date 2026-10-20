@@ -21,6 +21,20 @@ All notable changes to this project are documented here. Format follows [Keep a 
   `onFailure: "block"`, Claude hook path, `bin/secret` plus `compat/secret`, and
   Go hook output contract. The installed CLI, hooks, manifests and M2 policy
   remain unchanged in M4.
+- Tighten staged Go hook raw path limits to 4096 UTF-8 bytes per envelope path
+  and patch target, with 255-byte components before normalization (pending CI).
+  Reject C0/DEL patch-header controls, including CRLF, and malformed Add/Delete/
+  Update/Move bodies, incomplete hunks and misplaced EOF markers. Match upstream
+  Codex's optional first @@ marker, empty context lines, public indented headers
+  and exact literal EOF wrappers; do not misclassify valid implicit first hunks
+  as security tightenings. Patch bodies are grammar data only, never applied or
+  repeated in diagnostics. Document each retained security-specific grammar limit.
+- Bound Go hook input reading, decoding and analysis together to four seconds,
+  retaining independent two-second read and shell-analysis budgets. Delayed stdin
+  and late-analysis tests cover fixed single denials; process startup and blocked
+  output writes are excluded. The Bash CLI, installed guard and host failure
+  behavior are unchanged; applicable hosted CI remains required.
+
 - Fix staged Go hook over-denials for `python3 -m env`, explicit-file
   `git grep --no-index -q`, and ripgrep quiet/names-only searches with
   `--passthru` (pending CI). Preserve protected pattern-file, content-output and

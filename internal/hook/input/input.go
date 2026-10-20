@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/avhn/secret/internal/hook/paths"
 )
 
 var ErrInvalid = errors.New("invalid hook envelope")
@@ -122,11 +124,11 @@ func text(fields map[string]json.RawMessage, key string) (string, bool) {
 	if json.Unmarshal(raw, &value) != nil || bad(value) || strings.ContainsAny(value, "\n\t") {
 		return "", false
 	}
-	// Bound path normalization before filepath.Clean can hide excessive redundant
-	// components. Bash's deadline also denies these under-cap envelope paths.
+	// Check raw bytes before normalization can hide oversized components or
+	// redundant separators, including fields unused by the selected tool.
 	switch key {
 	case "cwd", "file_path", "notebook_path", "path", "workdir":
-		if strings.Count(value, "/") > MaxPathSeparators {
+		if !paths.RawWithinLimits(value) || strings.Count(value, "/") > MaxPathSeparators {
 			return "", false
 		}
 	}

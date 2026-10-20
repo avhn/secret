@@ -5,8 +5,11 @@ codex	audit19_allow#14	deliberate-tightening
 codex	audit19_allow#15	deliberate-tightening
 codex	audit19_allow#16	deliberate-tightening
 codex	audit19_allow#17	deliberate-tightening
+codex	audit19_yarn_project_patch	deliberate-tightening
 codex	audit23_o8_cwd_newline	deliberate-tightening
 codex	audit23_o8_workdir_newline	deliberate-tightening
+codex	audit27_s22_crlf	deliberate-tightening
+codex	audit27_s22_move	deliberate-tightening
 codex	audit27_s4_preanalysis_deadline	deliberate-find-shim
 codex	audit28_t13_compound_time_end_public	deliberate-tightening
 codex	audit28_t13_review_function_index_public	deliberate-tightening
