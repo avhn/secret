@@ -252,10 +252,16 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 ### M2 follow-ups (over-denials, non-blocking)
 
-- [ ] `git grep --no-index -q T .env`
-- [ ] Go: `python3 -m env`
-- [ ] Go: `rg --passthru -q` and `rg -l --passthru` on an explicit `.env`
-- [ ] Go: `rg -g '{!*.md,*.secret}'` under the protective config
+- [x] Go: permit `git grep --no-index -q T .env` consistently with existing
+  quiet/names-only search exemptions; match-status oracles remain a documented
+  policy limit (pending CI)
+- [x] Go: classify `python3 -m env` as a module, not the shell env printer,
+  without exempting protected arguments or known credential modules (pending CI)
+- [x] Go: retain quiet/names-only modes for `rg --passthru -q` and
+  `rg -l --passthru` on explicit `.env` inputs (pending CI)
+- [x] Review `rg -g '{!*.md,*.secret}'`: retained as an intended conservative
+  denial, not a pure-exclusion glob; see documented intended denials below
+  (pending CI)
 - [ ] `kubectl -o custom-columns` and curl uploads of unresolved variables (documented limits, P8)
 - [ ] Bash two-second budget on long chains (P20, documented)
 - [ ] Go denies long conditional-cd chains past the cwd-set cap
@@ -264,6 +270,15 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   exact controls are recorded in the hook tightening table and divergence inventory
 - [ ] Audit 28: Bash PHP descriptor syntax over-denies public proc_open array
   launches; Go public controls stay allowed rather than copying that over-denial
+
+### M2 documented intended denials
+
+- `rg -g '{!*.md,*.secret}'` contains a positive protected-name alternative.
+  It is neither an all-negative selector nor a public narrowing proof, so it
+  cannot reuse the protective config certificate. The policy deliberately does
+  not certify mixed `--glob`/`--iglob` precedence; this does not claim that every
+  ripgrep version prints a protected match with the shipped config. See
+  [the M2.1 review](docs/design/hook-tightening.md#m21-over-denial-review).
 
 ## M3: Operator workflow
 

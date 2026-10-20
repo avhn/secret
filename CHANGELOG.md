@@ -21,6 +21,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
   `onFailure: "block"`, Claude hook path, `bin/secret` plus `compat/secret`, and
   Go hook output contract. The installed CLI, hooks, manifests and M2 policy
   remain unchanged in M4.
+- Fix staged Go hook over-denials for `python3 -m env`, explicit-file
+  `git grep --no-index -q`, and ripgrep quiet/names-only searches with
+  `--passthru` (pending CI). Preserve protected pattern-file, content-output and
+  credential-module denials. Document the existing match-status/count oracle
+  limit and retain conservative mixed-brace selector denial under protective
+  ripgrep config. The Bash CLI and installed guard are unchanged.
 
 - Fix staged Go operator PTY tests to drain output through helper exit on macOS,
   with bounded nonblocking input, exit waits and redacted timeout diagnostics.

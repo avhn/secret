@@ -294,6 +294,11 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 			case "--json":
 				count, outputOnly, jsonOutput = true, false, true
 				continue
+			case "--passthru":
+				if kind == "rg" {
+					// Passthru changes selected lines, not quiet or filenames mode.
+					continue
+				}
 			case "--no-index", "--no-exclude-standard":
 				if kind == "git" {
 					includeIgnored, gitWorkTree = true, true
@@ -429,7 +434,9 @@ func Scope(words []string, cwd, home, config string, inlineConfig bool) string {
 		}
 		roots = append(roots, v)
 	}
-	if kind == "rg" && outputOnly && !jsonOutput && len(roots) > 0 && !unsafeNames {
+	// Git quiet, like the existing rg quiet/count exemption, emits no file
+	// contents. Keep Git counts outside this explicit-file exemption.
+	if (kind == "rg" || kind == "git" && !count) && outputOnly && !jsonOutput && len(roots) > 0 && !unsafeNames {
 		filesOnly := true
 		for _, root := range roots {
 			if info, err := os.Stat(paths.Resolve(root, cwd, "", home)); err == nil && info.IsDir() {
@@ -591,7 +598,7 @@ func searchLongOption(arg, kind string) string {
 	if kind == "git" {
 		names += " open-files-in-pager cached no-index untracked exclude-standard no-exclude-standard basic-regexp extended-regexp perl-regexp full-name all-match break heading show-function function-context"
 	} else {
-		names += " files count-matches json hidden follow search-zip no-ignore no-ignore-vcs no-ignore-parent no-ignore-dot no-config ignore-file-case-insensitive glob iglob type type-not type-add encoding colors max-depth threads pre pre-glob ignore-file smart-case case-sensitive max-columns-preview column no-column heading no-heading trim no-messages max-columns sort sortr max-filesize pcre2 multiline multiline-dotall stats"
+		names += " files count-matches json passthru hidden follow search-zip no-ignore no-ignore-vcs no-ignore-parent no-ignore-dot no-config ignore-file-case-insensitive glob iglob type type-not type-add encoding colors max-depth threads pre pre-glob ignore-file smart-case case-sensitive max-columns-preview column no-column heading no-heading trim no-messages max-columns sort sortr max-filesize pcre2 multiline multiline-dotall stats"
 	}
 	match := ""
 	for _, name := range strings.Fields(names) {

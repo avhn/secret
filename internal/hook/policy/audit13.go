@@ -189,7 +189,9 @@ func safePackageChild(name string, args []string) ([]string, bool) {
 			}
 		}
 	case "python", "python3":
-		if len(args) < 2 || args[0] != "-m" {
+		if len(args) < 2 || args[0] != "-m" || args[1] == "env" {
+			// A Python module named env is not the shell environment launcher.
+			// Leave its arguments with the interpreter's ordinary input checks.
 			return nil, false
 		}
 		args = args[1:]

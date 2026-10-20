@@ -152,6 +152,41 @@ never permit a Go allow where the shell suite requires deny.
 | `audit28_t13_review_quoted_number_public`, `audit28_t13_review_quoted_number_public_argv`, `audit28_t13_review_single_quoted_number_public`, `audit28_t13_review_single_quoted_number_public_argv` | deliberate-tightening | Quoted arithmetic operands remain indeterminate in Go, even when Bash command quote removal yields a valid constant expression. |
 | `audit28_t13_review_quoted_index_public`, `audit28_t13_review_quoted_index_public_argv`, `audit28_t13_review_quoted_loop_public`, `audit28_t13_review_quoted_loop_public_argv`, `audit28_t13_review_quoted_child_public`, `audit28_t13_review_quoted_child_public_argv` | deliberate-tightening | Go retains conservative quote rejection in arithmetic indices, loop clauses and substitution operands. Bash validates bounded quote-removed command operands without evaluating them. |
 
+## M2.1 over-denial review
+
+This review preserves the existing output-based search boundary from audits
+14 to 16 and 24. Quiet search status is a one-bit match oracle, filenames with
+matches also expose match bits, and counts expose more. Existing grep/rg quiet,
+count and filenames-only exemptions explicitly allow that information. They are
+not a promise of zero information about protected contents. Extending an existing
+quiet/names-only exemption is not appropriate for pattern-file inputs, arbitrary
+preprocessors, content output or JSON output that can carry matching text.
+
+| Case | Decision | Reason |
+| --- | --- | --- |
+| `git grep --no-index -q T .env` | Fix over-denial (pending CI) | The explicit-file quiet mode prints no contents, consistent with existing grep/rg quiet and Git filenames-only policy. Git count-only behavior is unchanged. Protected `-f` inputs, pager execution and unknown options still deny. |
+| `python3 -m env` | Fix over-denial (pending CI) | The module name is not a shell env launcher or a `.env` file input. Keep the interpreter path checks and inspect every later argument normally; dotenv/keyring credential modules and real env printers still deny. |
+| `rg --passthru -q T .env`, `rg -l --passthru T .env` | Fix over-denial (pending CI) | Passthru changes line selection, not quiet or filenames-only output. Both option orders retain the existing explicit-file non-content exemptions. Passthru without those modes, protected pattern files, preprocessors and content-bearing JSON still deny. |
+| `rg -g '{!*.md,*.secret}' T` | Intended conservative denial (pending CI) | Bounded brace analysis retains the positive `*.secret` alternative. A negated sibling does not make the whole selector a pure exclusion or a safe narrowing proof. The protective config certificate does not admit positive re-inclusions. |
+
+The last case is a certification limit, not proof that every implementation emits
+protected content with that exact config. A disposable ripgrep 15.2.0 probe with
+an explicit `.` root selects the synthetic secret without config; with the shipped
+`--iglob` exclusions it does not, because those exclusions take precedence over
+`-g`. The policy deliberately does not model mixed `--glob`/`--iglob` precedence:
+`--iglob='{!*.md,*.secret}'` can re-include the protected fixture, and config
+certification continues to require no positive re-inclusions. No glob decision or
+protected expectation is weakened. Probes without a path read redirected stdin
+in this environment, so they are not filesystem-scope evidence.
+
+Table-driven regressions live in `internal/hook/policy/m21_overdenial_test.go`,
+`internal/hook/search/m21_overdenial_test.go` and
+`internal/hook/m21_overdenial_test.go`. They use disposable metadata and fabricated
+files, cover source and argv paths through both adapters, and never execute the
+analyzed commands. Local results and inventory regeneration do not establish
+native platform CI or installed-host protection. The retained Bash guard and CLI
+are unchanged.
+
 ## Permanent synthetic evidence
 
 Audit fixtures are synthetic and permanent in `testdata/hook/audit-cases.json`
