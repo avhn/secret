@@ -331,7 +331,8 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(len(calls), 5)
         for call in calls:
             bundle = Path(call[call.index("--bundle") + 1])
-            self.assertEqual(bundle.parent, downloaded)
+            # The verifier resolves paths physically, e.g. macOS /var -> /private/var.
+            self.assertEqual(bundle.parent.resolve(), downloaded.resolve())
             self.assertIn(bundle.name, bundles)
 
         # A renamed bundle is not enough: verification must consume its intact payload.
