@@ -285,17 +285,19 @@ Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](htt
 
 ## M4: Releasable Linux/macOS core
 
-Status: in progress (branch go/m4, plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
+Status: in progress (candidate merged to main; final tag, draft and publication await owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
 
-- [x] docs(release): freeze v0.2.0 assets, toolchain, checksum and cache contracts (pending CI)
-- [x] build(release): add deterministic artifacts and final-tag attestation workflow (pending CI)
-- [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (pending CI)
-- [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (pending CI)
-- [x] test(host): build deferred real-host harness and offline synthetic classification (pending CI)
-- [x] fix(plugin): isolate failed denial writes and correct test cache cleanup, Darwin link limits and cwd aliases (pending hosted CI)
-- [x] docs(install): document pins, host limits, release sequence and failure modes; update doctor (pending CI)
+- [x] docs(release): freeze v0.2.0 assets, toolchain, checksum and cache contracts (d00072e)
+- [x] build(release): add deterministic artifacts and final-tag attestation workflow (cbf8bc6)
+- [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (c66f127)
+- [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (0bdf573)
+- [x] test(host): build deferred real-host harness and offline synthetic classification (84bc6cc)
+- [x] fix(plugin): isolate failed denial writes and correct test cache cleanup, Darwin link limits and cwd aliases (27de241, 306618e)
+- [x] docs(install): document pins, host limits, release sequence and failure modes; update doctor (d00072e)
 
 Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. `bin/secret`, Claude and Codex hooks and all four manifest versions remain on the existing Bash installation state. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.
+
+Candidate evidence (source 306618e, all green): [ci 39405526391](https://github.com/avhn/secret/actions/runs/39405526391), [release 39405526406](https://github.com/avhn/secret/actions/runs/39405526406) (two independent builds, byte-identical), [plugin install 39405526490](https://github.com/avhn/secret/actions/runs/39405526490) (native linux x86_64 and aarch64, macOS arm64 and x86_64). Remaining: second integrated candidate, checksum-only commit C, final tag and its attestation runs.
 
 ## M4.1: Host evidence and Claude cutover
 
