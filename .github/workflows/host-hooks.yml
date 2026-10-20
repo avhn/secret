@@ -1,0 +1,153 @@
+name: host-hooks (deferred real-host gate)
+
+# Inactive pending sponsorship; never configure these jobs as required checks.
+# Never runs on a push, PR, tag or release. The host-hook-tests environment must
+# require owner review and restrict trusted branches before credentials are configured.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-hooks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  claude-host-linux:
+    if: vars.SECRET_HOST_TESTS == 'enabled'
+    runs-on: ubuntu-latest
+    environment: host-hook-tests
+    timeout-minutes: 120
+    env:
+      HOST_KIND: claude
+      HOST_MODEL: claude-haiku-4-5-20251001
+    steps: &host-steps
+      - name: Require protected model credential
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          if [ "$HOST_KIND" = claude ]; then
+            if [ -z "$ANTHROPIC_API_KEY" ]; then
+              echo 'credential not configured; gate incomplete' >&2
+              exit 1
+            fi
+          else
+            if [ -z "$OPENAI_API_KEY" ]; then
+              echo 'credential not configured; gate incomplete' >&2
+              exit 1
+            fi
+          fi
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.0'
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Allocate isolated installation and session directories
+        id: prepare
+        shell: bash
+        run: |
+          root="$(mktemp -d "$RUNNER_TEMP/m4-host.XXXXXX")"
+          chmod 700 "$root"
+          mkdir -m 700 "$root/build-home" "$root/cache" "$root/npm-home" "$root/session"
+          {
+            echo "HOST_TEST_ROOT=$root"
+            echo "TMPDIR=$root"
+            echo "GOCACHE=$root/cache/go-build"
+            echo "GOMODCACHE=$root/cache/go-mod"
+            echo 'GOTOOLCHAIN=local'
+          } >> "$GITHUB_ENV"
+      - name: Test classification without network or models
+        run: |
+          command -v shellcheck
+          python3 -I tests/test-host-hooks.py
+      - name: Build test-only faults and staged Go CLI
+        shell: bash
+        run: |
+          export HOME="$HOST_TEST_ROOT/build-home"
+          go build -tags hosthookfixture -o "$HOST_TEST_ROOT/host-hook-fixture" tests/host-hook-fixture.go
+          go build -o "$HOST_TEST_ROOT/secret-go" ./cmd/secret
+          python3 -I tests/test-host-hooks.py --fixture "$HOST_TEST_ROOT/host-hook-fixture"
+          command -v jq
+          perl -MJSON::PP -e 1
+      - name: Install pinned host package in disposable prefix
+        shell: bash
+        run: |
+          export HOME="$HOST_TEST_ROOT/npm-home"
+          if [ "$HOST_KIND" = claude ]; then
+            package='@anthropic-ai/claude-code@2.1.295'
+            executable=claude
+          else
+            # Version verified against the public npm registry on 2026-10-19.
+            package='@openai/codex@0.163.0'
+            executable=codex
+          fi
+          npm install --prefix "$HOST_TEST_ROOT/npm" --cache "$HOST_TEST_ROOT/cache/npm" \
+            --no-audit --no-fund "$package"
+          echo "HOST_EXECUTABLE=$HOST_TEST_ROOT/npm/node_modules/.bin/$executable" >> "$GITHUB_ENV"
+      - name: Exercise real host (incomplete without positive evidence)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        shell: bash
+        run: |
+          binary="$HOST_TEST_ROOT/secret-go"
+          if [ "$HOST_KIND" = codex ]; then binary="$GITHUB_WORKSPACE/hooks/guard-secrets"; fi
+          python3 -I tests/test-host-hooks.py --hosted --host "$HOST_KIND" \
+            --root "$HOST_TEST_ROOT/session" --checkout "$GITHUB_WORKSPACE" \
+            --fixture "$HOST_TEST_ROOT/host-hook-fixture" --binary "$binary" \
+            --executable "$HOST_EXECUTABLE" --model "$HOST_MODEL" \
+            --evidence "$HOST_TEST_ROOT/evidence.json"
+      - name: Retain sanitized evidence only
+        if: always() && steps.prepare.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-hooks-${{ env.HOST_KIND }}-${{ runner.os }}
+          path: ${{ env.HOST_TEST_ROOT }}/evidence.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove disposable homes, raw sessions and packages
+        if: always() && steps.prepare.outcome == 'success'
+        shell: bash
+        run: |
+          case "$HOST_TEST_ROOT" in
+            "$RUNNER_TEMP"/m4-host.*) rm -rf -- "$HOST_TEST_ROOT" ;;
+            *) echo 'unexpected scratch root; cleanup refused' >&2; exit 1 ;;
+          esac
+
+  claude-host-macos:
+    if: vars.SECRET_HOST_TESTS == 'enabled'
+    runs-on: macos-latest
+    environment: host-hook-tests
+    timeout-minutes: 120
+    env:
+      HOST_KIND: claude
+      HOST_MODEL: claude-haiku-4-5-20251001
+    steps: *host-steps
+
+  codex-host-linux:
+    if: vars.SECRET_HOST_TESTS == 'enabled'
+    runs-on: ubuntu-latest
+    environment: host-hook-tests
+    timeout-minutes: 70
+    env:
+      HOST_KIND: codex
+      HOST_MODEL: gpt-5-mini
+    steps: *host-steps
+
+  codex-host-macos:
+    if: vars.SECRET_HOST_TESTS == 'enabled'
+    runs-on: macos-latest
+    environment: host-hook-tests
+    timeout-minutes: 70
+    env:
+      HOST_KIND: codex
+      HOST_MODEL: gpt-5-mini
+    steps: *host-steps

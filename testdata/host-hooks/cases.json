@@ -1,0 +1,39 @@
+{
+  "synthetic_only": true,
+  "claude_version": "2.1.295",
+  "codex_version": "0.163.0",
+  "cases": [
+    "missing-launcher",
+    "failed-launcher",
+    "nonexecutable-launcher",
+    "missing-binary",
+    "exec-format",
+    "exit1",
+    "fatal",
+    "signal",
+    "malformed",
+    "schema",
+    "timeout",
+    "deny",
+    "neutral",
+    "empty",
+    "retained"
+  ],
+  "claude_operations": [
+    "Bash",
+    "Read",
+    "Edit",
+    "Write"
+  ],
+  "codex_operations": [
+    "Bash",
+    "apply_patch"
+  ],
+  "codex_host_contract": [
+    "plugin-dispatch",
+    "trust",
+    "re-trust",
+    "omitted-workdir"
+  ],
+  "status": "pending: no hosted run yet"
+}

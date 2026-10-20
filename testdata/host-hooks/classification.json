@@ -1,0 +1,2121 @@
+[
+  {
+    "name": "claude-blocked",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "no-authentication",
+    "host": "claude",
+    "events": [
+      {
+        "type": "result",
+        "subtype": "error_during_execution",
+        "is_error": true,
+        "result": "authentication unavailable"
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "model-outage",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "system",
+        "subtype": "api_retry",
+        "error": "overloaded"
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "missing-plugin",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": []
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "plugin-load-error",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ],
+        "plugin_errors": [
+          {
+            "type": "invalid_plugin",
+            "message": "synthetic error"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "no-tool-attempt",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "model-refusal",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "text",
+              "text": "I will not call the tool. Hook failed."
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "ordinary-policy-denial",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "Permission denied by policy"
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "missing-healthy-control",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": false,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "timeout",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": -9,
+      "timeout": true
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "unfinished-session",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "filesystem-executed-despite-denial",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": true,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "FAIL"
+  },
+  {
+    "name": "filesystem-execution-even-without-auth",
+    "host": "claude",
+    "events": [],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": true,
+      "returncode": 1,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "FAIL"
+  },
+  {
+    "name": "structured-success-after-fault",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": false,
+              "content": ""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "FAIL"
+  },
+  {
+    "name": "neutral-control",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": false,
+              "content": ""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "neutral",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": true,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "neutral-control-no-execution",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "neutral",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "empty-is-not-a-fault",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": false,
+              "content": ""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "empty",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": true,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-missing-launcher",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "missing-launcher",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-failed-launcher",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "failed-launcher",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-nonexecutable-launcher",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "nonexecutable-launcher",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-missing-binary",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "missing-binary",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-exec-format",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exec-format",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-fatal",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "fatal",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-signal",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "signal",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-malformed",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "malformed",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-schema",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "schema",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-timeout",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "timeout",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "fault-deny",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Bash",
+              "input": {
+                "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "deny",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "read-blocked",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Read",
+              "input": {
+                "file_path": "/synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": true,
+              "content": "PreToolUse hook error: failed; blocking because onFailure is \"block\""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Read",
+      "input": {
+        "file_path": "/synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "read-result-leak",
+    "host": "claude",
+    "events": [
+      {
+        "type": "system",
+        "subtype": "init",
+        "plugins": [
+          {
+            "name": "secret-host-fixture",
+            "path": "/synthetic/plugin"
+          }
+        ]
+      },
+      {
+        "type": "assistant",
+        "message": {
+          "content": [
+            {
+              "type": "tool_use",
+              "id": "call-1",
+              "name": "Read",
+              "input": {
+                "file_path": "/synthetic/witness.txt"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "user",
+        "message": {
+          "content": [
+            {
+              "type": "tool_result",
+              "tool_use_id": "call-1",
+              "is_error": false,
+              "content": ""
+            }
+          ]
+        }
+      },
+      {
+        "type": "result",
+        "subtype": "success",
+        "is_error": false,
+        "total_cost_usd": 0.001
+      }
+    ],
+    "target": {
+      "tool": "Read",
+      "input": {
+        "file_path": "/synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "FAIL"
+  },
+  {
+    "name": "codex-untrusted-neutral",
+    "host": "codex",
+    "events": [
+      {
+        "type": "thread.started"
+      },
+      {
+        "type": "turn.failed",
+        "error": {
+          "message": "hooks require trust"
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "neutral",
+    "observed": {
+      "dispatch": false,
+      "probe": false,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "codex-untrusted-exit1",
+    "host": "codex",
+    "events": [
+      {
+        "type": "thread.started"
+      },
+      {
+        "type": "turn.failed",
+        "error": {
+          "message": "hooks require trust"
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": false,
+      "probe": false,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "codex-hook-reported",
+    "host": "codex",
+    "events": [
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "exit_code": 1,
+          "aggregated_output": "PreToolUse hook error: synthetic failure"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 4
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "PASS"
+  },
+  {
+    "name": "codex-missing-dispatch",
+    "host": "codex",
+    "events": [
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "exit_code": 1,
+          "aggregated_output": "PreToolUse hook error: synthetic failure"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 4
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": false,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "codex-no-attempt",
+    "host": "codex",
+    "events": [
+      {
+        "type": "turn.completed"
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": false,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "INCOMPLETE"
+  },
+  {
+    "name": "codex-executed",
+    "host": "codex",
+    "events": [
+      {
+        "type": "item.started",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "status": "in_progress"
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt",
+          "exit_code": 1,
+          "aggregated_output": "PreToolUse hook error: synthetic failure"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 4
+        }
+      }
+    ],
+    "target": {
+      "tool": "Bash",
+      "input": {
+        "command": "printf '%s\\n' host-hook-witness > /synthetic/witness.txt"
+      },
+      "path": "/synthetic/witness.txt"
+    },
+    "case": "exit1",
+    "observed": {
+      "dispatch": true,
+      "probe": true,
+      "executed": true,
+      "returncode": 0,
+      "timeout": false
+    },
+    "control_ok": true,
+    "expected": "FAIL"
+  }
+]
