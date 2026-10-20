@@ -292,6 +292,7 @@ Status: in progress (branch go/m4, plan docs/design/m4-plan.md). Estimate: 4-6 d
 - [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (pending CI)
 - [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (pending CI)
 - [x] test(host): build deferred real-host harness and offline synthetic classification (pending CI)
+- [x] fix(plugin): isolate failed denial writes and correct test cache cleanup, Darwin link limits and cwd aliases (pending hosted CI)
 - [x] docs(install): document pins, host limits, release sequence and failure modes; update doctor (pending CI)
 
 Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. `bin/secret`, Claude and Codex hooks and all four manifest versions remain on the existing Bash installation state. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.

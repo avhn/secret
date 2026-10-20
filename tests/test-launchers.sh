@@ -3,8 +3,17 @@
 set -euo pipefail
 umask 077
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# Resolve caller caches before replacing HOME; Go module directories are read-only.
+GOMODCACHE="$(go env GOMODCACHE)"
+GOCACHE="$(go env GOCACHE)"
+export GOMODCACHE GOCACHE
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+cleanup() {
+    # Only this suite's owned scratch may have its permissions repaired.
+    chmod -R u+w "$TMP"
+    rm -rf "$TMP"
+}
+trap cleanup EXIT
 mkdir -p "$TMP/assets" "$TMP/home" "$TMP/cache"
 export HOME="$TMP/home" XDG_CACHE_HOME="$TMP/cache" GOTOOLCHAIN=local
 export CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOFLAGS=''
@@ -16,6 +25,7 @@ done
 # An authenticated digest can still point at a wrongly versioned candidate.
 go -C "$ROOT" build -trimpath -buildvcs=false -o "$TMP/wrong-version" ./cmd/secret
 python3 -I - "$ROOT" "$TMP" <<'PY'
+import errno
 import hashlib
 import json
 import os
@@ -164,14 +174,23 @@ class Launchers(unittest.TestCase):
 
     def test_overlong_links_and_dangling_links_reject(self):
         self.installed()
-        # The kernel can traverse this chain, but the launcher's bound is 32.
+        # Linux accepts 35 links; Darwin's kernel rejects before bootstrap at 32.
         previous = self.cli
         for i in range(35):
             path = self.cwd / f'link-{i}'
             path.symlink_to(previous)
             previous = path
-        result = self.invoke([previous, 'version'])
-        self.assertEqual((result.returncode, result.stderr), (70, GUIDANCE))
+        try:
+            result = self.invoke([previous, 'version'])
+        except OSError as error:
+            if OS_NAME != 'darwin' or error.errno != errno.ELOOP:
+                raise
+        else:
+            self.assertEqual((result.returncode, result.stderr), (70, GUIDANCE))
+        # Supply the real launcher body and chain as $0, avoiding kernel exec
+        # traversal while still exercising the launcher's own 32-link bound.
+        result = self.invoke(['/bin/sh', '-c', self.cli.read_text(), previous, 'version'])
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (70, b'', GUIDANCE))
         dangling = self.cwd / 'dangling'
         dangling.symlink_to(self.cwd / 'absent')
         got = self.invoke(['/bin/sh', dangling])
@@ -351,8 +370,16 @@ class Launchers(unittest.TestCase):
         self.assertEqual((got.returncode, got.stderr), (2, b'secret: verified binary unavailable\n'))
 
     def test_closed_json_output(self):
-        got = self.invoke(['/bin/sh', '-c', 'exec 1>&-; exec "$1"', 'fixture', self.hook])
-        self.assertEqual((got.returncode, got.stderr), (2, b'secret: verified binary unavailable\n'))
+        commands = [[self.hook], ['/bin/sh', self.hook]]
+        for name, flags in (('dash', []), ('bash', ['--posix'])):
+            shell = shutil.which(name)
+            if shell:
+                commands.append([shell, *flags, self.hook])
+        for command in commands:
+            with self.subTest(command=command):
+                got = self.invoke(['/bin/sh', '-c', 'exec 1>&-; exec "$@"', 'fixture', *command])
+                self.assertEqual((got.returncode, got.stdout, got.stderr),
+                                 (2, b'', b'secret: verified binary unavailable\n'))
 
     def test_lock_timeout_never_steals(self):
         self.cache.mkdir(mode=0o700, parents=True)

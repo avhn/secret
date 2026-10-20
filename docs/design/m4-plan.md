@@ -52,6 +52,8 @@ Workers A to D build against this contract; changing it needs a coordinator edit
   If that write fails it exits 2 with fixed stderr `secret: verified binary unavailable`. On success it `exec`s `<cache>/secret hook claude` with stdin untouched.
 - CLI launcher: `bin/secret-go` (POSIX sh, later staged as `bin/secret`). On bootstrap failure it prints `secret: verified binary unavailable; run scripts/install-release.sh` to stderr and exits 70; otherwise `exec <cache>/secret "$@"`. No Bash fallback in either launcher.
 
+Launcher regression tests retain caller Go module/build caches before changing HOME and repair permissions only in owned disposable scratch during cleanup. Overlong symlink tests accept Darwin's kernel ELOOP rejection while independently exercising the launcher's 32-link bound with the chain supplied as shell `$0`. Closed-stdout tests require exact fixed stderr under the native sh and available dash/Bash POSIX interpreters. Offline fixture tests pass physical cwd paths and distinguish aliases from genuinely different directories; none of these synthetic checks proves installed-host protection.
+
 ## Ordered work items and parallel ownership
 
 ### 1. Freeze the release interface (coordinator, before parallel work)

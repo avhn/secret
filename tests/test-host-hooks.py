@@ -640,8 +640,10 @@ class ClassificationTests(unittest.TestCase):
             self.skipTest("pass --fixture ABSOLUTE_BINARY to test compiled faults")
         with tempfile.TemporaryDirectory(prefix="host-hook-executable-") as directory:
             record = Path(directory) / "dispatch.json"
+            # Go's physical cwd must match even under macOS /var -> /private/var.
             envelope = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
-                                   "cwd": directory, "tool_input": {"command": "synthetic"}}).encode()
+                                   "cwd": os.path.realpath(directory),
+                                   "tool_input": {"command": "synthetic"}}).encode()
             for case in ("probe", "neutral", "empty", "deny", "exit1", "fatal", "signal", "malformed", "schema"):
                 with self.subTest(case=case):
                     record.unlink(missing_ok=True)
@@ -679,11 +681,34 @@ class ClassificationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertNotIn("permissionDecision", json.loads(result.stdout)["hookSpecificOutput"])
 
+    def test_fixture_cwd_alias_and_mismatch(self):
+        if FIXTURE_BINARY is None:
+            self.skipTest("pass --fixture ABSOLUTE_BINARY to test compiled cwd facts")
+        with tempfile.TemporaryDirectory(prefix="host-hook-cwd-") as directory:
+            root = Path(directory)
+            actual = root / "actual"
+            actual.mkdir()
+            alias = root / "alias"
+            alias.symlink_to(actual, target_is_directory=True)
+            record = root / "dispatch.json"
+            for cwd, matches in ((alias, True), (root, False)):
+                with self.subTest(cwd=cwd):
+                    envelope = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                                           "cwd": os.path.realpath(cwd), "tool_input": {}}).encode()
+                    result = subprocess.run([FIXTURE_BINARY, "probe", str(record), "/synthetic/binary"],
+                                            input=envelope, capture_output=True, timeout=5,
+                                            cwd=alias, env={"PATH": os.defpath}, check=False)
+                    self.assertEqual((result.returncode, result.stdout, result.stderr), (0, b"", b""))
+                    facts = json.loads(record.read_text(encoding="utf-8"))
+                    self.assertEqual(facts["cwd_matches"], matches)
+                    self.assertTrue(facts["cwd_absolute"])
+
     def test_verified_fixture_launcher_offline(self):
         if FIXTURE_BINARY is None:
             self.skipTest("pass --fixture ABSOLUTE_BINARY to test verified launcher integration")
         with tempfile.TemporaryDirectory(prefix="host-hook-cache-") as directory:
-            root = Path(directory)
+            # The installer correctly forbids aliases in its private cache path.
+            root = Path(directory).resolve()
             checkout = root / "checkout"
             (checkout / "hooks").mkdir(parents=True)
             (checkout / "scripts").mkdir()
@@ -699,7 +724,7 @@ class ClassificationTests(unittest.TestCase):
                    "TMPDIR": directory, "LC_ALL": "C"}
             plugin, record, _, _, config = configure_fixture(
                 root, checkout, Path(FIXTURE_BINARY), Path("/synthetic/binary"), "claude", "neutral", env)
-            envelope = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": directory,
+            envelope = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": str(root),
                                    "tool_input": {"command": "synthetic"}}).encode()
             result = subprocess.run(["/bin/sh", "-c", config["hooks"]["PreToolUse"][0]["hooks"][0]["command"]],
                                     input=envelope, capture_output=True, env=env, cwd=directory, timeout=10, check=False)
@@ -707,6 +732,7 @@ class ClassificationTests(unittest.TestCase):
             output = json.loads(result.stdout)
             self.assertNotIn("permissionDecision", output["hookSpecificOutput"])
             self.assertTrue(record.exists())
+            self.assertTrue(json.loads(record.read_text(encoding="utf-8"))["cwd_matches"])
             self.assertEqual((root / "fixture-cache/secret/v0.2.0/secret").stat().st_mode & 0o777, 0o500)
             self.assertTrue((plugin / ".secret-release-test-fixture").exists())
 

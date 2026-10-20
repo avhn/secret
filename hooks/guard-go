@@ -50,7 +50,12 @@ if bootstrap 2>/dev/null; then
 fi
 # No external dependencies, including JSON tools, are needed to deny.
 trap '' PIPE
-if printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"secret: verified binary unavailable; run scripts/install-release.sh"}}' 2>/dev/null; then
+# Do not let a builtin's temporary stderr redirection reuse a closed stdout.
+# The subshell's exec redirection needs no saved descriptor or restoration.
+if (
+    exec 2>/dev/null
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"secret: verified binary unavailable; run scripts/install-release.sh"}}'
+); then
     exit 0
 fi
 printf '%s\n' 'secret: verified binary unavailable' >&2

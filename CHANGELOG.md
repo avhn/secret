@@ -10,6 +10,9 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
   with digest/provenance checks, private cache, offline preinstallation and no
   automatic Bash fallback. Add native install, launcher and synthetic release tests.
+- Keep failed hook denial writes on fixed stderr across POSIX shells, including
+  closed stdout on macOS. Preserve caller Go caches during launcher tests and
+  cover Darwin symlink limits and physical cwd aliases without relaxing rejection.
 - Add the inactive, sponsorship-gated real-host harness and PR-only offline
   synthetic classification. No model sessions or installed-host evidence claimed.
 - Document installation pins, failure recovery, Bash rollback and release approvals;
