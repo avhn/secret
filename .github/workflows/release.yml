@@ -1,0 +1,231 @@
+name: release
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Candidates only build and compare. Final-tag provenance is never borrowed from
+# a candidate run. Repository administrators must configure release-publish with
+# required reviewers and prevent self-review before approving draft creation.
+jobs:
+  release-build-a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: source-a
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.26.0'
+          cache: false
+      - name: Independent build A
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: ''
+        run: |
+          TMPDIR="$(mktemp -d "$RUNNER_TEMP/release-a.XXXXXX")"
+          export TMPDIR
+          export HOME="$TMPDIR/home" XDG_CACHE_HOME="$TMPDIR/cache"
+          export GOCACHE="$TMPDIR/go-cache" GOMODCACHE="$TMPDIR/go-modules"
+          mkdir -p "$HOME" "$XDG_CACHE_HOME"
+          sh source-a/scripts/build-release.sh "$RUNNER_TEMP/build-a/assets"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-build-a
+          path: ${{ runner.temp }}/build-a/assets/
+          if-no-files-found: error
+
+  release-build-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: independently/nested/source-b
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.26.0'
+          cache: false
+      - name: Independent build B
+        env:
+          GOTOOLCHAIN: local
+          GOFLAGS: ''
+        run: |
+          TMPDIR="$(mktemp -d "$RUNNER_TEMP/release-b.XXXXXX")"
+          export TMPDIR
+          export HOME="$TMPDIR/home" XDG_CACHE_HOME="$TMPDIR/cache"
+          export GOCACHE="$TMPDIR/go-cache" GOMODCACHE="$TMPDIR/go-modules"
+          mkdir -p "$HOME" "$XDG_CACHE_HOME"
+          sh independently/nested/source-b/scripts/build-release.sh "$RUNNER_TEMP/other/build-b/assets"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-build-b
+          path: ${{ runner.temp }}/other/build-b/assets/
+          if-no-files-found: error
+
+  release-repro:
+    needs: [release-build-a, release-build-b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check release scripts and synthetic regressions
+        run: |
+          sh -n scripts/build-release.sh scripts/verify-release.sh
+          shellcheck scripts/build-release.sh scripts/verify-release.sh
+          python3 -I tests/test-release.py
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-build-a
+          path: artifacts-a
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-build-b
+          path: artifacts-b
+      - name: Compare every executable byte and sorted checksum manifest
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          sh scripts/verify-release.sh --source
+          sh scripts/verify-release.sh --checksums "$PWD/artifacts-a"
+          sh scripts/verify-release.sh --checksums "$PWD/artifacts-b"
+          for os in darwin linux; do
+            for arch in amd64 arm64; do
+              cmp "artifacts-a/secret-v0.2.0-$os-$arch" "artifacts-b/secret-v0.2.0-$os-$arch"
+            done
+          done
+          cmp artifacts-a/checksums-v0.2.0.txt artifacts-b/checksums-v0.2.0.txt
+          if [ "$EVENT_NAME" = push ]; then
+            test "$RELEASE_REF" = refs/tags/v0.2.0
+            test "$(git cat-file -t refs/tags/v0.2.0)" = tag
+            test "$(git rev-parse 'refs/tags/v0.2.0^{commit}')" = "$GITHUB_SHA"
+            cmp dist/checksums-v0.2.0.txt artifacts-a/checksums-v0.2.0.txt
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-reproducible
+          path: artifacts-a/
+          if-no-files-found: error
+
+  release-attest:
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    needs: release-repro
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-reproducible
+          path: assets
+      # Reviewed composite action: the fixed revision generates SLSA v1 build
+      # provenance and invokes actions/attest. Subject paths contain only the
+      # four compared executables and their compared checksum asset.
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: assets/*
+
+  release-verify:
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    needs: release-attest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-reproducible
+          path: assets
+      - name: Verify final C, tag, certificate, workflow and all five subjects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA"
+          for asset in "$PWD"/assets/secret-v0.2.0-* "$PWD/assets/checksums-v0.2.0.txt"; do
+            scratch="$(mktemp -d "$RUNNER_TEMP/attestation.XXXXXX")"
+            (cd "$scratch" && gh attestation download "$asset" --repo avhn/secret)
+            cp "$scratch"/sha256:*.jsonl assets/
+          done
+          sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA" --bundle-dir "$PWD/assets"
+      - name: Require configured protected publication environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/avhn/secret/environments/release-publish --jq \
+            '[.protection_rules[] | select(.type == "required_reviewers" and .prevent_self_review == true and (.reviewers | length) > 0)] | length > 0' \
+            | grep -qx true
+      # upload-artifact rejects colons in paths. Preserve gh's bundle contents
+      # under portable transport names, then restore them in the approved job.
+      - name: Encode bundle names for artifact transport
+        run: |
+          for bundle in assets/sha256:*.jsonl; do
+            mv "$bundle" "assets/sha256-${bundle#assets/sha256:}"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-verified
+          path: assets/
+          if-no-files-found: error
+
+  release-publish:
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    needs: release-verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-verified
+          path: assets
+      - name: Restore gh bundle names after artifact transport
+        run: |
+          for bundle in assets/sha256-*.jsonl; do
+            mv "$bundle" "assets/sha256:${bundle#assets/sha256-}"
+          done
+      - name: Reverify approved assets and create draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA" --bundle-dir "$PWD/assets"
+          gh release create v0.2.0 --repo avhn/secret --verify-tag --target "$GITHUB_SHA" \
+            --draft --title 'secret v0.2.0' \
+            --notes 'Reproducible Linux/macOS binaries verified against final-tag C provenance. Publication requires separate owner approval.' \
+            assets/secret-v0.2.0-* assets/checksums-v0.2.0.txt assets/sha256:*.jsonl
+          scratch="$(mktemp -d "$RUNNER_TEMP/draft-assets.XXXXXX")"
+          gh release download v0.2.0 --repo avhn/secret --dir "$scratch"
+          for asset in assets/secret-v0.2.0-* assets/checksums-v0.2.0.txt assets/sha256:*.jsonl; do
+            cmp "$asset" "$scratch/$(basename "$asset")"
+          done
+          sh scripts/verify-release.sh "$scratch" "$GITHUB_SHA" --bundle-dir "$scratch"
+          # Deliberately no `gh release edit --draft=false`: publishing is a
+          # separate irreversible owner action, not a consequence of a tag push.
