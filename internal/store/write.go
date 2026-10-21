@@ -84,10 +84,13 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 		if err == nil {
 			break
 		}
-		if !os.IsExist(err) {
+		if !lockBusy(err) {
 			return errors.New("cannot acquire write lock")
 		}
 		if !time.Now().Before(deadline) {
+			if !os.IsExist(err) {
+				return errors.New("cannot acquire write lock")
+			}
 			return fmt.Errorf("write lock timed out after %d s; verify its owner then manually remove .write-lock (never auto-stolen)", int(wait/time.Second))
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -113,6 +116,12 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 		return err
 	}
 	return work()
+}
+
+// lockBusy reports contention. Windows denies access to a lock directory whose
+// delete is still pending, so a releasing owner briefly looks like a denial there.
+func lockBusy(err error) bool {
+	return os.IsExist(err) || runtime.GOOS == "windows" && os.IsPermission(err)
 }
 
 // A fresh owner may remove only our marked scratch directories after the

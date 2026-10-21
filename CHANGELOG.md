@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Retry the Go store write lock while Windows reports a pending-delete lock
+  directory as access denied, instead of failing a contended writer at once.
 - Prepare M4 v0.2.0 Linux/macOS reproducible assets, checksum-only source identity
   checks, scoped final-tag provenance verification and owner-approved draft workflow
   (candidate CI green in PR #9; tag and publication pending owner approval).

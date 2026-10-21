@@ -396,3 +396,19 @@ func TestStashProtectsSecretsDirectoryAndResetsTrailingScope(t *testing.T) {
 		t.Fatalf("unlabeled stash did not reset trailing scope: %v", err)
 	}
 }
+
+func TestLockBusyClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"exists", os.ErrExist, true},
+		{"permission", os.ErrPermission, runtime.GOOS == "windows"},
+		{"not exist", os.ErrNotExist, false},
+	} {
+		if got := lockBusy(&os.PathError{Op: "mkdir", Path: ".write-lock", Err: tc.err}); got != tc.want {
+			t.Errorf("%s: lockBusy=%v want %v", tc.name, got, tc.want)
+		}
+	}
+}
