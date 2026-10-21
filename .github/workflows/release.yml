@@ -11,7 +11,9 @@ permissions:
 
 # Candidates only build and compare. Final-tag provenance is never borrowed from
 # a candidate run. Repository administrators must configure release-publish with
-# required reviewers and prevent self-review before approving draft creation.
+# required reviewers and restrict it to the v0.2.0 tag before approving draft
+# creation. A sole maintainer approves their own deployment, so self-review is
+# permitted; the reviewer gate still makes the draft a separate human action.
 jobs:
   release-build-a:
     runs-on: ubuntu-24.04
@@ -175,7 +177,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api repos/avhn/secret/environments/release-publish --jq \
-            '[.protection_rules[] | select(.type == "required_reviewers" and .prevent_self_review == true and (.reviewers | length) > 0)] | length > 0' \
+            '([.protection_rules[] | select(.type == "required_reviewers" and (.reviewers | length) > 0)] | length > 0)
+             and .deployment_branch_policy.custom_branch_policies == true' \
+            | grep -qx true
+          gh api repos/avhn/secret/environments/release-publish/deployment-branch-policies --jq \
+            '[.branch_policies[] | {name, type}] == [{"name": "v0.2.0", "type": "tag"}]' \
             | grep -qx true
       # upload-artifact rejects colons in paths. Preserve gh's bundle contents
       # under portable transport names, then restore them in the approved job.

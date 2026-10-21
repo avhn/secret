@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Let a sole maintainer approve the `release-publish` draft gate: require a
+  reviewer and a deployment policy limited to the `v0.2.0` tag instead of
+  self-review prevention, which no single-owner repository can satisfy.
 - Retry the Go store write lock while Windows reports a pending-delete lock
   directory as access denied, instead of failing a contended writer at once.
 - Prepare M4 v0.2.0 Linux/macOS reproducible assets, checksum-only source identity

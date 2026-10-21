@@ -18,11 +18,13 @@ or publish merely because this procedure describes how. Use signed lowercase
 conventional commits, no co-author trailers, `git-safe-push` for an approved push
 and `git-merge-safe` for an approved fast-forward.
 
-The owner must configure the `release-publish` environment with required
-reviewers and self-review disabled before a tag can create a draft. The workflow
-checks that setting; YAML cannot create or independently prove every repository
-protection. Protect release tags and restrict the environment to trusted release
-refs. PR jobs have read-only permissions and never receive publishing or model
+The owner must configure the `release-publish` environment with at least one
+required reviewer and a deployment policy allowing only the `v0.2.0` tag before
+a tag can create a draft. The workflow checks both settings; YAML cannot create
+or independently prove every repository protection. Self-review is permitted
+because a sole maintainer must approve their own tag run; the reviewer gate
+still keeps the draft a separate human action. Protect `v*` tags with a ruleset
+blocking deletion and updates. PR jobs have read-only permissions and never receive publishing or model
 credentials. Only final-tag attestation gets OIDC/attestations write permission;
 only approved draft creation gets contents write permission.
 

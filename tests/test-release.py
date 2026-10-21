@@ -390,7 +390,10 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("cmp ", jobs["release-repro"])
         self.assertIn("environment: release-publish", jobs["release-publish"])
         self.assertIn("--draft --title", jobs["release-publish"])
-        self.assertIn("prevent_self_review == true", jobs["release-verify"])
+        self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
+        self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
+        self.assertIn('[{"name": "v0.2.0", "type": "tag"}]', jobs["release-verify"])
+        self.assertNotIn("prevent_self_review", jobs["release-verify"])
         self.assertIn("attestations: read", jobs["release-verify"])
         self.assertLess(jobs["release-verify"].index("Encode bundle names for artifact transport"),
                         jobs["release-verify"].index("name: release-verified"))
