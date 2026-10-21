@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Disable terminal echo in the Go CLI before printing the hidden `stash` prompt,
+  so input typed between the prompt and the read is never echoed (macOS CI
+  witnessed it in the retained `hidden_stash` case). Linux and macOS restore the
+  exact prior settings; other platforms keep the previous behavior.
 - Let a sole maintainer approve the `release-publish` draft gate: require a
   reviewer and a deployment policy limited to the `v0.2.0` tag instead of
   self-review prevention, which no single-owner repository can satisfy.

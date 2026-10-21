@@ -16,6 +16,7 @@ import (
 
 	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/hook"
+	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 	"golang.org/x/term"
 )
@@ -459,11 +460,17 @@ func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
 	return append([]byte(nil), r.Value...), nil
 }
 func (c command) input(key string) ([]byte, error) {
-	if term.IsTerminal(int(c.in.Fd())) {
-		fmt.Fprintf(c.errOut, "%s: ", key)
-		value, e := term.ReadPassword(int(c.in.Fd()))
-		fmt.Fprintln(c.errOut)
+	if fd := int(c.in.Fd()); term.IsTerminal(fd) {
+		// Echo goes off before the prompt appears, so typed-ahead bytes stay hidden.
+		restore, e := silenceEcho(fd)
 		if e != nil {
+			return nil, errors.New("no input")
+		}
+		fmt.Fprintf(c.errOut, "%s: ", key)
+		value, e := term.ReadPassword(fd)
+		fmt.Fprintln(c.errOut)
+		if r := restore(); e != nil || r != nil {
+			secure.Clear(value)
 			return nil, errors.New("no input")
 		}
 		return value, nil
