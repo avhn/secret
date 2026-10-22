@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 ROOT = Path(sys.argv[1])
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 TAG = "v" + VERSION
 REPO = "avhn/secret"
 WORKFLOW = REPO + "/.github/workflows/release.yml"
@@ -111,7 +111,7 @@ def verify(directory, final, bundle_dir):
     records[MANIFEST] = digest(directory / MANIFEST)
     for name, expected in records.items():
         command = ["gh", "attestation", "verify", str(directory / name),
-                   "--repo", REPO, "--signer-workflow", WORKFLOW,
+                   "--repo", REPO,
                    "--source-digest", final, "--signer-digest", final,
                    "--source-ref", "refs/tags/" + TAG,
                    "--cert-oidc-issuer", "https://token.actions.githubusercontent.com",
@@ -124,7 +124,13 @@ def verify(directory, final, bundle_dir):
         # A local bundle does not make gh offline: it still uses its normal
         # authenticated trust-root policy. Never trust a root supplied beside
         # an untrusted downloaded bundle.
-        result = subprocess.check_output(command, stderr=subprocess.DEVNULL, timeout=120)
+        try:
+            # Only public release assets/attestations reach gh here. Its stderr
+            # is safe to inherit and preserves the actual verification diagnosis.
+            result = subprocess.check_output(command, timeout=120)
+        except (OSError, subprocess.SubprocessError):
+            print("secret: gh attestation verification failed for " + name, file=sys.stderr)
+            raise
         verified = json.loads(result)
         require(isinstance(verified, list) and verified, "missing verified attestations")
         # gh validates the certificate identities and authenticated source fields.

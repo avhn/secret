@@ -19,8 +19,8 @@ export HOME="$TMP/home" XDG_CACHE_HOME="$TMP/cache" GOTOOLCHAIN=local
 export CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOFLAGS=''
 for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
     GOOS="${target%-*}" GOARCH="${target#*-}" go -C "$ROOT" build \
-        -trimpath -buildvcs=false -ldflags='-buildid= -s -w -X main.version=0.2.1' \
-        -o "$TMP/assets/secret-v0.2.1-$target" ./cmd/secret
+        -trimpath -buildvcs=false -ldflags='-buildid= -s -w -X main.version=0.2.2' \
+        -o "$TMP/assets/secret-v0.2.2-$target" ./cmd/secret
 done
 # An authenticated digest can still point at a wrongly versioned candidate.
 go -C "$ROOT" build -trimpath -buildvcs=false -o "$TMP/wrong-version" ./cmd/secret
@@ -43,11 +43,11 @@ ROOT, WORK = (Path(value).resolve() for value in sys.argv[1:])
 ASSETS = WORK / 'assets'
 OS_NAME = {'Linux': 'linux', 'Darwin': 'darwin'}[os.uname().sysname]
 ARCH = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[os.uname().machine]
-ASSET = f'secret-v0.2.1-{OS_NAME}-{ARCH}'
+ASSET = f'secret-v0.2.2-{OS_NAME}-{ARCH}'
 DENY = (b'{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny",'
         b'"permissionDecisionReason":"secret: verified binary unavailable; run scripts/install-release.sh"}}\n')
 GUIDANCE = b'secret: verified binary unavailable; run scripts/install-release.sh\n'
-VERSION = b'secret 0.2.1 (go)\n'
+VERSION = b'secret 0.2.2 (go)\n'
 REAL_PATH = os.environ['PATH']
 REAL_CP = shutil.which('cp')
 REAL_GIT = shutil.which('git')
@@ -69,7 +69,7 @@ class Launchers(unittest.TestCase):
             shutil.copyfile(ROOT / relative, dst)
             dst.chmod(0o700)
         self.assets = ASSETS
-        self.manifest = self.root / 'dist/checksums-v0.2.1.txt'
+        self.manifest = self.root / 'dist/checksums-v0.2.2.txt'
         self.manifest.parent.mkdir(mode=0o700)
         self.manifest.write_bytes(b''.join(
             hashlib.sha256(p.read_bytes()).hexdigest().encode() + b'  ' + p.name.encode() + b'\n'
@@ -82,7 +82,7 @@ class Launchers(unittest.TestCase):
         self.home = self.work
         self.base = self.work / 'cache root'
         self.base.mkdir(mode=0o700)
-        self.cache = self.base / 'secret/v0.2.1'
+        self.cache = self.base / 'secret/v0.2.2'
         self.cwd = self.work / 'other cwd'
         self.cwd.mkdir(mode=0o700)
         self.tools = self.work / 'tools'
@@ -254,7 +254,7 @@ class Launchers(unittest.TestCase):
                     self.original_manifest.replace(b'  secret', b' secret', 1),
                     self.original_manifest.replace(b'  secret', b'  ../secret', 1),
                     b'G' + self.original_manifest[1:],
-                    self.original_manifest.replace(b'v0.2.1', b'v9.9.9', 1),
+                    self.original_manifest.replace(b'v0.2.2', b'v9.9.9', 1),
                     self.original_manifest.replace(b'amd64', b'ppc64', 1),
                     self.original_manifest.replace(b'\n', b'\r\n')]
         for index, data in enumerate(variants):
@@ -279,7 +279,7 @@ class Launchers(unittest.TestCase):
         self.denial()
         self.installed()
         metadata = self.cache / 'verified'
-        metadata.write_bytes(metadata.read_bytes().replace(b'version=0.2.1', b'version=9.9.9'))
+        metadata.write_bytes(metadata.read_bytes().replace(b'version=0.2.2', b'version=9.9.9'))
         self.denial()
 
     def test_wrong_digest_version_and_architecture(self):
@@ -290,7 +290,7 @@ class Launchers(unittest.TestCase):
         self.assertEqual(self.invoke([self.install, '--from-dir', self.assets]).returncode, 1)
         self.denial()
         other_arch = 'arm64' if ARCH == 'amd64' else 'amd64'
-        for source in (WORK / 'wrong-version', ASSETS / f'secret-v0.2.1-{OS_NAME}-{other_arch}'):
+        for source in (WORK / 'wrong-version', ASSETS / f'secret-v0.2.2-{OS_NAME}-{other_arch}'):
             with self.subTest(source=source.name):
                 shutil.copyfile(source, native)
                 sha = hashlib.sha256(native.read_bytes()).hexdigest().encode()
@@ -448,7 +448,7 @@ class Launchers(unittest.TestCase):
         for args in (['init', '-q', str(self.root)], ['-C', str(self.root), 'add', '.'],
                      ['-C', str(self.root), '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture'],
                      ['-C', str(self.root), '-c', 'tag.gpgsign=false', 'tag', '-a',
-                      'v0.2.1', '-m', 'synthetic annotated release']):
+                      'v0.2.2', '-m', 'synthetic annotated release']):
             got = self.invoke([REAL_GIT, *args])
             self.assertEqual(got.returncode, 0, got.stderr)
         commit = self.invoke([REAL_GIT, '-C', self.root, 'rev-parse', 'HEAD']).stdout.strip().decode()
@@ -468,11 +468,15 @@ case "$1 $2" in
     case " $* " in
     *" --source-digest {commit} "*) ;; *) exit 1 ;; esac
     case " $* " in
-    *" --source-ref refs/tags/v0.2.1 "*) ;; *) exit 1 ;; esac
+    *" --signer-digest {commit} "*) ;; *) exit 1 ;; esac
+    case " $* " in
+    *" --deny-self-hosted-runners "*) ;; *) exit 1 ;; esac
+    case " $* " in
+    *" --source-ref refs/tags/v0.2.2 "*) ;; *) exit 1 ;; esac
     case " $* " in
     *" --repo avhn/secret "*) ;; *) exit 1 ;; esac
     case " $* " in
-    *" --signer-workflow avhn/secret/.github/workflows/release.yml "*) ;; *) exit 1 ;; esac
+    *" --cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.2 "*) ;; *) exit 1 ;; esac
     case " $* " in
     *" --cert-oidc-issuer https://token.actions.githubusercontent.com "*) ;; *) exit 1 ;; esac
     case " $* " in *" --bundle "*) ;; *) exit 1 ;; esac
@@ -510,15 +514,15 @@ esac
 
     def test_production_requires_trusted_tag_and_committed_manifest(self):
         self.production()
-        got = self.invoke([REAL_GIT, '-C', self.root, 'tag', '-d', 'v0.2.1'])
+        got = self.invoke([REAL_GIT, '-C', self.root, 'tag', '-d', 'v0.2.2'])
         self.assertEqual(got.returncode, 0)
         self.assertEqual(self.invoke([self.install, '--from-dir', self.assets]).returncode, 1)
         self.assertEqual(self.invoke([REAL_GIT, '-C', self.root, '-c', 'tag.gpgsign=false',
-                                      'tag', 'v0.2.1']).returncode, 0)
+                                      'tag', 'v0.2.2']).returncode, 0)
         self.assertEqual(self.invoke([self.install, '--from-dir', self.assets]).returncode, 1)
         self.assertFalse((self.work / 'gh-args').exists(), 'lightweight tag reached provenance')
         self.assertEqual(self.invoke([REAL_GIT, '-C', self.root, '-c', 'tag.gpgsign=false',
-                                      'tag', '-f', '-a', 'v0.2.1', '-m',
+                                      'tag', '-f', '-a', 'v0.2.2', '-m',
                                       'synthetic annotated release']).returncode, 0)
         # Keep grammar valid but differ from the trusted committed manifest.
         data = bytearray(self.manifest.read_bytes())

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Synthetic release-boundary tests. No network, providers or real HOME use."""
+import ast
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -12,7 +14,7 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 TAG = "v" + VERSION
 MANIFEST = "checksums-" + TAG + ".txt"
 NAMES = sorted("secret-" + TAG + "-" + system + "-" + arch
@@ -32,7 +34,7 @@ if args[:2] == ["attestation", "download"]:
     sys.exit(0)
 if args[:2] == ["release", "create"]:
     import shutil
-    assert args[2] == "v0.2.1"
+    assert args[2] == "v0.2.2"
     assert "--draft" in args and "--verify-tag" in args
     assert args[args.index("--target") + 1] == os.environ["EXPECTED_COMMIT"]
     assert args[args.index("--repo") + 1] == "avhn/secret"
@@ -46,22 +48,24 @@ if args[:2] == ["release", "create"]:
     sys.exit(0)
 if args[:2] == ["release", "download"]:
     import shutil
-    assert args[2:5] == ["v0.2.1", "--repo", "avhn/secret"]
+    assert args[2:5] == ["v0.2.2", "--repo", "avhn/secret"]
     destination = pathlib.Path(args[args.index("--dir") + 1])
     assert not any(destination.iterdir())
     for asset in pathlib.Path(os.environ["GH_RELEASE_ASSETS"]).iterdir():
         shutil.copyfile(asset, destination / asset.name)
     if os.environ.get("GH_MODE") == "corrupt-draft":
-        (destination / "secret-v0.2.1-linux-amd64").write_bytes(b"corrupt uploaded binary")
+        (destination / "secret-v0.2.2-linux-amd64").write_bytes(b"corrupt uploaded binary")
     sys.exit(0)
 assert args[:2] == ["attestation", "verify"]
+for group in (("--owner", "--repo"),
+              ("--cert-identity", "--cert-identity-regex", "--signer-repo", "--signer-workflow")):
+    assert sum(flag in args for flag in group) <= 1, "mutually exclusive gh flags"
 expected = {
     "--repo": "avhn/secret",
-    "--signer-workflow": "avhn/secret/.github/workflows/release.yml",
     "--source-digest": os.environ["EXPECTED_COMMIT"],
     "--signer-digest": os.environ["EXPECTED_COMMIT"],
-    "--source-ref": "refs/tags/v0.2.1",
-    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.1",
+    "--source-ref": "refs/tags/v0.2.2",
+    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.2",
     "--cert-oidc-issuer": "https://token.actions.githubusercontent.com",
     "--format": "json",
 }
@@ -71,7 +75,7 @@ assert "--deny-self-hosted-runners" in args
 mode = os.environ.get("GH_MODE", "valid")
 # Emulate gh rejecting authenticated identities that do not match pinned flags.
 if mode in ("repo", "workflow", "source", "ref", "issuer", "candidate"):
-    print("synthetic verifier diagnostic must not escape", file=sys.stderr)
+    print("synthetic public attestation diagnostic", file=sys.stderr)
     sys.exit(1)
 name = pathlib.Path(args[2]).name
 import hashlib
@@ -101,7 +105,7 @@ if args == ["env", "GOVERSION"]:
 if args in (["mod", "download"], ["mod", "verify"]):
     sys.exit(0)
 assert args[:3] == ["build", "-trimpath", "-buildvcs=false"]
-assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.2.1"
+assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.2.2"
 assert args[4] == "-o" and args[6:] == ["./cmd/secret"]
 if os.environ.get("GO_FAIL_BUILD") == "1": sys.exit(1)
 expected = {"CGO_ENABLED": "0", "GOAMD64": "v1", "GOARM64": "v8.0",
@@ -201,12 +205,20 @@ class ReleaseTest(unittest.TestCase):
 
     def assert_denied(self, result):
         self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("synthetic verifier diagnostic", result.stderr)
 
     def test_valid_final_and_all_five_pinned_verifications(self):
         self.assert_ok(self.verify())
         calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
         self.assertEqual(sorted(Path(call[2]).name for call in calls), sorted(NAMES + [MANIFEST]))
+
+    def test_gh_failure_preserves_public_diagnosis_and_names_subject(self):
+        self.env["GH_MODE"] = "source"
+        result = self.verify()
+        self.assert_denied(result)
+        self.assertIn("synthetic public attestation diagnostic", result.stderr)
+        self.assertIn("secret: gh attestation verification failed for " + NAMES[0], result.stderr)
+        self.assertIn("secret: release verification failed", result.stderr)
+        self.assertEqual(result.stdout, "")
 
     def test_changed_binary_denies_before_provenance(self):
         (self.assets / NAMES[0]).write_bytes(b"changed binary")
@@ -230,7 +242,7 @@ class ReleaseTest(unittest.TestCase):
             "one space": self.manifest.replace(b"  ", b" "),
             "path": self.manifest.replace(b"  secret", b"  ./secret"),
             "uppercase": self.manifest.upper(),
-            "other version": self.manifest.replace(b"v0.2.1", b"v0.2.2"),
+            "other version": self.manifest.replace(b"v0.2.2", b"v0.2.3"),
             "windows": self.manifest.replace(b"darwin", b"windows"),
         }
         for name, content in invalid.items():
@@ -489,9 +501,9 @@ class ReleaseTest(unittest.TestCase):
 
 class WorkflowTest(unittest.TestCase):
     def test_every_tag_check_follows_explicit_annotated_tag_restoration(self):
-        fetch = 'git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"'
-        tag_type = 'git cat-file -t refs/tags/v0.2.1'
-        peel = "git rev-parse 'refs/tags/v0.2.1^{commit}'"
+        fetch = 'git fetch --no-tags --force origin "refs/tags/v0.2.2:refs/tags/v0.2.2"'
+        tag_type = 'git cat-file -t refs/tags/v0.2.2'
+        peel = "git rev-parse 'refs/tags/v0.2.2^{commit}'"
         for filename, names in (
                 ("release.yml", ("release-repro", "release-verify", "release-publish")),
                 ("plugin.yml", ("plugin-install-linux", "plugin-install-macos"))):
@@ -511,6 +523,73 @@ class WorkflowTest(unittest.TestCase):
                         self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.published", job)
                         self.assertLess(job.index(fetch), job.index("--published"))
 
+    def test_real_provenance_rehearsal_is_read_only_and_runs_on_pr_head(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        job = workflow_jobs("release.yml")["release-rehearsal"]
+        self.assertIn("  pull_request:\n", workflow)
+        self.assertIn("  workflow_dispatch:\n", workflow)
+        self.assertIn("if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'", job)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", job)
+        self.assertIn("fetch-depth: 0", job)
+        self.assertIn("persist-credentials: false", job)
+        permissions = re.search(r"^    permissions:\n((?:      [^\n]*\n)+)", job, re.MULTILINE)
+        self.assertIsNotNone(permissions)
+        self.assertEqual(textwrap.dedent(permissions[1]), "contents: read\nattestations: read\n")
+        self.assertNotIn("secrets.", job)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", job)
+        self.assertIn("go-version: '1.26.0'", job)
+        self.assertIn("GOTOOLCHAIN: local", job)
+        self.assertIn("python3 -I scripts/rehearse-release.py", job)
+        rehearsal = (ROOT / "scripts/rehearse-release.py").read_text()
+        self.assertIn('FINAL = "229ee0ef5a229920f2bbe52f01adce1f7e0ae17c"', rehearsal)
+        self.assertIn('source.replace("0.2.2", "0.2.1")', rehearsal)
+        self.assertIn('"cat-file", "-t", "refs/tags/" + TAG', rehearsal)
+        self.assertIn('"--bundle-dir", bundles', rehearsal)
+        self.assertIn('"--offline", "--from-dir", inputs', rehearsal)
+        self.assertIn('"worktree", "remove", "--force", worktree', rehearsal)
+        self.assertLess(rehearsal.index('worktree / "scripts/build-release.sh"'),
+                        rehearsal.index('source.replace("0.2.2", "0.2.1")'))
+
+    def test_gh_attestation_argvs_respect_mutually_exclusive_flag_groups(self):
+        # gh 2.102.0 verify/verify.go and download/download.go declare these
+        # groups. Scan executable Python argv lists, embedded Python, shell,
+        # workflow run blocks and documented commands, without requiring gh.
+        groups = ({"--owner", "--repo"},
+                  {"--cert-identity", "--cert-identity-regex", "--signer-repo", "--signer-workflow"})
+        aliases = {"-o": "--owner", "-R": "--repo", "-i": "--cert-identity-regex"}
+        found = []
+        paths = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--cached", "--others",
+                                         "--exclude-standard"], text=True).splitlines()
+        for name in paths:
+            path = ROOT / name
+            if path.suffix not in (".sh", ".py", ".yml", ".md"):
+                continue
+            text = path.read_text()
+            # Shell and Markdown continuations are one argv, not separate lines.
+            shell = text.replace("\\\n", " ")
+            for match in re.finditer(r"\bgh\s+attestation\s+(verify|download)\b[^\n]*", shell):
+                found.append((name, match[1], shlex.split(match[0])))
+            sources = [text] if path.suffix == ".py" else re.findall(
+                r"<<'PY'[^\n]*\n(.*?)^PY$", text, re.MULTILINE | re.DOTALL)
+            for source in sources:
+                for node in ast.walk(ast.parse(source)):
+                    if not isinstance(node, ast.List) or len(node.elts) < 3:
+                        continue
+                    prefix = [item.value if isinstance(item, ast.Constant) else None
+                              for item in node.elts[:3]]
+                    if prefix[:2] == ["gh", "attestation"] and prefix[2] in ("verify", "download"):
+                        found.append((name, prefix[2], [item.value for item in node.elts
+                                                       if isinstance(item, ast.Constant)
+                                                       and isinstance(item.value, str)]))
+        self.assertTrue(any(name == "scripts/verify-release.sh" for name, _, _ in found))
+        self.assertTrue(any(name == "scripts/install-release.sh" for name, _, _ in found))
+        self.assertTrue(any(name == "scripts/rehearse-release.py" for name, _, _ in found))
+        for name, operation, argv in found:
+            with self.subTest(path=name, operation=operation, argv=argv):
+                flags = {aliases.get(arg.split("=", 1)[0], arg.split("=", 1)[0]) for arg in argv}
+                for group in groups[:2 if operation == "verify" else 1]:
+                    self.assertLessEqual(len(flags & group), 1, "mutually exclusive gh attestation flags")
+
     def test_candidate_and_final_job_boundaries(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn("  pull_request:\n", workflow)
@@ -518,10 +597,11 @@ class WorkflowTest(unittest.TestCase):
         jobs = dict(re.findall(r"^  (release-[a-z-]+):\n(.*?)(?=^  release-|\Z)",
                                workflow, re.MULTILINE | re.DOTALL))
         self.assertEqual(set(jobs), {"release-build-a", "release-build-b", "release-repro",
-                                     "release-attest", "release-verify", "release-publish"})
+                                     "release-attest", "release-verify", "release-publish",
+                                     "release-rehearsal"})
         for name in ("release-attest", "release-verify", "release-publish"):
             self.assertIn("github.event_name == 'push'", jobs[name])
-            self.assertIn("github.ref == 'refs/tags/v0.2.1'", jobs[name])
+            self.assertIn("github.ref == 'refs/tags/v0.2.2'", jobs[name])
             self.assertIn("github.repository == 'avhn/secret'", jobs[name])
         for name in ("release-build-a", "release-build-b"):
             self.assertIn("cache: false", jobs[name])
@@ -532,7 +612,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("--draft --title", jobs["release-publish"])
         self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
         self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
-        self.assertIn('[{"name": "v0.2.1", "type": "tag"}]', jobs["release-verify"])
+        self.assertIn('[{"name": "v0.2.2", "type": "tag"}]', jobs["release-verify"])
         self.assertNotIn("prevent_self_review", jobs["release-verify"])
         self.assertIn("attestations: read", jobs["release-verify"])
         for job, dependency in (("release-attest", "release-repro"),

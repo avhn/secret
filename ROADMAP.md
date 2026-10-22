@@ -305,11 +305,12 @@ Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](htt
 
 ## M4: Releasable Linux/macOS core
 
-Status: in progress (replacement v0.2.1 identity approved; new candidates, source S and checksum C required; tag, draft and publication each need separate owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
+Status: in progress (replacement v0.2.2 identity approved; new candidates, source S and checksum C required; tag, draft and publication each need separate owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
 
-- [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.1)
+- [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.2)
 - [x] build(release): add deterministic artifacts and final-tag attestation workflow (cbf8bc6)
-- [x] fix(release): restore annotated runner tags for v0.2.1 and upload portable draft bundle names (pending CI)
+- [x] fix(release): restore annotated runner tags for v0.2.2 and upload portable draft bundle names (pending CI)
+- [x] fix(release): use compatible exact-SAN verification and add read-only real-provenance rehearsal for v0.2.2 (pending hosted CI)
 - [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (c66f127)
 - [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (0bdf573)
 - [x] test(host): build deferred real-host harness and offline synthetic classification (84bc6cc)
@@ -324,8 +325,16 @@ Candidate evidence (source 306618e, all green): [ci 39405526391](https://github.
 39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before any
 release assets, attestation or draft: checkout replaced the annotated tag with a
 lightweight local ref. It is a dead, protected tag that must never be reused, moved or
-deleted. The owner-approved new release identity is **0.2.1**, with a new
-candidate/source/checksum cycle.
+deleted.
+
+`v0.2.1` was tagged at `229ee0e` (full C
+`229ee0ef5a229920f2bbe52f01adce1f7e0ae17c`), but its [tag workflow (run
+39790612288)](https://github.com/avhn/secret/actions/runs/39790612288) failed in
+`release-verify` after successful builds, byte reproduction and attestation:
+gh rejects `--signer-workflow` together with `--cert-identity`. The installer
+had the same conflict. This is another dead, protected tag, never to be reused,
+moved or deleted. The owner-approved new release identity is **0.2.2**, with a
+new candidate/source/checksum cycle.
 
 ## M4.1: Host evidence and Claude cutover
 
@@ -333,7 +342,7 @@ Status: planned, blocked on sponsorship for model usage. Goal: prove real host f
 
 - [ ] test(host): enable sponsored protected host sessions and record Linux/macOS Claude failure evidence
 - [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
-- [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.1 and add Claude onFailure block
+- [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.2 and add Claude onFailure block
 - [ ] feat(hook): switch hooks/hooks.json to guard-go after host evidence
 - [ ] feat(cli): stage bin/secret as the verified launcher with byte-identical executable compat/secret
 - [ ] fix(hook): adopt host-tested neutral output and output-failure contract in internal/hook

@@ -9,7 +9,7 @@ those launchers. Claude cutover, version bumps, `onFailure: "block"`, the
 `compat/secret` path and the Go hook output contract belong entirely to M4.1.
 Do not edit a local hook to activate Go based on a cache or doctor report.
 
-M4 is in progress, pending hosted CI and release approval. No v0.2.1 release or
+M4 is in progress, pending hosted CI and release approval. No v0.2.2 release or
 committed checksum manifest is available yet. The release procedure below is for
 an approved, published final tag, not a command to run against a candidate branch.
 See [release.md](release.md) for owner approval boundaries.
@@ -27,7 +27,7 @@ failure behavior is not proven to block tools.
 
 ## Release and platform pins
 
-Release identity is fixed at V=0.2.1, annotated tag `v0.2.1`, source commit S and
+Release identity is fixed at V=0.2.2, annotated tag `v0.2.2`, source commit S and
 checksum-only child commit C. The trusted checkout must be exactly the full C
 which the annotated tag peels to. Obtain C from separately authenticated owner
 release records, not a field inside the downloaded binary or its checksum file.
@@ -60,17 +60,18 @@ Python 3, POSIX sh, ordinary GNU/BSD utilities (`readlink`, `stat`, `awk`, `cmp`
 Cold verification also needs GitHub CLI `gh` with `attestation download`,
 `attestation trusted-root`, and `attestation verify` supporting `--source-digest`,
 `--source-ref`, `--bundle`, `--custom-trusted-root` and JSON output. Local synthetic
-checks use gh 2.102.0; real provenance and its offline behavior remain a hosted
-published-assets gate. Online downloading additionally needs curl with HTTPS,
-redirect, connect and total-time limits. Install these tools through your trusted
+checks use gh 2.102.0. The read-only release rehearsal exercises genuine public
+v0.2.1 provenance with identity-substituted new scripts; real v0.2.2 provenance
+and published-assets/offline behavior remain hosted gates. Online downloading
+additionally needs curl with HTTPS, redirect, connect and total-time limits. Install these tools through your trusted
 OS/package channel; do not pipe downloaded scripts to a shell.
 
 ```sh
 # In the trusted checkout, after independently authenticating C and the tag:
 git checkout --detach FULL_AUTHENTICATED_C
-git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
-test "$(git cat-file -t refs/tags/v0.2.1)" = tag
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.1^{commit}')"
+git fetch --no-tags --force origin "refs/tags/v0.2.2:refs/tags/v0.2.2"
+test "$(git cat-file -t refs/tags/v0.2.2)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.2^{commit}')"
 sh scripts/verify-release.sh --source
 sh scripts/install-release.sh
 ./bin/secret-go version
@@ -81,13 +82,22 @@ installer itself never fetches tags, including on warm or offline paths, and
 rejects lightweight tags rather than weakening the pin.
 
 The installer fetches only the exact platform asset under
-`https://github.com/avhn/secret/releases/download/v0.2.1/`. It checks the committed
+`https://github.com/avhn/secret/releases/download/v0.2.2/`. It checks the committed
 four-line checksum manifest, provenance repository `avhn/secret`, signer workflow
 `.github/workflows/release.yml`, source C, tag ref, certificate issuer and subject
 name/digest before execution. The checkout is the bootstrap trust root; a matching
 checksum alone is not independent provenance.
 
-Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.2.1/`. Keep it on a
+The verifier keeps `--repo avhn/secret`, `--source-digest C`,
+`--signer-digest C`, `--source-ref refs/tags/v0.2.2`,
+`--cert-oidc-issuer https://token.actions.githubusercontent.com`, the exact SAN
+`--cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.2`
+and `--deny-self-hosted-runners`. Do not add `--signer-workflow`: gh 2.102.0
+rejects it together with `--cert-identity`. The exact SAN already pins the
+same-repository signer workflow and tag. Likewise, use `--repo`, not both
+`--repo` and `--owner`, for verification or attestation download.
+
+Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.2.2/`. Keep it on a
 user-owned direct path with private directories (0700); `secret` is 0500 and
 names-only `verified` metadata is 0600. Do not symlink cache or checksum paths.
 The launchers resolve bounded entrypoint symlink chains and rehash before every
@@ -112,7 +122,10 @@ sh scripts/install-release.sh --offline
 ```
 
 `--from-dir` still verifies provenance and can contact the trust service unless
-`--offline` is given. A cold air-gapped install requires the authenticated
+`--offline` is given. During online preinstallation the installer runs
+`gh attestation trusted-root` using gh's authenticated TUF bootstrap and saves
+the result privately in the versioned cache. It does not use a root from the
+input directory. A cold air-gapped install requires the authenticated
 `trusted_root.jsonl` previously acquired by a successful online preinstallation
 and retained as a private 0600 file in that same versioned cache, plus the exact
 asset and digest-named attestation bundle. Preserve that trust file when

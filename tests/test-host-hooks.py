@@ -256,12 +256,12 @@ def install_fixture_cache(root, plugin, checkout, fixture, env):
     digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
     os_name = {"Linux": "linux", "Darwin": "darwin"}[platform.system()]
     arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine()]
-    native = "secret-v0.2.1-" + os_name + "-" + arch
+    native = "secret-v0.2.2-" + os_name + "-" + arch
     shutil.copyfile(fixture, assets / native)
     (assets / native).chmod(0o700)
-    names = sorted("secret-v0.2.1-" + system + "-" + machine
+    names = sorted("secret-v0.2.2-" + system + "-" + machine
                    for system in ("linux", "darwin") for machine in ("amd64", "arm64"))
-    manifest = manifest_dir / "checksums-v0.2.1.txt"
+    manifest = manifest_dir / "checksums-v0.2.2.txt"
     manifest.write_text("".join((digest if name == native else "0" * 64)
                                 + "  " + name + "\n" for name in names), encoding="utf-8")
     manifest.chmod(0o600)
@@ -733,7 +733,7 @@ class ClassificationTests(unittest.TestCase):
             self.assertNotIn("permissionDecision", output["hookSpecificOutput"])
             self.assertTrue(record.exists())
             self.assertTrue(json.loads(record.read_text(encoding="utf-8"))["cwd_matches"])
-            self.assertEqual((root / "fixture-cache/secret/v0.2.1/secret").stat().st_mode & 0o777, 0o500)
+            self.assertEqual((root / "fixture-cache/secret/v0.2.2/secret").stat().st_mode & 0o777, 0o500)
             self.assertTrue((plugin / ".secret-release-test-fixture").exists())
 
     def test_hosted_mode_refuses_local_execution(self):

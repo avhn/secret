@@ -8,8 +8,20 @@ All notable changes to this project are documented here. Format follows [Keep a 
   39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before
   any release assets, attestation or draft: checkout replaced the annotated tag with a
   lightweight local ref. It is a dead, protected tag that must never be reused, moved or
-  deleted. The owner-approved new release identity is **0.2.1**, with a new
+  deleted.
+- `v0.2.1` was tagged at `229ee0e` (full C
+  `229ee0ef5a229920f2bbe52f01adce1f7e0ae17c`), but its [tag workflow (run
+  39790612288)](https://github.com/avhn/secret/actions/runs/39790612288) failed in
+  `release-verify` after successful builds, byte reproduction and attestation:
+  gh rejects `--signer-workflow` together with `--cert-identity`. The installer
+  had the same conflict. This is another dead, protected tag, never to be reused,
+  moved or deleted. The owner-approved new identity is **0.2.2**, with a new
   candidate/source/checksum cycle.
+- Keep the exact certificate SAN and all source/signer/ref/issuer/runner pins
+  without mutually exclusive gh flags; show public gh verification diagnostics.
+- Rehearse new verifier and production installer logic on PRs/manual runs using
+  reproducibly rebuilt v0.2.1 assets and genuine public attestations, including
+  online/bundle verification, retained offline trust and negative cases.
 - Restore runner-local annotated release tags after checkout before checking
   their type and final commit; require annotated tags for production installs.
 - Upload draft attestation bundles with portable names, byte-compare downloaded
@@ -19,11 +31,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
   witnessed it in the retained `hidden_stash` case). Linux and macOS restore the
   exact prior settings; other platforms keep the previous behavior.
 - Let a sole maintainer approve the `release-publish` draft gate: require a
-  reviewer and a deployment policy limited to the `v0.2.1` tag instead of
+  reviewer and a deployment policy limited to the `v0.2.2` tag instead of
   self-review prevention, which no single-owner repository can satisfy.
 - Retry the Go store write lock while Windows reports a pending-delete lock
   directory as access denied, instead of failing a contended writer at once.
-- Prepare M4 v0.2.1 Linux/macOS reproducible assets, checksum-only source identity
+- Prepare M4 v0.2.2 Linux/macOS reproducible assets, checksum-only source identity
   checks, scoped final-tag provenance verification and owner-approved draft workflow
   (candidate CI green in PR #9; replacement candidates and publication pending).
 - Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
