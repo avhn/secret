@@ -5,8 +5,8 @@ set -f
 umask 077
 LC_ALL=C
 export LC_ALL
-version=0.2.0
-tag=v0.2.0
+version=0.2.1
+tag=v0.2.1
 scratch=
 locked=no
 
@@ -113,8 +113,8 @@ safe_chain "$manifest" && bounded_file "$manifest" 1024 || fail 1
 [ "$(wc -l <"$manifest")" -eq 4 ] || fail 1
 awk '
 BEGIN {
-    name[1]="secret-v0.2.0-darwin-amd64"; name[2]="secret-v0.2.0-darwin-arm64"
-    name[3]="secret-v0.2.0-linux-amd64"; name[4]="secret-v0.2.0-linux-arm64"
+    name[1]="secret-v0.2.1-darwin-amd64"; name[2]="secret-v0.2.1-darwin-arm64"
+    name[3]="secret-v0.2.1-linux-amd64"; name[4]="secret-v0.2.1-linux-arm64"
 }
 NR > 4 { exit 1 }
 { if (length(substr($0,1,64)) != 64 || substr($0,1,64) ~ /[^0-9a-f]/ ||
@@ -138,6 +138,7 @@ else
     base=${XDG_CACHE_HOME:-$HOME/.cache}
     # HEAD and the locally trusted tag are the pin, not a field committed at C.
     commit=$(git -C "$root" rev-parse --verify HEAD 2>/dev/null) || fail 1
+    [ "$(git -C "$root" cat-file -t "refs/tags/$tag" 2>/dev/null)" = tag ] || fail 1
     tagged=$(git -C "$root" rev-parse --verify "refs/tags/$tag^{commit}" 2>/dev/null) || fail 1
     [ "$commit" = "$tagged" ] && [ "${#commit}" -eq 40 ] || fail 1
     git -C "$root" show "HEAD:dist/checksums-v$version.txt" 2>/dev/null |

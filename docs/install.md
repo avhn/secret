@@ -9,7 +9,7 @@ those launchers. Claude cutover, version bumps, `onFailure: "block"`, the
 `compat/secret` path and the Go hook output contract belong entirely to M4.1.
 Do not edit a local hook to activate Go based on a cache or doctor report.
 
-M4 is in progress, pending hosted CI and release approval. No v0.2.0 release or
+M4 is in progress, pending hosted CI and release approval. No v0.2.1 release or
 committed checksum manifest is available yet. The release procedure below is for
 an approved, published final tag, not a command to run against a candidate branch.
 See [release.md](release.md) for owner approval boundaries.
@@ -27,7 +27,7 @@ failure behavior is not proven to block tools.
 
 ## Release and platform pins
 
-Release identity is fixed at V=0.2.0, annotated tag `v0.2.0`, source commit S and
+Release identity is fixed at V=0.2.1, annotated tag `v0.2.1`, source commit S and
 checksum-only child commit C. The trusted checkout must be exactly the full C
 which the annotated tag peels to. Obtain C from separately authenticated owner
 release records, not a field inside the downloaded binary or its checksum file.
@@ -68,21 +68,26 @@ OS/package channel; do not pipe downloaded scripts to a shell.
 ```sh
 # In the trusted checkout, after independently authenticating C and the tag:
 git checkout --detach FULL_AUTHENTICATED_C
-test "$(git cat-file -t refs/tags/v0.2.0)" = tag
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.0^{commit}')"
+git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
+test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.1^{commit}')"
 sh scripts/verify-release.sh --source
 sh scripts/install-release.sh
 ./bin/secret-go version
 ```
 
+The explicit fetch restores only the local annotated tag after checkout. The
+installer itself never fetches tags, including on warm or offline paths, and
+rejects lightweight tags rather than weakening the pin.
+
 The installer fetches only the exact platform asset under
-`https://github.com/avhn/secret/releases/download/v0.2.0/`. It checks the committed
+`https://github.com/avhn/secret/releases/download/v0.2.1/`. It checks the committed
 four-line checksum manifest, provenance repository `avhn/secret`, signer workflow
 `.github/workflows/release.yml`, source C, tag ref, certificate issuer and subject
 name/digest before execution. The checkout is the bootstrap trust root; a matching
 checksum alone is not independent provenance.
 
-Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.2.0/`. Keep it on a
+Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.2.1/`. Keep it on a
 user-owned direct path with private directories (0700); `secret` is 0500 and
 names-only `verified` metadata is 0600. Do not symlink cache or checksum paths.
 The launchers resolve bounded entrypoint symlink chains and rehash before every
@@ -95,6 +100,8 @@ Acquire its attestation with `gh attestation download /absolute/path/to/ASSET
 --repo avhn/secret` from a separate fresh empty bundle directory. Keep scripts
 outside downloaded directories; run Python readers with `-I`. Assemble only the
 reviewed asset and its `sha256:DIGEST.jsonl` bundle in a private input directory.
+GitHub Release bundles use portable `sha256-DIGEST.jsonl` asset names; rename the
+reviewed local copy to gh's colon form before `--from-dir` use.
 Then, from the trusted checkout, run:
 
 ```sh

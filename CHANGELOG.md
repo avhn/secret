@@ -1,21 +1,31 @@
 # Changelog
 
-All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). No release has been tagged; the plugin manifest version 0.1.0 is not a release tag.
+All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). No release has been published; the plugin manifest version 0.1.0 is not a release tag.
 
 ## [Unreleased]
 
+- `v0.2.0` was tagged at `29216e7`, but its [tag workflow (run
+  39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before
+  any release assets, attestation or draft: checkout replaced the annotated tag with a
+  lightweight local ref. It is a dead, protected tag that must never be reused, moved or
+  deleted. The owner-approved new release identity is **0.2.1**, with a new
+  candidate/source/checksum cycle.
+- Restore runner-local annotated release tags after checkout before checking
+  their type and final commit; require annotated tags for production installs.
+- Upload draft attestation bundles with portable names, byte-compare downloaded
+  assets, then restore gh bundle names before final provenance verification.
 - Disable terminal echo in the Go CLI before printing the hidden `stash` prompt,
   so input typed between the prompt and the read is never echoed (macOS CI
   witnessed it in the retained `hidden_stash` case). Linux and macOS restore the
   exact prior settings; other platforms keep the previous behavior.
 - Let a sole maintainer approve the `release-publish` draft gate: require a
-  reviewer and a deployment policy limited to the `v0.2.0` tag instead of
+  reviewer and a deployment policy limited to the `v0.2.1` tag instead of
   self-review prevention, which no single-owner repository can satisfy.
 - Retry the Go store write lock while Windows reports a pending-delete lock
   directory as access denied, instead of failing a contended writer at once.
-- Prepare M4 v0.2.0 Linux/macOS reproducible assets, checksum-only source identity
+- Prepare M4 v0.2.1 Linux/macOS reproducible assets, checksum-only source identity
   checks, scoped final-tag provenance verification and owner-approved draft workflow
-  (candidate CI green in PR #9; tag and publication pending owner approval).
+  (candidate CI green in PR #9; replacement candidates and publication pending).
 - Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
   with digest/provenance checks, private cache, offline preinstallation and no
   automatic Bash fallback. Add native install, launcher and synthetic release tests.

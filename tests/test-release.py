@@ -12,7 +12,7 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 TAG = "v" + VERSION
 MANIFEST = "checksums-" + TAG + ".txt"
 NAMES = sorted("secret-" + TAG + "-" + system + "-" + arch
@@ -30,14 +30,38 @@ if args[:2] == ["attestation", "download"]:
     digest = hashlib.sha256(pathlib.Path(args[2]).read_bytes()).hexdigest()
     pathlib.Path("sha256:" + digest + ".jsonl").write_text("synthetic bundle " + digest + "\n")
     sys.exit(0)
+if args[:2] == ["release", "create"]:
+    import shutil
+    assert args[2] == "v0.2.1"
+    assert "--draft" in args and "--verify-tag" in args
+    assert args[args.index("--target") + 1] == os.environ["EXPECTED_COMMIT"]
+    assert args[args.index("--repo") + 1] == "avhn/secret"
+    assets = [pathlib.Path(arg) for arg in args if arg.startswith("assets/")]
+    assert len(assets) == 10
+    destination = pathlib.Path(os.environ["GH_RELEASE_ASSETS"])
+    destination.mkdir()
+    for asset in assets:
+        assert all(char.isascii() and (char.isalnum() or char in "-_.") for char in asset.name)
+        shutil.copyfile(asset, destination / asset.name)
+    sys.exit(0)
+if args[:2] == ["release", "download"]:
+    import shutil
+    assert args[2:5] == ["v0.2.1", "--repo", "avhn/secret"]
+    destination = pathlib.Path(args[args.index("--dir") + 1])
+    assert not any(destination.iterdir())
+    for asset in pathlib.Path(os.environ["GH_RELEASE_ASSETS"]).iterdir():
+        shutil.copyfile(asset, destination / asset.name)
+    if os.environ.get("GH_MODE") == "corrupt-draft":
+        (destination / "secret-v0.2.1-linux-amd64").write_bytes(b"corrupt uploaded binary")
+    sys.exit(0)
 assert args[:2] == ["attestation", "verify"]
 expected = {
     "--repo": "avhn/secret",
     "--signer-workflow": "avhn/secret/.github/workflows/release.yml",
     "--source-digest": os.environ["EXPECTED_COMMIT"],
     "--signer-digest": os.environ["EXPECTED_COMMIT"],
-    "--source-ref": "refs/tags/v0.2.0",
-    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.0",
+    "--source-ref": "refs/tags/v0.2.1",
+    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.1",
     "--cert-oidc-issuer": "https://token.actions.githubusercontent.com",
     "--format": "json",
 }
@@ -77,7 +101,7 @@ if args == ["env", "GOVERSION"]:
 if args in (["mod", "download"], ["mod", "verify"]):
     sys.exit(0)
 assert args[:3] == ["build", "-trimpath", "-buildvcs=false"]
-assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.2.0"
+assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.2.1"
 assert args[4] == "-o" and args[6:] == ["./cmd/secret"]
 if os.environ.get("GO_FAIL_BUILD") == "1": sys.exit(1)
 expected = {"CGO_ENABLED": "0", "GOAMD64": "v1", "GOARM64": "v8.0",
@@ -89,6 +113,21 @@ with open(os.environ["GO_CALLS"], "a") as log:
                          ["GOOS", "GOARCH", "SOURCE_DATE_EPOCH"]}) + "\n")
 pathlib.Path(args[5]).write_bytes((os.environ["GOOS"] + "/" + os.environ["GOARCH"]).encode())
 '''
+
+
+def workflow_jobs(filename):
+    workflow = (ROOT / ".github/workflows" / filename).read_text()
+    return dict(re.findall(r"^  ([a-z][a-z-]+):\n(.*?)(?=^  [a-z][a-z-]+:|\Z)",
+                           workflow, re.MULTILINE | re.DOTALL))
+
+
+def workflow_step(job, name):
+    match = re.search(r"^      - name: " + re.escape(name)
+                      + r"\n.*?^        run: \|\n((?:          [^\n]*\n)+)",
+                      job, re.MULTILINE | re.DOTALL)
+    if match is None:
+        raise AssertionError("missing workflow step: " + name)
+    return textwrap.dedent(match[1])
 
 
 class ReleaseTest(unittest.TestCase):
@@ -191,7 +230,7 @@ class ReleaseTest(unittest.TestCase):
             "one space": self.manifest.replace(b"  ", b" "),
             "path": self.manifest.replace(b"  secret", b"  ./secret"),
             "uppercase": self.manifest.upper(),
-            "other version": self.manifest.replace(b"v0.2.0", b"v0.2.1"),
+            "other version": self.manifest.replace(b"v0.2.1", b"v0.2.2"),
             "windows": self.manifest.replace(b"darwin", b"windows"),
         }
         for name, content in invalid.items():
@@ -221,6 +260,59 @@ class ReleaseTest(unittest.TestCase):
         self.git("tag", "-d", TAG)
         self.git("tag", TAG)
         self.assert_denied(self.verify())
+
+    def tag_check_steps(self):
+        release = workflow_jobs("release.yml")
+        plugin = workflow_jobs("plugin.yml")
+        return [(name, workflow_step(release[name], "Restore and check annotated release tag"))
+                for name in ("release-repro", "release-verify", "release-publish")] + [
+                    (name, workflow_step(plugin[name],
+                                         "Require final checksum commit C for published verification"))
+                    for name in ("plugin-install-linux", "plugin-install-macos")]
+
+    def tag_origin(self):
+        origin = self.base / "origin.git"
+        subprocess.run(["git", "clone", "--quiet", "--bare", str(self.repo), str(origin)],
+                       env=self.env, check=True, capture_output=True)
+        self.git("remote", "add", "origin", str(origin))
+        self.env.update(GITHUB_SHA=self.final, GITHUB_REF="refs/tags/" + TAG)
+        self.git("checkout", "-q", "--detach", self.final)
+        return origin
+
+    def run_tag_step(self, step):
+        return subprocess.run(["sh", "-eu", "-c", step], cwd=self.repo, env=self.env,
+                              capture_output=True, text=True)
+
+    def test_tag_jobs_restore_checkout_clobbered_annotated_tag(self):
+        original = self.git("rev-parse", "refs/tags/" + TAG)
+        origin = self.tag_origin()
+        for name, step in self.tag_check_steps():
+            with self.subTest(job=name):
+                # Reproduce checkout's tag-push refspec: commit SHA replaces tag object.
+                self.git("fetch", "--no-tags", "--force", "origin",
+                         self.final + ":refs/tags/" + TAG)
+                self.assertEqual(self.git("cat-file", "-t", "refs/tags/" + TAG), "commit")
+                self.assert_denied(self.verify())
+                self.assert_ok(self.run_tag_step(step))
+                self.assertEqual(self.git("rev-parse", "refs/tags/" + TAG), original)
+                self.assert_ok(self.verify())
+        remote = subprocess.check_output(["git", "--git-dir", str(origin), "rev-parse",
+                                          "refs/tags/" + TAG], env=self.env).decode().strip()
+        self.assertEqual(remote, original, "restoration must not change the remote tag")
+
+    def test_tag_jobs_reject_remote_lightweight_tag(self):
+        self.git("tag", "-f", TAG, self.final)
+        self.tag_origin()
+        for name, step in self.tag_check_steps():
+            with self.subTest(job=name):
+                self.assert_denied(self.run_tag_step(step))
+
+    def test_tag_jobs_reject_remote_annotated_tag_at_wrong_commit(self):
+        self.git("tag", "-f", "-a", TAG, self.source, "-m", "wrong target")
+        self.tag_origin()
+        for name, step in self.tag_check_steps():
+            with self.subTest(job=name):
+                self.assert_denied(self.run_tag_step(step))
 
     def test_wrong_or_short_source_denies(self):
         for sha in (self.source, self.final[:12], "f" * 40):
@@ -340,6 +432,31 @@ class ReleaseTest(unittest.TestCase):
         self.assert_denied(self.script("verify-release.sh", downloaded, self.final,
                                        "--bundle-dir", downloaded))
 
+    def draft_step(self, mode):
+        self.env.update(GITHUB_SHA=self.final, RUNNER_TEMP=str(self.base), GH_MODE=mode,
+                        GH_RELEASE_ASSETS=str(self.base / "draft release"))
+        assets = self.repo / "assets"
+        shutil.copytree(self.assets, assets)
+        for bundle in self.bundles().iterdir():
+            shutil.copyfile(bundle, assets / bundle.name)
+        step = workflow_step(workflow_jobs("release.yml")["release-publish"],
+                             "Reverify approved assets and create draft only")
+        return self.run_tag_step(step)
+
+    def test_workflow_draft_portable_names_and_final_reverification(self):
+        self.assert_ok(self.draft_step("valid"))
+        uploaded = Path(self.env["GH_RELEASE_ASSETS"])
+        self.assertEqual(len(list(uploaded.glob("sha256-*.jsonl"))), 5)
+        self.assertFalse(list(uploaded.glob("sha256:*.jsonl")))
+        calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
+        self.assertEqual([call[:2] for call in calls],
+                         [["attestation", "verify"]] * 5
+                         + [["release", "create"], ["release", "download"]]
+                         + [["attestation", "verify"]] * 5)
+
+    def test_workflow_draft_changed_uploaded_bytes_denies(self):
+        self.assert_denied(self.draft_step("corrupt-draft"))
+
     def test_build_frozen_environment_names_flags_and_source_epoch(self):
         self.env.update(GOFLAGS="-tags=secretstub", GOAMD64="v4", GOARM64="v9.0",
                         CGO_ENABLED="1", SOURCE_DATE_EPOCH="0", GOTOOLCHAIN="auto")
@@ -371,6 +488,29 @@ class ReleaseTest(unittest.TestCase):
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_every_tag_check_follows_explicit_annotated_tag_restoration(self):
+        fetch = 'git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"'
+        tag_type = 'git cat-file -t refs/tags/v0.2.1'
+        peel = "git rev-parse 'refs/tags/v0.2.1^{commit}'"
+        for filename, names in (
+                ("release.yml", ("release-repro", "release-verify", "release-publish")),
+                ("plugin.yml", ("plugin-install-linux", "plugin-install-macos"))):
+            jobs = workflow_jobs(filename)
+            for name in names:
+                with self.subTest(workflow=filename, job=name):
+                    job = jobs[name]
+                    self.assertIn("fetch-depth: 0", job)
+                    self.assertIn("persist-credentials: false", job)
+                    self.assertLess(job.index("uses: actions/checkout@"), job.index(fetch))
+                    self.assertLess(job.index(fetch), job.index(tag_type))
+                    self.assertLess(job.index(tag_type), job.index(peel))
+                    self.assertIn('test "$(' + peel + ')" = "$GITHUB_SHA"', job)
+                    # Script entry points can inspect tags too, so restore before them.
+                    self.assertLess(job.index(fetch), job.index("sh scripts/verify-release.sh"))
+                    if filename == "plugin.yml":
+                        self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.published", job)
+                        self.assertLess(job.index(fetch), job.index("--published"))
+
     def test_candidate_and_final_job_boundaries(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn("  pull_request:\n", workflow)
@@ -381,7 +521,7 @@ class WorkflowTest(unittest.TestCase):
                                      "release-attest", "release-verify", "release-publish"})
         for name in ("release-attest", "release-verify", "release-publish"):
             self.assertIn("github.event_name == 'push'", jobs[name])
-            self.assertIn("github.ref == 'refs/tags/v0.2.0'", jobs[name])
+            self.assertIn("github.ref == 'refs/tags/v0.2.1'", jobs[name])
             self.assertIn("github.repository == 'avhn/secret'", jobs[name])
         for name in ("release-build-a", "release-build-b"):
             self.assertIn("cache: false", jobs[name])
@@ -392,9 +532,18 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("--draft --title", jobs["release-publish"])
         self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
         self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
-        self.assertIn('[{"name": "v0.2.0", "type": "tag"}]', jobs["release-verify"])
+        self.assertIn('[{"name": "v0.2.1", "type": "tag"}]', jobs["release-verify"])
         self.assertNotIn("prevent_self_review", jobs["release-verify"])
         self.assertIn("attestations: read", jobs["release-verify"])
+        for job, dependency in (("release-attest", "release-repro"),
+                                ("release-verify", "release-attest"),
+                                ("release-publish", "release-verify")):
+            self.assertIn("needs: " + dependency, jobs[job])
+        self.assertIn("id-token: write", jobs["release-attest"])
+        self.assertIn("attestations: write", jobs["release-attest"])
+        self.assertIn("contents: write", jobs["release-publish"])
+        self.assertIn('--bundle-dir "$PWD/assets"', jobs["release-publish"])
+        self.assertIn('--verify-tag --target "$GITHUB_SHA"', jobs["release-publish"])
         self.assertLess(jobs["release-verify"].index("Encode bundle names for artifact transport"),
                         jobs["release-verify"].index("name: release-verified"))
         self.assertLess(jobs["release-publish"].index("Restore gh bundle names after artifact transport"),

@@ -1,10 +1,17 @@
 # Release procedure
 
-M4 prepares the Linux/macOS core release V=0.2.0 without changing installed Bash
+M4 prepares the Linux/macOS core release V=0.2.1 without changing installed Bash
 CLI/hooks or any of the four plugin/marketplace versions. M4.1 owns all activation
 changes and is blocked on sponsorship for model usage. The full frozen contract
 is in [the M4 plan](design/m4-plan.md); consumer dependencies and failure recovery
 are in [install.md](install.md).
+
+`v0.2.0` was tagged at `29216e7`, but its [tag workflow (run
+39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before any
+release assets, attestation or draft: checkout replaced the annotated tag with a
+lightweight local ref. It is a dead, protected tag that must never be reused, moved or
+deleted. The owner-approved new release identity is **0.2.1**, with a new
+candidate/source/checksum cycle.
 
 ## Approval boundaries
 
@@ -19,7 +26,7 @@ conventional commits, no co-author trailers, `git-safe-push` for an approved pus
 and `git-merge-safe` for an approved fast-forward.
 
 The owner must configure the `release-publish` environment with at least one
-required reviewer and a deployment policy allowing only the `v0.2.0` tag before
+required reviewer and a deployment policy allowing only the `v0.2.1` tag before
 a tag can create a draft. The workflow checks both settings; YAML cannot create
 or independently prove every repository protection. Self-review is permitted
 because a sole maintainer must approve their own tag run; the reviewer gate
@@ -62,7 +69,7 @@ absolute checkout/output directories, isolated HOME/module/build caches, Go
 1.26.0 and `GOTOOLCHAIN=local`. Build exactly with `CGO_ENABLED=0`, `GOAMD64=v1`,
 `GOARM64=v8.0`, empty GOFLAGS, `SOURCE_DATE_EPOCH` equal to S's commit timestamp,
 `-trimpath -buildvcs=false` and
-`-ldflags='-buildid= -s -w -X main.version=0.2.0'`. The build script disables
+`-ldflags='-buildid= -s -w -X main.version=0.2.1'`. The build script disables
 persistent Go settings, workspaces and experiments. There is no `secretstub` tag.
 
 ```sh
@@ -72,21 +79,28 @@ sh scripts/verify-release.sh --checksums /absolute/private/build-output
 ```
 
 `release-repro` byte-compares all four raw linux/darwin amd64/arm64 executables
-and the sorted four-line `checksums-v0.2.0.txt`. No Windows assets or archives.
+and the sorted four-line `checksums-v0.2.1.txt`. No Windows assets or archives.
 After owner authorization for the commit, commit only the generated
-`dist/checksums-v0.2.0.txt` as signed checksum commit C, the direct child of S.
+`dist/checksums-v0.2.1.txt` as signed checksum commit C, the direct child of S.
 `scripts/verify-release.sh --source` rejects every other S..C tree change and
 markers in S or C. Rebuild at C using S's epoch; require equality with the
 committed manifest. Never put a candidate manifest into a production checkout.
 
 ## 3. Immutable annotated tag at C
 
-Creating and pushing `v0.2.0` requires explicit owner go-ahead. Verify its peeled
+Creating and pushing `v0.2.1` requires explicit owner go-ahead. Verify its peeled
 full SHA equals C, not S. Do not move or reuse the tag after failure. A changed
 release input needs a new approved release identity and another candidate cycle.
 The tag workflow repeats both builds, compares every byte/digest to C's committed
 manifest and attests the four assets plus checksum asset. Candidate workflow
 attestations, if any, cannot substitute for final-tag provenance.
+
+Each tag-inspecting job explicitly fetches
+`refs/tags/v0.2.1:refs/tags/v0.2.1` with `--no-tags --force` after checkout,
+then requires an annotated object whose peeled commit equals `GITHUB_SHA`.
+This restores only the runner's local ref, never the protected remote tag.
+Checkout can otherwise replace the annotated tag with a lightweight ref even
+with full history. Restore before calling any script that checks the tag.
 
 ## 4. Final-tag verification and draft
 
@@ -97,17 +111,26 @@ repository, workflow, source C, tag ref and certificate issuer:
 ```sh
 gh attestation verify /absolute/path/to/ASSET --repo avhn/secret \
   --signer-workflow avhn/secret/.github/workflows/release.yml \
-  --source-digest FULL_C --source-ref refs/tags/v0.2.0 \
+  --source-digest FULL_C --source-ref refs/tags/v0.2.1 \
   --cert-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
+The verifier also pins `--signer-digest FULL_C` and the exact certificate SAN
+`https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.1`.
+This is a same-repository workflow, not a reusable workflow; the composite
+attestation action does not become the signer. On a tag push both source and
+signer digests are C, and the source ref is the tag, not the default branch.
+Moving signing into a reusable workflow would require its own signer SHA/ref.
 The verifier additionally checks subject name/digest and all five subjects.
 Download bundles into new empty directories, keep readers/scripts elsewhere and
 use Python `-I`. `release-verify` transports bundles under colon-free names;
 `release-publish` restores gh's digest-named bundle files, re-verifies them and
 creates a **draft only**, after separately approved environment review. Creating
 that draft itself requires explicit owner go-ahead, not just tag permission.
-The draft contains four binaries, the checksum manifest and five bundles.
+The draft contains four binaries, the checksum manifest and five bundles named
+`sha256-DIGEST.jsonl`. Portable release names avoid server-side normalization of
+colons. After download and byte comparison, restore `sha256:DIGEST.jsonl` before
+local verification or installer `--from-dir` use.
 Download every uploaded draft asset into a fresh empty directory, byte-compare
 and verify provenance again. Do not run scripts from downloaded directories.
 
@@ -115,9 +138,9 @@ and verify provenance again. Do not run scripts from downloaded directories.
 
 Publishing the verified draft requires another explicit owner go-ahead. The
 workflow deliberately never runs `gh release edit --draft=false`. After approved
-publication, dispatch `plugin.yml` with `published=true` at exactly full C with
-complete tag history. Its native matrix repeats the install from the real public
-assets without the fixture bypass, validates cold/warm paths and checks actual
+publication, dispatch `plugin.yml` with `published=true` using the `v0.2.1`
+tag ref, which must resolve to full C, with complete tag history. Its native
+matrix repeats the install from the real public assets without the fixture bypass, validates cold/warm paths and checks actual
 offline provenance with the cached executable removed and network attempts
 witnessed. A digest or bundle alone is insufficient offline trust.
 
@@ -138,10 +161,10 @@ refs. Missing auth/model availability or absent healthy-control witnesses leaves
 the gate incomplete. Pins start at Claude Code 2.1.295 and Codex 0.163.0; host
 upgrades need new evidence. Codex stays on Bash regardless of Claude results.
 
-M4.1 stages and tests the four 0.2.0 manifests, both Claude `onFailure: "block"`
+M4.1 stages and tests the four 0.2.1 manifests, both Claude `onFailure: "block"`
 entries pointing to `guard-go`, the verified `bin/secret` launcher with
 byte-identical executable `compat/secret`, and neutral-output/error behavior in
 `internal/hook`. Enable `tests/test-plugin.py --stage m4.1` there, not in M4's
 workflow. The harness requires that staged configuration on a disposable hosted
 branch. Changed inputs require new source/candidate/release identity and renewed
-owner approvals, never mutation of the M4 S, C or immutable v0.2.0 tag.
+owner approvals, never mutation of the M4 S, C or immutable v0.2.1 tag.

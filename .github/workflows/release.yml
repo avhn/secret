@@ -11,7 +11,7 @@ permissions:
 
 # Candidates only build and compare. Final-tag provenance is never borrowed from
 # a candidate run. Repository administrators must configure release-publish with
-# required reviewers and restrict it to the v0.2.0 tag before approving draft
+# required reviewers and restrict it to the v0.2.1 tag before approving draft
 # creation. A sole maintainer approves their own deployment, so self-review is
 # permitted; the reviewer gate still makes the draft a separate human action.
 jobs:
@@ -84,6 +84,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Restore and check annotated release tag
+        if: github.event_name == 'push'
+        run: |
+          test "$GITHUB_REF" = refs/tags/v0.2.1
+          git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
+          test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+          test "$(git rev-parse 'refs/tags/v0.2.1^{commit}')" = "$GITHUB_SHA"
       - name: Check release scripts and synthetic regressions
         run: |
           sh -n scripts/build-release.sh scripts/verify-release.sh
@@ -100,22 +107,18 @@ jobs:
       - name: Compare every executable byte and sorted checksum manifest
         env:
           EVENT_NAME: ${{ github.event_name }}
-          RELEASE_REF: ${{ github.ref }}
         run: |
           sh scripts/verify-release.sh --source
           sh scripts/verify-release.sh --checksums "$PWD/artifacts-a"
           sh scripts/verify-release.sh --checksums "$PWD/artifacts-b"
           for os in darwin linux; do
             for arch in amd64 arm64; do
-              cmp "artifacts-a/secret-v0.2.0-$os-$arch" "artifacts-b/secret-v0.2.0-$os-$arch"
+              cmp "artifacts-a/secret-v0.2.1-$os-$arch" "artifacts-b/secret-v0.2.1-$os-$arch"
             done
           done
-          cmp artifacts-a/checksums-v0.2.0.txt artifacts-b/checksums-v0.2.0.txt
+          cmp artifacts-a/checksums-v0.2.1.txt artifacts-b/checksums-v0.2.1.txt
           if [ "$EVENT_NAME" = push ]; then
-            test "$RELEASE_REF" = refs/tags/v0.2.0
-            test "$(git cat-file -t refs/tags/v0.2.0)" = tag
-            test "$(git rev-parse 'refs/tags/v0.2.0^{commit}')" = "$GITHUB_SHA"
-            cmp dist/checksums-v0.2.0.txt artifacts-a/checksums-v0.2.0.txt
+            cmp dist/checksums-v0.2.1.txt artifacts-a/checksums-v0.2.1.txt
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -124,7 +127,7 @@ jobs:
           if-no-files-found: error
 
   release-attest:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.1' && github.repository == 'avhn/secret'
     needs: release-repro
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -145,7 +148,7 @@ jobs:
           subject-path: assets/*
 
   release-verify:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.1' && github.repository == 'avhn/secret'
     needs: release-attest
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -157,6 +160,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Restore and check annotated release tag
+        run: |
+          test "$GITHUB_REF" = refs/tags/v0.2.1
+          git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
+          test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+          test "$(git rev-parse 'refs/tags/v0.2.1^{commit}')" = "$GITHUB_SHA"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-reproducible
@@ -166,7 +175,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA"
-          for asset in "$PWD"/assets/secret-v0.2.0-* "$PWD/assets/checksums-v0.2.0.txt"; do
+          for asset in "$PWD"/assets/secret-v0.2.1-* "$PWD/assets/checksums-v0.2.1.txt"; do
             scratch="$(mktemp -d "$RUNNER_TEMP/attestation.XXXXXX")"
             (cd "$scratch" && gh attestation download "$asset" --repo avhn/secret)
             cp "$scratch"/sha256:*.jsonl assets/
@@ -181,7 +190,7 @@ jobs:
              and .deployment_branch_policy.custom_branch_policies == true' \
             | grep -qx true
           gh api repos/avhn/secret/environments/release-publish/deployment-branch-policies --jq \
-            '[.branch_policies[] | {name, type}] == [{"name": "v0.2.0", "type": "tag"}]' \
+            '[.branch_policies[] | {name, type}] == [{"name": "v0.2.1", "type": "tag"}]' \
             | grep -qx true
       # upload-artifact rejects colons in paths. Preserve gh's bundle contents
       # under portable transport names, then restore them in the approved job.
@@ -197,7 +206,7 @@ jobs:
           if-no-files-found: error
 
   release-publish:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.1' && github.repository == 'avhn/secret'
     needs: release-verify
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -209,6 +218,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Restore and check annotated release tag
+        run: |
+          test "$GITHUB_REF" = refs/tags/v0.2.1
+          git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
+          test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+          test "$(git rev-parse 'refs/tags/v0.2.1^{commit}')" = "$GITHUB_SHA"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-verified
@@ -223,14 +238,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA" --bundle-dir "$PWD/assets"
-          gh release create v0.2.0 --repo avhn/secret --verify-tag --target "$GITHUB_SHA" \
-            --draft --title 'secret v0.2.0' \
+          # GitHub can normalize special characters in release asset names too.
+          # Upload portable bundle names, then restore only the downloaded copies.
+          for bundle in assets/sha256:*.jsonl; do
+            mv "$bundle" "assets/sha256-${bundle#assets/sha256:}"
+          done
+          gh release create v0.2.1 --repo avhn/secret --verify-tag --target "$GITHUB_SHA" \
+            --draft --title 'secret v0.2.1' \
             --notes 'Reproducible Linux/macOS binaries verified against final-tag C provenance. Publication requires separate owner approval.' \
-            assets/secret-v0.2.0-* assets/checksums-v0.2.0.txt assets/sha256:*.jsonl
+            assets/secret-v0.2.1-* assets/checksums-v0.2.1.txt assets/sha256-*.jsonl
           scratch="$(mktemp -d "$RUNNER_TEMP/draft-assets.XXXXXX")"
-          gh release download v0.2.0 --repo avhn/secret --dir "$scratch"
-          for asset in assets/secret-v0.2.0-* assets/checksums-v0.2.0.txt assets/sha256:*.jsonl; do
+          gh release download v0.2.1 --repo avhn/secret --dir "$scratch"
+          for asset in assets/secret-v0.2.1-* assets/checksums-v0.2.1.txt assets/sha256-*.jsonl; do
             cmp "$asset" "$scratch/$(basename "$asset")"
+          done
+          for bundle in "$scratch"/sha256-*.jsonl; do
+            mv "$bundle" "$scratch/sha256:${bundle##*/sha256-}"
           done
           sh scripts/verify-release.sh "$scratch" "$GITHUB_SHA" --bundle-dir "$scratch"
           # Deliberately no `gh release edit --draft=false`: publishing is a

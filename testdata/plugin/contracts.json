@@ -1,11 +1,11 @@
 {
-  "version": "0.2.0",
-  "tag": "v0.2.0",
+  "version": "0.2.1",
+  "tag": "v0.2.1",
   "assets": [
-    "secret-v0.2.0-darwin-amd64",
-    "secret-v0.2.0-darwin-arm64",
-    "secret-v0.2.0-linux-amd64",
-    "secret-v0.2.0-linux-arm64"
+    "secret-v0.2.1-darwin-amd64",
+    "secret-v0.2.1-darwin-arm64",
+    "secret-v0.2.1-linux-amd64",
+    "secret-v0.2.1-linux-arm64"
   ],
   "manifests": {
     ".claude-plugin/plugin.json": ["version"],

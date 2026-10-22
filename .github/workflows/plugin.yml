@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       published:
-        description: Repeat against published v0.2.0 assets from final checksum commit C
+        description: Repeat against published v0.2.1 assets from final checksum commit C
         type: boolean
         default: false
 
@@ -53,14 +53,17 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
       - name: Require final checksum commit C for published verification
         if: github.event_name == 'workflow_dispatch' && inputs.published
         run: |
+          git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
           test "$(git rev-parse --is-shallow-repository)" = false
-          test "$(git cat-file -t refs/tags/v0.2.0)" = tag
-          test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.0^{commit}')"
-          test -f dist/checksums-v0.2.0.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.2.0.txt
+          test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+          test "$(git rev-parse 'refs/tags/v0.2.1^{commit}')" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f dist/checksums-v0.2.1.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.2.1.txt
           sh scripts/verify-release.sh --source
       - uses: actions/setup-go@v6
         with:
@@ -112,14 +115,17 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
       - name: Require final checksum commit C for published verification
         if: github.event_name == 'workflow_dispatch' && inputs.published
         run: |
+          git fetch --no-tags --force origin "refs/tags/v0.2.1:refs/tags/v0.2.1"
           test "$(git rev-parse --is-shallow-repository)" = false
-          test "$(git cat-file -t refs/tags/v0.2.0)" = tag
-          test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.2.0^{commit}')"
-          test -f dist/checksums-v0.2.0.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.2.0.txt
+          test "$(git cat-file -t refs/tags/v0.2.1)" = tag
+          test "$(git rev-parse 'refs/tags/v0.2.1^{commit}')" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f dist/checksums-v0.2.1.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.2.1.txt
           sh scripts/verify-release.sh --source
       - uses: actions/setup-go@v6
         with:
