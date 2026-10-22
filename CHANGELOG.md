@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Build and test with Go 1.26.10 instead of 1.26.0: govulncheck found reachable
+  standard library vulnerabilities, including `os.Root` escapes (GO-2026-4970,
+  GO-2026-4602, GO-2026-4864) on store write paths and `net/url` parsing
+  (GO-2026-4601). CI now runs a pinned govulncheck. The dead-tag rehearsal keeps
+  Go 1.26.0 only to reproduce v0.2.1's attested bytes.
 - `v0.2.0` was tagged at `29216e7`, but its [tag workflow (run
   39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before
   any release assets, attestation or draft: checkout replaced the annotated tag with a

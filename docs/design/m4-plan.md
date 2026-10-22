@@ -39,7 +39,7 @@ M4.1:   CLI symlink -> verified launcher -> Go CLI; rollback -> compat/secret
 
 Workers A to D build against this contract; changing it needs a coordinator edit here first.
 
-- Version: `V=0.2.2`, tag `v0.2.2`. Toolchain: Go 1.26.0 (`go.mod` directive), `GOTOOLCHAIN=local`.
+- Version: `V=0.2.2`, tag `v0.2.2`. Toolchain: Go 1.26.10 (`go.mod` directive), `GOTOOLCHAIN=local`.
 - Assets (raw executables, no archives): `secret-v0.2.2-linux-amd64`, `secret-v0.2.2-linux-arm64`, `secret-v0.2.2-darwin-amd64`, `secret-v0.2.2-darwin-arm64`.
 - Build environment: `CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOFLAGS= GOTOOLCHAIN=local SOURCE_DATE_EPOCH=$(git show -s --format=%ct S)`; flags exactly `-trimpath -buildvcs=false -ldflags="-buildid= -s -w -X main.version=0.2.2"`, package `./cmd/secret`. `scripts/build-release.sh OUTDIR` builds all four into `OUTDIR` and writes `OUTDIR/checksums-v0.2.2.txt`.
 - Checksum grammar: exactly four lines, LF-terminated, sorted by asset name, each `<64 lowercase hex sha256><two spaces><asset name>` (GNU `sha256sum` and `shasum -a 256` format). No blank lines, comments, duplicates, paths or other names; any deviation rejects the whole file. The committed copy lives at `dist/checksums-v0.2.2.txt` (introduced only by checksum commit C).
@@ -60,7 +60,7 @@ Launcher regression tests retain caller Go module/build caches before changing H
 
 Files: `docs/design/m4-plan.md`, `docs/design/go-rewrite.md`.
 
-Freeze four raw executable asset names `secret-v<V>-<os>-<arch>`, checksum grammar, exact V, Go 1.26.0, source epoch, cache layout, installer arguments and failure JSON. Raw binaries avoid archive timestamp and order variability.
+Freeze four raw executable asset names `secret-v<V>-<os>-<arch>`, checksum grammar, exact V, Go 1.26.10, source epoch, cache layout, installer arguments and failure JSON. Raw binaries avoid archive timestamp and order variability.
 
 `scripts/install-release.sh` performs explicit preinstallation and provenance verification. Launchers consume its private cache and may attempt only bounded bootstrap. Full network verification must not consume the five-second hook budget: a cold hook may deny with fixed preinstall guidance and must never relax validation to succeed. Candidate fixture injection exists only in disposable test checkouts, never as a production trust-bypass variable.
 

@@ -170,7 +170,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.0"
+          go-version: "1.26.10"
           cache: true
           cache-dependency-path: go.mod
       - name: Check gofmt
@@ -230,6 +230,12 @@ jobs:
       - name: Check module files
         shell: bash
         run: go mod tidy && git diff --exit-code -- go.mod go.sum
+      - name: Scan reachable Go vulnerabilities
+        if: runner.os == 'Linux'
+        shell: bash
+        # Fails on any known vulnerability reachable from our code, including the
+        # standard library of the pinned toolchain.
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
       - name: Cross-compile Go binary
         if: runner.os == 'Linux'
         shell: bash

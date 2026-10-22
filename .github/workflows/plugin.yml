@@ -67,7 +67,7 @@ jobs:
           sh scripts/verify-release.sh --source
       - uses: actions/setup-go@v6
         with:
-          go-version: 1.26.0
+          go-version: 1.26.10
           cache: false
       - name: Record native runner evidence
         env:
@@ -129,7 +129,7 @@ jobs:
           sh scripts/verify-release.sh --source
       - uses: actions/setup-go@v6
         with:
-          go-version: 1.26.0
+          go-version: 1.26.10
           cache: false
       - name: Record native runner and stock Bash evidence
         env:

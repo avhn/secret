@@ -100,7 +100,7 @@ GO = r'''#!/usr/bin/env python3
 import json, os, pathlib, sys
 args = sys.argv[1:]
 if args == ["env", "GOVERSION"]:
-    print(os.environ.get("FAKE_GO_VERSION", "go1.26.0"))
+    print(os.environ.get("FAKE_GO_VERSION", "go1.26.10"))
     sys.exit(0)
 if args in (["mod", "download"], ["mod", "verify"]):
     sys.exit(0)
@@ -164,7 +164,7 @@ class ReleaseTest(unittest.TestCase):
         self.git("config", "user.name", "Synthetic Release")
         self.git("config", "user.email", "release@example.invalid")
         self.git("config", "commit.gpgsign", "false")
-        (self.repo / "go.mod").write_text("module synthetic.invalid/release\n\ngo 1.26.0\n")
+        (self.repo / "go.mod").write_text("module synthetic.invalid/release\n\ngo 1.26.10\n")
         (self.repo / "go.sum").write_bytes(b"")
         self.env.update(GIT_AUTHOR_DATE="2001-01-01T00:00:00Z",
                         GIT_COMMITTER_DATE="2001-01-01T00:00:00Z")

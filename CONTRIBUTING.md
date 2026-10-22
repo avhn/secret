@@ -2,7 +2,7 @@
 
 ## Set up
 
-Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.26.0 or newer; CI pins Go 1.26.0. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
+Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.26.10 or newer; CI pins Go 1.26.10. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
 
 ## Test locally
 
@@ -80,7 +80,7 @@ are `release.yml`, `plugin.yml` and inactive `host-hooks.yml`. Synthetic fixture
 live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.go`
 is test-only under `-tags hosthookfixture`, never a shipped binary.
 
-Use exactly Go 1.26.0, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
+Use exactly Go 1.26.10, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
 builds. Run tests from the trusted checkout, keeping downloads in fresh empty
 directories and readers/scripts outside them. Never install into your real HOME.
 

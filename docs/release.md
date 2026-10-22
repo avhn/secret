@@ -98,7 +98,7 @@ post-S source edits.
 
 `release-build-a` and `release-build-b` use independent hosted jobs, different
 absolute checkout/output directories, isolated HOME/module/build caches, Go
-1.26.0 and `GOTOOLCHAIN=local`. Build exactly with `CGO_ENABLED=0`, `GOAMD64=v1`,
+1.26.10 and `GOTOOLCHAIN=local`. Build exactly with `CGO_ENABLED=0`, `GOAMD64=v1`,
 `GOARM64=v8.0`, empty GOFLAGS, `SOURCE_DATE_EPOCH` equal to S's commit timestamp,
 `-trimpath -buildvcs=false` and
 `-ldflags='-buildid= -s -w -X main.version=0.2.2'`. The build script disables

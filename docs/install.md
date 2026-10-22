@@ -45,7 +45,7 @@ ImageOS/ImageVersion and RUNNER_ARCH; the passing run records, not mutable runne
 label names, establish the tested OS versions and architectures. No hosted
 Linux/macOS version is certified by this branch before those jobs pass.
 
-The release build pin is Go 1.26.0 with `GOTOOLCHAIN=local`; consumers need no Go
+The release build pin is Go 1.26.10 with `GOTOOLCHAIN=local`; consumers need no Go
 compiler. Future Claude activation requires at least Claude Code 2.1.295, initially
 pinned to exactly 2.1.295; older hosts are unsupported for Go cutover. The inactive
 host harness pins Codex 0.163.0, but this is not a claim of tested host protection.
