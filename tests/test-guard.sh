@@ -42,9 +42,16 @@ command -v jq >/dev/null 2>&1 || {
 # command (Bash), file_path (Read/Edit/Write), or path (Grep) is VALUE.
 SECRETS_GUARD="$REPO_ROOT/hooks/guard-secrets"
 # Alternate commands are split as arguments, never evaluated as shell source.
-read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$SECRETS_GUARD}"
+if [[ -n "${SECRET_GUARD:-}" ]]; then
+    read -r -a GUARD_ARGS <<<"$SECRET_GUARD"
+else
+    GUARD_ARGS=("$BASH" "$SECRETS_GUARD")
+fi
+print_guard_reason() {
+    printf '      reason: %s\n' "$(jq -r '.hookSpecificOutput.permissionDecisionReason // ""' "$TMP/$1.out" 2>/dev/null || true)"
+}
 invoke_guard() {
-    if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
+    if [[ -z "${SECRET_GUARD:-}" || "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
         "$BASH" "$SECRETS_GUARD"
     else
         "${GUARD_ARGS[@]}"
@@ -82,7 +89,7 @@ secrets() {
     fi
     # shellcheck disable=SC2053  # optional glob filters focused synthetic runs
     if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
-    if [[ "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
+    if [[ -z "${SECRET_GUARD:-}" || "$SECRETS_GUARD" != "$REPO_ROOT/hooks/guard-secrets" ]]; then
         guard_cmd=("$BASH" "$SECRETS_GUARD")
     fi
     [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\t%s\n' guard "$name" "$want" >>"$SECRET_TEST_INVENTORY"
@@ -93,10 +100,13 @@ secrets() {
         printf 'guard\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
     fi
     [[ -n "$extra" ]] || extra='{}'
-    got="$(jq -cn --arg t "$tool" "${jq_value_args[@]}" --arg w "$TMP/search" --argjson extra "$extra" \
+    if jq -cn --arg t "$tool" "${jq_value_args[@]}" --arg w "$TMP/search" --argjson extra "$extra" \
         '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
-        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" 2>"$TMP/$name.err" |
-        jq -r 'if env.SECRET_TEST_REASON == "1" then (.hookSpecificOutput.permissionDecision // "allow") + " " + (.hookSpecificOutput.permissionDecisionReason // "") else .hookSpecificOutput.permissionDecision // "allow" end' 2>/dev/null)" || got="crash"
+        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
+        got="$(jq -r 'if env.SECRET_TEST_REASON == "1" then (.hookSpecificOutput.permissionDecision // "allow") + " " + (.hookSpecificOutput.permissionDecisionReason // "") else .hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out" 2>/dev/null)" || got="crash"
+    else
+        got="crash"
+    fi
     got="${got:-allow}"
     if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
         if [[ "$got" == "$want" ]]; then
@@ -111,6 +121,7 @@ secrets() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL  %-22s got %s, expected %s: %s %s\n' "$name" "$got" "$want" "$tool" "$value"
+        print_guard_reason "$name"
         sed 's/^/      /' "$TMP/$name.err"
     fi
     return 0
@@ -133,11 +144,15 @@ audit27_case() {
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' guard "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
     jq -cn --arg w "$TMP/search" '{cwd:$w,tool_name:"Bash",tool_input:{command:"true"}} | '"$filter" >"$TMP/audit27-envelope"
     started="$(perl -MTime::HiRes=time -e 'print time')"
-    output="$(PATH="${4:-$PATH}" perl -e 'alarm 4; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit27-envelope" 2>"$TMP/audit27-error")" || output=invalid
+    if PATH="${4:-$PATH}" perl -e 'alarm 4; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit27-envelope" 2>"$TMP/audit27-error" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=invalid
+    fi
     elapsed="$(perl -MTime::HiRes=time -e 'printf "%.3f", time - $ARGV[0]' "$started")"
     if [[ ! -s "$TMP/audit27-error" ]]; then
         if [[ -z "$output" ]]; then got=allow
-        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        elif [[ "$output" != invalid ]] && jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=deny
         fi
     fi
     if [[ "$got" == "$expected" ]]; then
@@ -147,6 +162,7 @@ audit27_case() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s within four seconds without stderr (%ss)\n' "$name" "$got" "$expected" "$elapsed"
+        print_guard_reason "$name"
         printf '%s\n' "$output"
         cat "$TMP/audit27-error"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' guard "$name" >>"$SECRET_TEST_RESULTS"
@@ -1507,7 +1523,7 @@ record_direct malformed_json
 if printf '%s' 'malformed cat .env' | invoke_guard | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 record_direct malformed_sensitive
 [[ -n "${SECRET_TEST_INVENTORY:-}" ]] && printf '%s\t%s\tdecision\tallow\n' guard empty_stdin >>"$SECRET_TEST_INVENTORY"
-if [[ -z "$(PATH="$TMP/empty-search" invoke_guard </dev/null)" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
+if empty_output="$(PATH="$TMP/empty-search" invoke_guard </dev/null)" && [[ -z "$empty_output" ]]; then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 record_direct empty_stdin
 
 # Operand redesign: fixtures are synthetic and command strings are never run.
@@ -3649,10 +3665,14 @@ audit20_raw() {
     if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'guard\t%s\tdecision\t%s\n' "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
     printf '%b' "$encoded" >"$TMP/audit20-envelope"
-    output="$(invoke_guard <"$TMP/audit20-envelope")" || output=crash
+    if invoke_guard <"$TMP/audit20-envelope" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=crash
+    fi
     got=deny
     if [[ "$expected" == allow && -z "$output" ]]; then got=allow
-    elif ! printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=invalid
+    elif [[ "$output" == crash ]] || ! jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=invalid
     fi
     if [[ "$got" == "$expected" ]]; then
         PASSED=$((PASSED + 1))
@@ -3660,6 +3680,7 @@ audit20_raw() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s\n' "$name" "$got" "$expected"
+        print_guard_reason "$name"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'guard\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
     fi
 }
@@ -4376,14 +4397,19 @@ audit22_large() {
     if [[ -n "${SECRET_TEST_FILTER:-}" && audit22_n14_oversized != $SECRET_TEST_FILTER ]]; then return 0; fi
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\taudit22_n14_oversized\tdecision\tdeny\n' guard >>"$SECRET_TEST_INVENTORY"
     perl -e 'print qq({"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo ), "x" x (16 * 1024 * 1024), qq("}})' >"$TMP/audit22-large"
-    output="$(perl -e 'alarm 3; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit22-large")" || output=invalid
-    if ! printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=invalid; fi
+    if perl -e 'alarm 3; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit22-large" >"$TMP/audit22_n14_oversized.out"; then
+        output="$(cat "$TMP/audit22_n14_oversized.out")"
+    else
+        output=invalid
+    fi
+    if [[ "$output" == invalid ]] || ! jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/audit22_n14_oversized.out" >/dev/null 2>&1; then got=invalid; fi
     if [[ "$got" == deny ]]; then
         PASSED=$((PASSED + 1))
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\taudit22_n14_oversized\tpass\n' guard >>"$SECRET_TEST_RESULTS"
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL audit22_n14_oversized: got %s, expected explicit denial within deadline\n' "$got"
+        print_guard_reason audit22_n14_oversized
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\taudit22_n14_oversized\tfail\n' guard >>"$SECRET_TEST_RESULTS"
     fi
 }
@@ -4399,10 +4425,14 @@ audit23_envelope() {
     # shellcheck disable=SC2053  # same focused filter as ordinary cases
     if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' guard "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
-    output="$(perl -e 'alarm 4; exec @ARGV' "${guard_cmd[@]}" <"$TMP/audit23-envelope" 2>"$TMP/audit23-error")" || output=invalid
+    if perl -e 'alarm 4; exec @ARGV' "${guard_cmd[@]}" <"$TMP/audit23-envelope" 2>"$TMP/audit23-error" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=invalid
+    fi
     if [[ ! -s "$TMP/audit23-error" ]]; then
         if [[ -z "$output" ]]; then got=allow
-        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        elif [[ "$output" != invalid ]] && jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=deny
         fi
     fi
     if [[ "$got" == "$expected" ]]; then
@@ -4411,6 +4441,7 @@ audit23_envelope() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s within four seconds without stderr\n' "$name" "$got" "$expected"
+        print_guard_reason "$name"
         printf '%s\n' "$output"
         cat "$TMP/audit23-error"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' guard "$name" >>"$SECRET_TEST_RESULTS"

@@ -12,7 +12,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 PASSED=0 FAILED=0
-read -r -a GUARD_ARGS <<<"${SECRET_GUARD:-$ROOT/hooks/guard-secrets}"
+# Alternate commands are split as arguments, never evaluated as shell source.
+if [[ -n "${SECRET_GUARD:-}" ]]; then
+    read -r -a GUARD_ARGS <<<"$SECRET_GUARD"
+else
+    GUARD_ARGS=("$BASH" "$ROOT/hooks/guard-secrets")
+fi
+print_guard_reason() {
+    printf '      reason: %s\n' "$(jq -r '.hookSpecificOutput.permissionDecisionReason // ""' "$TMP/$1.out" 2>/dev/null || true)"
+}
 export HOME="$TMP/home" XDG_CONFIG_HOME="$TMP/home/.config" GIT_CONFIG_NOSYSTEM=1
 mkdir -p "$TMP/work" "$TMP/elsewhere" "$HOME"
 printf '%s\n' 'synthetic-only' >"$TMP/work/.env"
@@ -28,11 +36,15 @@ audit27_case() {
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
     jq -cn --arg w "$TMP/work" '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:"Bash",tool_input:{command:"true"}} | '"$filter" >"$TMP/audit27-envelope"
     started="$(perl -MTime::HiRes=time -e 'print time')"
-    output="$(PATH="${4:-$PATH}" perl -e 'alarm 4; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit27-envelope" 2>"$TMP/audit27-error")" || output=invalid
+    if PATH="${4:-$PATH}" perl -e 'alarm 4; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit27-envelope" 2>"$TMP/audit27-error" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=invalid
+    fi
     elapsed="$(perl -MTime::HiRes=time -e 'printf "%.3f", time - $ARGV[0]' "$started")"
     if [[ ! -s "$TMP/audit27-error" ]]; then
         if [[ -z "$output" ]]; then got=allow
-        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        elif [[ "$output" != invalid ]] && jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=deny
         fi
     fi
     if [[ "$got" == "$expected" ]]; then
@@ -42,6 +54,7 @@ audit27_case() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s within four seconds without stderr (%ss)\n' "$name" "$got" "$expected" "$elapsed"
+        print_guard_reason "$name"
         printf '%s\n' "$output"
         cat "$TMP/audit27-error"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' codex "$name" >>"$SECRET_TEST_RESULTS"
@@ -534,9 +547,13 @@ check() {
         [[ "$tool" != Bash ]] || category=pending-M2-ast
         printf 'codex\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
     fi
-    got="$(jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
+    if jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
         '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:$t,tool_input:({command:$c} + (if $d == "" then {} else {workdir:$d} end))}' |
-        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" | jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end')" || got=crash
+        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out"; then
+        got="$(jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out")" || got=crash
+    else
+        got=crash
+    fi
     if [[ "$got" == "$expected" ]]; then
         PASSED=$((PASSED + 1))
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"
@@ -544,6 +561,7 @@ check() {
         FAILED=$((FAILED + 1))
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
         printf 'FAIL %s: got %s, expected %s\n' "$name" "$got" "$expected"
+        print_guard_reason "$name"
     fi
 }
 # shell NAME DECISION COMMAND_JSON [WORKDIR].
@@ -987,10 +1005,14 @@ audit20_raw() {
     local name="$1" expected="$2" encoded="$3" got output
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf 'codex\t%s\tdecision\t%s\n' "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
     printf '%b' "$encoded" >"$TMP/audit20-envelope"
-    output="$("${GUARD_ARGS[@]}" <"$TMP/audit20-envelope")" || output=crash
+    if "${GUARD_ARGS[@]}" <"$TMP/audit20-envelope" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=crash
+    fi
     got=deny
     if [[ "$expected" == allow && -z "$output" ]]; then got=allow
-    elif ! printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=invalid
+    elif [[ "$output" == crash ]] || ! jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=invalid
     fi
     if [[ "$got" == "$expected" ]]; then
         PASSED=$((PASSED + 1))
@@ -998,6 +1020,7 @@ audit20_raw() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s\n' "$name" "$got" "$expected"
+        print_guard_reason "$name"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tfail\n' "$name" >>"$SECRET_TEST_RESULTS"
     fi
 }
@@ -1691,14 +1714,19 @@ audit22_large() {
     if [[ -n "${SECRET_TEST_FILTER:-}" && audit22_n14_oversized != $SECRET_TEST_FILTER ]]; then return 0; fi
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\taudit22_n14_oversized\tdecision\tdeny\n' codex >>"$SECRET_TEST_INVENTORY"
     perl -e 'print qq({"tool_name":"Bash","cwd":"/synthetic","tool_input":{"command":"echo ), "x" x (16 * 1024 * 1024), qq("}})' >"$TMP/audit22-large"
-    output="$(perl -e 'alarm 3; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit22-large")" || output=invalid
-    if ! printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=invalid; fi
+    if perl -e 'alarm 3; exec @ARGV' "${GUARD_ARGS[@]}" <"$TMP/audit22-large" >"$TMP/audit22_n14_oversized.out"; then
+        output="$(cat "$TMP/audit22_n14_oversized.out")"
+    else
+        output=invalid
+    fi
+    if [[ "$output" == invalid ]] || ! jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/audit22_n14_oversized.out" >/dev/null 2>&1; then got=invalid; fi
     if [[ "$got" == deny ]]; then
         PASSED=$((PASSED + 1))
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\taudit22_n14_oversized\tpass\n' codex >>"$SECRET_TEST_RESULTS"
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL audit22_n14_oversized: got %s, expected explicit denial within deadline\n' "$got"
+        print_guard_reason audit22_n14_oversized
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\taudit22_n14_oversized\tfail\n' codex >>"$SECRET_TEST_RESULTS"
     fi
 }
@@ -1714,10 +1742,14 @@ audit23_envelope() {
     # shellcheck disable=SC2053  # same focused filter as ordinary cases
     if [[ -n "${SECRET_TEST_FILTER:-}" && "$name" != $SECRET_TEST_FILTER ]]; then return 0; fi
     [[ -z "${SECRET_TEST_INVENTORY:-}" ]] || printf '%s\t%s\tdecision\t%s\n' codex "$name" "$expected" >>"$SECRET_TEST_INVENTORY"
-    output="$(perl -e 'alarm 4; exec @ARGV' "${guard_cmd[@]}" <"$TMP/audit23-envelope" 2>"$TMP/audit23-error")" || output=invalid
+    if perl -e 'alarm 4; exec @ARGV' "${guard_cmd[@]}" <"$TMP/audit23-envelope" 2>"$TMP/audit23-error" >"$TMP/$name.out"; then
+        output="$(cat "$TMP/$name.out")"
+    else
+        output=invalid
+    fi
     if [[ ! -s "$TMP/audit23-error" ]]; then
         if [[ -z "$output" ]]; then got=allow
-        elif printf '%s' "$output" | jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1; then got=deny
+        elif [[ "$output" != invalid ]] && jq -se 'length == 1 and .[0].hookSpecificOutput.permissionDecision == "deny"' "$TMP/$name.out" >/dev/null 2>&1; then got=deny
         fi
     fi
     if [[ "$got" == "$expected" ]]; then
@@ -1726,6 +1758,7 @@ audit23_envelope() {
     else
         FAILED=$((FAILED + 1))
         printf 'FAIL %s: got %s, expected %s within four seconds without stderr\n' "$name" "$got" "$expected"
+        print_guard_reason "$name"
         printf '%s\n' "$output"
         cat "$TMP/audit23-error"
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf '%s\t%s\tfail\n' codex "$name" >>"$SECRET_TEST_RESULTS"

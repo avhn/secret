@@ -33,6 +33,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
   publish it. No draft or release exists. The tag ruleset keeps this dead tag;
   never reuse, move or delete it. The owner-approved new release identity is
   **0.2.3**, with a new candidate/source/checksum cycle.
+- Run the default shell guard under each test suite's own Bash interpreter so
+  stock macOS Bash 3.2 CI also exercises the guard under 3.2. Guard suite failures
+  now print the permission decision reason, and empty stdin must exit successfully.
+
 - `tests/go-cli.sh` and `tests/go-hook.sh` now print the last 40 suite log lines (synthetic-
   value lines redacted) to stderr when a suite does not finish or divergences are unlisted.
 - Preserve physical symlink-parent traversal in Go Docker/Podman bind sources,
