@@ -67,6 +67,9 @@ func TestAudit27AssignmentSubstitutions(t *testing.T) {
 		`a+=("$(cat .env)")`,
 		`a=([0]="$(cat .env)")`,
 		`a=([$(cat .env)]=public)`,
+		// Even public substitution output is recursively evaluated in indices.
+		`a=([$(cat README.md)]=public)`,
+		`a[$(cat README.md)]=public`,
 		`a[$(cat .env)]=public`,
 		`a[$(cat .env)]+=public`,
 		`a=(<(cat .env))`,
@@ -83,8 +86,6 @@ func TestAudit27AssignmentSubstitutions(t *testing.T) {
 	}
 	for _, source := range []string{
 		`a=("$(cat README.md)")`,
-		`a=([$(cat README.md)]=public)`,
-		`a[$(cat README.md)]=public`,
 		`a=(<(cat README.md))`,
 		`a=('$(cat .env)' 'public')`,
 		`a=('` + "`cat .env`" + `')`,

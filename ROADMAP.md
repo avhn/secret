@@ -220,6 +220,11 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 - [x] Review 935ad4e: Docker/Podman bind-source and container-operand symlink-parent
   traversal in Go (pending CI). Synthetic reader aliases now deny; the frozen Bash
   guard retains this class (i) gap, not a class (ii) difference.
+
+- [ ] Bash-only: expansion-bearing arithmetic operands remain allowed in retained
+  guard contexts (integer declarations, array indices, slices, comparisons and
+  C-style for clauses); Go now denies expansions in every arithmetic context.
+
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads
 - [x] Audit 28: Go closes shared UV tool-runner directory/source options (pending CI)

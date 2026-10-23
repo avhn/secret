@@ -100,6 +100,14 @@ func (a *analyzer) walkExpansionSyntax(node syntax.Node, depth int, cwd string) 
 			}
 		}
 	case *syntax.Assign:
+		if n.Name != nil && a.integerVariables[n.Name.Value] {
+			if n.Value != nil {
+				a.reevaluatedArithmetic(n.Value)
+			}
+			if n.Array != nil {
+				a.reevaluatedArithmetic(n.Array)
+			}
+		}
 		if n.Index != nil {
 			a.reevaluatedArithmetic(n.Index)
 		} else if n.Name != nil && n.Value != nil && n.Array == nil {
@@ -112,6 +120,10 @@ func (a *analyzer) walkExpansionSyntax(node syntax.Node, depth int, cwd string) 
 				// Literal appends were already recorded before env was merged.
 				a.noteArithmeticAppend(n.Name.Value, value)
 			}
+		}
+	case *syntax.ArrayElem:
+		if n.Index != nil {
+			a.reevaluatedArithmetic(n.Index)
 		}
 	case *syntax.WordIter:
 		if n.Name != nil {
@@ -172,7 +184,7 @@ func (a *analyzer) walkExtglob(pattern *syntax.ExtGlob, depth int, cwd string) {
 var arithmeticIdentifier = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`)
 
 func activeArithmeticSyntax(value string) bool {
-	return strings.Contains(value, "$(") || strings.ContainsRune(value, '`') || strings.Contains(value, "${")
+	return strings.ContainsAny(value, "$`")
 }
 
 // A scalar expansion cannot borrow env's empty sentinel or the first loop item
@@ -239,10 +251,10 @@ func (a *analyzer) noteArithmeticAppend(name, suffix string) {
 	}
 }
 
-// Arithmetic recursively evaluates variable contents, unlike ordinary scalar
-// expansion. Do not certify stored shell syntax as inert arithmetic data. This
-// deliberately denies active re-evaluation rather than executing or evaluating
-// the stored expression, and follows bounded chains of literal variable names.
+// Arithmetic recursively evaluates expanded operands, including array subscripts
+// in the resulting text. No expansion's output can certify inert arithmetic, even
+// if its command or currently known value looks harmless. Deny those operands
+// without evaluation, and retain bounded checks of stored plain variable names.
 func (a *analyzer) reevaluatedArithmetic(node syntax.Node) {
 	seen := make(map[string]bool)
 	var active func(string, int) bool
@@ -282,14 +294,22 @@ func (a *analyzer) reevaluatedArithmetic(node syntax.Node) {
 			return false
 		}
 		switch n := node.(type) {
-		case *syntax.CmdSubst, *syntax.ProcSubst:
-			return false // A separate command context, visited by the normal walk.
+		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
+			a.reason = roles.Indeterminate
+		case *syntax.ParamExp:
+			// The parser also represents bare arr[0] as a parameter node,
+			// without a dollar position. Its literal subscript stays arithmetic.
+			if n.Dollar.IsValid() {
+				a.reason = roles.Indeterminate
+			}
 		case *syntax.Lit:
-			if active(n.Value, 0) {
+			if activeArithmeticSyntax(n.Value) || active(n.Value, 0) {
 				a.reason = roles.Indeterminate
 			}
 		case *syntax.SglQuoted:
-			if active(n.Value, 0) {
+			// let and integer declarations can preserve expansion spelling as
+			// quoted text until the arithmetic evaluation pass.
+			if activeArithmeticSyntax(n.Value) || active(n.Value, 0) {
 				a.reason = roles.Indeterminate
 			}
 		}
@@ -297,12 +317,30 @@ func (a *analyzer) reevaluatedArithmetic(node syntax.Node) {
 	})
 }
 
+// Retain possible integer attributes monotonically, like stored arithmetic
+// alternatives: a conditional declaration cannot be erased by another branch.
+func (a *analyzer) noteIntegerVariable(name string) {
+	if a.integerVariables == nil {
+		a.integerVariables = make(map[string]bool)
+	}
+	a.integerVariables[name] = true
+}
+
 // A quoted compound-assignment string is reinterpreted by array declarations.
 // Real array AST values retain their element quoting and are walked normally.
 func (a *analyzer) reevaluatedDeclaration(decl *syntax.DeclClause) {
 	array, integer := false, false
 	for _, assign := range decl.Args {
-		if assign.Array != nil || assign.Value == nil {
+		if integer && assign.Name != nil {
+			a.noteIntegerVariable(assign.Name.Value)
+		}
+		if assign.Array != nil {
+			if integer {
+				a.reevaluatedArithmetic(assign.Array)
+			}
+			continue
+		}
+		if assign.Value == nil {
 			continue
 		}
 		if assign.Name != nil && !array && !integer {
@@ -319,7 +357,15 @@ func (a *analyzer) reevaluatedDeclaration(decl *syntax.DeclClause) {
 				continue
 			}
 			if known {
-				_, value, _, known = declarationOperand(value)
+				if integer && declarationName.MatchString(value) {
+					a.noteIntegerVariable(value)
+					continue
+				}
+				var name string
+				name, value, _, known = declarationOperand(value)
+				if integer && known {
+					a.noteIntegerVariable(name)
+				}
 			}
 		}
 		if !known {
@@ -333,7 +379,13 @@ func (a *analyzer) reevaluatedDeclaration(decl *syntax.DeclClause) {
 				a.reason = roles.Indeterminate
 				return
 			}
-			a.reevaluatedArithmetic(assign.Value)
+			if integer {
+				a.reevaluatedArithmetic(assign.Value)
+			} else {
+				// Non-integer compound assignments reinterpret the normalized
+				// shell text, not the scalar expansion that supplied that text.
+				a.reevaluatedArithmetic(&syntax.Word{Parts: []syntax.WordPart{&syntax.Lit{Value: value}}})
+			}
 		}
 	}
 }

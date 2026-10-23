@@ -19,9 +19,10 @@ func TestAudit27ArithmeticTargets(t *testing.T) {
 		{`echo $((x--))`, false},
 		{`echo $((++a[0]))`, false},
 		{`echo $((a[0]++))`, false},
-		{`echo $(( ${x:-0} + 1 ))`, false},
-		{`echo $(( $(printf 1) + 2 ))`, false},
-		{`echo $((1 + $((2+3))))`, false},
+		// Expansion-bearing operands cannot certify recursive arithmetic.
+		{`echo $(( ${x:-0} + 1 ))`, true},
+		{`echo $(( $(printf 1) + 2 ))`, true},
+		{`echo $((1 + $((2+3))))`, true},
 		{`echo $(( $(cat .env) + 2 ))`, true},
 	} {
 		for _, source := range []string{tc.source, "bash -c " + shellLiteral(tc.source)} {

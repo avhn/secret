@@ -369,7 +369,7 @@ func (a *analyzer) literalChild(cwd string) *analyzer {
 		cwdPaths: a.cwdPaths, cwdPathCheck: a.cwdPathCheck,
 		configWrites: a.configWrites, configWriteCheck: a.configWriteCheck,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
-		arithmeticValues: maps.Clone(a.arithmeticValues),
+		arithmeticValues: maps.Clone(a.arithmeticValues), integerVariables: maps.Clone(a.integerVariables),
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
 }
 

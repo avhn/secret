@@ -118,6 +118,7 @@ type analyzer struct {
 	structuralUncertain bool
 	env                 map[string]string
 	arithmeticValues    map[string][]string
+	integerVariables    map[string]bool
 	gitRoots            []string
 	source              string
 	assignments         map[string]int
@@ -822,7 +823,6 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			a.patchInput, a.patchInputStart = prior, start
 		case *syntax.LetClause, *syntax.ArithmCmd:
 			a.walkNode(cmd, depth, cwd)
-			a.uncertain = true
 		default:
 			a.walkNode(cmd, depth, cwd)
 			a.uncertain = true

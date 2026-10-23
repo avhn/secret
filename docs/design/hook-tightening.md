@@ -12,6 +12,40 @@ execute Git, a shell interpreter, child commands, or provider value APIs while
 making a decision. It reads only the bounded metadata described below. Real-host
 failure tests, dialect evidence, and supported-platform CI remain separate gates.
 
+## Arithmetic expansion operands
+
+The Go arithmetic walker denies any expansion-bearing operand, including command
+substitutions, parameters, backquotes and nested arithmetic expansions. Bash can
+recursively evaluate the resulting text and expand array subscripts within it;
+classifying the apparent substitution command or its currently known scalar value
+cannot certify the arithmetic expression. The rule covers arithmetic expansions
+and commands, let, integer declarations (including integer array elements and
+later assignments to possibly integer variables), array assignment and parameter
+indices, substring offsets and lengths, numeric [[ ]] comparisons and all three
+C-style for clauses. Literal arithmetic and bare names
+retain their normal checks, including bounded inspection of stored expressions.
+Possible integer attributes are retained conservatively across branches and copied
+with child analysis state, so a later assignment cannot lose its arithmetic role.
+Array compound-assignment indices now use that same arithmetic walker. Ordinary
+non-integer array element values and scalar expansions remain data.
+
+Earlier Go controls that allowed numeric-producing substitutions, numeric-valued
+parameter expansions or public-reader substitutions in arithmetic now deny by
+this rule. Literal arithmetic commands no longer set generic command uncertainty:
+this preserves their allow decision through explicit bash -c argv, including
+`((i++))` and `let "i=1+2"`. The literal arithmetic function-body controls
+`audit28_t13_review_function_public` and `audit28_t13_review_function_public_argv`
+now match Bash's allow and no longer require divergence rows. Quoted or malformed
+arithmetic framing still denies.
+
+The retained Bash guard allows arithmetic expansions with variable or
+numeric-producing substitution operands. It also allows the synthetic printed
+subscript operands in integer declarations, assignment and parameter indices,
+slices, numeric comparisons and some C-style for clauses. This is a Bash-only
+coverage backlog, not a change to the shipped guard or an installed-host claim.
+The v0.2.2 comparison uses commit `68b2cf8` in a separate temporary worktree;
+all candidate commands are synthetic JSON data and are never executed.
+
 ## Interpreter metadata lifetime
 
 Interpreter literal children share their parent's bounded metadata snapshot,
@@ -148,7 +182,10 @@ never permit a Go allow where the shell suite requires deny.
 | Cases | Category | Reason |
 | --- | --- | --- |
 | `audit28_t13_compound_time_end_public` | deliberate-tightening | Go retains its conservative `time --` framing denial for an arithmetic command. |
-| `audit28_t13_review_function_public`, `audit28_t13_review_function_public_argv`, `audit28_t13_review_function_index_public`, `audit28_t13_review_function_index_public_argv` | deliberate-tightening | Go's parser/framing checks retain denial of arithmetic function bodies without name parentheses. Native Bash 4+ accepts these controls; Bash 3.2 does not. |
+| `audit28_t13_valid_nested_loop` | deliberate-tightening | A command substitution in the C-style loop initializer is an expansion-bearing arithmetic operand, even when it prints a number. |
+| `audit27_s16_nested_parameter`, `audit27_s16_nested_parameter_shell`, `audit27_s16_nested_command`, `audit27_s16_nested_command_shell`, `audit27_s16_nested_arithmetic`, `audit27_s16_nested_arithmetic_shell`, `audit27_s16_nested_parameter_command`, `audit27_s16_nested_parameter_command_shell` | deliberate-tightening | Nested parameter, command and arithmetic expansions cannot certify a literal arithmetic operand, including when their apparent result is numeric. |
+| `audit27_s16_legacy_nested`, `audit27_s16_legacy_nested_shell`, `audit27_s16_legacy_command`, `audit27_s16_legacy_command_shell` | deliberate-tightening | The same expansion-operand rule applies to legacy `$[ ]` arithmetic. |
+| `audit28_t13_review_function_index_public`, `audit28_t13_review_function_index_public_argv` | deliberate-tightening | Go retains denial of quoted arithmetic indices in function bodies. Native Bash 4+ accepts these controls; Bash 3.2 does not. |
 | `audit28_t13_review_quoted_number_public`, `audit28_t13_review_quoted_number_public_argv`, `audit28_t13_review_single_quoted_number_public`, `audit28_t13_review_single_quoted_number_public_argv` | deliberate-tightening | Quoted arithmetic operands remain indeterminate in Go, even when Bash command quote removal yields a valid constant expression. |
 | `audit28_t13_review_quoted_index_public`, `audit28_t13_review_quoted_index_public_argv`, `audit28_t13_review_quoted_loop_public`, `audit28_t13_review_quoted_loop_public_argv`, `audit28_t13_review_quoted_child_public`, `audit28_t13_review_quoted_child_public_argv` | deliberate-tightening | Go retains conservative quote rejection in arithmetic indices, loop clauses and substitution operands. Bash validates bounded quote-removed command operands without evaluating them. |
 

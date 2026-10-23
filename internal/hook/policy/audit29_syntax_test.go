@@ -97,9 +97,13 @@ func TestAudit29ReevaluatedAssignments(t *testing.T) {
 			}
 		}
 	}
+	// Even a currently numeric scalar expansion is not a literal operand.
+	if reason := Analyze(`x='1 + 2'; echo $(($x))`, work, home, check); reason == "" {
+		t.Error("allowed expanded arithmetic operand")
+	}
 	for _, source := range []string{
 		`x='a[$(cat .env)]'; echo "$x"`, `x='a[$(cat .env)]'; echo $((1 + 2))`,
-		`x=1; echo $((x + 1))`, `x='1 + 2'; echo $(($x))`,
+		`x=1; echo $((x + 1))`, `x='1 + 2'; echo $((x))`,
 		"a=('$(cat .env)' '`cat .env`')", `declare -a a=('$(cat .env)')`,
 		`f() { local -a x='(public data)'; }; f`, `[[ public == public ]]`,
 	} {

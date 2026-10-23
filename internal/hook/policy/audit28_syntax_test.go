@@ -24,6 +24,7 @@ func TestAudit28QuotedParameterSubstitutions(t *testing.T) {
 	denied = append(denied,
 		`x="${y:-'$(cat .env)'}"`,
 		`echo "${x['$(cat .env)']}"`,
+		`echo "${x['$(cat README.md)']}"`,
 		`echo "${x['`+"`cat .env`"+`']}"`,
 		`echo "${x:-'${y:-$(cat .env)}'}"`,
 		`echo "${x:-'$(echo public; else echo public)'}"`,
@@ -46,7 +47,6 @@ func TestAudit28QuotedParameterSubstitutions(t *testing.T) {
 		`echo "$(echo '$(cat .env)')"`,
 		`echo "${x:-$(echo '$(cat .env)')}"`,
 		`echo "${x:-'public'}"`,
-		`echo "${x['$(cat README.md)']}"`,
 		`echo "${x:-'` + "`cat README.md`" + `'}"`,
 	} {
 		if reason := Analyze(source, work, home, check); reason != "" {
@@ -83,6 +83,8 @@ func TestAudit28QuotedArithmetic(t *testing.T) {
 		`echo ${x:'1'}`,
 		`(( '1' ))`,
 		`for (( i='0'; i<1; i++ )); do true; done`,
+		// Expansion outputs are recursively evaluated, even numeric-looking ones.
+		`echo $(( $(printf '%s' 1) + 2 ))`,
 	} {
 		for _, wrapped := range []string{source, "bash -c " + shellLiteral(source)} {
 			if reason := Analyze(wrapped, work, home, check); reason == "" {
@@ -94,7 +96,6 @@ func TestAudit28QuotedArithmetic(t *testing.T) {
 		`echo $(( 1 + 2 ))`, `echo $[ 1 + 2 ]`, `echo ${x:1:2}`,
 		`echo $(( x[1] + 1 ))`, `(( x = 1 ))`,
 		`for (( i=0; i<1; i++ )); do true; done`,
-		`echo $(( $(printf '%s' 1) + 2 ))`,
 		`echo '$(( '\''$(cat .env)'\'' ))'`,
 	} {
 		if reason := Analyze(source, work, home, check); reason != "" {
@@ -124,11 +125,12 @@ func audit28ArithmeticParameterCases() []struct {
 		{"backticks", "echo $(( ${x:-'`cat .env`'} ))", true},
 		{"redirect_substitution", `echo $(( ${x:-'$(< .env)'} ))`, true},
 		{"double_quotes", `echo $(( ${x:-"$(cat .env)"} ))`, true},
-		{"unquoted_default", `echo $(( ${x:-1} + 2 ))`, false},
-		{"unquoted_replacement", `echo $(( ${x/a/1} ))`, false},
-		{"unquoted_offset", `echo ${a:${x:-1}}`, false},
-		{"command_quoting", `echo $(( $(printf '%s' 1) + 2 ))`, false},
-		{"default_command_quoting", `echo $(( ${x:-$(printf '%s' 1)} ))`, false},
+		// All expansions deny in arithmetic, independent of their apparent value.
+		{"unquoted_default", `echo $(( ${x:-1} + 2 ))`, true},
+		{"unquoted_replacement", `echo $(( ${x/a/1} ))`, true},
+		{"unquoted_offset", `echo ${a:${x:-1}}`, true},
+		{"command_quoting", `echo $(( $(printf '%s' 1) + 2 ))`, true},
+		{"default_command_quoting", `echo $(( ${x:-$(printf '%s' 1)} ))`, true},
 		{"non_arithmetic_default", `echo ${x:-'$(cat .env)'}`, false},
 	}
 }

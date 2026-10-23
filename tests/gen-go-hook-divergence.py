@@ -29,9 +29,16 @@ ENVELOPE_TIGHTENING = {"audit23_o8_workdir_newline", "audit23_o8_cwd_newline"}
 # These exact public controls are stricter than Bash, never exceptions for allows.
 AUDIT28_TIGHTENING = {"audit28_t13_compound_time_end_public"} | {
     "audit28_t13_review_" + name + "_public" + suffix
-    for name in ("function", "function_index", "quoted_number", "single_quoted_number",
+    for name in ("function_index", "quoted_number", "single_quoted_number",
                  "quoted_index", "quoted_loop", "quoted_child")
     for suffix in ("", "_argv")
+}
+# Expansion-bearing arithmetic operands deny even when their output looks numeric.
+ARITHMETIC_TIGHTENING = {"audit28_t13_valid_nested_loop"} | {
+    "audit27_s16_" + name + suffix
+    for name in ("nested_parameter", "nested_command", "nested_arithmetic",
+                 "nested_parameter_command", "legacy_nested", "legacy_command")
+    for suffix in ("", "_shell")
 }
 # Exact harmless controls retained by Bash, reviewed in hook-tightening.md.
 # These are not protected-read, malformed-shell or budget exceptions.
@@ -70,7 +77,7 @@ def suite_rows(suite, binary, host, tmp):
                 category = "deliberate-find-shim"
             elif expected[key] == "deny" and key in AUDIT29_BASH_OVER_DENIAL:
                 category = "reviewed-bash-over-denial"
-            elif expected[key] == "allow" and (key in ENVELOPE_TIGHTENING or key in AUDIT28_TIGHTENING or key in AUDIT29_TIGHTENING or
+            elif expected[key] == "allow" and (key in ENVELOPE_TIGHTENING or key in AUDIT28_TIGHTENING or key in AUDIT29_TIGHTENING or key in ARITHMETIC_TIGHTENING or
                                                 (suite == "guard" and key in TIGHTENING) or
                                                 (suite == "codex" and key in CODEX_TIGHTENING)):
                 category = "deliberate-tightening"
