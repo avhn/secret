@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild a dead release and exercise new logic against its public provenance.
 
-Only disposable copies receive the 0.2.2 -> 0.2.1 identity substitution. Production
+Only disposable copies receive the 0.2.3 -> 0.2.2 identity substitution. Production
 entry points have no tag override and the dead tag is never created or moved.
 Run with Python -I and TMPDIR set to a private scratch directory.
 """
@@ -15,8 +15,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-TAG = "v0.2.1"
-FINAL = "229ee0ef5a229920f2bbe52f01adce1f7e0ae17c"
+TAG = "v0.2.2"
+FINAL = "68b2cf8c5e9196f4d79afc032ea95b535751971d"
 MANIFEST = "checksums-" + TAG + ".txt"
 
 
@@ -57,11 +57,11 @@ def rehearse(scratch):
         # Build BEFORE replacing scripts, using precisely the dead tag's inputs.
         run("sh", worktree / "scripts/build-release.sh", assets, env=env)
         assert (assets / MANIFEST).read_bytes() == (worktree / "dist" / MANIFEST).read_bytes()
-        print("PASS: rebuilt all four assets match the committed v0.2.1 manifest", flush=True)
+        print("PASS: rebuilt all four assets match the committed v0.2.2 manifest", flush=True)
         for name in ("verify-release.sh", "install-release.sh"):
             source = (ROOT / "scripts" / name).read_text()
-            assert "0.2.2" in source
-            (worktree / "scripts" / name).write_text(source.replace("0.2.2", "0.2.1"))
+            assert "0.2.3" in source
+            (worktree / "scripts" / name).write_text(source.replace("0.2.3", "0.2.2"))
         verify = worktree / "scripts/verify-release.sh"
         install = worktree / "scripts/install-release.sh"
         run("sh", verify, assets, FINAL, env=env)
@@ -120,7 +120,7 @@ def rehearse(scratch):
                    "--cert-identity", "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/" + TAG,
                    "--deny-self-hosted-runners", "--format", "json"]
         for flag, value in (("--source-digest", source),
-                            ("--source-ref", "refs/tags/v0.2.2")):
+                            ("--source-ref", "refs/tags/v0.2.3")):
             wrong = command.copy()
             wrong[wrong.index(flag) + 1] = value
             run(*wrong, env=env, deny=True)

@@ -32,7 +32,7 @@ The installed CLI and Claude/Codex hooks remain Bash until M4.1. M4 adds opt-in
 verified Go launchers without activating them. See [installation and rollback](docs/install.md)
 for checkout/release pins, platform evidence, dependencies, offline preinstallation
 and failure recovery, and [the release procedure](docs/release.md) for approval gates.
-The v0.2.2 release is in progress, not yet published.
+The v0.2.3 release is in progress, not yet published.
 
 Requirements: bash 3.2 or newer (stock macOS bash works), perl, and jq for the
 guard.

@@ -317,12 +317,12 @@ Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](htt
 
 ## M4: Releasable Linux/macOS core
 
-Status: in progress (replacement v0.2.2 identity approved; new candidates, source S and checksum C required; tag, draft and publication each need separate owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
+Status: in progress (replacement v0.2.3 identity approved; new candidates, source S and checksum C required; tag, draft and publication each need separate owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
 
-- [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.2)
+- [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.3)
 - [x] build(release): add deterministic artifacts and final-tag attestation workflow (cbf8bc6)
-- [x] fix(release): restore annotated runner tags for v0.2.2 and upload portable draft bundle names (pending CI)
-- [x] fix(release): use compatible exact-SAN verification and add read-only real-provenance rehearsal for v0.2.2 (pending hosted CI)
+- [x] fix(release): restore annotated runner tags for v0.2.3 and upload portable draft bundle names (pending CI)
+- [x] fix(release): use compatible exact-SAN verification and add read-only real-provenance rehearsal for v0.2.3 (pending hosted CI)
 - [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (c66f127)
 - [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (0bdf573)
 - [x] test(host): build deferred real-host harness and offline synthetic classification (84bc6cc)
@@ -345,8 +345,17 @@ deleted.
 `release-verify` after successful builds, byte reproduction and attestation:
 gh rejects `--signer-workflow` together with `--cert-identity`. The installer
 had the same conflict. This is another dead, protected tag, never to be reused,
-moved or deleted. The owner-approved new release identity is **0.2.2**, with a
-new candidate/source/checksum cycle.
+moved or deleted. The owner-approved replacement identity was **0.2.2**.
+
+`v0.2.2` was tagged at C `68b2cf8` (full C
+`68b2cf8c5e9196f4d79afc032ea95b535751971d`, source S `3001f3c`). Its
+[tag workflow (run 39876942544)](https://github.com/avhn/secret/actions/runs/39876942544)
+passed every job through `release-verify`, but the owner retired the identity
+before approving `release-publish`: a staged Go hook gap involving expansion
+operands in arithmetic contexts, fixed by a later PR, led the owner not to
+publish it. No draft or release exists. The tag ruleset keeps this dead tag;
+never reuse, move or delete it. The owner-approved new release identity is
+**0.2.3**, with a new candidate/source/checksum cycle.
 
 ## M4.1: Host evidence and Claude cutover
 
@@ -354,7 +363,7 @@ Status: planned, blocked on sponsorship for model usage. Goal: prove real host f
 
 - [ ] test(host): enable sponsored protected host sessions and record Linux/macOS Claude failure evidence
 - [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
-- [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.2 and add Claude onFailure block
+- [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.3 and add Claude onFailure block
 - [ ] feat(hook): switch hooks/hooks.json to guard-go after host evidence
 - [ ] feat(cli): stage bin/secret as the verified launcher with byte-identical executable compat/secret
 - [ ] fix(hook): adopt host-tested neutral output and output-failure contract in internal/hook

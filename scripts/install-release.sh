@@ -5,8 +5,8 @@ set -f
 umask 077
 LC_ALL=C
 export LC_ALL
-version=0.2.2
-tag=v0.2.2
+version=0.2.3
+tag=v0.2.3
 scratch=
 locked=no
 
@@ -113,8 +113,8 @@ safe_chain "$manifest" && bounded_file "$manifest" 1024 || fail 1
 [ "$(wc -l <"$manifest")" -eq 4 ] || fail 1
 awk '
 BEGIN {
-    name[1]="secret-v0.2.2-darwin-amd64"; name[2]="secret-v0.2.2-darwin-arm64"
-    name[3]="secret-v0.2.2-linux-amd64"; name[4]="secret-v0.2.2-linux-arm64"
+    name[1]="secret-v0.2.3-darwin-amd64"; name[2]="secret-v0.2.3-darwin-arm64"
+    name[3]="secret-v0.2.3-linux-amd64"; name[4]="secret-v0.2.3-linux-arm64"
 }
 NR > 4 { exit 1 }
 { if (length(substr($0,1,64)) != 64 || substr($0,1,64) ~ /[^0-9a-f]/ ||

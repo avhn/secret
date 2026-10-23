@@ -63,10 +63,10 @@ def transport(name, args):
             return 0
         if args[:2] == ["attestation", "verify"]:
             required = {"--repo": "avhn/secret",
-                        "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.2",
+                        "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.3",
                         "--signer-digest": "1" * 40,
                         "--source-digest": "1" * 40,
-                        "--source-ref": "refs/tags/v0.2.2",
+                        "--source-ref": "refs/tags/v0.2.3",
                         "--cert-oidc-issuer": "https://token.actions.githubusercontent.com"}
             for flag, value in required.items():
                 if flag not in args or args[args.index(flag) + 1] != value:
@@ -84,7 +84,7 @@ def transport(name, args):
     if name == "git":
         # Pin only the disposable negative-test checkout. This is deliberately
         # not evidence of final C/tag authentication.
-        if args[-3:] == ["cat-file", "-t", "refs/tags/v0.2.2"]:
+        if args[-3:] == ["cat-file", "-t", "refs/tags/v0.2.3"]:
             if config["mode"] == "missing-tag":
                 return 1
             print("commit" if config["mode"] == "lightweight-tag" else "tag")
@@ -92,10 +92,10 @@ def transport(name, args):
         if args[-3:] == ["rev-parse", "--verify", "HEAD"]:
             print("1" * 40)
             return 0
-        if args[-3:] == ["rev-parse", "--verify", "refs/tags/v0.2.2^{commit}"]:
+        if args[-3:] == ["rev-parse", "--verify", "refs/tags/v0.2.3^{commit}"]:
             print(("2" if config["mode"] == "wrong-tag-target" else "1") * 40)
             return 0
-        if args[-2:] == ["show", "HEAD:dist/checksums-v0.2.2.txt"]:
+        if args[-2:] == ["show", "HEAD:dist/checksums-v0.2.3.txt"]:
             sys.stdout.write(Path(config["manifest"]).read_text())
             return 0
         return subprocess.call([config["git"], *args])
@@ -114,7 +114,7 @@ def transport(name, args):
             if "--proto-redir" not in args or "--max-redirs" not in args:
                 return 96
         url = next((arg for arg in args if arg.startswith("https://")), "")
-        prefix = "https://github.com/avhn/secret/releases/download/v0.2.2/"
+        prefix = "https://github.com/avhn/secret/releases/download/v0.2.3/"
         if not url.startswith(prefix) or url[len(prefix):] not in ASSETS:
             return 96
         output = None
@@ -449,7 +449,7 @@ class InstallTests(unittest.TestCase):
         for launcher in (absolute, relative):
             with self.subTest(launcher=launcher.name):
                 version = self.command([launcher, "version"])
-                self.assertEqual(version.stdout, b"secret 0.2.2 (go)\n")
+                self.assertEqual(version.stdout, b"secret 0.2.3 (go)\n")
                 shown = self.command([launcher, "show", self.store])
                 self.assertIn(b"PLUGIN_TOKEN=<", shown.stdout)
                 witness = self.root / "child.witness"
@@ -505,7 +505,7 @@ class InstallTests(unittest.TestCase):
             "single-space": self.expected_manifest.replace("  ", " ", 1),
             "crlf": self.expected_manifest.replace("\n", "\r\n"),
             "no-final-lf": self.expected_manifest.rstrip("\n"),
-            "wrong-version": self.expected_manifest.replace("v0.2.2", "v0.2.3"),
+            "wrong-version": self.expected_manifest.replace("v0.2.3", "v0.2.4"),
         }
         for name, contents in variants.items():
             with self.subTest(malformed=name):
@@ -545,7 +545,7 @@ class InstallTests(unittest.TestCase):
         other_asset = next(name for name in ASSETS if name != self.asset)
         native = self.assets / self.asset
         original = native.read_bytes()
-        wrong_version = original.replace(b"0.2.2", b"0.2.3")
+        wrong_version = original.replace(b"0.2.3", b"0.2.4")
         self.assertNotEqual(original, wrong_version, "release version not found in native asset")
         for label, contents in (("architecture", (self.assets / other_asset).read_bytes()),
                                 ("version", wrong_version)):
@@ -723,16 +723,16 @@ class PublishedTests(unittest.TestCase):
                 env["GH_TOKEN"] = os.environ["GH_TOKEN"]
             # The checkout must already be the authenticated final C, not S.
             self.assertFalse((CHECKOUT / ".secret-release-test-fixture").exists())
-            self.assertTrue((CHECKOUT / "dist/checksums-v0.2.2.txt").is_file())
+            self.assertTrue((CHECKOUT / "dist/checksums-v0.2.3.txt").is_file())
 
             def git(*args):
                 return subprocess.check_output(["git", "-C", str(CHECKOUT), *args],
                                                cwd=other, env=env, stderr=subprocess.DEVNULL).strip()
 
             self.assertEqual(git("rev-parse", "--is-shallow-repository"), b"false")
-            self.assertEqual(git("cat-file", "-t", "refs/tags/v0.2.2"), b"tag")
+            self.assertEqual(git("cat-file", "-t", "refs/tags/v0.2.3"), b"tag")
             commit = git("rev-parse", "HEAD")
-            self.assertEqual(commit, git("rev-parse", "refs/tags/v0.2.2^{commit}"))
+            self.assertEqual(commit, git("rev-parse", "refs/tags/v0.2.3^{commit}"))
             installer = CHECKOUT / "scripts/install-release.sh"
 
             def command(arguments, expected=0, environment=None, input=None):
@@ -746,7 +746,7 @@ class PublishedTests(unittest.TestCase):
 
             command([CHECKOUT / "scripts/verify-release.sh", "--source"])
             command([installer])
-            cache = home / ".cache/secret/v0.2.2"
+            cache = home / ".cache/secret/v0.2.3"
             binary = cache / "secret"
             metadata = cache / "verified"
             fields = dict(line.split("=", 1) for line in metadata.read_text().splitlines())
@@ -819,7 +819,7 @@ class PublishedTests(unittest.TestCase):
                     self.assertEqual(path.stat().st_uid, os.getuid())
                 self.assertFalse(Path(str(cache) + ".lock").exists())
                 result = command([CHECKOUT / "bin/secret-go", "version"], environment=offline)
-                self.assertEqual(result.stdout, b"secret 0.2.2 (go)\n")
+                self.assertEqual(result.stdout, b"secret 0.2.3 (go)\n")
                 binary.chmod(0o700)
                 binary.write_bytes(b"#!/bin/sh\nexit 0\n")
                 binary.chmod(0o500)

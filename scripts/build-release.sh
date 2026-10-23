@@ -37,18 +37,18 @@ go mod verify
 for os in darwin linux; do
     for arch in amd64 arm64; do
         GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false \
-            -ldflags='-buildid= -s -w -X main.version=0.2.2' \
-            -o "$out/secret-v0.2.2-$os-$arch" ./cmd/secret
+            -ldflags='-buildid= -s -w -X main.version=0.2.3' \
+            -o "$out/secret-v0.2.3-$os-$arch" ./cmd/secret
     done
 done
 git diff --exit-code -- go.mod go.sum
 cd "$out"
 if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum secret-v0.2.2-darwin-amd64 secret-v0.2.2-darwin-arm64 \
-        secret-v0.2.2-linux-amd64 secret-v0.2.2-linux-arm64 >checksums-v0.2.2.txt
+    sha256sum secret-v0.2.3-darwin-amd64 secret-v0.2.3-darwin-arm64 \
+        secret-v0.2.3-linux-amd64 secret-v0.2.3-linux-arm64 >checksums-v0.2.3.txt
 elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 secret-v0.2.2-darwin-amd64 secret-v0.2.2-darwin-arm64 \
-        secret-v0.2.2-linux-amd64 secret-v0.2.2-linux-arm64 >checksums-v0.2.2.txt
+    shasum -a 256 secret-v0.2.3-darwin-amd64 secret-v0.2.3-darwin-arm64 \
+        secret-v0.2.3-linux-amd64 secret-v0.2.3-linux-arm64 >checksums-v0.2.3.txt
 else
     echo 'secret: missing SHA-256 utility' >&2
     exit 1

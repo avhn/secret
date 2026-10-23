@@ -157,7 +157,7 @@ func TestDoctorArtifactChecksumAndAliases(t *testing.T) {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256([]byte("synthetic public artifact"))
-	cache := filepath.Join(root, ".cache", "secret", "v0.2.2")
+	cache := filepath.Join(root, ".cache", "secret", "v0.2.3")
 	if err := os.MkdirAll(cache, 0700); err != nil {
 		t.Fatal(err)
 	}
