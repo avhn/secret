@@ -100,12 +100,18 @@ func (a *analyzer) walkExpansionSyntax(node syntax.Node, depth int, cwd string) 
 			}
 		}
 	case *syntax.Assign:
-		if n.Name != nil && a.integerVariables[n.Name.Value] {
+		if n.Name != nil && a.possibleInteger(n.Name.Value) {
 			if n.Value != nil {
 				a.reevaluatedArithmetic(n.Value)
 			}
 			if n.Array != nil {
 				a.reevaluatedArithmetic(n.Array)
+			}
+		}
+		if n.Name != nil {
+			if _, reference := a.arithmeticRefs[n.Name.Value]; reference {
+				a.arithmeticReferenceBinding(n.Name.Value)
+				a.invalidateArithmeticWrite(n.Name.Value)
 			}
 		}
 		if n.Index != nil {
@@ -128,9 +134,16 @@ func (a *analyzer) walkExpansionSyntax(node syntax.Node, depth int, cwd string) 
 	case *syntax.WordIter:
 		if n.Name != nil {
 			if len(n.Items) == 0 {
-				a.noteArithmeticUnknown(n.Name.Value)
+				a.arithmeticWriteUnknown(n.Name.Value)
 			}
 			for _, item := range n.Items {
+				if a.possibleInteger(n.Name.Value) {
+					a.reevaluatedArithmetic(item)
+				}
+				if _, reference := a.arithmeticRefs[n.Name.Value]; reference {
+					a.arithmeticReferenceBinding(n.Name.Value)
+					a.invalidateArithmeticWrite(n.Name.Value)
+				}
 				value, known := a.arithmeticWordValue(item)
 				if !known {
 					a.noteArithmeticUnknown(n.Name.Value)
@@ -263,6 +276,9 @@ func (a *analyzer) reevaluatedArithmetic(node syntax.Node) {
 			return true
 		}
 		for _, name := range arithmeticIdentifier.FindAllString(value, -1) {
+			if a.arithmeticOpaque {
+				return true
+			}
 			if seen[name] {
 				continue
 			}
@@ -365,6 +381,23 @@ func (a *analyzer) reevaluatedDeclaration(decl *syntax.DeclClause) {
 				name, value, _, known = declarationOperand(value)
 				if integer && known {
 					a.noteIntegerVariable(name)
+				}
+				if known {
+					if declarationExpansion(assign.Value) {
+						a.arithmeticWriteUnknown(name)
+					} else {
+						a.noteArithmeticValue(name, value)
+					}
+				}
+			}
+			if !known && declarationExpansion(assign.Value) {
+				if name, _, _, operand := declarationOperand(declarationPrefix(assign.Value.Parts)); operand {
+					a.arithmeticWriteUnknown(name)
+				} else {
+					// The unresolved word may select -i and supply assignments.
+					// No absent option or binding can be used as an allow proof.
+					a.arithmeticOpaque = true
+					a.reason = roles.Indeterminate
 				}
 			}
 		}

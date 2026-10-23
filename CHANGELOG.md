@@ -6,8 +6,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Staged Go hook: deny expansion-bearing operands in arithmetic evaluation contexts
   (arithmetic expansion and commands, `let`, integer declarations and assignments, array
-  indices) and allow literal arithmetic controls in explicit-shell argv again. The frozen
-  Bash guard is unchanged.
+  indices), including implicit integer binds through loops, shell writers and namerefs.
+  Unknown writer results cannot certify later bare arithmetic identifiers; unresolved
+  declaration options deny. Literal arithmetic controls remain allowed in explicit-shell
+  argv. The frozen Bash guard is unchanged.
 
 - `tests/go-cli.sh` and `tests/go-hook.sh` now print the last 40 suite log lines (synthetic-
   value lines redacted) to stderr when a suite does not finish or divergences are unlisted.

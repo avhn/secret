@@ -87,9 +87,11 @@ func (a *analyzer) declarationWords(words []*syntax.Word, depth int, cwd string)
 			}
 			if value == "" {
 				a.hookAssignment(key, "", depth, cwd)
+				a.arithmeticWriteUnknown(key)
 			}
 		} else if value == "" && declarationExpansion(word) {
 			a.indirect = true // Expanded names remain indirect even if currently static.
+			a.arithmeticOpaque = true
 		}
 	}
 	return cwd

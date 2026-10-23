@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Keep reviewed path tightenings directional and exact using synthetic rows."""
+"""Keep reviewed hook tightenings directional and exact using synthetic rows."""
 import importlib.util
+import json
 import pathlib
 import subprocess
 import sys
@@ -28,6 +29,30 @@ class EnvelopeTighteningTests(unittest.TestCase):
             result = mock.Mock(stdout="0 passed, 1 failed\n")
             with mock.patch.object(divergence, "ROOT", root), mock.patch.object(divergence.subprocess, "run", return_value=result):
                 return divergence.suite_rows(suite, "/synthetic/secret", "claude" if suite == "guard" else "codex", root)
+
+    def test_arithmetic_writer_corpus_is_directional(self):
+        for expected, go, bash, error in [
+            (True, "deny", "allow", None),
+            (True, "allow", "allow", "unexpected Go outcome"),
+            (False, "allow", "deny", "Go-looser outcome"),
+            (False, "allow", "allow", None),
+        ]:
+            with self.subTest(expected=expected, go=go, bash=bash), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                fixture = root / "testdata/hook/arithmetic-writers.json"
+                fixture.parent.mkdir(parents=True)
+                fixture.write_text(json.dumps({"fixtures": [], "cases": [
+                    {"name": "read", "tool": "Bash", "cwd": directory,
+                     "fields": {"command": "synthetic"}, "deny": expected}
+                ]}))
+                with mock.patch.object(divergence, "ROOT", root), mock.patch.object(divergence, "decision", side_effect=[go, bash]):
+                    if error:
+                        with self.assertRaisesRegex(ValueError, error):
+                            divergence.audit19_rows("/synthetic/secret", root, "arithmetic-writers")
+                    else:
+                        rows = divergence.audit19_rows("/synthetic/secret", root, "arithmetic-writers")
+                        want = [("audit", "arithmetic-writers_read", "deliberate-tightening")] if go != bash else []
+                        self.assertEqual(rows, want)
 
     def test_retained_newline_path_tightenings(self):
         for suite in ["guard", "codex"]:

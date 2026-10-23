@@ -370,6 +370,7 @@ func (a *analyzer) literalChild(cwd string) *analyzer {
 		configWrites: a.configWrites, configWriteCheck: a.configWriteCheck,
 		credentialConfigs: slices.Clone(a.credentialConfigs), env: maps.Clone(a.env),
 		arithmeticValues: maps.Clone(a.arithmeticValues), integerVariables: maps.Clone(a.integerVariables),
+		arithmeticRefs: maps.Clone(a.arithmeticRefs), arithmeticOpaque: a.arithmeticOpaque,
 		interpreterNames: a.interpreterNames, literalDepth: a.literalDepth + 1}
 }
 

@@ -130,12 +130,12 @@ def audit_rows(binary, tmp):
     return rows
 
 
-def audit19_rows(binary, tmp):
-    """Check mixed audit 19 outcomes and reject every Go-looser decision."""
-    text = (ROOT / "testdata/hook/audit19.json").read_text()
+def audit19_rows(binary, tmp, name="audit19"):
+    """Check mixed synthetic outcomes and reject every Go-looser decision."""
+    text = (ROOT / "testdata/hook" / f"{name}.json").read_text()
     corpus = json.loads(text.replace("@TMP@", tmp.as_posix()))
-    for name, kind, value in corpus["fixtures"]:
-        target = tmp / name
+    for filename, kind, value in corpus["fixtures"]:
+        target = tmp / filename
         target.parent.mkdir(parents=True, exist_ok=True)
         if kind == "dir":
             target.mkdir(exist_ok=True)
@@ -154,12 +154,12 @@ def audit19_rows(binary, tmp):
         bash = decision([str(ROOT / "hooks/guard-secrets")], payload, env)
         expected = "deny" if row["deny"] else "allow"
         if go != expected:
-            raise ValueError(f"audit19 unexpected Go outcome: {row['name']}")
+            raise ValueError(f"{name} unexpected Go outcome: {row['name']}")
         if go == "allow" and bash == "deny":
-            raise ValueError(f"audit19 Go-looser outcome: {row['name']}")
+            raise ValueError(f"{name} Go-looser outcome: {row['name']}")
         if go != bash:
-            rows.append(("audit", "audit19_" + row["name"], "deliberate-tightening"))
-    print(f"audit19: {len(corpus['cases'])} expected Go outcomes, {len(rows)} stricter than Bash")
+            rows.append(("audit", name + "_" + row["name"], "deliberate-tightening"))
+    print(f"{name}: {len(corpus['cases'])} expected Go outcomes, {len(rows)} stricter than Bash")
     return rows
 
 
@@ -195,6 +195,7 @@ def main():
         rows += audit_rows(sys.argv[1], tmp / "audit")
         rows += audit19_rows(sys.argv[1], tmp / "audit19")
         rows += m21_u2_u3_rows(sys.argv[1], tmp / "m21-u2-u3")
+        rows += audit19_rows(sys.argv[1], tmp / "arithmetic-writers", "arithmetic-writers")
     table = (ROOT / "docs/design/hook-tightening.md").read_text()
     missing = [f"{suite}/{name}" for suite, name, _ in rows if f"`{name}`" not in table]
     if missing:

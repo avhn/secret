@@ -46,6 +46,81 @@ coverage backlog, not a change to the shipped guard or an installed-host claim.
 The v0.2.2 comparison uses commit `68b2cf8` in a separate temporary worktree;
 all candidate commands are synthetic JSON data and are never executed.
 
+### Arithmetic writer bindings
+
+Integer attributes also apply to for-loop items, read, mapfile/readarray,
+printf -v, getopts and writes through namerefs. These binds reach the shared
+arithmetic rule before an uncertain value can be accepted. Literal loop items
+remain certifiable; unmodelled builtin results are indeterminate for possible
+integer targets, even when the supplied format or input looks numeric.
+
+For ordinary variables, these writers invalidate the target's arithmetic value
+and stale scalar/loop proofs without denying ordinary data use. Default REPLY
+and MAPFILE targets, builtin option arities and printf's format boundary are
+retained. Unknown target names invalidate bare-identifier arithmetic proofs,
+not numeric-only expressions. Expanded declaration operands retain identifiable
+target prefixes; unresolved declaration options deny because they can enable -i
+and supply assignments. This does not depend on generic arithmetic-command
+uncertainty. Literal controls such as i=0; ((i++)) remain allowed.
+
+Nameref targets retain bounded alternatives and possible integer attributes,
+including integer declarations reached after the reference definition. Bind-time
+subscripts use the arithmetic rule. Unresolved references and untracked binds
+invalidate arithmetic proofs instead of borrowing a prior literal value. Child
+analyses copy the reference and unknown-binding state; alternatives are retained
+conservatively across branches, rather than cleared by later writes.
+
+Independent runtime witnesses on Bash 5.3.9 used disposable HOME/work roots and
+an explicitly synthetic .env file. All nine tested binding families opened that
+fixture both on integer binds and during later bare-identifier arithmetic.
+The read-array witness preserves the whole field with empty IFS. Separate
+expanded declare/export/local witnesses also opened the fixture during later
+bare-identifier arithmetic. These runtime witnesses are separate from
+adapter/corpus command strings, which remain JSON
+data only. They do not establish installed-host protection or other Bash versions.
+
+The arithmetic-writers corpus below adds named directional comparisons to the
+existing divergence gate. A Go allow cannot be classified as a tightening, and
+literal/data controls must agree with the retained Bash guard.
+
+| Writer cases | Category | Reason |
+| --- | --- | --- |
+| `arithmetic-writers_writer_read`, `arithmetic-writers_writer_read_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_read_array`, `arithmetic-writers_writer_read_array_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_read_default`, `arithmetic-writers_writer_read_default_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_read_dynamic`, `arithmetic-writers_writer_read_dynamic_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_mapfile`, `arithmetic-writers_writer_mapfile_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_mapfile_default`, `arithmetic-writers_writer_mapfile_default_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_readarray`, `arithmetic-writers_writer_readarray_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_printf`, `arithmetic-writers_writer_printf_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_printf_attached`, `arithmetic-writers_writer_printf_attached_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_printf_dynamic`, `arithmetic-writers_writer_printf_dynamic_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_getopts`, `arithmetic-writers_writer_getopts_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_declare`, `arithmetic-writers_writer_declare_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_export`, `arithmetic-writers_writer_export_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_nameref`, `arithmetic-writers_writer_nameref_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_nameref_dynamic`, `arithmetic-writers_writer_nameref_dynamic_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_wrapped_read`, `arithmetic-writers_writer_wrapped_read_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_wrapped_printf`, `arithmetic-writers_writer_wrapped_printf_argv` | deliberate-tightening | Untracked writer results cannot certify later bare arithmetic identifiers. |
+| `arithmetic-writers_writer_unknown_options`, `arithmetic-writers_writer_unknown_options_argv` | deliberate-tightening | Unresolved declaration options can enable integer evaluation and bind an uncertified value. |
+| `arithmetic-writers_bind_integer_for_positional`, `arithmetic-writers_bind_integer_for_positional_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_read`, `arithmetic-writers_bind_integer_read_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_read_array`, `arithmetic-writers_bind_integer_read_array_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_mapfile`, `arithmetic-writers_bind_integer_mapfile_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_readarray`, `arithmetic-writers_bind_integer_readarray_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_printf`, `arithmetic-writers_bind_integer_printf_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_getopts`, `arithmetic-writers_bind_integer_getopts_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_nameref`, `arithmetic-writers_bind_integer_nameref_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_later_nameref`, `arithmetic-writers_bind_integer_later_nameref_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_nameref_read`, `arithmetic-writers_bind_integer_nameref_read_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_unknown_options`, `arithmetic-writers_bind_integer_unknown_options_argv` | deliberate-tightening | Unresolved declaration options can enable integer evaluation and bind an uncertified value. |
+| `arithmetic-writers_bind_integer_printf_repeated`, `arithmetic-writers_bind_integer_printf_repeated_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_read_initial_default`, `arithmetic-writers_bind_integer_read_initial_default_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_nameref_index`, `arithmetic-writers_bind_nameref_index_argv` | deliberate-tightening | A bound reference uses an unknown arithmetic subscript. |
+| `arithmetic-writers_bind_nameref_unknown_literal`, `arithmetic-writers_bind_nameref_unknown_literal_argv` | deliberate-tightening | A possible integer or nameref target binds an uncertified value. |
+| `arithmetic-writers_bind_integer_wrapped_declare_read`, `arithmetic-writers_bind_integer_wrapped_declare_read_argv` | deliberate-tightening | Transparent declaration prefixes retain the possible integer attribute before an untracked bind. |
+| `arithmetic-writers_bind_integer_wrapped_typeset_printf`, `arithmetic-writers_bind_integer_wrapped_typeset_printf_argv` | deliberate-tightening | Transparent declaration prefixes retain the possible integer attribute before an untracked bind. |
+
 ## Interpreter metadata lifetime
 
 Interpreter literal children share their parent's bounded metadata snapshot,

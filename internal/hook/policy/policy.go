@@ -119,6 +119,8 @@ type analyzer struct {
 	env                 map[string]string
 	arithmeticValues    map[string][]string
 	integerVariables    map[string]bool
+	arithmeticRefs      map[string][]string
+	arithmeticOpaque    bool
 	gitRoots            []string
 	source              string
 	assignments         map[string]int
@@ -474,10 +476,18 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				break
 			}
 			args := words[1:]
-			if declaration := declarationOperands(operands); len(declaration) > 0 && declarationCommand(declaration[0].value) {
+			if declaration := declarationOperands(operands); len(declaration) > 0 && optionIn("declare typeset local export readonly", declaration[0].value) {
+				// Transparent prefixes can leave declarations as CallExpr nodes.
+				// Preserve their operand ASTs so options and integer bindings use
+				// the same arithmetic rule as a direct DeclClause.
+				decl := &syntax.DeclClause{Variant: &syntax.Lit{Value: declaration[0].value}}
 				for _, operand := range declaration[1:] {
-					cwd = a.declarationWords([]*syntax.Word{operand.source}, depth, cwd)
+					decl.Args = append(decl.Args, &syntax.Assign{Value: operand.source})
+					if declarationCommand(declaration[0].value) {
+						cwd = a.declarationWords([]*syntax.Word{operand.source}, depth, cwd)
+					}
 				}
+				a.reevaluatedDeclaration(decl)
 			}
 			if writePatternCommand(name, cmd.Args) {
 				a.reason = roles.Indeterminate

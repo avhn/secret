@@ -223,7 +223,8 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 - [ ] Bash-only: expansion-bearing arithmetic operands remain allowed in retained
   guard contexts (integer declarations, array indices, slices, comparisons and
-  C-style for clauses); Go now denies expansions in every arithmetic context.
+  C-style for clauses), including implicit integer binds and arithmetic values
+  from shell writers or namerefs; the staged Go walker now checks these roles.
 
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads

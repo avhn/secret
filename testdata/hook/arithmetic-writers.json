@@ -1,0 +1,1143 @@
+{
+  "fixtures": [
+    [
+      "home",
+      "dir",
+      ""
+    ],
+    [
+      "work",
+      "dir",
+      ""
+    ],
+    [
+      "work/.env",
+      "file",
+      "SYNTHETIC=fixture\n"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "writer_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; read -r n; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; read -r n; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_array",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; read -ra n; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_array_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; read -ra n; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_default",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "read; n=REPLY; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_default_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "read; n=REPLY; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_dynamic",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; read \"$target\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_read_dynamic_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; read \"$target\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_mapfile",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; mapfile -t n; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_mapfile_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; mapfile -t n; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_mapfile_default",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "mapfile; n=MAPFILE; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_mapfile_default_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "mapfile; n=MAPFILE; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_readarray",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; readarray -t n; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_readarray_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; readarray -t n; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; printf -v n %s \"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; printf -v n %s \"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf_attached",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; printf -vn %s \"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf_attached_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; printf -vn %s \"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf_dynamic",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; printf \"$flags\" n %s \"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_printf_dynamic_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; printf \"$flags\" n %s \"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_getopts",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; getopts a n -a; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_getopts_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; getopts a n -a; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_declare",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; declare \"n=$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_declare_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; declare \"n=$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_export",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; export \"n=$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_export_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; export \"n=$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_local",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "f() { n=0; local \"n=$operand\"; echo $((n)); }; f"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_local_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "f() { n=0; local \"n=$operand\"; echo $((n)); }; f"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_nameref",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; declare -n ref=n; ref=\"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_nameref_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; declare -n ref=n; ref=\"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_nameref_dynamic",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; declare -n ref=\"$target\"; ref=\"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_nameref_dynamic_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; declare -n ref=\"$target\"; ref=\"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_wrapped_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; builtin read n; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_wrapped_read_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; builtin read n; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_wrapped_printf",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; command printf -v n %s \"$operand\"; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_wrapped_printf_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; command printf -v n %s \"$operand\"; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_unknown_options",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare \"$flags\" n=1; echo $((n))"
+      },
+      "deny": true
+    },
+    {
+      "name": "writer_unknown_options_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare \"$flags\" n=1; echo $((n))"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_expansion",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; for n in \"$(printf 'arr[$(cat .env)]')\"; do :; done"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_expansion_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; for n in \"$(printf 'arr[$(cat .env)]')\"; do :; done"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_variable",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; for n in \"$operand\"; do :; done"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_variable_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; for n in \"$operand\"; do :; done"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_literal_expression",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; for n in 'arr[$(cat .env)]'; do :; done"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_literal_expression_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; for n in 'arr[$(cat .env)]'; do :; done"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_positional",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; for n; do :; done"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_for_positional_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; for n; do :; done"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; read -r n"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; read -r n"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_wrapped_declare_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "command declare -i n; read -r n"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_wrapped_declare_read_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "command declare -i n; read -r n"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_wrapped_typeset_printf",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "builtin typeset -i n; printf -v n %s \"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_wrapped_typeset_printf_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "builtin typeset -i n; printf -v n %s \"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read_array",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; read -ra n"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read_array_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; read -ra n"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_mapfile",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; mapfile -t n"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_mapfile_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; mapfile -t n"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_readarray",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; readarray -t n"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_readarray_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; readarray -t n"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_printf",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; printf -v n %s \"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_printf_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; printf -v n %s \"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_getopts",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; getopts a n -a"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_getopts_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; getopts a n -a"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_nameref",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; declare -n ref=n; ref=\"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_nameref_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; declare -n ref=n; ref=\"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_later_nameref",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -n ref=n; declare -i n; ref=\"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_later_nameref_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -n ref=n; declare -i n; ref=\"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_nameref_read",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; declare -n ref=n; read ref"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_nameref_read_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; declare -n ref=n; read ref"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_unknown_options",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare \"$flags\" n=\"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_unknown_options_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare \"$flags\" n=\"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_printf_repeated",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; printf -v public -v n %s \"$operand\""
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_printf_repeated_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; printf -v public -v n %s \"$operand\""
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read_initial_default",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i REPLY; read -ei public"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_integer_read_initial_default_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i REPLY; read -ei public"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_nameref_index",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "read index; declare -n ref='n[index]'; ref=1"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_nameref_index_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "read index; declare -n ref='n[index]'; ref=1"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_nameref_unknown_literal",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -n ref=\"$target\"; ref=1"
+      },
+      "deny": true
+    },
+    {
+      "name": "bind_nameref_unknown_literal_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -n ref=\"$target\"; ref=1"
+        ]
+      },
+      "deny": true
+    },
+    {
+      "name": "control_0",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "i=0; ((i++))"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_0_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "i=0; ((i++))"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_1",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "i=0; let 'i++'"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_1_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "i=0; let 'i++'"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_2",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "i=0; echo $((i+1))"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_2_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "i=0; echo $((i+1))"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_3",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "declare -i n; for n in 0 1 2; do :; done"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_3_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "declare -i n; for n in 0 1 2; do :; done"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_4",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "read -r n; echo \"$n\""
+      },
+      "deny": false
+    },
+    {
+      "name": "control_4_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "read -r n; echo \"$n\""
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_5",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "mapfile -t n; echo public"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_5_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "mapfile -t n; echo public"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_6",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "readarray -t n; echo public"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_6_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "readarray -t n; echo public"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_7",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "printf -v n %s public; echo \"$n\""
+      },
+      "deny": false
+    },
+    {
+      "name": "control_7_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "printf -v n %s public; echo \"$n\""
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_8",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "getopts a n -a; echo \"$n\""
+      },
+      "deny": false
+    },
+    {
+      "name": "control_8_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "getopts a n -a; echo \"$n\""
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_9",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; declare -n ref=n; echo public"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_9_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; declare -n ref=n; echo public"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_10",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "printf %s -v n; echo public"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_10_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "printf %s -v n; echo public"
+        ]
+      },
+      "deny": false
+    },
+    {
+      "name": "control_11",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": "n=0; declare -n ref=n; ref=1; echo public"
+      },
+      "deny": false
+    },
+    {
+      "name": "control_11_argv",
+      "tool": "Bash",
+      "cwd": "@TMP@/work",
+      "fields": {
+        "command": [
+          "bash",
+          "-c",
+          "n=0; declare -n ref=n; ref=1; echo public"
+        ]
+      },
+      "deny": false
+    }
+  ]
+}

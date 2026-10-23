@@ -178,6 +178,7 @@ func sensitiveIndirect(name string) bool {
 
 // recordIndirect retains a conservative flag until the end of the analyzed source.
 func (a *analyzer) recordIndirect(name string, args []string, unknown bool) {
+	a.arithmeticWriter(name, args)
 	mark := func(value string) {
 		if value == "" || sensitiveIndirect(value) || strings.ContainsAny(value, "$`{}[]*") {
 			a.indirect = true
