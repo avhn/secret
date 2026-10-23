@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- `tests/go-cli.sh` and `tests/go-hook.sh` now print the last 40 suite log lines (synthetic-
+  value lines redacted) to stderr when a suite does not finish or divergences are unlisted.
 - Build and test with Go 1.26.10 instead of 1.26.0: govulncheck found reachable
   standard library vulnerabilities, including `os.Root` escapes (GO-2026-4970,
   GO-2026-4602, GO-2026-4864) on store write paths and `net/url` parsing
