@@ -125,7 +125,7 @@ func (a *analyzer) dockerBindReaders(args []string, depth int, cwd string) {
 			value, args = args[0], args[1:]
 		}
 		if optionIn("-w --workdir", key) {
-			containerCWD = path.Join("/", value)
+			containerCWD = "/" + strings.TrimPrefix(value, "/")
 			continue
 		}
 		var source, target string
@@ -176,19 +176,19 @@ func (a *analyzer) dockerBindReaders(args []string, depth int, cwd string) {
 	probe.protected = func(name, childCWD string) bool {
 		containerPath := name
 		if !path.IsAbs(containerPath) {
-			containerPath = path.Join(childCWD, containerPath)
+			containerPath = childCWD + "/" + containerPath
 		}
-		containerPath = path.Clean(containerPath)
-		best := -1
-		for i, bind := range binds {
-			if (containerPath == bind.target || strings.HasPrefix(containerPath, strings.TrimSuffix(bind.target, "/")+"/")) && (best < 0 || len(bind.target) >= len(binds[best].target)) {
-				best = i
-			}
+		// Empty and dot components are inert, but link/.. must reach the host
+		// metadata walker intact. Keep the lexical mapping as an independent
+		// witness, including its existing mount precedence and path denials.
+		parts := strings.Split(containerPath, "/")
+		parts = slices.DeleteFunc(parts, func(part string) bool { return part == "" || part == "." })
+		raw := "/" + strings.Join(parts, "/")
+		if hostPath, ok := dockerBindPath(raw, binds); ok && a.inputProtected(hostPath, cwd) {
+			return true
 		}
-		if best >= 0 {
-			bind := binds[best]
-			suffix := strings.TrimPrefix(strings.TrimPrefix(containerPath, bind.target), "/")
-			return a.inputProtected(filepath.Join(bind.source, filepath.FromSlash(suffix)), cwd)
+		if hostPath, ok := dockerBindPath(path.Clean(containerPath), binds); ok {
+			return a.inputProtected(hostPath, cwd)
 		}
 		return a.protected(name, childCWD)
 	}
@@ -199,6 +199,48 @@ func (a *analyzer) dockerBindReaders(args []string, depth int, cwd string) {
 	if probe.reason != "" {
 		a.reason = probe.reason
 	}
+}
+
+// dockerBindPath keeps physical parent traversal inside the selected bind. A
+// parent at the bind root belongs to the container namespace, not the source's
+// host parent. Nested mounts likewise replace that source rather than extend it.
+func dockerBindPath(containerPath string, binds []dockerBind) (string, bool) {
+	best := dockerBindIndex(containerPath, binds)
+	if best < 0 {
+		return "", false
+	}
+	bind := binds[best]
+	suffix := strings.TrimPrefix(strings.TrimPrefix(containerPath, bind.target), "/")
+	level, prefix := 0, bind.target
+	for _, part := range strings.Split(suffix, "/") {
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			if level == 0 {
+				return "", false
+			}
+			level--
+		default:
+			level++
+		}
+		prefix = path.Join(prefix, part)
+		if dockerBindIndex(prefix, binds) != best {
+			return "", false
+		}
+	}
+	// filepath.Join would erase source/.. and suffix/.. before symlink lookup.
+	return bind.source + string(filepath.Separator) + filepath.FromSlash(suffix), true
+}
+
+func dockerBindIndex(containerPath string, binds []dockerBind) int {
+	best := -1
+	for i, bind := range binds {
+		if (containerPath == bind.target || strings.HasPrefix(containerPath, strings.TrimSuffix(bind.target, "/")+"/")) && (best < 0 || len(bind.target) >= len(binds[best].target)) {
+			best = i
+		}
+	}
+	return best
 }
 
 // A Windows host drive's colon is part of the source, not the mount separator.

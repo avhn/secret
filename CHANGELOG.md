@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - `tests/go-cli.sh` and `tests/go-hook.sh` now print the last 40 suite log lines (synthetic-
   value lines redacted) to stderr when a suite does not finish or divergences are unlisted.
+- Preserve physical symlink-parent traversal in Go Docker/Podman bind sources,
+  container reader operands and workdirs before protected-path checks. Retain
+  public binds, mount precedence and container-root boundaries, with synthetic
+  shell/argv tests on both adapters. The frozen Bash guard remains unchanged;
+  native platform CI and installed-host protection are not claimed.
 - Build and test with Go 1.26.10 instead of 1.26.0: govulncheck found reachable
   standard library vulnerabilities, including `os.Root` escapes (GO-2026-4970,
   GO-2026-4602, GO-2026-4864) on store write paths and `net/url` parsing

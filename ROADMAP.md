@@ -217,8 +217,9 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 ### M2 coverage backlog (class i, non-blocking under P22)
 
 - [ ] Track future shared or Bash-only coverage findings under the P22 class (i) rule
-- [ ] Review 935ad4e: shared Docker bind-source and container-operand symlink-parent
-  traversal (both guards allow synthetic protected-reader aliases; not class ii)
+- [x] Review 935ad4e: Docker/Podman bind-source and container-operand symlink-parent
+  traversal in Go (pending CI). Synthetic reader aliases now deny; the frozen Bash
+  guard retains this class (i) gap, not a class (ii) difference.
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads
 - [ ] Audit 28: shared UV tool-runner directory options and Bash attached

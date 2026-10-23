@@ -199,12 +199,12 @@ func unmodelledCommand(name string) bool {
 	// systemd-run keeps its opaque-argument protection in addition to precise
 	// child and working-directory parsing.
 	return name == "systemd-run" || !modelledCommand(name) && !shellName(name) && !roles.KnownReader(name) &&
-		!optionIn("tar bsdtar unzip cpio 7z 7za split dotenv eval docker openssl zip rsync scp du realpath readlink basename dirname chmod chown chgrp rm find [ [[", name)
+		!optionIn("tar bsdtar unzip cpio 7z 7za split dotenv eval docker podman openssl zip rsync scp du realpath readlink basename dirname chmod chown chgrp rm find [ [[", name)
 }
 
 func knownNested(name string) bool {
 	name = strings.ToLower(path.Base(name))
-	return shellName(name) || interpreter(name) || modelledCommand(name) || roles.KnownReader(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker npm go", name)
+	return shellName(name) || interpreter(name) || modelledCommand(name) || roles.KnownReader(name) || optionIn("cat head tail grep rg git sed perl python python3 ruby node echo printf tee patch tar mkdir cp mv ssh docker podman npm go", name)
 }
 
 // genericShellText is best-effort: prose or invalid shell syntax in an

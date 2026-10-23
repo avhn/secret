@@ -1571,6 +1571,34 @@ controls that the suites cannot parse there. Denials and every other inventory
 key remain mandatory. Synthetic inventory tests verify both runtime paths and
 reject attempts to overwrite the canonical inventory from Bash 3.2.
 
+## Review 935ad4e: Docker bind and container physical parents (pending CI)
+
+This closes the Go side of the recorded class (i) gap, not a Go-looser class (ii)
+regression. With disposable `work/alias` pointing to `home/.aws/inner`, both guards
+previously allowed these synthetic protected-reader aliases:
+
+- `docker run -v ./alias/..:/input:ro alpine cat /input/credentials`
+- `docker run --mount type=bind,src=./,dst=/input alpine cat /input/alias/../credentials`
+
+The Go mapping now retains raw bind-source, container-operand and workdir
+components until the shared metadata-only protected-path check resolves symlinks
+before parent traversal. The prior lexical witness remains independent, so no
+existing protected denial is weakened. Longest-target and last-same-target mount
+precedence remain intact. A parent at the bind root stays in the container
+namespace, not the host source's parent; nested mounts replace their outer source.
+Podman uses the same Docker path roles, including container-qualified `cp` sources.
+
+Permanent tables are `TestDockerBindPath`, `TestDockerBindPhysicalParents` and
+`TestDockerPhysicalParentsBothAdapters`. They cover separate/attached/clustered
+`-v`, `--volume`, `--mount` with `source=`/`src=`, absolute and relative sources,
+intermediate symlinks, container workdirs, missing credential-name leaves and
+container-qualified copies. Public aliases, ordinary credential basenames and
+mount-boundary/precedence controls remain must-allow or unmapped controls.
+Candidate commands are never executed. The retained Bash guard still allows the
+two recorded aliases and is unchanged. Exact retained-suite divergence inventories
+remain separate from these new Go regression tables; synthetic replay does not
+establish installed-host protection or native macOS/Windows behavior.
+
 ## Confirmation audit 29: bounded launch, patch and syntax witnesses
 
 U0 recognizes static computed Deno argument keys, retaining witnesses across

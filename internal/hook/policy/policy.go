@@ -365,7 +365,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 					}
 				}
 			}
-			if len(cmd.Args) > 2 && literal(cmd.Args[0]) == "docker" && literal(cmd.Args[1]) == "cp" && strings.Contains(a.raw(cmd.Args[2]), ":/") && hasProtectedLiteral(a.raw(cmd.Args[2])) {
+			if len(cmd.Args) > 2 && optionIn("docker podman", literal(cmd.Args[0])) && literal(cmd.Args[1]) == "cp" && strings.Contains(a.raw(cmd.Args[2]), ":/") && hasProtectedLiteral(a.raw(cmd.Args[2])) {
 				a.reason = roles.FileInput
 			}
 			if len(cmd.Args) == 0 {
@@ -1090,6 +1090,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	}
 	if name == "fdfind" {
 		name = "fd"
+	}
+	if name == "podman" {
+		// Bind mounts and container file operands share Docker's path roles.
+		name = "docker"
 	}
 	if name == "ack" || name == "ack-grep" {
 		// ack searches recursively without Git ignore certification. Reuse the
