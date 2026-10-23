@@ -18,6 +18,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
   `XDG_CONFIG_HOME`/`GH_CONFIG_DIR`, including aliases and content searches.
   Keep public readers, metadata queries and approved printer transports allowed;
   retained Bash executables and installed hooks are unchanged (pending CI).
+- Tighten Go coprocess framing and restore redirected simple executable dispatch,
+  including patch recipients. Coprocess pipes cannot borrow ancestor heredoc
+  proofs. Reject alternate apply_patch argv sources and uncertified patch diff
+  inputs even with an explicit output; retain patch help/version, read-only Git
+  apply modes and valid public apply_patch heredocs. Synthetic U2/U3 coverage and
+  exact Bash differences are recorded; retained Bash and installed hooks are
+  unchanged, with native CI and host evidence still required.
+
 - Build and test with Go 1.26.10 instead of 1.26.0: govulncheck found reachable
   standard library vulnerabilities, including `os.Root` escapes (GO-2026-4970,
   GO-2026-4602, GO-2026-4864) on store write paths and `net/url` parsing

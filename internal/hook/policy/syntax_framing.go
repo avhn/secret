@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -112,22 +113,106 @@ func coprocCommand(cmd *syntax.CoprocClause) bool {
 	if cmd.Stmt == nil {
 		return false
 	}
+	if cmd.Name != nil && coprocReservedWord(cmd.Name) {
+		return false
+	}
 	if cmd.Stmt.Cmd != nil {
-		return true
+		if cmd.Name != nil {
+			// Only a compound command can follow a coprocess name. The parser
+			// also accepts names before time, declarations and let, losing the
+			// executable's actual argv. Those shapes cannot certify a command.
+			if !coprocCompound(cmd.Stmt.Cmd) {
+				return false
+			}
+		}
+		return coprocHead(cmd.Stmt)
 	}
 	if cmd.Name == nil {
 		return false
 	}
-	name := cmd.Name.Lit()
-	if name == "" || len(cmd.Stmt.Redirs) == 0 || cmd.Name.End().Offset() != cmd.Stmt.Redirs[0].OpPos.Offset() {
-		return true
+	return !coprocDescriptor(cmd.Name, cmd.Stmt.Redirs)
+}
+
+// The parser can consume the first descriptor as Name, then prepend it to a
+// following call's argv. Adjacency and literal digits distinguish a descriptor
+// from a quoted/escaped or whitespace-separated numeric executable name.
+func coprocDescriptor(word *syntax.Word, redirs []*syntax.Redirect) bool {
+	name := word.Lit()
+	if name == "" || len(redirs) == 0 || redirs[0].N != nil || word.End().Offset() != redirs[0].OpPos.Offset() {
+		return false
 	}
 	for _, c := range name {
 		if c < '0' || c > '9' {
-			return true
+			return false
 		}
 	}
+	return true
+}
+
+// Restore an initial descriptor without mutating the parsed tree, including
+// the leftmost call of a coprocess pipeline. Later descriptors parse normally.
+func coprocStatement(stmt *syntax.Stmt) *syntax.Stmt {
+	copy := *stmt
+	switch cmd := stmt.Cmd.(type) {
+	case *syntax.CallExpr:
+		if len(cmd.Args) > 0 && coprocDescriptor(cmd.Args[0], stmt.Redirs) {
+			call := *cmd
+			call.Args = cmd.Args[1:]
+			copy.Cmd = &call
+			redirect := *stmt.Redirs[0]
+			redirect.N = &syntax.Lit{Value: cmd.Args[0].Lit()}
+			copy.Redirs = slices.Clone(stmt.Redirs)
+			copy.Redirs[0] = &redirect
+		}
+	case *syntax.BinaryCmd:
+		if cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll {
+			pipeline := *cmd
+			pipeline.X = coprocStatement(cmd.X)
+			copy.Cmd = &pipeline
+		}
+	}
+	return &copy
+}
+
+func coprocCompound(cmd syntax.Command) bool {
+	switch cmd := cmd.(type) {
+	case *syntax.Block, *syntax.Subshell, *syntax.IfClause, *syntax.WhileClause, *syntax.ForClause, *syntax.CaseClause, *syntax.TestClause, *syntax.ArithmCmd:
+		return true
+	case *syntax.BinaryCmd:
+		return (cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll) && coprocCompound(cmd.X.Cmd)
+	}
 	return false
+}
+
+// Coprocess parsing can leave reserved words in a call or in Name even though
+// Bash rejects them in that position. Quoted/escaped executable names are inert.
+func coprocReservedWord(word *syntax.Word) bool {
+	switch word.Lit() {
+	case "then", "elif", "else", "fi", "do", "done", "esac", "in", "select", "!", "}", "]]":
+		return true
+	}
+	return false
+}
+
+func coprocHead(stmt *syntax.Stmt) bool {
+	switch cmd := stmt.Cmd.(type) {
+	case *syntax.CallExpr:
+		args := cmd.Args
+		if len(args) > 0 && coprocDescriptor(args[0], stmt.Redirs) {
+			args = args[1:]
+			if len(args) == 0 {
+				return false
+			}
+		}
+		return len(cmd.Assigns) != 0 || len(args) == 0 || !coprocReservedWord(args[0])
+	case *syntax.BinaryCmd:
+		return coprocHead(cmd.X)
+	case *syntax.FuncDecl, *syntax.CoprocClause:
+		// These are not Bash compound commands in a coprocess head, despite
+		// the parser accepting them as such. Nested bodies are checked normally.
+		return false
+	}
+	return true
 }
 
 // Quotes do not make arithmetic operands inert in Bash. Reject the unsupported

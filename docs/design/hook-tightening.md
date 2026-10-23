@@ -1678,11 +1678,98 @@ matches when HOME is outside cwd without changing wildcard or dotfile rules. A
 synthetic alias/listing mismatch runs on every OS; it does not replace native
 Windows CI or installed-host checks.
 
-U2, U3, U8 and U11 retain named M2.1 review entries in ROADMAP.md. Some share
-closures above or the earlier patch-stdin review; their remaining malformed-input
+U2/U3 have the Go-side follow-up below, pending applicable CI. U8 and U11
+retain named M2.1 review entries in ROADMAP.md; their remaining malformed-input
 differences are not claimed fixed by these synthetic tests. Go-side U15-U17 and
 timing follow-ups are described below, pending applicable CI. Installed-host
 failure evidence remains a separate gate.
+
+### M2.1 U2/U3 coprocess framing and effective patch recipients (pending CI)
+
+U2 rejects misplaced unquoted coprocess head words (then/elif/else/fi/do/done/
+esac/in/select/!/}/]]), including redirected and pipeline heads. The parser may accept
+those as ordinary calls or names even though Bash rejects their grammar.
+Parser-only function/nested-coprocess heads and names before noncompound
+commands also deny as uncertified. Quoted/escaped executable words, ordinary
+simple calls, valid named compound bodies and nested coprocesses inside a real
+body retain their roles. Candidate strings are only parser/analyzer input.
+
+A redirected simple executable can reside in CoprocClause.Name while Stmt.Cmd
+is nil. Go now reconstructs a call using that same word and the original
+redirects, rather than checking only shell executable names and skipping every
+other command's dispatch. Initial adjacent numeric descriptor tokens can also
+be misplaced in argv; Go restores their descriptor role and checks the actual
+executable, including a pipeline's leftmost call. Spaced/quoted/escaped numeric
+executable names keep their original roles. In particular, coproc apply_patch with a malformed or
+protected heredoc now reaches full patch validation. Coprocess stdin begins at
+its own opaque pipe; an ancestor's public heredoc cannot certify it. Explicit
+child heredocs may replace the pipe, and restoring the scope preserves siblings.
+
+U3 retains the a3b0306 rejection of effective pipeline/file/descriptor/here-string
+input and adds regression coverage for process substitution, wrappers, argv,
+compound bodies and coprocesses. An apply_patch argv operand may select bytes
+other than stdin, so even a public stdin heredoc cannot certify that invocation.
+Those alternate sources deny instead of borrowing the heredoc's framing proof.
+Git apply already denies mutating modes, including dashed Git dispatch; its
+explicit read-only check/stat modes remain allowed for public input.
+
+The earlier patch -o/--output exception certified only an output destination,
+not original files selected by unified/context diff headers. Go now denies
+patch content operations until that grammar has a bounded certifier, even when
+a public output is explicit. This is a deliberate tightening of the prior
+public patch-output fixture, not a claim to parse unified/context patches.
+Source-free patch --help/--version/-v controls remain allowed. Valid public
+apply_patch heredocs, including inherited compound-body input and recipient
+heredocs shadowing a pipe, retain positive controls.
+
+The retained Bash guard is frozen. Its single-body tokenizer and compound/
+pipeline provenance limits remain; in particular the documented U3 public
+ancestor-heredoc over-denial is unchanged. Go-only closure does not close the
+Bash-only backlog, establish a sandbox, or supply installed-host/native CI
+failure evidence. The measured supplemental fixtures are exact, directional
+Go denials, with source and explicit bash -c argv forms listed separately.
+
+Named supplemental replay entries (the argv suffix changes only the envelope).
+
+- `m21_u2_reserved_then`, `m21_u2_reserved_then_argv`: misplaced then head.
+- `m21_u2_reserved_redirect`, `m21_u2_reserved_redirect_argv`: fi with redirect.
+- `m21_u2_reserved_select`, `m21_u2_reserved_select_argv`: select without a
+  certifiable loop body, represented by the parser as an ordinary call.
+- `m21_u2_descriptor_reserved`, `m21_u2_descriptor_reserved_argv`: an initial
+  descriptor cannot hide a misplaced reserved-word executable.
+- `m21_u2_function_head`, `m21_u2_function_head_argv`: parser-only function head.
+- `m21_u2_named_noncompound`, `m21_u2_named_noncompound_argv`: uncertified name
+  before export, rather than a real named compound command.
+- `m21_u3_coproc_malformed`, `m21_u3_coproc_malformed_argv`: malformed patch
+  body on a redirected simple coprocess executable. The focused Go policy tests
+  also target public-link.txt, a disposable symlink to a synthetic .env file,
+  to retain the physical protected-target witness without raw protected text.
+- `m21_u3_coproc_descriptor`, `m21_u3_coproc_descriptor_argv`: an initial
+  output descriptor cannot hide a malformed patch recipient.
+- `m21_u3_coproc_descriptor_pipeline`, `m21_u3_coproc_descriptor_pipeline_argv`:
+  the same restoration reaches a coprocess pipeline's leftmost patch call.
+- `m21_u3_coproc_fd3`, `m21_u3_coproc_fd3_argv`: restoring the descriptor must
+  not mistake fd 3's public patch heredoc for effective stdin.
+- `m21_u3_coproc_protected`, `m21_u3_coproc_protected_argv`: synthetic protected
+  patch target on the same previously skipped executable path.
+- `m21_u3_coproc_inherited`, `m21_u3_coproc_inherited_argv`: coprocess pipe
+  cannot inherit a parent's public patch-body proof.
+- `m21_u3_patch_output_pipe`, `m21_u3_patch_output_pipe_argv`: opaque pipeline
+  diff input despite explicit public output.
+- `m21_u3_patch_output_file`, `m21_u3_patch_output_file_argv`: opaque file diff
+  input despite explicit public output.
+- `m21_u3_patch_output_heredoc`, `m21_u3_patch_output_heredoc_argv`: unsupported
+  unified diff grammar remains uncertified even with public-looking headers.
+- `m21_u3_patch_output_process`, `m21_u3_patch_output_process_argv`: process
+  substitution diff input cannot certify the selected original files.
+- `m21_u3_argv_shadow`, `m21_u3_argv_shadow_argv`: malformed argv patch bytes
+  cannot borrow a valid stdin heredoc.
+- `m21_u3_env_argv`, `m21_u3_env_argv_argv`: attached env -S already supplies
+  apply_patch; a repeated apply_patch word is an alternate argv source. The
+  earlier audit28 public control is intentionally tightened to deny, while the
+  correctly formed env -Sapply_patch with no repeated executable stays allowed.
+- `m21_u3_process_operand`, `m21_u3_process_operand_argv`: a process-substitution
+  argv source cannot borrow a valid stdin heredoc.
 
 ### M2.1 U15-U17 raw paths and patch grammar (pending CI)
 

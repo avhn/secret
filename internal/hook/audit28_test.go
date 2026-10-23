@@ -72,8 +72,10 @@ func TestAudit28WrappedPatch(t *testing.T) {
 			t.Run(wrapper+tc.name, func(t *testing.T) {
 				command := wrapper + "apply_patch <<'PATCH'\n" + tc.body + "PATCH\n"
 				// The existing launcher-stdin policy denies systemd-run even
-				// with a valid public body. Keep that denial unchanged.
-				deny := tc.deny || strings.HasPrefix(wrapper, "systemd-run ")
+				// with a valid public body. Attached env -S already supplies the
+				// executable, so its repeated apply_patch is an alternate argv
+				// source, not an argument-free stdin recipient (M2.1 U3).
+				deny := tc.deny || strings.HasPrefix(wrapper, "systemd-run ") || wrapper == "env -Sapply_patch "
 				audit28ToolCheck(t, "Bash", work, map[string]any{"command": command}, deny)
 				audit28ToolCheck(t, "Bash", work, map[string]any{"command": []string{"bash", "-c", command}}, deny)
 			})

@@ -1,0 +1,21 @@
+[
+  {"name":"m21_u2_reserved_then","source":"coproc then echo public"},
+  {"name":"m21_u2_reserved_redirect","source":"coproc fi >public.out"},
+  {"name":"m21_u2_reserved_select","source":"coproc select public"},
+  {"name":"m21_u2_descriptor_reserved","source":"coproc 2>public.out then echo public"},
+  {"name":"m21_u2_function_head","source":"coproc function f { true; }"},
+  {"name":"m21_u2_named_noncompound","source":"coproc X export A=public"},
+  {"name":"m21_u3_coproc_malformed","source":"coproc apply_patch <<'PATCH'\nnot a patch\nPATCH"},
+  {"name":"m21_u3_coproc_descriptor","source":"coproc 2>public.out apply_patch <<'PATCH'\nnot a patch\nPATCH"},
+  {"name":"m21_u3_coproc_descriptor_pipeline","source":"coproc 2>public.out apply_patch <<'PATCH' | cat\nnot a patch\nPATCH"},
+  {"name":"m21_u3_coproc_fd3","source":"coproc 3<<'PATCH' apply_patch\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH"},
+  {"name":"m21_u3_coproc_protected","source":"coproc apply_patch <<'PATCH'\n*** Begin Patch\n*** Delete File: .env\n*** End Patch\nPATCH"},
+  {"name":"m21_u3_coproc_inherited","source":"{ coproc { apply_patch; }; } <<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH"},
+  {"name":"m21_u3_patch_output_pipe","source":"cat public.patch | patch -o output.txt"},
+  {"name":"m21_u3_patch_output_file","source":"patch -o output.txt < public.patch"},
+  {"name":"m21_u3_patch_output_heredoc","source":"patch --output=output.txt <<'PATCH'\n--- public.txt\n+++ public.txt\n@@ -1 +1 @@\n-old\n+new\nPATCH"},
+  {"name":"m21_u3_patch_output_process","source":"patch -o output.txt < <(cat public.patch)"},
+  {"name":"m21_u3_argv_shadow","source":"apply_patch 'not a patch' <<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH"},
+  {"name":"m21_u3_env_argv","source":"env -Sapply_patch apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH"},
+  {"name":"m21_u3_process_operand","source":"apply_patch <(cat public.patch) <<'PATCH'\n*** Begin Patch\n*** Add File: public.txt\n+synthetic\n*** End Patch\nPATCH"}
+]

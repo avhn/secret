@@ -66,6 +66,30 @@ Search contract: `Grep` content/count checks explicit target and a bounded names
 
 Differential protocol: snapshot bash guard at a fixed git revision in test fixtures or run it from its retained executable, feed identical synthetic JSON, cwd, PATH and rg config to both hooks, compare allow/deny and fixed denial shape, classify each difference as intentional tightening, parser grammar limitation or regression in a checked-in reviewed expectation table. Add paired accepted-expansion cases: single/double quotes and escaped dollars, literal `$HOME` with known home, `IFS` explicitly assigned to space/tab and used unquoted vs quoted, brace fields and ranges under the cap, literal tilde, simple globs resolving only synthetic paths, and scoped env -C/cd; compare actual safe Bash argv/paths and Go classifications. Add unknown-inherited-IFS and dynamically reassigned-HOME/IFS deny cases. Also run real `bash -n`, `bash -c` word/trace experiments in a disposable synthetic directory for tricky quoting, brace, heredoc, substitution, IFS, options and redirects: never execute inspected untrusted strings or real credentials. Fail CI on a new unclassified difference. Preserve host output contract while explicitly documenting intended change from the bash guard's fail-open malformed/analysis behavior.
 
+### Audit 29 U2/U3 follow-up (Go, pending CI)
+
+Certify coprocess heads before command analysis: reject misplaced unquoted
+reserved words, parser-only function/nested-coprocess heads and named
+noncompound shapes. Restore a simple redirected executable stored in the
+parser's Name field to a call with its original word and redirects. Restore
+initial adjacent numeric descriptor tokens misplaced in argv, including a
+pipeline's leftmost call, without reclassifying quoted/spaced numeric names.
+A coprocess
+starts with opaque pipe stdin, not an inherited ancestor heredoc; its own
+redirects may establish a new proof. Preserve ordinary simple/named compound
+coprocesses and quoted/escaped executable words.
+
+Only argument-free apply_patch with effective, validated stdin heredocs is
+certified. Pipelines, process/file/descriptor sources, here-strings and alternate
+argv sources remain indeterminate unless the recipient's own heredoc replaces
+the opaque stdin. A patch output option is not a proof about original files
+selected by unified/context diff headers. Until that grammar has a bounded
+certifier, deny patch content operations even with explicit output; source-free
+help/version requests retain an allow. Git apply already denies mutating modes;
+its explicit read-only check/stat modes retain their existing operand checks.
+See hook-tightening.md for named synthetic witnesses and retained Bash limits.
+This does not establish installed-host protection.
+
 ## 4. Store format and CLI compatibility
 
 Port exact bash reader behavior before adding formats: default `~/.secrets.env`, `~/.secrets/*.secret` and hidden files, ignore backup names, `SECRETS_ENV/SECRETS_DIR`, bare NAME resolution (existing local file first, then visible/hidden private file), `file:PATH` escape, `keychain:NAME`/`libsecret:NAME`, key regex, comment and ignored-line warnings, duplicate last-wins, optional leading `export`, first `=`, CRLF removal on each line, matched outer quote pair removal without shell unescaping, malformed starting quote ignored, and no evaluation. `show` without selectors preserves order and duplicate records in labeled files; unlabeled flat stores show last per key; selected `show` displays `<unset>` for unmatched names and canonical sorted labels. Header is _exactly_ `[name=value,...]` (no whitespace, duplicate names invalid); `[]` resets scope; malformed bracket lines are ignored without changing scope. Values can contain literal `$`, `#`, `=`, backslashes and internal spaces; use byte lengths, not rune counts. Document precise parser behavior with golden fixtures including invalid UTF-8 on file stores where Go strings alone would obscure byte semantics.

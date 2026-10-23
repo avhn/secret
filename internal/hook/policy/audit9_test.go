@@ -28,7 +28,8 @@ func TestAuditNineGuardParity(t *testing.T) {
 		{"unmodelled shell text", `ssh host "cat .env"`, root, true},
 		{"coproc script redirect", "coproc sh < s.sh", root, true},
 		{"patch without output", "patch < changes.patch", root, true},
-		{"patch with output", "patch -o output.txt < changes.patch", root, false},
+		// An output target does not certify the files selected by diff headers.
+		{"patch with opaque input and output", "patch -o output.txt < changes.patch", root, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			reason := Analyze(tc.source, tc.cwd, root, check)

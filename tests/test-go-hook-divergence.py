@@ -106,6 +106,21 @@ class EnvelopeTighteningTests(unittest.TestCase):
                                           str(root / "divergences"), str(root / "log")], capture_output=True, text=True)
                     self.assertEqual(run.returncode == 0, valid, run.stderr)
 
+    def test_m21_u2_u3_rows_never_permit_a_go_allow(self):
+        corpus = divergence.json.loads((divergence.ROOT / "testdata/hook/m21-u2-u3.json").read_text())
+        expected = [("audit", case["name"] + suffix, "deliberate-tightening")
+                    for case in corpus for suffix in ("", "_argv")]
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            with mock.patch.object(divergence, "decision", side_effect=lambda argv, *_: "allow" if len(argv) == 1 else "deny"):
+                self.assertEqual(divergence.m21_u2_u3_rows("/synthetic/secret", root / "differences"), expected)
+            with mock.patch.object(divergence, "decision", return_value="deny"):
+                self.assertEqual(divergence.m21_u2_u3_rows("/synthetic/secret", root / "same"), [])
+            for host in ("claude", "codex"):
+                with self.subTest(host=host), mock.patch.object(divergence, "decision", side_effect=lambda argv, *_: "allow" if argv[-1] == host else "deny"):
+                    with self.assertRaisesRegex(ValueError, "m21 false allow"):
+                        divergence.m21_u2_u3_rows("/synthetic/secret", root / host)
+
     def test_unknown_newline_case_stays_unreviewed(self):
         with self.assertRaisesRegex(ValueError, "unreviewed difference"):
             self.measure("guard", "audit23_o8_unknown_newline", "allow")

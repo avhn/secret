@@ -801,19 +801,25 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 				cwd = a.stmts([]*syntax.Stmt{&child}, depth, cwd)
 			}
 		case *syntax.CoprocClause:
-			a.walkWord(cmd.Name, depth, cwd)
 			if cmd.Stmt == nil {
 				a.reason = roles.Indeterminate
-			} else {
-				// In `coproc sh < file`, the parser stores sh as Name and
-				// leaves the redirected statement without a command.
-				if cmd.Name != nil && cmd.Stmt.Cmd == nil && shellName(literal(cmd.Name)) {
-					a.command([]string{literal(cmd.Name)}, depth+1, cwd, false)
-				}
-				if a.reason == "" {
-					a.stmts([]*syntax.Stmt{cmd.Stmt}, depth, cwd)
-				}
+				break
 			}
+			child := coprocStatement(cmd.Stmt)
+			if cmd.Name != nil && child.Cmd == nil {
+				// A redirected simple executable is stored in Name, not Cmd.
+				// Restore a call so every role sees its argv and effective stdin.
+				child.Cmd = &syntax.CallExpr{Args: []*syntax.Word{cmd.Name}}
+			} else {
+				a.walkWord(cmd.Name, depth, cwd)
+			}
+			// A coprocess starts with its own pipe, not its parent's heredoc.
+			// Explicit child redirects can replace that opaque input normally.
+			prior, start := a.patchInput, a.patchInputStart
+			a.patchInput = &interpreterInput{}
+			a.patchInputStart = len(a.interpreterInputs)
+			a.stmts([]*syntax.Stmt{child}, depth, cwd)
+			a.patchInput, a.patchInputStart = prior, start
 		case *syntax.LetClause, *syntax.ArithmCmd:
 			a.walkNode(cmd, depth, cwd)
 			a.uncertain = true
@@ -1039,7 +1045,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 	if name == "apply_patch" {
 		// Wrappers retain redirect provenance. Validate only the effective stdin
 		// scope at the child, using its scoped cwd for patch targets.
-		if a.patchInput == nil || a.patchInput.redirect == nil || a.patchInput.redirect.Hdoc == nil {
+		if len(args) != 0 || a.patchInput == nil || a.patchInput.redirect == nil || a.patchInput.redirect.Hdoc == nil {
 			a.reason = roles.Indeterminate
 			return
 		}
@@ -1333,13 +1339,10 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		return
 	}
 	if name == "patch" {
-		output := false
-		for i, arg := range args {
-			if (arg == "-o" || arg == "--output") && i+1 < len(args) || strings.HasPrefix(arg, "-o") && len(arg) > 2 || strings.HasPrefix(arg, "--output=") && len(arg) > len("--output=") {
-				output = true
-			}
-		}
-		if !output {
+		// An explicit output does not certify the original files read from
+		// unified/context diff headers. That grammar is not analyzed here;
+		// only source-free informational requests have a bounded allow proof.
+		if len(args) != 1 || !optionIn("--help --version -v", args[0]) {
 			a.reason = roles.Indeterminate
 			return
 		}

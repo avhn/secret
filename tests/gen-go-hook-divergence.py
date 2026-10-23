@@ -48,7 +48,9 @@ def suite_rows(suite, binary, host, tmp):
     results = tmp / f"{suite}.tsv"
     env = os.environ.copy()
     env.update(SECRET_GUARD=f"{binary} hook {host}", SECRET_TEST_RESULTS=str(results))
-    run = subprocess.run(["bash", str(ROOT / "tests" / f"test-{suite}.sh")], cwd=ROOT, env=env, capture_output=True, text=True, timeout=240)
+    # Bound the entire synthetic suite separately from each hook's budgets;
+    # concurrent worker checkouts can exceed four minutes of suite wall time.
+    run = subprocess.run(["bash", str(ROOT / "tests" / f"test-{suite}.sh")], cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
     if not re.search(r"(?m)^\d+ passed, \d+ failed", run.stdout):
         raise ValueError(f"{suite}: suite did not finish")
     inventory = ROOT / "testdata/inventory" / f"{suite}.tsv"
@@ -154,6 +156,27 @@ def audit19_rows(binary, tmp):
     return rows
 
 
+def m21_u2_u3_rows(binary, tmp):
+    """Retain exact malformed coprocess and uncertified patch-stream denials."""
+    corpus = json.loads((ROOT / "testdata/hook/m21-u2-u3.json").read_text())
+    (tmp / "home").mkdir(parents=True)
+    (tmp / ".env").write_text("synthetic\n")
+    env = os.environ.copy()
+    env.update(HOME=str(tmp / "home"), RIPGREP_CONFIG_PATH="", KUBECONFIG="")
+    rows = []
+    for case in corpus:
+        for suffix, command in (("", case["source"]), ("_argv", ["bash", "-c", case["source"]])):
+            payload = dict(tool_name="Bash", cwd=str(tmp), tool_input=dict(command=command))
+            for host in ("claude", "codex"):
+                if decision([binary, "hook", host], payload, env) != "deny":
+                    raise ValueError(f"m21 false allow: {case['name']}{suffix}/{host}")
+            bash = decision([str(ROOT / "hooks/guard-secrets")], payload, env)
+            if bash != "deny":
+                rows.append(("audit", case["name"] + suffix, "deliberate-tightening"))
+    print(f"m21 U2/U3: {len(corpus) * 4} denied Go envelopes, {len(rows)} stricter than Bash")
+    return rows
+
+
 def main():
     """Write the inventory only after every measured row is reviewed in docs."""
     if len(sys.argv) != 2 or not pathlib.Path(sys.argv[1]).is_absolute():
@@ -164,6 +187,7 @@ def main():
         rows += suite_rows("codex", sys.argv[1], "codex", tmp)
         rows += audit_rows(sys.argv[1], tmp / "audit")
         rows += audit19_rows(sys.argv[1], tmp / "audit19")
+        rows += m21_u2_u3_rows(sys.argv[1], tmp / "m21-u2-u3")
     table = (ROOT / "docs/design/hook-tightening.md").read_text()
     missing = [f"{suite}/{name}" for suite, name, _ in rows if f"`{name}`" not in table]
     if missing:

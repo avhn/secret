@@ -232,9 +232,12 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 ### M2.1 follow-ups (audit 29 syntax, raw limits and coverage)
 
-- [ ] U2: malformed coprocess reserved-word framing in direct shell strings
-- [ ] U3: effective pipeline patch stdin, including retained Bash provenance limits;
-  the a3b0306 review already rejects opaque recipient streams in Go
+- [x] U2: reject malformed/uncertified coprocess reserved-word framing and
+  restore redirected simple executable dispatch (Go, pending CI)
+- [x] U3: certify effective patch stdin across pipelines, redirects and coprocess
+  scopes; deny alternate apply_patch argv sources and uncertified patch diff
+  inputs even with explicit output (Go, pending CI). Retained Bash provenance
+  limits and its public ancestor-heredoc over-denial remain unchanged
 - [ ] U8: malformed code in opaque extglobs; Go now denies the reported forms,
   retain paired malformed-language regression coverage
 - [ ] U11: malformed nested backquotes; Go now denies deep residue, while Bash
