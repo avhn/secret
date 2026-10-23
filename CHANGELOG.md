@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Reduce staged Go hook over-denials for conditional `cd` chains and literal
+  double-quoted arithmetic constants. Directory alternatives stay precise up to
+  128 (was 32), with a 16384 per-directory replay budget; exceeding either bound
+  still denies. Package-manager workspace proofs keep a separate 32-directory
+  bound. Arithmetic commands and C-style loops accept whole double-quoted
+  decimal constants, including indices, through shell strings and explicit-shell
+  argv. Expansion-bearing operands and single quotes retain the base denials;
+  the earlier quoted-command-substitution allowance is dropped. Synthetic
+  adversarial cases cover protected alternatives, symlinks, nested shells,
+  container binds and recursive arithmetic text on both adapters. The default
+  divergence inventory drops 16 literal-quote rows (181 to 165); the retained
+  Bash CLI and installed hooks are unchanged, with native CI still required.
+
 - Staged Go hook: deny expansion-bearing operands in arithmetic evaluation contexts
   (arithmetic expansion and commands, `let`, integer declarations and assignments, array
   indices), including implicit integer binds through loops, shell writers and namerefs.

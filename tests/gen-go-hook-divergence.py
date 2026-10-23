@@ -25,12 +25,11 @@ CODEX_TIGHTENING = {"cwd_safe", "audit19_allow#14", "audit19_allow#15", "audit19
                     "audit27_s22_move", "audit27_s22_crlf", "audit19_yarn_project_patch"}
 # Existing Go path-field controls remain stricter than Bash's valid LF paths.
 ENVELOPE_TIGHTENING = {"audit23_o8_workdir_newline", "audit23_o8_cwd_newline"}
-# Audit 28 retains Go's conservative arithmetic and function/time framing denials.
-# These exact public controls are stricter than Bash, never exceptions for allows.
+# Time framing and single quotes still deny; expansion output remains arithmetic.
+# Double-quoted constants now match Bash in shell-string and argv forms.
 AUDIT28_TIGHTENING = {"audit28_t13_compound_time_end_public"} | {
     "audit28_t13_review_" + name + "_public" + suffix
-    for name in ("function_index", "quoted_number", "single_quoted_number",
-                 "quoted_index", "quoted_loop", "quoted_child")
+    for name in ("single_quoted_number", "quoted_child")
     for suffix in ("", "_argv")
 }
 # Expansion-bearing arithmetic operands deny even when their output looks numeric.

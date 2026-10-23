@@ -10,6 +10,10 @@ import (
 	"github.com/avhn/secret/internal/hook/roles"
 )
 
+// Workspace scope proofs keep their own 32-directory bound. The cwd-flow cap is
+// larger for conditional cd chains; it does not widen workspace enumeration.
+const maxWorkspaceDirectories = 32
+
 // Package execution options belong to the launcher only until its child starts.
 // Keep directory alternatives local to that child, never the following statement.
 type packageExecOptions struct {
@@ -142,6 +146,10 @@ func (a *analyzer) packageExec(name string, args []string, depth int, cwd string
 	if unresolved {
 		dirs = a.cwdUnion(dirs, a.packageWorkspaceDirectories(options.cwd))
 	}
+	if len(dirs) > maxWorkspaceDirectories {
+		a.reason = roles.Indeterminate
+		return true
+	}
 	for _, dir := range dirs {
 		if name == "yarn" || options.shell {
 			a.strictCommandSlot(name, strings.Join(child, " "), depth, dir)
@@ -234,7 +242,7 @@ func (a *analyzer) packageWorkspaceTree(root string) []string {
 		}
 		if entry.IsDir() {
 			dirs = a.cwdUnion(dirs, []string{name})
-			if a.reason != "" {
+			if a.reason != "" || len(dirs) > maxWorkspaceDirectories {
 				return fs.ErrInvalid
 			}
 		}

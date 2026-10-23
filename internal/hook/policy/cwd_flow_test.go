@@ -191,3 +191,47 @@ func TestAudit15CWDSetBudget(t *testing.T) {
 		t.Fatalf("cwd budget not enforced: %q", a.reason)
 	}
 }
+
+// Conditional cd alternatives stay precise up to the directory cap: a protected
+// alternative is still found, and one more distinct directory is indeterminate.
+func TestConditionalCDChainCap(t *testing.T) {
+	home, work, check := audit21Fixture(t)
+	chain := func(n int) string {
+		var b strings.Builder
+		b.WriteString("cd d0")
+		for i := 1; i < n; i++ {
+			fmt.Fprintf(&b, " || cd d%d", i)
+		}
+		return b.String()
+	}
+	sequence := func(n int) string {
+		var b strings.Builder
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&b, "cd s%d && ls; ", i)
+		}
+		return b.String()
+	}
+	// Shell text needs slash paths: unquoted Windows backslashes are escapes.
+	aws, shellHome := filepath.ToSlash(filepath.Join(home, ".aws")), filepath.ToSlash(home)
+	for _, tc := range []struct {
+		name, source, want string
+	}{
+		// Alternatives plus the original cwd fill the cap exactly.
+		{"chain at cap", chain(maxWorkingDirectories-1) + "; ls", ""},
+		{"chain past cap", chain(maxWorkingDirectories) + "; ls", roles.Indeterminate},
+		{"protected alternative", chain(maxWorkingDirectories-2) + " || cd " + aws + "; cat credentials", "reader targets a protected store"},
+		{"protected alternative past cap", chain(maxWorkingDirectories-1) + " || cd " + aws + "; cat credentials", roles.Indeterminate},
+		// Each relative conditional cd can double the set: 2^7 fits, 2^8 does not.
+		{"doubling at cap", sequence(7) + "ls", ""},
+		{"doubling past cap", sequence(8) + "ls", roles.Indeterminate},
+		{"doubling protected", sequence(6) + "cd " + shellHome + " && cd .aws; cat credentials", "reader targets a protected store"},
+		// The replay budget bounds statements times directories.
+		{"replay budget", sequence(7) + strings.Repeat("ls; ", maxFlowWork/maxWorkingDirectories), roles.Indeterminate},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := Analyze(tc.source, work, home, check); got != tc.want {
+				t.Errorf("denial=%q want %q", got, tc.want)
+			}
+		})
+	}
+}

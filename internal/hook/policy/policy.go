@@ -108,6 +108,7 @@ type analyzer struct {
 	words, globs        int
 	countedWords        map[*syntax.Word]bool
 	flowSteps           int
+	flowWork            int
 	aliases             map[string][]string
 	activeAliases       map[string]bool
 	functions           map[string][]*syntax.Stmt

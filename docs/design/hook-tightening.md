@@ -35,8 +35,10 @@ this rule. Literal arithmetic commands no longer set generic command uncertainty
 this preserves their allow decision through explicit bash -c argv, including
 `((i++))` and `let "i=1+2"`. The literal arithmetic function-body controls
 `audit28_t13_review_function_public` and `audit28_t13_review_function_public_argv`
-now match Bash's allow and no longer require divergence rows. Quoted or malformed
-arithmetic framing still denies.
+now match Bash's allow and no longer require divergence rows. Whole double-quoted
+decimal constants in arithmetic commands and C-style loops also retain literal
+proofs, including indices and function bodies. Single-quoted operands and other
+unsupported or malformed arithmetic framing still deny.
 
 The retained Bash guard allows arithmetic expansions with variable or
 numeric-producing substitution operands. It also allows the synthetic printed
@@ -260,9 +262,8 @@ never permit a Go allow where the shell suite requires deny.
 | `audit28_t13_valid_nested_loop` | deliberate-tightening | A command substitution in the C-style loop initializer is an expansion-bearing arithmetic operand, even when it prints a number. |
 | `audit27_s16_nested_parameter`, `audit27_s16_nested_parameter_shell`, `audit27_s16_nested_command`, `audit27_s16_nested_command_shell`, `audit27_s16_nested_arithmetic`, `audit27_s16_nested_arithmetic_shell`, `audit27_s16_nested_parameter_command`, `audit27_s16_nested_parameter_command_shell` | deliberate-tightening | Nested parameter, command and arithmetic expansions cannot certify a literal arithmetic operand, including when their apparent result is numeric. |
 | `audit27_s16_legacy_nested`, `audit27_s16_legacy_nested_shell`, `audit27_s16_legacy_command`, `audit27_s16_legacy_command_shell` | deliberate-tightening | The same expansion-operand rule applies to legacy `$[ ]` arithmetic. |
-| `audit28_t13_review_function_index_public`, `audit28_t13_review_function_index_public_argv` | deliberate-tightening | Go retains denial of quoted arithmetic indices in function bodies. Native Bash 4+ accepts these controls; Bash 3.2 does not. |
-| `audit28_t13_review_quoted_number_public`, `audit28_t13_review_quoted_number_public_argv`, `audit28_t13_review_single_quoted_number_public`, `audit28_t13_review_single_quoted_number_public_argv` | deliberate-tightening | Quoted arithmetic operands remain indeterminate in Go, even when Bash command quote removal yields a valid constant expression. |
-| `audit28_t13_review_quoted_index_public`, `audit28_t13_review_quoted_index_public_argv`, `audit28_t13_review_quoted_loop_public`, `audit28_t13_review_quoted_loop_public_argv`, `audit28_t13_review_quoted_child_public`, `audit28_t13_review_quoted_child_public_argv` | deliberate-tightening | Go retains conservative quote rejection in arithmetic indices, loop clauses and substitution operands. Bash validates bounded quote-removed command operands without evaluating them. |
+| `audit28_t13_review_single_quoted_number_public`, `audit28_t13_review_single_quoted_number_public_argv` | deliberate-tightening | Single-quoted arithmetic operands retain the base conservative framing denial, including literal constants. |
+| `audit28_t13_review_quoted_child_public`, `audit28_t13_review_quoted_child_public_argv` | deliberate-tightening | A double-quoted command substitution is still an expansion-bearing arithmetic operand. Even numeric-looking output is indeterminate under the shared arithmetic rule. |
 
 ## M2.1 over-denial review
 
@@ -298,6 +299,47 @@ files, cover source and argv paths through both adapters, and never execute the
 analyzed commands. Local results and inventory regeneration do not establish
 native platform CI or installed-host protection. The retained Bash guard and CLI
 are unchanged.
+
+## M2 over-denial follow-up review
+
+| Case | Decision | Reason |
+| --- | --- | --- |
+| Long conditional `cd` chains | Fix over-denial (pending CI) | Canonicalized directory alternatives stay precise up to 128 distinct directories (was 32). A per-directory statement replay budget (`maxFlowWork`, 16384) bounds work at twice the earlier 256-word by 32-directory worst case. Exceeding either bound, the 4096-step bound or the deadline still denies, without collapsing to an unknown cwd. Package-manager workspace proofs keep a separate 32-directory bound (`maxWorkspaceDirectories`), so wide-workspace denials do not loosen. |
+| `(( "1" + 2 ))`, `((a["0"]++))`, `for ((i="0";i<"2";a["0"]++))` | Fix literal-quote over-denial (pending CI) | Only a whole double-quoted decimal constant is accepted. It contains no expansion output or identifier text to reinterpret. This works in explicit-shell argv and function bodies because the base no longer marks literal arithmetic as generally uncertain. Concatenations, quoted identifiers, separators, escapes, parameter operation words, single quotes and quoted `$(( ))` operands retain denial. |
+| `(( "$(printf 1)" ))` and quoted recursive substitution output | Drop earlier allowance | The stricter base arithmetic rule wins: every expansion-bearing arithmetic operand is indeterminate, even if the substitution looks harmless or prints digits. The arithmetic, arithmetic-writer and policy arithmetic matrices remain unchanged. Single-quoted decimal allowances are also dropped to preserve the base's existing conservative denial expectations. |
+| `time -- ((i++))` | Retained | The Go parser rejects this framing; unparsed source cannot be certified. |
+
+The fresh default-binary generator removes exactly 16 of the base's 181 rows,
+leaving 165. There are no additions or category changes. Each of the following
+names disappears once from `guard` and once from `codex`:
+
+- `audit28_t13_review_function_index_public`,
+  `audit28_t13_review_function_index_public_argv`: literal double-quoted indices
+  are now supported inside the function body, with the base's literal proof.
+- `audit28_t13_review_quoted_number_public`,
+  `audit28_t13_review_quoted_number_public_argv`: whole double-quoted decimal
+  constants now match Bash in shell strings and explicit-shell argv.
+- `audit28_t13_review_quoted_index_public`,
+  `audit28_t13_review_quoted_index_public_argv`: the same literal-only allowance
+  applies to arithmetic array indices.
+- `audit28_t13_review_quoted_loop_public`,
+  `audit28_t13_review_quoted_loop_public_argv`: literal double-quoted constants
+  and indices in all three C-style loop clauses now match Bash.
+
+The `cd` change removes no inventory rows. Single-quoted-number and quoted-child
+rows remain named in the table above; all 26 arithmetic-operand tightening rows
+and the arithmetic-writer evidence are retained unchanged.
+
+`TestConditionalCDChainCap` covers precise alternatives and both budgets.
+`TestArithmeticCommandQuotedOperands` covers literal quotes and denied expansion
+shapes. `TestOverDenialFollowupAdapters` adds 31 must-deny review commands and
+five allow controls, each through both adapters as shell strings and explicit
+`bash -c` argv. Protected alternatives at and past the cap, retained failure cwd,
+symlinks, pipeline/subshell scope, nested shells, relative container binds,
+workspace bounds, recursive arithmetic output, stored operands and unknown
+writers all retain denial. Candidates are JSON data only, never executed; every
+file is synthetic and below a disposable HOME/work root. These local results do
+not establish native platform CI or installed-host protection.
 
 ## Permanent synthetic evidence
 
@@ -476,8 +518,10 @@ operands retain their non-command roles. R2/R8 analyze substitutions in
 unquoted message heredocs and keep interpreter heredocs scoped to their own
 statement. R4 derives future protected-name witnesses from the selector's
 literal structure, including arbitrary environment suffixes. R6 propagates
-success/failure cwd sets once per statement, with 32-directory and 4096-step
-caps; AST word budgets count each word once across alternative directories.
+success/failure cwd sets once per statement, originally with 32-directory and
+4096-step caps; AST word budgets count each word once across alternative
+directories. The M2 over-denial follow-up raises the directory cap to 128 under
+a separate 16384 per-directory replay budget.
 
 L1 models fd execution as a child consuming the selected names. L3/L4 cover
 Kubernetes attached output values and comma-separated resource lists. L5/L6
@@ -1656,8 +1700,9 @@ protection or native macOS/Windows behavior.
 - T13: Bash validates arithmetic commands and C-style loop clauses with bounded,
   non-evaluating quote removal, normalized loop tokens and original-source
   substitution checks, including function bodies. Continued loops and quoted
-  command constants/indices remain valid. Go's stricter quoted arithmetic and
-  function/time framing controls are named in the divergence table above.
+  command constants/indices remain valid. Go now accepts literal double-quoted
+  constants, indices and loops; its single-quote, expansion-operand and time
+  framing denials remain named in the divergence table above.
 - T14/T18: classify Grep on either host; default only an absent output_mode to
   files_with_matches. Explicit empty or unknown strings receive content checks.
 - T15: configured credential path equality and containment fold case on every

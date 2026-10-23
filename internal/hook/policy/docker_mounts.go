@@ -193,7 +193,7 @@ func (a *analyzer) dockerBindReaders(args []string, depth int, cwd string) {
 		return a.protected(name, childCWD)
 	}
 	probe.command(args[1:], depth+1, containerCWD, false)
-	a.words, a.globs, a.flowSteps = probe.words, probe.globs, probe.flowSteps
+	a.words, a.globs, a.flowSteps, a.flowWork = probe.words, probe.globs, probe.flowSteps, probe.flowWork
 	a.uncertain = a.uncertain || probe.uncertain
 	a.structuralUncertain = a.structuralUncertain || probe.structuralUncertain
 	if probe.reason != "" {

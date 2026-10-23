@@ -39,9 +39,9 @@ func bashFraming(root syntax.Node) bool {
 		case *syntax.ArithmExp:
 			valid = arithmeticQuotes(cmd.X)
 		case *syntax.ArithmCmd:
-			valid = arithmeticQuotes(cmd.X)
+			valid = arithmeticCommandQuotes(cmd.X)
 		case *syntax.CStyleLoop:
-			valid = arithmeticQuotes(cmd.Init) && arithmeticQuotes(cmd.Cond) && arithmeticQuotes(cmd.Post)
+			valid = arithmeticCommandQuotes(cmd.Init) && arithmeticCommandQuotes(cmd.Cond) && arithmeticCommandQuotes(cmd.Post)
 		case *syntax.ParamExp:
 			if cmd.Slice != nil {
 				valid = arithmeticQuotes(cmd.Slice.Offset) && arithmeticQuotes(cmd.Slice.Length)
@@ -238,6 +238,76 @@ func arithmeticQuotes(expr syntax.ArithmExpr) bool {
 		return valid
 	})
 	return valid
+}
+
+// Arithmetic commands and C-style loop clauses accept whole double-quoted decimal
+// constants without expansion text. Expansion-bearing operands still deny:
+// quote removal cannot certify the text Bash recursively evaluates. Single
+// quotes remain unsupported, preserving their existing conservative denial.
+// Concatenations such as x"1" would name a variable the identifier scan cannot
+// see; spaces, operators, escapes and separators can change the expression
+// structure. Parameter operation words and nested $(( )) keep the strict check.
+func arithmeticCommandQuotes(expr syntax.ArithmExpr) bool {
+	if expr == nil {
+		return true
+	}
+	valid := true
+	syntax.Walk(expr, func(node syntax.Node) bool {
+		if !valid {
+			return false
+		}
+		switch n := node.(type) {
+		case *syntax.Word:
+			quoted := false
+			for _, part := range n.Parts {
+				switch part.(type) {
+				case *syntax.SglQuoted, *syntax.DblQuoted:
+					quoted = true
+				}
+			}
+			if quoted {
+				valid = len(n.Parts) == 1 && quotedArithmeticOperand(n.Parts[0])
+				return false
+			}
+		case *syntax.ParamExp:
+			// Only a subscript is an arithmetic operand context. Check every
+			// other parameter component with the strict quote rule.
+			rest := *n
+			rest.Index = nil
+			valid = arithmeticQuotes(&syntax.Word{Parts: []syntax.WordPart{&rest}}) && arithmeticCommandQuotes(n.Index)
+			return false
+		case *syntax.CmdSubst, *syntax.ProcSubst:
+			return false
+		}
+		return valid
+	})
+	return valid
+}
+
+func quotedArithmeticOperand(part syntax.WordPart) bool {
+	switch quoted := part.(type) {
+	case *syntax.DblQuoted:
+		if quoted.Dollar || len(quoted.Parts) != 1 {
+			return false
+		}
+		switch inner := quoted.Parts[0].(type) {
+		case *syntax.Lit:
+			return decimalDigits(inner.Value)
+		}
+	}
+	return false
+}
+
+func decimalDigits(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, c := range value {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func emptyTimedPipeline(stmt *syntax.Stmt) bool {

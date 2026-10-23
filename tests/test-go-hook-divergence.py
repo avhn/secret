@@ -68,15 +68,20 @@ class EnvelopeTighteningTests(unittest.TestCase):
                         self.measure(suite, name, "deny")
 
     def test_audit28_tightenings_are_exact_and_directional(self):
-        self.assertEqual(len(divergence.AUDIT28_TIGHTENING), 13)
+        self.assertEqual(len(divergence.AUDIT28_TIGHTENING), 5)
         for suite in ["guard", "codex"]:
             for name in sorted(divergence.AUDIT28_TIGHTENING):
                 with self.subTest(suite=suite, name=name):
                     self.assertEqual(self.measure(suite, name, "allow"), [(suite, name, "deliberate-tightening")])
                     with self.assertRaisesRegex(ValueError, "unreviewed difference"):
                         self.measure(suite, name, "deny")
-            for name in ["audit28_t13_review_unknown_public", "audit28_t19_depth_65_deadline",
-                         "audit28_t13_review_function_public", "audit28_t13_review_function_public_argv"]:
+            matching = {
+                "audit28_t13_review_" + name + "_public" + suffix
+                for name in ("function", "function_index", "quoted_number",
+                             "quoted_index", "quoted_loop")
+                for suffix in ("", "_argv")
+            }
+            for name in sorted(matching | {"audit28_t13_review_unknown_public", "audit28_t19_depth_65_deadline"}):
                 with self.assertRaisesRegex(ValueError, "unreviewed difference"):
                     self.measure(suite, name, "allow")
 

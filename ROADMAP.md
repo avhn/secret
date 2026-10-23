@@ -281,10 +281,17 @@ Hosted CI for ede0b3b and b19f0b9: [ci 39468276188](https://github.com/avhn/secr
   (ede0b3b)
 - [ ] `kubectl -o custom-columns` and curl uploads of unresolved variables (documented limits, P8)
 - [ ] Bash two-second budget on long chains (P20, documented)
-- [ ] Go denies long conditional-cd chains past the cwd-set cap
-- [ ] Audit 28: Go retains conservative quoted arithmetic-command operands,
-  parenthesis-free arithmetic function bodies and `time --` arithmetic framing;
-  exact controls are recorded in the hook tightening table and divergence inventory
+- [x] Go denies long conditional-cd chains past the cwd-set cap: precise
+  cwd alternatives rise from 32 to 128 under a 16384 per-directory replay
+  budget; past either bound Go still denies (pending CI)
+- [x] Audit 28: Go accepts whole double-quoted decimal constants and indices
+  in arithmetic commands, function bodies and loop clauses, including explicit-shell
+  argv. Expansion-bearing operands and single quotes retain all base denials;
+  the quoted-command-substitution allowance is dropped. Regenerated inventory:
+  181 to 165 rows, with 16 literal-quote controls now matching Bash (pending CI)
+- [ ] Audit 28: Go retains `time --` arithmetic framing, single-quoted operands
+  and all expansion-bearing arithmetic operands; exact controls are recorded in
+  the hook tightening table and divergence inventory
 - [ ] Audit 28: Bash PHP descriptor syntax over-denies public proc_open array
   launches; Go public controls stay allowed rather than copying that over-denial
 

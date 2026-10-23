@@ -152,7 +152,9 @@ func TestPackageExecWorkspaceBounds(t *testing.T) {
 		deny bool
 	}{
 		{"bounded", 3, false},
-		{"directory limit", maxWorkingDirectories + 1, true},
+		{"at directory limit", maxWorkspaceDirectories - 1, false},
+		{"directory limit", maxWorkspaceDirectories + 1, true},
+		{"cwd-flow limit", maxWorkingDirectories + 1, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()

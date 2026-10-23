@@ -12,8 +12,16 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-const maxWorkingDirectories = 32
+// Directory alternatives are precise, not widened: a set beyond this cap is
+// indeterminate. Conditional relative cd statements can double the set, so a
+// larger cap admits longer alternative chains without changing that decision.
+const maxWorkingDirectories = 128
 const maxFlowSteps = 4096
+
+// maxFlowWork bounds the per-directory statement replays across one analysis,
+// whatever the directory cap. The 256-word budget at the earlier 32-directory
+// cap allowed about 8192 replays; this keeps the total within twice that.
+const maxFlowWork = 16384
 
 type cwdFlow struct{ success, failure []string }
 
@@ -229,7 +237,8 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	}
 	defer func() { a.credentialBranch = priorBranch }()
 	a.flowSteps++
-	if a.flowSteps > maxFlowSteps {
+	a.flowWork += len(states)
+	if a.flowSteps > maxFlowSteps || a.flowWork > maxFlowWork {
 		a.reason = roles.Indeterminate
 		return cwdFlow{}
 	}
