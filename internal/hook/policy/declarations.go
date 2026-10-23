@@ -14,7 +14,7 @@ var declarationName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // HOME and static variables expand without execution, splitting or globbing.
 // An unresolved declaration is not an empty assignment that erases protection.
 func (a *analyzer) assignmentLiteral(key string, word *syntax.Word, cwd string) string {
-	if !optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE", key) || word == nil {
+	if !optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE XDG_CONFIG_HOME GH_CONFIG_DIR", key) || word == nil {
 		return literal(word)
 	}
 	value, known := a.expandInterpreterStdin(word, false, cwd)

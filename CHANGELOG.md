@@ -11,6 +11,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
   public binds, mount precedence and container-root boundaries, with synthetic
   shell/argv tests on both adapters. The frozen Bash guard remains unchanged;
   native platform CI and installed-host protection are not claimed.
+- Close staged Go hook Audit 28 gaps for `uvx` and `uv tool run`: inspect the
+  actual child under its directory options and deny protected configuration,
+  requirements, env-file and project metadata inputs. Protect relocated gh
+  `hosts.yml` selected by inherited, inline, exported and wrapped
+  `XDG_CONFIG_HOME`/`GH_CONFIG_DIR`, including aliases and content searches.
+  Keep public readers, metadata queries and approved printer transports allowed;
+  retained Bash executables and installed hooks are unchanged (pending CI).
 - Build and test with Go 1.26.10 instead of 1.26.0: govulncheck found reachable
   standard library vulnerabilities, including `os.Root` escapes (GO-2026-4970,
   GO-2026-4602, GO-2026-4864) on store write paths and `net/url` parsing

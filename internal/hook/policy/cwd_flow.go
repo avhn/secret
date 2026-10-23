@@ -240,6 +240,15 @@ func (a *analyzer) statementFlow(stmt *syntax.Stmt, depth int, states []string) 
 	case *syntax.BinaryCmd:
 		childScope = childScope || cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll
 	}
+	ghChild := childScope
+	if call, ok := stmt.Cmd.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+		name := flowCommandName(stmt)
+		ghChild = ghChild || len(a.functions[name]) == 0 && !optionIn("eval export declare typeset local readonly source .", name)
+	}
+	if ghChild {
+		restore := a.scopedGHConfig()
+		defer restore()
+	}
 	if childScope {
 		parent, aliases := a.functions, a.aliases
 		a.functions, a.aliases = maps.Clone(parent), maps.Clone(aliases)

@@ -72,12 +72,16 @@ type credentialConfig struct {
 func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 	a.noteArithmeticValue(key, value)
 	// Branches and scoped assignments cannot erase a possible credential path.
-	if key == "KUBECONFIG" || key == "AWS_CONFIG_FILE" || key == "AWS_SHARED_CREDENTIALS_FILE" {
+	if optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE XDG_CONFIG_HOME GH_CONFIG_DIR", key) {
 		if !a.credentialBranch {
 			a.credentialConfigs = slices.DeleteFunc(a.credentialConfigs, func(config credentialConfig) bool { return config.key == key })
 		}
-		config := credentialConfig{key, value}
-		if value != "" && !slices.Contains(a.credentialConfigs, config) {
+		target := value
+		if key == "XDG_CONFIG_HOME" || key == "GH_CONFIG_DIR" {
+			target = paths.GHHostsPath(key, value)
+		}
+		config := credentialConfig{key, target}
+		if target != "" && !slices.Contains(a.credentialConfigs, config) {
 			a.credentialConfigs = append(a.credentialConfigs, config)
 		}
 	}
@@ -127,6 +131,39 @@ func (a *analyzer) hookAssignment(key, value string, depth int, cwd string) {
 			return
 		}
 		a.fragmentAt(value, depth+1, cwd)
+	}
+}
+
+// scopedGHConfig keeps new gh directory witnesses local to child environments.
+// Retain the older conservative scope rules for other credential providers.
+func (a *analyzer) scopedGHConfig() func() {
+	isGH := func(config credentialConfig) bool {
+		return config.key == "XDG_CONFIG_HOME" || config.key == "GH_CONFIG_DIR"
+	}
+	var parent []credentialConfig
+	for _, config := range a.credentialConfigs {
+		if isGH(config) {
+			parent = append(parent, config)
+		}
+	}
+	xdg, xdgKnown := a.env["XDG_CONFIG_HOME"]
+	gh, ghKnown := a.env["GH_CONFIG_DIR"]
+	return func() {
+		a.credentialConfigs = append(slices.DeleteFunc(a.credentialConfigs, isGH), parent...)
+		for key, value := range map[string]string{"XDG_CONFIG_HOME": xdg, "GH_CONFIG_DIR": gh} {
+			known := xdgKnown
+			if key == "GH_CONFIG_DIR" {
+				known = ghKnown
+			}
+			if !known {
+				delete(a.env, key)
+			} else {
+				if a.env == nil {
+					a.env = make(map[string]string)
+				}
+				a.env[key] = value
+			}
+		}
 	}
 }
 
@@ -409,7 +446,7 @@ func invalidControls(source string) bool {
 	return strings.IndexFunc(source, func(r rune) bool { return r < 32 && r != '\n' && r != '\t' || r == 127 }) >= 0
 }
 
-// Keep Kubernetes path lists separate from singular AWS names.
+// Keep Kubernetes path lists separate from singular AWS and gh names.
 func (a *analyzer) credentialConfig() string {
 	var values []string
 	for _, config := range a.credentialConfigs {

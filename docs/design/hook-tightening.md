@@ -1599,6 +1599,43 @@ two recorded aliases and is unchanged. Exact retained-suite divergence inventori
 remain separate from these new Go regression tables; synthetic replay does not
 establish installed-host protection or native macOS/Windows behavior.
 
+### Audit 28 follow-up: UV tool runners and relocated gh credentials (pending CI)
+
+The Go-only `TestAudit28UVToolOptions` witnesses close the shared tool-runner
+backlog without changing the frozen Bash executables. Synthetic examples include
+`uvx --directory HOME/.aws cat credentials` and
+`uv --directory HOME/.aws tool run cat credentials`. The bounded UV parser now
+selects the actual executable for `uvx`, `uv tool run` and `uv run`, including
+options before `tool`/`run`, attached values, `--from` and option terminators.
+Source options (`--with-requirements`, `--env-file`, `--config-file`, local
+packages, cache and project selectors) retain protected input witnesses. Source
+paths are checked after `--directory` regardless of option order. Project,
+editable and directory selectors also check the known metadata filenames for
+protected aliases, without opening their contents. Unknown/incomplete launch
+options deny. Public children, help/version, metadata queries and sibling cwd
+controls remain allowed. `TestAudit28LaunchSystemdEnvironment` already covers
+attached `--setenv` on Go; the Bash-only half remains a backlog item.
+
+`TestAudit28RelocatedGHHosts` closes synthetic reads such as
+`GH_CONFIG_DIR=custom cat custom/hosts.yml` and
+`export XDG_CONFIG_HOME=custom; rg synthetic custom/gh/hosts.yml`. Both directory
+variables register only their gh credential file, not every public file in the
+selected directory. Inherited settings also reach native file tools, lexical
+and physical path checks, case-folded aliases and bounded content searches.
+Inline, exported, static-expanded and env-wrapped settings share the existing
+configured-path machinery. New directory witnesses retain branch alternatives
+but do not leak from child environments into sibling reads; existing provider
+scope rules are unchanged. Explicit configured rg file inputs deny even with
+names-only output. `TestAudit28GHConfiguredPaths` checks absent files and dangling
+aliases. `TestAudit28GHConfigCertification` prevents static rg exclusions from
+certifying arbitrary `GH_CONFIG_DIR` locations. The existing gh token/status
+printers still deny after relocation, while ordinary status and direct approved
+`secret stash` pipes retain their previous controls.
+
+These are synthetic adapter decisions on Claude and Codex, not installed-host
+or native macOS/Windows evidence. No retained shell expectation is weakened.
+The existing divergence generator remains authoritative for any measured rows.
+
 ## Confirmation audit 29: bounded launch, patch and syntax witnesses
 
 U0 recognizes static computed Deno argument keys, retaining witnesses across

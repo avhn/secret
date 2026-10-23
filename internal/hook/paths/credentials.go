@@ -41,15 +41,31 @@ func physicalOrCleanWith(name string, resolve func(string) (string, error)) stri
 	return filepath.Clean(name)
 }
 
-// configuredEntries combines Kubernetes path lists with the two singular AWS
-// config paths. AWS paths are not split: a literal colon can be part of a name.
+// GHHostsPath names the credential file selected by a gh configuration directory.
+// Preserve components for physical lookup rather than cleaning across symlinks.
+func GHHostsPath(key, directory string) string {
+	if directory == "" {
+		return ""
+	}
+	switch key {
+	case "XDG_CONFIG_HOME":
+		return directory + "/gh/hosts.yml"
+	case "GH_CONFIG_DIR":
+		return directory + "/hosts.yml"
+	}
+	return ""
+}
+
+// configuredEntries combines Kubernetes path lists with singular AWS and gh
+// credential paths. Singular paths may contain the native list separator.
 func configuredEntries(config string) []string {
-	return append(filepath.SplitList(config), os.Getenv("AWS_CONFIG_FILE"), os.Getenv("AWS_SHARED_CREDENTIALS_FILE"))
+	return append(filepath.SplitList(config), os.Getenv("AWS_CONFIG_FILE"), os.Getenv("AWS_SHARED_CREDENTIALS_FILE"),
+		GHHostsPath("XDG_CONFIG_HOME", os.Getenv("XDG_CONFIG_HOME")), GHHostsPath("GH_CONFIG_DIR", os.Getenv("GH_CONFIG_DIR")))
 }
 
 // ConfiguredProtected recognizes literal configured credential paths, including
 // physical aliases. Config is a Kubernetes path list; literals are whole singular
-// AWS alternatives. Values are metadata only, never opened or evaluated.
+// credential alternatives. Values are metadata only, never opened or evaluated.
 func ConfiguredProtected(name, cwd, workdir, home, config string, literals ...string) bool {
 	return configuredProtected(name, cwd, workdir, home, config, physicalOrClean, literals...)
 }

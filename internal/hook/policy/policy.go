@@ -277,7 +277,7 @@ func (a *analyzer) singleStmtInput(stmts []*syntax.Stmt, depth int, cwd string) 
 			for _, assign := range call.Assigns {
 				// Redirected interpreter bodies run with the call's literal
 				// credential-path assignments, not just inherited paths.
-				if assign.Name != nil && !assign.Append && optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE", assign.Name.Value) {
+				if assign.Name != nil && !assign.Append && optionIn("KUBECONFIG AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE XDG_CONFIG_HOME GH_CONFIG_DIR", assign.Name.Value) {
 					a.hookAssignment(assign.Name.Value, a.assignmentLiteral(assign.Name.Value, assign.Value, cwd), depth, cwd)
 				}
 				if assign.Name != nil && !assign.Append && optionIn("GIT_CONFIG_GLOBAL XDG_CONFIG_HOME HOME GIT_DIR GIT_COMMON_DIR", assign.Name.Value) {
@@ -1247,7 +1247,7 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 			}
 		}
 	}
-	if name == "uv" && a.uvRunChild(args, depth, cwd, direct) {
+	if (name == "uv" || name == "uvx") && a.uvRunChild(name, args, depth, cwd, direct) {
 		return
 	}
 	if a.packageExec(name, args, depth, cwd, direct) || a.audit13Printer(name, args, cwd) {
@@ -1743,6 +1743,14 @@ func (a *analyzer) command(words []string, depth int, cwd string, direct bool) {
 		}
 	}
 	if name == "rg" {
+		// Names-only output does not exempt an explicitly selected configured
+		// credential file. Inline directory assignments are not in os.Environ.
+		for _, root := range rgRoots(args) {
+			if a.pathMetadata().ConfiguredProtected(root, cwd, "", a.home, a.credentialConfig(), a.credentialPaths()...) {
+				a.reason = roles.FileInput
+				return
+			}
+		}
 		if config := a.credentialConfig(); (config != "" || len(a.credentialPaths()) != 0) && !rgOutputOnly(args) {
 			roots := rgRoots(args)
 			if len(roots) == 0 {

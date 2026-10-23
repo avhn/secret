@@ -222,10 +222,12 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
   guard retains this class (i) gap, not a class (ii) difference.
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads
-- [ ] Audit 28: shared UV tool-runner directory options and Bash attached
-  systemd-run --setenv configured credential paths
+- [x] Audit 28: Go closes shared UV tool-runner directory/source options (pending CI)
+- [ ] Audit 28: Bash attached systemd-run --setenv configured credential paths
+  (Go already denies these child reads)
 - [ ] Audit 28: Bash whitespace-listed Grep selectors (Go now checks their union)
-- [ ] Audit 28: shared relocated gh hosts.yml under XDG_CONFIG_HOME/GH_CONFIG_DIR
+- [x] Audit 28: Go protects relocated gh hosts.yml under XDG_CONFIG_HOME/GH_CONFIG_DIR
+  (pending CI; retained Bash guard unchanged)
 - [ ] Audit 28: Bash recursive grep following protected symlink targets
 
 ### M2.1 follow-ups (audit 29 syntax, raw limits and coverage)

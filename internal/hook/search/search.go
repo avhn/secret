@@ -68,7 +68,7 @@ func Config(file, cwd, home string) (int, bool) {
 			return 1, hidden
 		}
 	}
-	if os.Getenv("KUBECONFIG") != "" || os.Getenv("AWS_CONFIG_FILE") != "" || os.Getenv("AWS_SHARED_CREDENTIALS_FILE") != "" {
+	if os.Getenv("KUBECONFIG") != "" || os.Getenv("AWS_CONFIG_FILE") != "" || os.Getenv("AWS_SHARED_CREDENTIALS_FILE") != "" || os.Getenv("GH_CONFIG_DIR") != "" {
 		// Arbitrary configured names are not covered by the static exclusions.
 		return 1, hidden
 	}
