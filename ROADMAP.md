@@ -217,9 +217,9 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 ### M2 coverage backlog (class i, non-blocking under P22)
 
 - [ ] Track future shared or Bash-only coverage findings under the P22 class (i) rule
-- [x] Review 935ad4e: Docker/Podman bind-source and container-operand symlink-parent
-  traversal in Go (pending CI). Synthetic reader aliases now deny; the frozen Bash
-  guard retains this class (i) gap, not a class (ii) difference.
+- [x] Review 935ad4e: Docker/Podman bind-source and container-operand
+  symlink-parent traversal in Go (merged in #17, CI green). Synthetic reader aliases now deny;
+  the frozen Bash guard retains this class (i) gap, not a class (ii) difference.
 
 - [ ] Bash-only: expansion-bearing arithmetic operands remain allowed in retained
   guard contexts (integer declarations, array indices, slices, comparisons and
@@ -228,22 +228,26 @@ Gate: map ~1389 guard and ~41 Codex cases; review tightening table; meet 5 s hos
 
 - [ ] Audit 28: Bash explicit-shell argv positional operands and option terminators
 - [ ] Audit 28: Bash awk pipe/getline protected child reads
-- [x] Audit 28: Go closes shared UV tool-runner directory/source options (pending CI)
+- [x] Audit 28: Go closes shared UV tool-runner directory/source options
+  (merged in #18, CI green)
 - [ ] Audit 28: Bash attached systemd-run --setenv configured credential paths
   (Go already denies these child reads)
 - [ ] Audit 28: Bash whitespace-listed Grep selectors (Go now checks their union)
 - [x] Audit 28: Go protects relocated gh hosts.yml under XDG_CONFIG_HOME/GH_CONFIG_DIR
-  (pending CI; retained Bash guard unchanged)
+  (merged in #18, CI green; retained Bash guard unchanged)
 - [ ] Audit 28: Bash recursive grep following protected symlink targets
 
 ### M2.1 follow-ups (audit 29 syntax, raw limits and coverage)
 
 - [x] U2: reject malformed/uncertified coprocess reserved-word framing and
-  restore redirected simple executable dispatch (Go, pending CI)
+  restore redirected simple executable dispatch (Go, merged in #19, CI green)
 - [x] U3: certify effective patch stdin across pipelines, redirects and coprocess
   scopes; deny alternate apply_patch argv sources and uncertified patch diff
-  inputs even with explicit output (Go, pending CI). Retained Bash provenance
-  limits and its public ancestor-heredoc over-denial remain unchanged
+  inputs even with explicit output (Go, merged in #19, CI green). Retained Bash
+  provenance limits and its public ancestor-heredoc over-denial remain unchanged
+- [ ] Known gap: the frozen Bash guard still allows several expansion-bearing arithmetic
+  operand and untracked-writer forms that staged Go denies (#20). The owner kept Bash
+  frozen by policy; Go activation in M4.1 is the fix path
 - [ ] U8: malformed code in opaque extglobs; Go now denies the reported forms,
   retain paired malformed-language regression coverage
 - [ ] U11: malformed nested backquotes; Go now denies deep residue, while Bash
@@ -283,12 +287,13 @@ Hosted CI for ede0b3b and b19f0b9: [ci 39468276188](https://github.com/avhn/secr
 - [ ] Bash two-second budget on long chains (P20, documented)
 - [x] Go denies long conditional-cd chains past the cwd-set cap: precise
   cwd alternatives rise from 32 to 128 under a 16384 per-directory replay
-  budget; past either bound Go still denies (pending CI)
+  budget; past either bound Go still denies (merged in #22, CI green)
 - [x] Audit 28: Go accepts whole double-quoted decimal constants and indices
   in arithmetic commands, function bodies and loop clauses, including explicit-shell
   argv. Expansion-bearing operands and single quotes retain all base denials;
   the quoted-command-substitution allowance is dropped. Regenerated inventory:
-  181 to 165 rows, with 16 literal-quote controls now matching Bash (pending CI)
+  181 to 165 rows, with 16 literal-quote controls now matching Bash
+  (merged in #22, CI green)
 - [ ] Audit 28: Go retains `time --` arithmetic framing, single-quoted operands
   and all expansion-bearing arithmetic operands; exact controls are recorded in
   the hook tightening table and divergence inventory
@@ -328,8 +333,9 @@ Status: in progress (replacement v0.2.3 identity approved; new candidates, sourc
 
 - [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.3)
 - [x] build(release): add deterministic artifacts and final-tag attestation workflow (cbf8bc6)
-- [x] fix(release): restore annotated runner tags for v0.2.3 and upload portable draft bundle names (pending CI)
-- [x] fix(release): use compatible exact-SAN verification and add read-only real-provenance rehearsal for v0.2.3 (pending hosted CI)
+- [x] fix(release): restore annotated runner tags after checkout and upload portable draft bundle names (merged in #14, CI green)
+- [x] fix(release): use compatible exact-SAN verification and add read-only real-provenance
+  rehearsal for v0.2.3 (merged in #21, CI green)
 - [x] feat(plugin): add symlink-safe opt-in verified launchers and bootstrap denial (c66f127)
 - [x] test(plugin): add native install, offline, corruption, timeout and concurrency matrix (0bdf573)
 - [x] test(host): build deferred real-host harness and offline synthetic classification (84bc6cc)

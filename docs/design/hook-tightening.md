@@ -277,10 +277,10 @@ preprocessors, content output or JSON output that can carry matching text.
 
 | Case | Decision | Reason |
 | --- | --- | --- |
-| `git grep --no-index -q T .env` | Fix over-denial (pending CI) | The explicit-file quiet mode prints no contents, consistent with existing grep/rg quiet and Git filenames-only policy. Git count-only behavior is unchanged. Protected `-f` inputs, pager execution and unknown options still deny. |
-| `python3 -m env` | Fix over-denial (pending CI) | The module name is not a shell env launcher or a `.env` file input. Keep the interpreter path checks and inspect every later argument normally; dotenv/keyring credential modules and real env printers still deny. |
-| `rg --passthru -q T .env`, `rg -l --passthru T .env` | Fix over-denial (pending CI) | Passthru changes line selection, not quiet or filenames-only output. Both option orders retain the existing explicit-file non-content exemptions. Passthru without those modes, protected pattern files, preprocessors and content-bearing JSON still deny. |
-| `rg -g '{!*.md,*.secret}' T` | Intended conservative denial (pending CI) | Bounded brace analysis retains the positive `*.secret` alternative. A negated sibling does not make the whole selector a pure exclusion or a safe narrowing proof. The protective config certificate does not admit positive re-inclusions. |
+| `git grep --no-index -q T .env` | Fix over-denial (merged in #10, CI green) | The explicit-file quiet mode prints no contents, consistent with existing grep/rg quiet and Git filenames-only policy. Git count-only behavior is unchanged. Protected `-f` inputs, pager execution and unknown options still deny. |
+| `python3 -m env` | Fix over-denial (merged in #10, CI green) | The module name is not a shell env launcher or a `.env` file input. Keep the interpreter path checks and inspect every later argument normally; dotenv/keyring credential modules and real env printers still deny. |
+| `rg --passthru -q T .env`, `rg -l --passthru T .env` | Fix over-denial (merged in #10, CI green) | Passthru changes line selection, not quiet or filenames-only output. Both option orders retain the existing explicit-file non-content exemptions. Passthru without those modes, protected pattern files, preprocessors and content-bearing JSON still deny. |
+| `rg -g '{!*.md,*.secret}' T` | Intended conservative denial (merged in #10, CI green) | Bounded brace analysis retains the positive `*.secret` alternative. A negated sibling does not make the whole selector a pure exclusion or a safe narrowing proof. The protective config certificate does not admit positive re-inclusions. |
 
 The last case is a certification limit, not proof that every implementation emits
 protected content with that exact config. A disposable ripgrep 15.2.0 probe with
@@ -304,8 +304,8 @@ are unchanged.
 
 | Case | Decision | Reason |
 | --- | --- | --- |
-| Long conditional `cd` chains | Fix over-denial (pending CI) | Canonicalized directory alternatives stay precise up to 128 distinct directories (was 32). A per-directory statement replay budget (`maxFlowWork`, 16384) bounds work at twice the earlier 256-word by 32-directory worst case. Exceeding either bound, the 4096-step bound or the deadline still denies, without collapsing to an unknown cwd. Package-manager workspace proofs keep a separate 32-directory bound (`maxWorkspaceDirectories`), so wide-workspace denials do not loosen. |
-| `(( "1" + 2 ))`, `((a["0"]++))`, `for ((i="0";i<"2";a["0"]++))` | Fix literal-quote over-denial (pending CI) | Only a whole double-quoted decimal constant is accepted. It contains no expansion output or identifier text to reinterpret. This works in explicit-shell argv and function bodies because the base no longer marks literal arithmetic as generally uncertain. Concatenations, quoted identifiers, separators, escapes, parameter operation words, single quotes and quoted `$(( ))` operands retain denial. |
+| Long conditional `cd` chains | Fix over-denial (merged in #22, CI green) | Canonicalized directory alternatives stay precise up to 128 distinct directories (was 32). A per-directory statement replay budget (`maxFlowWork`, 16384) bounds work at twice the earlier 256-word by 32-directory worst case. Exceeding either bound, the 4096-step bound or the deadline still denies, without collapsing to an unknown cwd. Package-manager workspace proofs keep a separate 32-directory bound (`maxWorkspaceDirectories`), so wide-workspace denials do not loosen. |
+| `(( "1" + 2 ))`, `((a["0"]++))`, `for ((i="0";i<"2";a["0"]++))` | Fix literal-quote over-denial (merged in #22, CI green) | Only a whole double-quoted decimal constant is accepted. It contains no expansion output or identifier text to reinterpret. This works in explicit-shell argv and function bodies because the base no longer marks literal arithmetic as generally uncertain. Concatenations, quoted identifiers, separators, escapes, parameter operation words, single quotes and quoted `$(( ))` operands retain denial. |
 | `(( "$(printf 1)" ))` and quoted recursive substitution output | Drop earlier allowance | The stricter base arithmetic rule wins: every expansion-bearing arithmetic operand is indeterminate, even if the substitution looks harmless or prints digits. The arithmetic, arithmetic-writer and policy arithmetic matrices remain unchanged. Single-quoted decimal allowances are also dropped to preserve the base's existing conservative denial expectations. |
 | `time -- ((i++))` | Retained | The Go parser rejects this framing; unparsed source cannot be certified. |
 
@@ -1728,7 +1728,7 @@ controls that the suites cannot parse there. Denials and every other inventory
 key remain mandatory. Synthetic inventory tests verify both runtime paths and
 reject attempts to overwrite the canonical inventory from Bash 3.2.
 
-## Review 935ad4e: Docker bind and container physical parents (pending CI)
+## Review 935ad4e: Docker bind and container physical parents (merged in #17, CI green)
 
 This closes the Go side of the recorded class (i) gap, not a Go-looser class (ii)
 regression. With disposable `work/alias` pointing to `home/.aws/inner`, both guards
@@ -1756,7 +1756,7 @@ two recorded aliases and is unchanged. Exact retained-suite divergence inventori
 remain separate from these new Go regression tables; synthetic replay does not
 establish installed-host protection or native macOS/Windows behavior.
 
-### Audit 28 follow-up: UV tool runners and relocated gh credentials (pending CI)
+### Audit 28 follow-up: UV tool runners and relocated gh credentials (merged in #18, CI green)
 
 The Go-only `TestAudit28UVToolOptions` witnesses close the shared tool-runner
 backlog without changing the frozen Bash executables. Synthetic examples include
@@ -1841,7 +1841,7 @@ differences are not claimed fixed by these synthetic tests. Go-side U15-U17 and
 timing follow-ups are described below, pending applicable CI. Installed-host
 failure evidence remains a separate gate.
 
-### M2.1 U2/U3 coprocess framing and effective patch recipients (pending CI)
+### M2.1 U2/U3 coprocess framing and effective patch recipients (merged in #19, CI green)
 
 U2 rejects misplaced unquoted coprocess head words (then/elif/else/fi/do/done/
 esac/in/select/!/}/]]), including redirected and pipeline heads. The parser may accept
@@ -1928,7 +1928,7 @@ Named supplemental replay entries (the argv suffix changes only the envelope).
 - `m21_u3_process_operand`, `m21_u3_process_operand_argv`: a process-substitution
   argv source cannot borrow a valid stdin heredoc.
 
-### M2.1 U15-U17 raw paths and patch grammar (pending CI)
+### M2.1 U15-U17 raw paths and patch grammar (merged in #10, CI green)
 
 U15 checks raw UTF-8 bytes before normalization or filesystem metadata: at most
 4096 bytes total and 255 bytes per component. These are the retained Bash
@@ -1996,7 +1996,7 @@ internal/hook/patch/m21_upstream_test.go and internal/hook/m21_boundaries_test.g
 They include upstream compatibility controls, multibyte boundaries, every
 path role, both host adapters, native and shell patch routes, and C0/DEL controls.
 
-### Audit 29 input-read and total decision timing (pending CI)
+### Audit 29 input-read and total decision timing (merged in #10, CI green)
 
 The two-second policy deadline starts at shell analysis, not at process launch
 or the first stdin read. The existing independent two-second read deadline still

@@ -46,7 +46,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
   `hosts.yml` selected by inherited, inline, exported and wrapped
   `XDG_CONFIG_HOME`/`GH_CONFIG_DIR`, including aliases and content searches.
   Keep public readers, metadata queries and approved printer transports allowed;
-  retained Bash executables and installed hooks are unchanged (pending CI).
+  retained Bash executables and installed hooks are unchanged (merged in #18, CI green).
 - Tighten Go coprocess framing and restore redirected simple executable dispatch,
   including patch recipients. Coprocess pipes cannot borrow ancestor heredoc
   proofs. Reject alternate apply_patch argv sources and uncertified patch diff

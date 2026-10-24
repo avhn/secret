@@ -66,7 +66,7 @@ Search contract: `Grep` content/count checks explicit target and a bounded names
 
 Differential protocol: snapshot bash guard at a fixed git revision in test fixtures or run it from its retained executable, feed identical synthetic JSON, cwd, PATH and rg config to both hooks, compare allow/deny and fixed denial shape, classify each difference as intentional tightening, parser grammar limitation or regression in a checked-in reviewed expectation table. Add paired accepted-expansion cases: single/double quotes and escaped dollars, literal `$HOME` with known home, `IFS` explicitly assigned to space/tab and used unquoted vs quoted, brace fields and ranges under the cap, literal tilde, simple globs resolving only synthetic paths, and scoped env -C/cd; compare actual safe Bash argv/paths and Go classifications. Add unknown-inherited-IFS and dynamically reassigned-HOME/IFS deny cases. Also run real `bash -n`, `bash -c` word/trace experiments in a disposable synthetic directory for tricky quoting, brace, heredoc, substitution, IFS, options and redirects: never execute inspected untrusted strings or real credentials. Fail CI on a new unclassified difference. Preserve host output contract while explicitly documenting intended change from the bash guard's fail-open malformed/analysis behavior.
 
-### Audit 29 U2/U3 follow-up (Go, pending CI)
+### Audit 29 U2/U3 follow-up (Go, merged in #19, CI green)
 
 Certify coprocess heads before command analysis: reject misplaced unquoted
 reserved words, parser-only function/nested-coprocess heads and named
@@ -142,7 +142,7 @@ protection or prove a production hang.
 
 ### M3 integration status
 
-M3 is implemented, pending CI, under [the owner-approved M3 plan](m3-plan.md).
+M3 is done, with hosted CI green, under [the owner-approved M3 plan](m3-plan.md).
 The staged Go CLI dispatches positional `rotate REF KEY`, `delete REF KEY` and
 `rename REF OLD NEW` through stdin/stdout TTY checks and exact hidden
 controlling-terminal consent for each identity. Provider batches use fresh verified
