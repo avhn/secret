@@ -10,6 +10,17 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 - Cut over Claude Code only on v2.1.295+ with `onFailure: "block"` on every synchronous hook entry and verified host failure tests. Keep Codex on the Bash guard until Codex blocks hook failures. Claim no Windows shell protection until its adapter and host tests exist.
 - Keep audit off by default and MCP off until configured; allow names-only JSON.
 
+## Bash guard compatibility exception (2026-10-24)
+
+The owner approved a narrow Bash 3.2 nounset compatibility exception to the
+frozen `hooks/guard-secrets`, with no policy change. Stock macOS Bash 3.2.57
+CI job `120709429478` failed only `audit28_t19_find_deadline`: after a correct
+deny, an empty `read -a parts` result emitted `parts[@]: unbound variable`
+(reported runtime line 885, source expansion at lines 941-942). The other 5711
+guard cases and the Codex suite passed. Audit empty array expansions without
+changing decisions, messages, budgets or deadlines; preserve exact inventories
+and require native CI after local Bash 3.2 and current-Bash checks.
+
 ## Done: Bash-era phases
 
 - Hardened guard: protected input roles and aliases (`b430d30`), parser and search fixes (`3aba0f2`, `fc59cd1`, `ab4fa37`) and fail-safe redaction (`020c540`).

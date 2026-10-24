@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Apply an owner-approved narrow Bash 3.2 nounset compatibility exception to the
+  frozen `hooks/guard-secrets`, with no policy change. Empty array expansions
+  retain their intended zero-argument behavior without `unbound variable`
+  diagnostics. Stock macOS Bash 3.2.57 CI job `120709429478` correctly denied
+  `audit28_t19_find_deadline` but failed on `parts[@]` stderr; the other 5711
+  guard cases and the Codex suite passed. Keep decisions, messages and analysis
+  budgets unchanged; native CI remains required.
+
 - Reduce staged Go hook over-denials for conditional `cd` chains and literal
   double-quoted arithmetic constants. Directory alternatives stay precise up to
   128 (was 32), with a 16384 per-directory replay budget; exceeding either bound

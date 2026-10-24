@@ -54,3 +54,5 @@ RESOLVE_FAIL=0
 git_write_context
 expect_calls 17
 printf '10 cache, scope, failure and deadline controls passed\n'
+# Exercise empty-array compatibility under this suite's Bash, including 3.2 CI.
+"$BASH" "$ROOT/tests/test-guard-nounset.sh"
