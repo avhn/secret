@@ -1,8 +1,16 @@
 # Changelog
 
-All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). No release has been published; the plugin manifest version 0.1.0 is not a release tag.
+All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The first published release is v0.2.3; installed plugin manifests still carry version 0.1.0 and are not release tags.
 
 ## [Unreleased]
+
+## [0.2.3] - 2026-10-24
+
+First published release: reproducible, attested Linux and macOS Go binaries
+(opt-in launchers only; installed defaults stay on the Bash CLI and guard).
+[Release](https://github.com/avhn/secret/releases/tag/v0.2.3), tag at checksum
+commit C `7998002`, source S `7141a13`.
+
 
 - Apply an owner-approved narrow Bash 3.2 nounset compatibility exception to the
   frozen `hooks/guard-secrets`, with no policy change. Empty array expansions
@@ -616,4 +624,4 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Go libsecret and Keychain transports now use stdin-only value writes, exact service/account lookups, and disposable provider integration tests in CI; provider validation is pending isolated runners.
 - Go store writes now use an anchored parent for private atomic replacement and the shared Bash secrets-directory lock for file and backend transactions, alongside validated v1 manifests, with Bash-generated stash byte goldens and process-concurrency checks. Backend dispatch has a test-only directory stub, readback-before-publish ordering, and unsupported real-provider placeholders; the Bash CLI remains active.
 - Go file-store parsing, resolution, label selection, and merge helpers have synthetic tests and Bash-generated golden assertions, including an extended selection corpus and CI drift check; runner validation remains pending.
-- The Go rewrite is tracked in [ROADMAP.md](ROADMAP.md); no Go cutover or release is claimed yet.
+- The Go rewrite is tracked in [ROADMAP.md](ROADMAP.md); v0.2.3 is published, and no Go cutover is claimed.

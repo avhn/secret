@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4, releasable Linux/macOS core (in progress). M0 to M3 are done. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -340,7 +340,7 @@ Gate evidence: all eight hosted jobs green on `d84ecc4` in [run 39264874201](htt
 
 ## M4: Releasable Linux/macOS core
 
-Status: in progress (replacement v0.2.3 identity approved; new candidates, source S and checksum C required; tag, draft and publication each need separate owner go-ahead; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
+Status: done (2026-10-24, [v0.2.3](https://github.com/avhn/secret/releases/tag/v0.2.3) published with owner go-ahead for tag, draft and publication; plan docs/design/m4-plan.md). Estimate: 4-6 days. Goal: prepare reproducible, attested Linux/macOS releases without changing installed defaults.
 
 - [x] docs(release): freeze assets, toolchain, checksum and cache contracts (d00072e; current identity v0.2.3)
 - [x] build(release): add deterministic artifacts and final-tag attestation workflow (cbf8bc6)
@@ -355,7 +355,28 @@ Status: in progress (replacement v0.2.3 identity approved; new candidates, sourc
 
 Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. `bin/secret`, Claude and Codex hooks and all four manifest versions remain on the existing Bash installation state. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.
 
-Candidate evidence (source 306618e, all green): [ci 39405526391](https://github.com/avhn/secret/actions/runs/39405526391), [release 39405526406](https://github.com/avhn/secret/actions/runs/39405526406) (two independent builds, byte-identical), [plugin install 39405526490](https://github.com/avhn/secret/actions/runs/39405526490) (native linux x86_64 and aarch64, macOS arm64 and x86_64). Remaining: second integrated candidate, checksum-only commit C, final tag and its attestation runs.
+Release evidence for v0.2.3 (source S `7141a13`, checksum commit C `7998002`, full C
+`79980020b3ffaea14833684592ffa2c97d78aae0`, signed annotated tag `v0.2.3` peeling to C):
+
+- Candidate 1 on S, first attempts: [ci 40087498442](https://github.com/avhn/secret/actions/runs/40087498442),
+  [release 40087548293](https://github.com/avhn/secret/actions/runs/40087548293),
+  [plugin install 40087550529](https://github.com/avhn/secret/actions/runs/40087550529).
+- Candidate 2 on S, first attempts: ci 40087498442 attempt 2,
+  [release 40097441381](https://github.com/avhn/secret/actions/runs/40097441381),
+  [plugin install 40097443246](https://github.com/avhn/secret/actions/runs/40097443246).
+- A local Go 1.26.10 build at S and the rebuild at C were byte-identical to the hosted
+  build-a, build-b and repro manifests; `verify-release.sh --check-source S C` passed.
+- [Tag workflow 40107685062](https://github.com/avhn/secret/actions/runs/40107685062):
+  both builds, repro, attest, verify and owner-approved `release-publish` passed on the
+  first attempt; the draft had all 10 assets and re-verified bundles. Local download
+  verified all five subjects online and offline (bundles renamed to `sha256:DIGEST.jsonl`).
+- Published 2026-10-24. [Published-asset plugin install 40130118807](https://github.com/avhn/secret/actions/runs/40130118807)
+  passed on native Linux x86_64 and aarch64 and macOS arm64 and x86_64.
+- Installed defaults are unchanged: `bin/secret`, the Bash hooks and all four manifest
+  versions stay on the Bash installation; promotion and Go activation move to M4.1.
+
+Earlier candidate evidence (source 306618e): ci 39405526391, release 39405526406, plugin
+install 39405526490, all green.
 
 `v0.2.0` was tagged at `29216e7`, but its [tag workflow (run
 39696575366)](https://github.com/avhn/secret/actions/runs/39696575366) failed before any
