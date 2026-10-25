@@ -98,3 +98,43 @@ func TestWindowsNativeFileAmbiguity(t *testing.T) {
 		}
 	}
 }
+
+func TestWindowsGitIdentityAndResolutionErrors(t *testing.T) {
+	root := t.TempDir()
+	repo, git, public := filepath.Join(root, "repo"), filepath.Join(root, "metadata"), filepath.Join(root, "public")
+	for _, dir := range []string{repo, git, public} {
+		if err := os.Mkdir(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	marker := filepath.Join(repo, ".git")
+	if err := os.WriteFile(marker, []byte("gitdir: ../metadata\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	system, err := windows.GetSystemDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(root, "junction")
+	if output, err := exec.Command(filepath.Join(system, "cmd.exe"), "/d", "/c", "mklink", "/J", alias, git).CombinedOutput(); err != nil {
+		t.Fatalf("required Git junction fixture: %v (%s)", err, output)
+	}
+	// Exercise the identity walk without first replacing the junction spelling
+	// with its final name. The missing target retains its existing ancestors.
+	for _, name := range []string{alias, filepath.Join(alias, "config"), filepath.Join(alias, "missing", "new.txt")} {
+		if !nativeGitProtected(name, repo, "", root) {
+			t.Errorf("Git directory identity was lost for %q", name)
+		}
+	}
+	if nativeGitProtected(filepath.Join(public, "new.txt"), repo, "", root) {
+		t.Fatal("public target outside the Git identity denied")
+	}
+	for _, contents := range []string{"not a gitdir", "gitdir: ", "gitdir: C:relative", "gitdir: ../missing", "gitdir: ../metadata\nextra", strings.Repeat("x", 4097)} {
+		if err := os.WriteFile(marker, []byte(contents), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if !nativeGitProtected(filepath.Join(public, "new.txt"), repo, "", root) {
+			t.Errorf("ambiguous repository marker did not deny: %q", contents)
+		}
+	}
+}

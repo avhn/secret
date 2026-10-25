@@ -2251,6 +2251,24 @@ all retained shell requests to deny.
 | Native junction-plus-parent traversal | Binding native semantics | TestWindowsNativeParentTraversal compares the resolver to an actual Win32 open. Unix physical link/.. expectations remain intact and Unix-only; Windows uses lexical cleaning before native reparse traversal. |
 | Case, separator, reparse, 8.3 and volume/UNC aliases | Protected-role preservation | TestWindowsFileAndPatchAliases, TestWindowsShortFileAndPatchAliases and TestWindowsUNCFileAndPatchAliases pair protected targets and patch moves with public controls. Handle names and file/directory identity retain configured credentials and known home credential directories. Missing suffixes retain their existing ancestor. Dangling reparse points deny rather than borrowing an absent-name exception. |
 
+### M5a review: local share and Git identity preservation
+
+| Native decision | Classification | Evidence and reason |
+| --- | --- | --- |
+| Local UNC shares, administrative shares and substituted drives | Windows-only tightening | TestWindowsLocalUNCStoreIdentities, TestWindowsUNCProtectedRootRoles, TestWindowsUNCProtectedIdentityWitness and TestWindowsSubstProtectedAliases retain HOME credential roles and store-directory basename rules outside HOME, with public-file controls. Local share mappings require NetShareGetInfo plus matching handle file ID and volume serial; failure or ambiguity denies. |
+| Repository gitdirs hidden by share/drive/junction aliases | Windows-only tightening | TestWindowsGitDirectoryIdentityAliases and TestWindowsGitIdentityAndResolutionErrors compare target ancestors with cwd/workdir .git directories and gitfile targets using eager handle identity. Missing targets retain existing ancestors; malformed, oversized, missing-target and unresolved gitfiles deny. |
+| Git metadata at a share or volume root | Windows-only tightening | TestWindowsUNCGitDirectoryRoots includes the root itself in HEAD/objects/refs or HEAD/commondir detection, even without a cwd repository marker. Read and public-write controls remain allowed. |
+
+Local-machine detection includes native computer names, loopback addresses, local
+interface addresses and DNS aliases resolving to those addresses. DNS lookup is
+bounded; detection/lookup errors deny rather than asserting a remote/public role.
+User-supplied extended UNC and bracketed IPv6 paths retain ambiguous-path denial;
+they are not newly accepted device spellings. Required C$, share, junction and
+subst fixtures fail explicitly if unavailable, with exact cleanup checks for
+created shares and substituted drives. These tests require windows-latest runtime
+evidence; cross-compilation does not establish native alias coverage. No Unix
+expectation, installed guard, plugin manifest or divergence inventory changes.
+
 Aliased known home credential-directory roots also deny explicit Glob/Grep
 requests rather than certifying their descendants from a public share/drive name.
 Public UNC roots/files remain controls; names-only behavior on Unix is unchanged.

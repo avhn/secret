@@ -24,5 +24,7 @@ func nativeProtected(_, _ string) bool { return false }
 
 func nativeConfigProtected(_, _, _, _, _ string) bool { return false }
 
+func nativeGitProtected(_, _, _, _ string) bool { return false }
+
 // The shared metadata walker calls this only on Windows.
 func nativePhysical(_ string) (string, error) { return "", fs.ErrInvalid }

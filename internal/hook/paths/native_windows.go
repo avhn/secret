@@ -3,10 +3,15 @@
 package paths
 
 import (
+	"context"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
+	"unsafe"
 
 	"github.com/avhn/secret/internal/secure"
 	"golang.org/x/sys/windows"
@@ -33,12 +38,15 @@ func nativeName(name string) string { return strings.ReplaceAll(name, `\`, "/") 
 // Compare metadata identities, retaining equal missing suffixes conservatively.
 func sameNativePath(a, b string) bool {
 	for count := 0; count < 128; count++ {
-		left, leftErr := os.Stat(a)
-		right, rightErr := os.Stat(b)
+		left, leftErr := nativeStat(a)
+		right, rightErr := nativeStat(b)
 		if leftErr == nil && rightErr == nil {
 			return os.SameFile(left, right)
 		}
-		if !os.IsNotExist(leftErr) || !os.IsNotExist(rightErr) || !strings.EqualFold(filepath.Base(a), filepath.Base(b)) {
+		if leftErr != nil && !os.IsNotExist(leftErr) || rightErr != nil && !os.IsNotExist(rightErr) {
+			return true
+		}
+		if leftErr == nil || rightErr == nil || !strings.EqualFold(filepath.Base(a), filepath.Base(b)) {
 			return false
 		}
 		parentA, parentB := filepath.Dir(a), filepath.Dir(b)
@@ -47,13 +55,22 @@ func sameNativePath(a, b string) bool {
 		}
 		a, b = parentA, parentB
 	}
-	return false
+	return true
 }
 
 // A share or drive can expose a home credential directory under a public name.
 // Preserve those directory roles by identity, not just GetFinalPath's DOS/UNC
 // spelling. Inspect names and attributes only, never credential file contents.
 func nativeProtected(name, home string) bool {
+	resolved, err := nativePhysical(name)
+	if err != nil || lexical(resolved) || homeCredential(resolved, home) {
+		return true
+	}
+	// Directory roles apply outside HOME too, including a share that hides the
+	// entire store-directory basename. Public files inside .aws/.ssh stay public.
+	if nativeStoreDirectory(resolved) && !strings.EqualFold(filepath.Clean(name), resolved) {
+		return true
+	}
 	type witness struct {
 		name string
 		info os.FileInfo
@@ -61,15 +78,15 @@ func nativeProtected(name, home string) bool {
 	var roots []witness
 	for _, suffix := range []string{".", ".secrets", ".aws", ".ssh", ".kube", ".docker", ".config", ".config/gh", ".config/gcloud", ".terraform.d", ".cargo"} {
 		root := filepath.Join(home, filepath.FromSlash(suffix))
-		if info, err := os.Stat(root); err == nil && info.IsDir() {
+		if info, err := nativeStat(root); err == nil && info.IsDir() {
 			roots = append(roots, witness{root, info})
 		} else if err != nil && !os.IsNotExist(err) {
 			return true
 		}
 	}
 	tail := ""
-	for candidate, count := filepath.Clean(name), 0; count < 128; count++ {
-		info, err := os.Stat(candidate)
+	for candidate, count := resolved, 0; count < 128; count++ {
+		info, err := nativeStat(candidate)
 		if err != nil && !os.IsNotExist(err) {
 			return true
 		}
@@ -81,8 +98,10 @@ func nativeProtected(name, home string) bool {
 					if tail == "" && root.name != home && !strings.EqualFold(filepath.Clean(name), root.name) {
 						return true
 					}
-					resolved := filepath.Join(root.name, tail)
-					return lexical(resolved) || homeCredential(resolved, home)
+					witness := filepath.Join(root.name, tail)
+					if lexical(witness) || homeCredential(witness, home) {
+						return true
+					}
 				}
 			}
 		}
@@ -136,9 +155,65 @@ func nativePhysical(raw string) (string, error) {
 }
 
 func finalNativePath(name string) (string, error) {
-	pointer, err := windows.UTF16PtrFromString(name)
+	file, err := openNativeMetadata(name)
+	if err != nil {
+		return name, err
+	}
+	defer file.Close()
+	resolved, err := secure.FinalPath(file)
+	if err != nil {
+		return name, err
+	}
+	resolved = nativeDOSPath(resolved)
+	local, err := localUNCPath(resolved)
 	if err != nil {
 		return name, fs.ErrPermission
+	}
+	if local != resolved {
+		// Share metadata is only a candidate mapping. Certify it against the
+		// opened UNC object using file ID and volume serial before trusting it.
+		other, err := openNativeMetadata(local)
+		if err != nil {
+			return name, fs.ErrPermission
+		}
+		defer other.Close()
+		left, leftErr := file.Stat()
+		right, rightErr := other.Stat()
+		if leftErr != nil || rightErr != nil || !os.SameFile(left, right) {
+			return name, fs.ErrPermission
+		}
+		resolved, err = secure.FinalPath(other)
+		if err != nil {
+			return name, fs.ErrPermission
+		}
+		resolved = nativeDOSPath(resolved)
+		// Do not recurse through another share or lose a protected lexical
+		// witness in the local share path when a reparse target hides it.
+		if strings.HasPrefix(resolved, `\\`) || lexical(local) {
+			return name, fs.ErrPermission
+		}
+	}
+	if !ValidPath(resolved) || !filepath.IsAbs(resolved) {
+		return name, fs.ErrPermission
+	}
+	return filepath.Clean(resolved), nil
+}
+
+// nativeStat eagerly obtains identity from the same metadata-only handle.
+// os.Stat may defer identity lookup until SameFile, which cannot report errors.
+func nativeStat(name string) (os.FileInfo, error) {
+	file, err := openNativeMetadata(name)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return file.Stat()
+}
+
+func openNativeMetadata(name string) (*os.File, error) {
+	pointer, err := windows.UTF16PtrFromString(name)
+	if err != nil {
+		return nil, fs.ErrPermission
 	}
 	handle, err := windows.CreateFile(pointer, windows.FILE_READ_ATTRIBUTES,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
@@ -147,25 +222,134 @@ func finalNativePath(name string) (string, error) {
 		// GetFileAttributes observes the final reparse point even when following
 		// it failed. Missing children are peeled until that point is reached.
 		if attributes, attrErr := windows.GetFileAttributes(pointer); attrErr == nil && attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-			return name, fs.ErrPermission
+			return nil, fs.ErrPermission
 		}
+		return nil, err
+	}
+	return os.NewFile(uintptr(handle), name), nil
+}
+
+// Only kernel-generated extended names are admitted by this conversion.
+func nativeDOSPath(name string) string {
+	if strings.HasPrefix(name, `\\?\UNC\`) {
+		return `\\` + strings.TrimPrefix(name, `\\?\UNC\`)
+	}
+	return strings.TrimPrefix(name, `\\?\`)
+}
+
+func nativeStoreDirectory(name string) bool {
+	switch strings.ToLower(filepath.Base(name)) {
+	case ".secrets", ".aws", ".ssh", ".kube", ".docker", ".config", ".terraform.d", ".cargo":
+		return true
+	case "gh", "gcloud":
+		return strings.EqualFold(filepath.Base(filepath.Dir(name)), ".config")
+	}
+	return false
+}
+
+var nativeShareInfo = windows.NewLazySystemDLL("netapi32.dll").NewProc("NetShareGetInfo")
+
+// localUNCPath resolves local SMB shares without assuming that GetFinalPath
+// translates a redirector name into its on-disk DOS spelling. Unknown or
+// inaccessible local shares are errors, never public-name evidence.
+func localUNCPath(name string) (string, error) {
+	volume := filepath.VolumeName(name)
+	if !strings.HasPrefix(volume, `\\`) {
+		return name, nil
+	}
+	parts := strings.Split(strings.TrimPrefix(volume, `\\`), `\`)
+	if len(parts) != 2 {
+		return name, fs.ErrInvalid
+	}
+	local, err := localNativeHost(parts[0])
+	if err != nil || !local {
 		return name, err
 	}
-	file := os.NewFile(uintptr(handle), name)
-	defer file.Close()
-	resolved, err := secure.FinalPath(file)
+	share, err := windows.UTF16PtrFromString(parts[1])
 	if err != nil {
-		return name, err
+		return name, fs.ErrInvalid
 	}
-	// FinalPath returns a kernel-generated extended DOS/UNC name. User-supplied
-	// device namespaces are rejected above, never admitted by this conversion.
-	if strings.HasPrefix(resolved, `\\?\UNC\`) {
-		resolved = `\\` + strings.TrimPrefix(resolved, `\\?\UNC\`)
-	} else {
-		resolved = strings.TrimPrefix(resolved, `\\?\`)
-	}
-	if !ValidPath(resolved) || !filepath.IsAbs(resolved) {
+	if err := nativeShareInfo.Find(); err != nil {
 		return name, fs.ErrPermission
 	}
-	return filepath.Clean(resolved), nil
+	var buffer *byte
+	status, _, _ := nativeShareInfo.Call(
+		0, uintptr(unsafe.Pointer(share)), 2, uintptr(unsafe.Pointer(&buffer)))
+	runtime.KeepAlive(share)
+	if buffer != nil {
+		defer windows.NetApiBufferFree(buffer)
+	}
+	if status != 0 || buffer == nil {
+		return name, fs.ErrPermission
+	}
+	info := (*struct {
+		Name                              *uint16
+		Type                              uint32
+		Remark                            *uint16
+		Permissions, MaxUses, CurrentUses uint32
+		Path, Password                    *uint16
+	})(unsafe.Pointer(buffer))
+	root := windows.UTF16PtrToString(info.Path)
+	if info.Type&0xff != 0 || !ValidPath(root) || !filepath.IsAbs(root) || strings.HasPrefix(root, `\\`) {
+		return name, fs.ErrPermission
+	}
+	return filepath.Join(root, strings.TrimLeft(strings.TrimPrefix(name, volume), `\`)), nil
+}
+
+func localNativeHost(host string) (bool, error) {
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "localhost" {
+		return true, nil
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip != nil && ip.IsLoopback() {
+		return true, nil
+	}
+	for _, kind := range []uint32{windows.ComputerNameNetBIOS, windows.ComputerNameDnsHostname, windows.ComputerNameDnsFullyQualified} {
+		buffer := make([]uint16, 256)
+		n := uint32(len(buffer))
+		if err := windows.GetComputerNameEx(kind, &buffer[0], &n); err != nil {
+			return false, err
+		}
+		if strings.EqualFold(host, windows.UTF16ToString(buffer[:n])) {
+			return true, nil
+		}
+	}
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		return false, err
+	}
+	ips := []net.IP{ip}
+	if ip == nil {
+		// Also recognize DNS aliases of this machine. Bound lookup and deny
+		// uncertainty rather than treating a failed lookup as a remote host.
+		ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+		defer cancel()
+		answers, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return false, err
+		}
+		if len(answers) == 0 {
+			return false, fs.ErrInvalid
+		}
+		ips = nil
+		for _, answer := range answers {
+			ips = append(ips, answer.IP)
+		}
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() {
+			return true, nil
+		}
+		for _, address := range addresses {
+			local, _, err := net.ParseCIDR(address.String())
+			if err != nil {
+				return false, err
+			}
+			if ip.Equal(local) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

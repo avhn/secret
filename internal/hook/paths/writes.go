@@ -25,12 +25,12 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 		return true
 	}
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
-	if check(raw) {
-		return true
-	}
 	if runtime.GOOS == "windows" {
 		target, err := physical(raw)
-		return err != nil || check(target) || nativeConfigProtected(target, cwd, home, xdg, global)
+		return err != nil || nativeGitProtected(target, cwd, workdir, home) || check(raw) || check(target) || nativeConfigProtected(target, cwd, home, xdg, global)
+	}
+	if check(raw) {
+		return true
 	}
 	if target, err := filepath.EvalSymlinks(raw); err == nil && check(target) {
 		return true

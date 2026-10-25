@@ -496,6 +496,16 @@ denies when it is absent. It is not referenced by installed manifests. Unix
 adapter expectations and divergence inventories remain unchanged. These native
 tests compile locally; windows-latest runtime confirmation remains required.
 
+Step 7 review corrections retain protected roots across local SMB aliases using
+NetShareGetInfo plus handle file-ID/volume-serial verification. Unresolved local
+shares and ambiguous identity lookups deny; resolved store-directory basename
+rules apply outside HOME too. Windows Git writes compare target ancestors with
+cwd/workdir gitdirs by identity and include exposed share/drive roots in metadata
+signature checks. Required native regressions cover loopback/computer-name/C$
+shares, extended-UNC denial, subst drives, junctions, gitfiles and public controls.
+Unavailable required share/subst fixtures fail explicitly rather than skipping.
+Unix decisions and inventories remain unchanged; native results are still pending.
+
 Step 8 (the full isolated native matrix), plus final hosted evidence
 documentation, remains pending. Installed hooks/manifests and release defaults
 are unchanged; neither local checks nor the development shim prove host protection.

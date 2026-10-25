@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/avhn/secret/internal/hook/paths"
 	"golang.org/x/sys/windows"
 )
 
@@ -108,4 +109,136 @@ func TestWindowsShortFileAndPatchAliases(t *testing.T) {
 		checkWindowsAlias(t, work, short, strings.HasSuffix(name, ".secret"))
 		checkWindowsAlias(t, work, strings.ToUpper(filepath.ToSlash(short)), strings.HasSuffix(name, ".secret"))
 	}
+}
+
+// Allocate only an unused drive letter and remove only this test's substitution.
+// Missing subst or an unavailable letter fails required alias coverage explicitly.
+func windowsHookSubst(t *testing.T, directory string) string {
+	t.Helper()
+	system, err := windows.GetSystemDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	subst := filepath.Join(system, "subst.exe")
+	if _, err := os.Stat(subst); err != nil {
+		t.Fatalf("required subst drive fixture unavailable: %v", err)
+	}
+	drives, err := windows.GetLogicalDrives()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for letter := byte('Z'); letter >= 'E'; letter-- {
+		if drives&(1<<uint(letter-'A')) != 0 {
+			continue
+		}
+		drive := string(letter) + ":"
+		if output, err := exec.Command(subst, drive, directory).CombinedOutput(); err != nil {
+			t.Fatalf("required subst drive fixture: %v (%s)", err, output)
+		}
+		t.Cleanup(func() {
+			if output, err := exec.Command(subst, drive, "/D").CombinedOutput(); err != nil {
+				t.Errorf("synthetic subst cleanup: %v (%s)", err, output)
+			}
+			current, err := windows.GetLogicalDrives()
+			if err != nil || current&(1<<uint(letter-'A')) != 0 {
+				t.Errorf("synthetic subst cleanup did not remove %s: %v", drive, err)
+			}
+		})
+		return drive + `\`
+	}
+	t.Fatal("required subst drive fixture: no unused drive letter")
+	return ""
+}
+
+func checkWindowsGitAlias(t *testing.T, work, name string, deny bool) {
+	t.Helper()
+	windowsHookCheck(t, "Read", work, map[string]any{"file_path": name}, "")
+	for _, tool := range []string{"Edit", "Write", "MultiEdit", "NotebookEdit"} {
+		field, reason := "file_path", ""
+		if tool == "NotebookEdit" {
+			field = "notebook_path"
+		}
+		if deny {
+			reason = "file access targets a protected store"
+		}
+		windowsHookCheck(t, tool, work, map[string]any{field: name}, reason)
+	}
+	reason := ""
+	if deny {
+		reason = "patch targets a protected store"
+	}
+	for _, header := range []string{
+		"*** Add File: " + name + "\n+synthetic",
+		"*** Update File: " + name + "\n@@\n-old\n+new",
+		"*** Delete File: " + name,
+		"*** Update File: public.txt\n*** Move to: " + name + "\n@@\n-old\n+new",
+	} {
+		windowsHookCheck(t, "apply_patch", work, map[string]any{"command": "*** Begin Patch\n" + header + "\n*** End Patch"}, reason)
+	}
+}
+
+func TestWindowsSubstProtectedAliases(t *testing.T) {
+	home, work := windowsHookFixture(t)
+	outside := filepath.Join(work, ".aws")
+	for _, dir := range []string{outside, filepath.Join(home, ".ssh")} {
+		if err := os.Mkdir(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{filepath.Join(outside, "credentials"), filepath.Join(outside, "public.txt"), filepath.Join(home, ".ssh", "id_synthetic")} {
+		if err := os.WriteFile(name, []byte("synthetic"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Both the HOME directory and a store basename outside HOME can be hidden
+	// at a substituted drive root. Public siblings must not be blanket-denied.
+	drive := windowsHookSubst(t, outside)
+	checkWindowsAlias(t, work, drive+"credentials", true)
+	checkWindowsAlias(t, work, drive+`missing\credentials`, false)
+	checkWindowsAlias(t, work, drive+"public.txt", false)
+	private := windowsHookSubst(t, filepath.Join(home, ".ssh"))
+	checkWindowsAlias(t, work, private+"id_synthetic", true)
+	checkWindowsAlias(t, work, private+"id_synthetic.pub", false)
+	for _, tool := range []string{"Glob", "Grep"} {
+		windowsHookCheck(t, tool, work, map[string]any{"path": drive, "output_mode": "files_with_matches"}, "file access targets a protected store")
+	}
+}
+
+func TestWindowsGitDirectoryIdentityAliases(t *testing.T) {
+	home, work := windowsHookFixture(t)
+	git := filepath.Join(work, ".git")
+	if err := os.Mkdir(git, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(git, "config"), []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Deliberately omit HEAD/objects/refs: discovery from cwd must retain the
+	// gitdir identity independently of a signature or protected basename.
+	drive := windowsHookSubst(t, git)
+	checkWindowsGitAlias(t, work, drive+"config", true)
+	checkWindowsGitAlias(t, work, drive+`missing\new.txt`, true)
+	if !paths.ConfigWriteProtected(drive+"config", home, work, home, "", "") {
+		t.Fatal("workdir repository identity was not checked")
+	}
+	if !paths.ConfigWriteProtected(drive+"config", work, home, home, "", "") {
+		t.Fatal("cwd repository identity was lost to workdir")
+	}
+	// A gitfile can name a separate directory with an ordinary basename.
+	separate := filepath.Join(home, "metadata")
+	if err := os.Mkdir(separate, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(git); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(git, []byte("gitdir: "+separate+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	other := windowsHookSubst(t, separate)
+	checkWindowsGitAlias(t, work, other+`missing\new.txt`, true)
+	if !paths.ConfigWriteProtected(other+"config", home, work, home, "", "") {
+		t.Fatal("workdir gitfile identity was not checked")
+	}
+	checkWindowsGitAlias(t, work, filepath.Join(home, "public.txt"), false)
 }

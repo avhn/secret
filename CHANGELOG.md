@@ -6,6 +6,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
   mark both milestones done. Installed defaults remain the Bash CLI and guard.
+- Tighten Windows-only hook path checks across local UNC shares, administrative
+  shares and substituted drives. Verify local-share mappings against opened
+  handle identities, retain protected directory roles outside HOME and deny
+  unresolved or ambiguous mappings. Match cwd/workdir Git directories by identity
+  and recognize Git metadata at share/volume roots. Synthetic Windows regressions
+  include public controls; native windows-latest results remain required. Unix
+  decisions, inventories, installed guards and plugin manifests are unchanged.
+
 - Scaffold the Go-only, read-only 1Password backend behind a disabled source gate.
   Add the strict names-only v2 container, immutable registration consent, bound
   fake-op reads, detached bounded subprocesses, exact-byte validation and early
