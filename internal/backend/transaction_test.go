@@ -337,20 +337,10 @@ func TestTransactionDeleteOnlyAndScopedIdentity(t *testing.T) {
 	}
 }
 
-func TestTransactionInvalidTargetsAndWindowsRefusal(t *testing.T) {
+func TestTransactionInvalidTargets(t *testing.T) {
 	dir := t.TempDir()
 	spy := &transactionSpy{stub: &stub{dir: filepath.Join(dir, "provider"), backend: "libsecret"}}
 	mutations := []store.Mutation{{Kind: store.MutationPut, Key: "KEY", Value: []byte("new")}}
-	if runtime.GOOS == "windows" {
-		target := filepath.Join(dir, "missing")
-		if err := (Transaction{SecretsDir: target, Reference: "libsecret:demo", Provider: spy}).Apply(mutations); err != secure.ErrUnsupported || len(spy.calls) != 0 {
-			t.Fatal("Windows did not refuse before provider access")
-		}
-		if _, err := os.Stat(target); !os.IsNotExist(err) {
-			t.Fatal("Windows created storage")
-		}
-		return
-	}
 	for _, reference := range []string{"keychain:../invalid", "libsecret:", "file:/synthetic", "bare"} {
 		if err := (Transaction{SecretsDir: dir, Reference: reference, Provider: spy}).Apply(mutations); err != secure.ErrInvalidRequest || len(spy.calls) != 0 {
 			t.Fatalf("invalid reference result: %v", err)
@@ -358,6 +348,10 @@ func TestTransactionInvalidTargetsAndWindowsRefusal(t *testing.T) {
 	}
 	if err := (Transaction{SecretsDir: "relative", Reference: "libsecret:demo", Provider: spy}).Apply(mutations); err != secure.ErrInvalidRequest {
 		t.Fatal("relative directory accepted")
+	}
+	// Native private/reparse publication is covered by the dedicated Windows suite.
+	if runtime.GOOS == "windows" {
+		return
 	}
 	path := filepath.Join(dir, "demo.keys")
 	if err := os.Symlink("missing", path); err != nil {

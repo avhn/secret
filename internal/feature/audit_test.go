@@ -44,7 +44,7 @@ func auditTestLog(t *testing.T, maxBytes, maxFiles int) *AuditLog {
 	return log
 }
 
-func TestAuditDisabledAndWindows(t *testing.T) {
+func TestAuditDisabled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "must-not-be-created")
 	log, err := OpenAudit(AuditConfig{Directory: path, MaxBytes: -1, MaxFiles: -1})
 	if err != nil || log == nil {
@@ -63,21 +63,7 @@ func TestAuditDisabledAndWindows(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("disabled audit touched filesystem")
 	}
-	if runtime.GOOS == "windows" {
-		if _, err := OpenAudit(AuditConfig{Enabled: true, Directory: path}); !errors.Is(err, secure.ErrUnsupported) {
-			t.Fatal("Windows persistence did not reject early")
-		}
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatal("Windows persistence side effect")
-		}
-		forced := &AuditLog{config: AuditConfig{Enabled: true, Directory: path}}
-		if err := forced.Record(auditTestEvent()); !errors.Is(err, secure.ErrUnsupported) {
-			t.Fatal("Windows record side effect")
-		}
-		if _, err := forced.Query(AuditQuery{}); !errors.Is(err, secure.ErrUnsupported) {
-			t.Fatal("Windows query side effect")
-		}
-	}
+
 }
 
 func TestAuditSchemaGolden(t *testing.T) {

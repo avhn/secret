@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -102,9 +101,6 @@ func validOperatorReference(reference string) bool {
 }
 
 func (operator Operator) validate() error {
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
-	}
 	if !filepath.IsAbs(operator.SecretsDir) || !validOperatorText(operator.SecretsDir) {
 		return secure.ErrInvalidRequest
 	}
@@ -134,7 +130,7 @@ func readOperatorFile(path string, missing bool) ([]byte, error) {
 	if err != nil || !info.Mode().IsRegular() || info.Size() > MaxOperatorBytes {
 		return nil, secure.ErrTransaction
 	}
-	file, err := root.Open(name)
+	file, err := openOperatorFile(root, name)
 	if err != nil {
 		return nil, secure.ErrTransaction
 	}
@@ -196,7 +192,7 @@ func (operator Operator) metadata(reference string, missing bool) (store.Metadat
 		return result, nil
 	}
 	info, statErr := os.Lstat(path)
-	if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+	if statErr != nil || !info.Mode().IsRegular() || !operatorManifestMode(info) {
 		return store.Metadata{}, secure.ErrTransaction
 	}
 	records, err := store.ParseManifest(data, kind)

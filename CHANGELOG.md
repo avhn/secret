@@ -35,6 +35,26 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Correct M5a Windows bare-image resolution to skip empty, dot and relative PATH
+  entries, retaining explicit relative image paths. Windows run filters raw
+  loaded values and UTF-16LE/BE encodings of valid UTF-8 values. Derived bytes are
+  cleared; the aggregate pattern ceiling stays 4 MiB despite up to fivefold
+  growth. Other code pages are not covered. Portable and native regression tests
+  include a planted cwd image and a UTF-16-emitting child; hosted evidence is pending.
+
+- Implement M5a native console consent and private operator transactions. Verified
+  CONIN$/CONOUT$ handles provide hidden Unicode byte input with exact mode
+  restoration on catchable cancellation and errors; redirected consent is rejected
+  before storage/provider discovery. Windows stash also requires console stdin.
+  Operator, template and audit persistence use native private ACL primitives;
+  Job cleanup precedes template deletion. Audit follows the documented Windows
+  directory-durability limit, while file flush/publication failures stay required.
+  Doctor inspects private ACLs and names-only recovery. Native transaction tests
+  cover fresh accounts, readback, publication and failure recovery, including the
+  existing journaled required-provider lane. ConPTY tests are windows-latest-only.
+  Guards are lifted with these tests, but native runtime certification is pending.
+  Unix behavior, M2 denial, installed hooks/manifests and release defaults are unchanged.
+
 - Implement M5a Windows run, supervised unfiltered exec and importer children with
   atomic PROC_THREAD_ATTRIBUTE_JOB_LIST enrollment, kill-on-close Jobs and stdio-only
   handle inheritance, never assignment after creation. Bound runtime, pipe drain,

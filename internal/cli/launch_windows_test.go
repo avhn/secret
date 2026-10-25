@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/store"
@@ -63,6 +64,18 @@ func TestWindowsLaunchFilteringAndExec(t *testing.T) {
 		if status != 37 || output.String() != want || diagnostic.String() != want {
 			t.Fatal("Windows launch exit code or two-stream filtering changed")
 		}
+	}
+}
+
+func TestWindowsLaunchUTF16Filtering(t *testing.T) {
+	dir := t.TempDir()
+	var out, diagnostic bytes.Buffer
+	c := command{in: os.Stdin, out: &out, errOut: &diagnostic}
+	value := []byte("synthetic-é-𐐷")
+	t.Setenv("TOKEN", string(value))
+	env := os.Environ()
+	if status := c.runChild(windowsCLIArgs("emit utf16", dir), env, [][]byte{value}); status != 0 || out.String() != "<redacted>" || diagnostic.String() != "<redacted>" {
+		t.Fatal("native child UTF-16 output was not redacted on both streams")
 	}
 }
 
@@ -267,6 +280,15 @@ func TestWindowsCLIChild(t *testing.T) {
 		case <-time.After(10 * time.Second):
 			os.Exit(2)
 		}
+	case "emit utf16":
+		var value []byte
+		for _, unit := range utf16.Encode([]rune(os.Getenv("TOKEN"))) {
+			value = append(value, byte(unit), byte(unit>>8))
+		}
+		os.Stdout.Write(value)
+		os.Stderr.Write(value)
+		clear(value)
+		os.Exit(0)
 	case "emit", "emit wait":
 		value := []byte(os.Getenv("TOKEN") + "/synthetic-unselected")
 		os.Stdout.Write(value)

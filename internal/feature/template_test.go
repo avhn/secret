@@ -66,15 +66,7 @@ func TestTemplateBytes(t *testing.T) {
 func TestTemplatePrivateNamespace(t *testing.T) {
 	home := templateHome(t)
 	if runtime.GOOS == "windows" {
-		_, err := RenderTemplate(home, []byte("literal"), nil)
-		if !errors.Is(err, secure.ErrUnsupported) {
-			t.Fatalf("Windows error: %v", err)
-		}
-		entries, err := os.ReadDir(home)
-		if err != nil || len(entries) != 0 {
-			t.Fatal("Windows refusal had filesystem side effects")
-		}
-		return
+		t.Skip("native ACL namespace covered in TestWindowsPrivateTemplate")
 	}
 	override := templateHome(t)
 	t.Setenv("SECRETS_DIR", override)

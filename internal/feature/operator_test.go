@@ -409,18 +409,18 @@ func TestOperatorLifecyclePendingRecoveryBeforeHiddenInput(t *testing.T) {
 	}
 }
 
-func TestOperatorWindowsRefusesBeforeAccess(t *testing.T) {
+func TestOperatorWindowsInvalidRequestsBeforeAccess(t *testing.T) {
 	if runtime.GOOS != "windows" {
-		t.Skip("Windows-only early refusal")
+		t.Skip("Windows invalid request ordering")
 	}
-	operator := Operator{Confirm: func(OperatorResult) error { t.Fatal("Windows requested consent"); return nil }}
-	if _, err := operator.Export(context.Background(), ExportRequest{}); err != secure.ErrUnsupported {
+	operator := Operator{Confirm: func(OperatorResult) error { t.Fatal("invalid request requested consent"); return nil }}
+	if _, err := operator.Export(context.Background(), ExportRequest{}); err != secure.ErrInvalidRequest {
 		t.Fatal(err)
 	}
-	if _, err := operator.Import(context.Background(), ImportRequest{}); err != secure.ErrUnsupported {
+	if _, err := operator.Import(context.Background(), ImportRequest{}); err != secure.ErrInvalidRequest {
 		t.Fatal(err)
 	}
-	if _, err := operator.Lifecycle(LifecycleRequest{}, nil); err != secure.ErrUnsupported {
+	if _, err := operator.Lifecycle(LifecycleRequest{}, nil); err != secure.ErrInvalidRequest {
 		t.Fatal(err)
 	}
 }

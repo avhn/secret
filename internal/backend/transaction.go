@@ -3,7 +3,6 @@ package backend
 import (
 	"bytes"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/avhn/secret/internal/secure"
@@ -12,7 +11,7 @@ import (
 
 // Transaction publishes a whole provider batch through fresh random accounts.
 // SecretsDir is the shared lock/manifest directory. Reference is an explicit
-// keychain:NAME, libsecret:NAME or pass:NAME. A nil Provider uses production dispatch;
+// keychain:NAME, libsecret:NAME, pass:NAME or wincred:NAME. A nil Provider uses production dispatch;
 // injected providers are for isolated tests, never environment-selected in a
 // production build. The CLI must obtain operator consent before Apply.
 // FailOnConflict makes put insert-only for import/export. RequireExisting makes
@@ -48,9 +47,6 @@ func (transaction Transaction) Apply(mutations []store.Mutation) error {
 func (transaction Transaction) apply(mutations []store.Mutation, steps transactionSteps) error {
 	if err := ReadOnlyReference(transaction.Reference); err != nil {
 		return err
-	}
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
 	}
 	if !filepath.IsAbs(transaction.SecretsDir) || (transaction.FailOnConflict && transaction.RequireExisting) {
 		return secure.ErrInvalidRequest

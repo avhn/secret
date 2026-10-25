@@ -25,14 +25,14 @@ Key files must be private under HOME/.secrets/.age-keys; no identity discovery e
 Age metadata is unauthenticated and names-only; value use authenticates the whole store.
 age-init is create-only; rekey proves the new identity before publishing ciphertext.
 Age sources use export, never import; plaintext export targets remain prohibited.
-Age plus --template-file is rejected. Windows age filesystem support awaits M5a.
+Age plus --template-file is rejected. Windows age filesystem operations remain unsupported.
 SECRET_KEYCHAIN selects an explicit keychain path (without spaces or quoting).
 file:PATH forces a literal file path. Keystore names must be
 simple names, not paths. Legacy provider manifests live at ~/.secrets/NAME.keys.
 wincred:NAME uses native Windows Credential Manager (2560-byte raw blob limit),
 with names-only NAME.wincred-keys manifests outside Bash discovery. Metadata can
 be read on other platforms; credential access is unsupported there. Windows
-run/exec and operator workflows remain unavailable pending their native gates.
+run/exec and operator workflows use native primitives; hosted runtime evidence is pending.
 list prints store references; show prints file lengths or keystore <stored>.
 run and exec require explicit files and --. Later files win. Selectors export
 only selected keys; required keys must be nonempty, missing optional keys vanish.

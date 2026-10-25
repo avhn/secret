@@ -12,8 +12,8 @@ import (
 	"github.com/avhn/secret/internal/transport"
 )
 
-// Rendering, console consent and operator persistence are a separate M5a step.
-func launchTemplateUnsupported() bool { return true }
+// Private rendering uses the native ACL primitives before child creation.
+func launchTemplateUnsupported() bool { return false }
 
 // Windows exec is a supervised, unfiltered child, not process replacement.
 func (c command) execChild(args, env []string) int {
@@ -24,21 +24,29 @@ func (c command) runChild(args, env []string, values [][]byte) int {
 	return c.windowsChild(args, env, values, true)
 }
 
-func (c command) windowsChild(args, env []string, values [][]byte, filtered bool) (status int) {
+func (c command) runTemplateChild(args, env []string, values [][]byte, signals <-chan os.Signal) int {
+	return c.windowsChildSignals(args, env, values, true, signals)
+}
+
+func (c command) windowsChild(args, env []string, values [][]byte, filtered bool) int {
+	signals := make(chan os.Signal, 4)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	return c.windowsChildSignals(args, env, values, filtered, signals)
+}
+
+func (c command) windowsChildSignals(args, env []string, values [][]byte, filtered bool, signals <-chan os.Signal) (status int) {
 	copyStream := func(r io.Reader, w io.Writer) error {
 		_, err := io.Copy(w, r)
 		return err
 	}
 	if filtered {
-		matcher, err := transport.NewMatcher(values)
+		matcher, err := transport.NewWindowsMatcher(values)
 		if err != nil {
 			return c.runFailure(err.Error())
 		}
 		copyStream = matcher.Filter
 	}
-	signals := make(chan os.Signal, 4)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(signals)
 	stdout, outWrite, err := os.Pipe()
 	if err != nil {
 		return c.runFailure("child launch failed")

@@ -201,9 +201,9 @@ always() and verifies absence, never enumerating or wildcard-deleting records.
 No real provider access runs when SECRET_REQUIRE_WINCRED is unset. Hosted results
 remain required; cross-vet and test compilation are not native evidence.
 
-Windows operator/Transaction, template and audit persistence guards remain.
-Step 6 still owns transaction success/failure and recovery lifecycle coverage on
-native Windows before lifting its guard. Steps 5-8 were not implemented by the
+Steps 3 and 4 retained Windows operator/Transaction, template and audit guards.
+Step 6 owns lifting them with native transaction success/failure and recovery
+lifecycle coverage, as recorded below. Steps 5-8 were not implemented by the
 CredMan transport change; step 5 progress is recorded separately below.
 
 ## Initial native Windows unit-test corrections
@@ -217,8 +217,8 @@ must be created through the private test helper: os.MkdirAll inherits an unprote
 DACL even beneath a protected parent, so private-file creation correctly rejects
 it. The template parser fixture uses a native absolute path instead of the
 volume-less /synthetic/store path. Production protected owner-only checks and
-ambiguous-path rejection stay intact. Hosted confirmation of these corrections
-remains pending; cross-vet and compilation do not establish native success.
+ambiguous-path rejection stay intact. The corrected Go unit lane passed natively at b8399a1. Step 5 and step 6
+runtime evidence remains pending; cross-vet and compilation are not native success.
 
 ## Step 5 implementation status
 
@@ -244,7 +244,7 @@ failure if containment completion cannot be confirmed. Native uint32 exit codes
 are preserved on Windows amd64. Importers keep the existing 15-second context,
 250 ms pipe wait, bounded byte-only stdout and counted/discarded stderr, and now
 clean up Job descendants on normal completion as well as failure. Operator
-entry points remain disabled until step 6.
+entry points were left disabled by step 5; step 6 integration is recorded below.
 
 Environment blocks are explicitly encoded, sorted by case-insensitive UTF-16
 name and double-NUL terminated, including the empty block and native =C: drive-cwd
@@ -260,8 +260,9 @@ already excludes NUL assignments on all platforms. Raw CredMan storage is unchan
 Executable resolution deliberately uses only child PATH and PATHEXT, with
 case-insensitive environment names. Bare names search PATH in its listed order;
 there is no implicit cwd, application-directory or system-directory search.
-Explicit relative paths and relative/empty entries explicitly present in PATH
-refer to the parent's current directory. An absent/empty PATH does not search cwd.
+Bare names skip empty, dot and all relative PATH entries, even when listed
+explicitly; an absent/empty PATH does not search cwd. An explicit relative image
+path such as .\name.exe still refers to the parent's current directory.
 An explicit extension is used literally; otherwise allowed PATHEXT suffixes are
 tried in order (default .COM;.EXE when PATHEXT is absent). Only .exe/.com images
 are launched. Batch files require an explicit shell executable and its arguments;
@@ -276,9 +277,57 @@ enclosing Jobs, scoped console forwarding, environment and argv round-trip,
 full exit codes, two-stream filtering, unfiltered exec, inherited/closed pipes,
 output failures/stalls, runtime deadlines and importer descendants. They run in
 the existing windows-latest package/race lanes, not on the Linux cross-check host.
-Hosted runtime confirmation remains required. Templates/private rendering,
-console consent, operator/transaction persistence, hooks and the full isolated
-native matrix remain steps 6-8; installed CLI/hooks/manifests are unchanged.
+Hosted runtime confirmation remains required. Step 6 private rendering, console
+consent and operator integration is recorded below; hooks and the full isolated
+native matrix remain steps 7-8. Installed CLI/hooks/manifests are unchanged.
+
+## Step 5 security review corrections
+
+Bare executable names now skip empty, dot and all relative child PATH entries;
+only an explicit relative image path opts into cwd resolution. Portable directory
+classification and native planted-image cases preserve this ordering. Windows run
+matches raw loaded bytes plus UTF-16LE and UTF-16BE encodings for valid UTF-8
+values. Derived byte buffers are cleared after matcher construction. Aggregate
+pattern bytes grow by at most five times but retain the existing 4 MiB ceiling,
+so oversized expanded sets fail before child creation. Other code pages and
+transforms remain outside the literal-redaction guarantee. Native child tests
+exercise UTF-16 output on both streams; hosted execution is still required.
+
+## Step 6 implementation status
+
+Native operator consent verifies stdin and stdout console modes before opening
+CONIN$/CONOUT$ or discovering store/provider metadata. Hidden input disables echo,
+line buffering and processed input before displaying the prompt. Native UTF-16
+key events become owned UTF-8 bytes without a value-bearing Go string. Raw Ctrl+C
+cancels input; catchable externally generated console events are polled without
+stranding a blocking read. Deferred restoration reinstates the exact prior mode
+on success, overflow, cancellation and prompt/input errors. Restoration failure
+is a fixed terminal error with owned input cleared. Uncatchable process death or
+console destruction cannot promise restoration. Windows stash uses the same
+reader and rejects nonconsole stdin before reference resolution. Unix terminal
+and piped-stash behavior is unchanged.
+
+Private operator reads, template directories/payloads and audit directories,
+locks and atomic replacements now use the step-2 handle-checked owner-only DACL
+primitives. Template launch shares one signal channel through rendering, Job
+supervision and cleanup. Job containment completes before payload removal. Audit
+requires data flushes and real rename errors, but verifies its live directory
+anchor instead of claiming unsupported Windows directory flush durability.
+Doctor inspects native private ACLs and names-only recovery without provider
+access. Transaction and higher-level operator guards are lifted together with
+native private-filesystem wincred-transport tests for fresh accounts, readback,
+publication, locked-destination failure and names-only recovery after cleanup
+failure. Pending recovery stops subsequent provider access. Real transaction
+success/publication/cleanup failures join the existing required-provider hosted
+lane and exact-target journal/always-cleanup contract.
+
+ConPTY tests run only on hosted Windows CI and cover exact consent, Unicode hidden
+paste, overflow draining, Ctrl+C, console events, error restoration and redirected
+stdin ordering. Portable parser and consent-ordering tests remain active. Native
+ACL/template/audit/operator, transaction and Job-before-template-cleanup fixtures
+compile locally, but this Linux host cannot establish their runtime success.
+Step 6 is implemented, not native-certified. Steps 7 and 8, final hosted evidence
+and documentation remain outstanding; installed hooks/manifests are unchanged.
 
 ## Native verification matrix and CI
 

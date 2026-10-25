@@ -20,7 +20,7 @@ import (
 
 var launchKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// Platform supervisors share filtering; Windows templates remain gated on private rendering.
+// Platform supervisors share filtering and retain signals through private cleanup.
 // Keeping one channel from creation through cleanup avoids a pre-spawn signal gap.
 type templateSupervisor interface {
 	runTemplateChild(args, env []string, values [][]byte, signals <-chan os.Signal) int

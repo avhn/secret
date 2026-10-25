@@ -6,8 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 
 	"github.com/avhn/secret/internal/secure"
 )
@@ -46,11 +44,8 @@ type RenderedTemplate struct {
 // RenderTemplate borrows template and selected byte buffers without retaining
 // them. Only exact {{KEY}} placeholders are supported, with no evaluation or
 // recursive expansion. HOME is explicit; SECRETS_DIR never controls this path.
-// Windows rejects before any filesystem access until private ACL support exists.
+// Windows uses protected owner-only DACLs, not emulated Unix modes.
 func RenderTemplate(home string, template []byte, selected map[string][]byte) (_ *RenderedTemplate, err error) {
-	if runtime.GOOS == "windows" {
-		return nil, secure.ErrUnsupported
-	}
 	data, err := renderTemplateBytes(template, selected)
 	if err != nil {
 		return nil, err
@@ -59,11 +54,7 @@ func RenderTemplate(home string, template []byte, selected map[string][]byte) (_
 	if !filepath.IsAbs(home) || filepath.Clean(home) != home || home == string(filepath.Separator) {
 		return nil, ErrTemplatePath
 	}
-	parts := strings.Split(strings.TrimPrefix(home, string(filepath.Separator)), string(filepath.Separator))
-	if len(parts) > 256 {
-		return nil, ErrTemplatePath
-	}
-	base, err := os.OpenRoot(string(filepath.Separator))
+	base, parts, err := featurePathRoot(home)
 	if err != nil {
 		return nil, ErrTemplatePath
 	}
@@ -90,7 +81,7 @@ func RenderTemplate(home string, template []byte, selected map[string][]byte) (_
 	}
 	name := rand.Text()
 	parent := r.dirs[len(r.dirs)-1].root
-	if err = parent.Mkdir(name, 0700); err != nil {
+	if err = createFeatureDirectory(parent, name); err != nil {
 		return nil, ErrTemplateWrite
 	}
 	if err = r.openDirectory(name, true, false); err != nil {
@@ -102,14 +93,14 @@ func RenderTemplate(home string, template []byte, selected map[string][]byte) (_
 		return nil, err
 	}
 	root := r.dirs[len(r.dirs)-1].root
-	file, err := root.OpenFile("payload", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := createFeatureFile(root, "payload")
 	if err != nil {
 		return nil, ErrTemplateWrite
 	}
 	// The exclusive file is owned even if a write or fsync fails.
 	r.payload, err = file.Stat()
 	if err == nil {
-		err = file.Chmod(0600)
+		err = protectFeatureFile(file)
 	}
 	if err == nil {
 		_, err = file.Write(data)
@@ -193,15 +184,15 @@ func (r *RenderedTemplate) openDirectory(name string, private, create bool) erro
 	parent := r.dirs[len(r.dirs)-1].root
 	info, err := parent.Lstat(name)
 	if errors.Is(err, os.ErrNotExist) && create {
-		if err = parent.Mkdir(name, 0700); err != nil && !errors.Is(err, os.ErrExist) {
+		if err = createFeatureDirectory(parent, name); err != nil && !errors.Is(err, os.ErrExist) {
 			return ErrTemplatePath
 		}
 		info, err = parent.Lstat(name)
 	}
-	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || private && info.Mode().Perm() != 0700 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 && private {
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !featureDirectoryMode(info, private) || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 && private {
 		return ErrTemplatePath
 	}
-	root, err := parent.OpenRoot(name)
+	root, err := openFeatureDirectory(parent, name, private)
 	if err != nil {
 		return ErrTemplatePath
 	}
@@ -217,7 +208,10 @@ func (r *RenderedTemplate) openDirectory(name string, private, create bool) erro
 func (r *RenderedTemplate) validateDirectories() error {
 	for _, dir := range r.dirs[1:] {
 		info, err := dir.parent.Lstat(dir.name)
-		if err != nil || info.Mode()&os.ModeSymlink != 0 || !os.SameFile(dir.info, info) || dir.private && (info.Mode().Perm() != 0700 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0) {
+		if validateFeatureDirectory(dir.root, dir.private) != nil {
+			return ErrTemplatePath
+		}
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !os.SameFile(dir.info, info) || (!featureDirectoryMode(info, dir.private) || dir.private && info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0) {
 			return ErrTemplatePath
 		}
 	}
@@ -238,7 +232,10 @@ func (r *RenderedTemplate) Validate() error {
 		return err
 	}
 	info, err := r.dirs[len(r.dirs)-1].root.Lstat("payload")
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 || !os.SameFile(r.payload, info) {
+	if err != nil || !info.Mode().IsRegular() || !featureFileMode(info) || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 || !os.SameFile(r.payload, info) {
+		return ErrTemplatePath
+	}
+	if validateFeaturePayload(r.dirs[len(r.dirs)-1].root, r.payload) != nil {
 		return ErrTemplatePath
 	}
 	return nil

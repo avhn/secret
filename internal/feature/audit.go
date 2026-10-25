@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,7 +35,7 @@ type AuditConfig struct {
 }
 
 // AuditLog implements store.AuditSink. Disabled and nil logs are no-ops. Enabled
-// persistence is unsupported on Windows until private ACL support exists.
+// persistence uses native private ACLs on Windows and private modes on Unix.
 // A separate private lock serializes processes; stale locks are never stolen.
 type AuditLog struct {
 	config AuditConfig
@@ -71,9 +70,6 @@ func OpenAudit(config AuditConfig) (*AuditLog, error) {
 	if !config.Enabled {
 		return log, nil
 	}
-	if runtime.GOOS == "windows" {
-		return nil, secure.ErrUnsupported
-	}
 	if config.MaxBytes == 0 {
 		config.MaxBytes = 1 << 20
 	}
@@ -102,9 +98,6 @@ func OpenAudit(config AuditConfig) (*AuditLog, error) {
 func (log *AuditLog) Record(event store.AuditEvent) error {
 	if log == nil || !log.config.Enabled {
 		return nil
-	}
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
 	}
 	if !validAuditEvent(event) {
 		return secure.ErrAudit
@@ -147,9 +140,6 @@ func (log *AuditLog) Query(query AuditQuery) (AuditRecords, error) {
 	}
 	if log == nil || !log.config.Enabled {
 		return result, nil
-	}
-	if runtime.GOOS == "windows" {
-		return AuditRecords{}, secure.ErrUnsupported
 	}
 	if query.Limit == 0 {
 		query.Limit = 1000
@@ -268,11 +258,10 @@ func auditName(index int) string {
 // openAuditDirectory walks anchored components without accepting ancestor aliases.
 // Parents may have ordinary home-directory modes; only the audit leaf is private.
 func openAuditDirectory(path string, create bool) (*os.Root, error) {
-	root, err := os.OpenRoot(string(filepath.Separator))
+	root, parts, err := featurePathRoot(path)
 	if err != nil {
 		return nil, secure.ErrAudit
 	}
-	parts := strings.Split(strings.TrimPrefix(path, string(filepath.Separator)), string(filepath.Separator))
 	if len(parts) > 256 {
 		root.Close()
 		return nil, secure.ErrAudit
@@ -280,16 +269,16 @@ func openAuditDirectory(path string, create bool) (*os.Root, error) {
 	for index, name := range parts {
 		info, err := root.Lstat(name)
 		if os.IsNotExist(err) && create && index == len(parts)-1 {
-			err = root.Mkdir(name, 0700)
+			err = createFeatureDirectory(root, name)
 			if err == nil || os.IsExist(err) {
 				info, err = root.Lstat(name)
 			}
 		}
-		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || (index == len(parts)-1 && info.Mode().Perm() != 0700) {
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !featureDirectoryMode(info, index == len(parts)-1) {
 			root.Close()
 			return nil, secure.ErrAudit
 		}
-		next, err := root.OpenRoot(name)
+		next, err := openFeatureDirectory(root, name, index == len(parts)-1)
 		if err != nil {
 			root.Close()
 			return nil, secure.ErrAudit
@@ -307,9 +296,6 @@ func openAuditDirectory(path string, create bool) (*os.Root, error) {
 }
 
 func (log *AuditLog) withLock(work func(*os.Root) error) error {
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
-	}
 	log.mu.Lock()
 	defer log.mu.Unlock()
 	root, err := openAuditDirectory(log.config.Directory, false)
@@ -318,7 +304,7 @@ func (log *AuditLog) withLock(work func(*os.Root) error) error {
 	}
 	defer root.Close()
 	const lock = ".audit-lock"
-	if root.Mkdir(lock, 0700) != nil {
+	if createFeatureDirectory(root, lock) != nil {
 		return secure.ErrAudit
 	}
 	info, err := root.Lstat(lock)
@@ -338,16 +324,16 @@ func readAuditFile(root *os.Root, name string, limit int) ([]byte, os.FileInfo, 
 	if os.IsNotExist(err) {
 		return nil, nil, nil
 	}
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() > int64(limit) {
+	if err != nil || !info.Mode().IsRegular() || !featureFileMode(info) || info.Size() > int64(limit) {
 		return nil, nil, secure.ErrAudit
 	}
-	file, err := root.Open(name)
+	file, err := openFeatureFile(root, name)
 	if err != nil {
 		return nil, nil, secure.ErrAudit
 	}
 	defer file.Close()
 	opened, err := file.Stat()
-	if err != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || opened.Mode().Perm() != 0600 {
+	if err != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || !featureFileMode(opened) {
 		return nil, nil, secure.ErrAudit
 	}
 	data, err := io.ReadAll(io.LimitReader(file, int64(limit)+1))
@@ -397,12 +383,12 @@ func (log *AuditLog) rotate(root *os.Root) error {
 
 func replaceAuditFile(root *os.Root, data []byte) error {
 	name := ".audit-" + rand.Text()
-	file, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := createFeatureFile(root, name)
 	if err != nil {
 		return secure.ErrAudit
 	}
 	defer root.Remove(name)
-	if file.Chmod(0600) != nil {
+	if protectFeatureFile(file) != nil {
 		file.Close()
 		return secure.ErrAudit
 	}
@@ -411,7 +397,7 @@ func replaceAuditFile(root *os.Root, data []byte) error {
 	info, statErr := file.Stat()
 	closeErr := file.Close()
 	current, currentErr := root.Lstat(name)
-	if writeErr != nil || syncErr != nil || closeErr != nil || statErr != nil || currentErr != nil || !current.Mode().IsRegular() || current.Mode().Perm() != 0600 || !os.SameFile(info, current) {
+	if writeErr != nil || syncErr != nil || closeErr != nil || statErr != nil || currentErr != nil || !current.Mode().IsRegular() || !featureFileMode(current) || !os.SameFile(info, current) {
 		return secure.ErrAudit
 	}
 	if _, _, err := readAuditFile(root, auditName(0), maxAuditFileBytes); err != nil {
@@ -420,12 +406,7 @@ func replaceAuditFile(root *os.Root, data []byte) error {
 	if root.Rename(name, auditName(0)) != nil {
 		return secure.ErrAudit
 	}
-	parent, err := root.Open(".")
-	if err != nil {
-		return secure.ErrAudit
-	}
-	defer parent.Close()
-	if parent.Sync() != nil {
+	if syncFeatureDirectory(root) != nil {
 		return secure.ErrAudit
 	}
 	return nil

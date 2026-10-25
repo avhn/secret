@@ -97,7 +97,7 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 		result.Checks = append(result.Checks, DoctorCheck{kind, target, status, detail})
 	}
 	if runtime.GOOS == "windows" {
-		add("compatibility", "windows", "unsupported", "private operator persistence awaits the Windows permission gate")
+		add("compatibility", "windows", "limited", "native private operator persistence implemented; hosted console and lifecycle evidence required; installed Bash hooks unchanged")
 	} else {
 		add("compatibility", runtime.GOOS, "limited", "M4 release tooling is staged; the installed default CLI and hooks remain Bash until M4.1")
 	}
@@ -202,10 +202,6 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			return DoctorReport{}, ErrMetadata
 		}
 		doctorPath(path, add)
-		if runtime.GOOS == "windows" {
-			add("recovery", reference, "unsupported", "private recovery inspection awaits the Windows permission gate")
-			continue
-		}
 		// Inspect ancestors before opening a names-only recovery record. Never
 		// follow aliases into an unrequested manifest namespace.
 		alias := doctorAlias(path + ".recovery")
@@ -269,7 +265,7 @@ func doctorPath(path string, add func(string, string, string, string)) {
 		return
 	}
 	if runtime.GOOS == "windows" {
-		add("mode", path, "unsupported", "Unix modes do not certify Windows private ACLs")
+		add("mode", path, doctorPrivateStatus(path), "opened-handle owner and protected DACL inspection; not same-user isolation or host certification")
 		return
 	}
 	status := "private"

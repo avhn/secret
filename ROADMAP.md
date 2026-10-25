@@ -450,7 +450,8 @@ The initial native Windows unit-test lane exposed OS-dependent reserved-device
 extension acceptance, inherited-DACL backend stub ancestors and a Unix-only
 absolute path in the template parser fixture. Explicit device-base rejection and
 private/native fixtures address those failures without relaxing production ACLs.
-The corrected lane still requires hosted windows-latest confirmation.
+The corrected Windows Go unit lane passed natively at b8399a1; step 5 and
+step 6 hosted runtime confirmation remains pending.
 
 Step 5 is implemented locally: run, supervised unfiltered exec and importer
 children use native STARTUPINFOEX with PROC_THREAD_ATTRIBUTE_JOB_LIST, restricted
@@ -465,10 +466,28 @@ Job, parent-death/grandchild, console-forwarding, environment, exit and cleanup
 tests are added to the existing Windows package lanes. Cross-checks are not native
 runtime evidence; windows-latest confirmation is still required.
 
-Steps 6-8 (console/operator integration, hooks and the full isolated native
-matrix) and final evidence documentation remain pending. Higher-level operator,
-provider transaction and template Windows guards remain in place; there are no
-installed hook or release changes.
+Step 5 review corrections skip every relative PATH entry for bare image names,
+including empty/dot entries. Explicit relative image paths still work. Windows
+run additionally matches valid UTF-8 values in UTF-16LE/BE, clearing derived byte
+buffers and retaining the 4 MiB aggregate matcher bound (up to fivefold growth).
+Portable classifier/encoding tests and native planted-image/UTF-16 child-output
+tests cover these corrections. Other code pages remain outside coverage.
+
+Step 6 is implemented locally, not native-certified: verified CONIN$/CONOUT$
+consent and hidden key-event input restore exact console modes on catchable
+cancellation and errors. Redirected operator stdin/stdout and Windows stash stdin
+are rejected before storage/provider discovery. Operator reads, templates and
+audit use the private native primitives; template cleanup follows bounded Job
+containment. Doctor reports handle-checked ACLs and names-only recovery. The
+Transaction/operator guards are lifted with native success, fresh-account,
+readback, publication, cleanup-failure recovery and pending-recovery tests.
+ConPTY cases run only on windows-latest, and real transaction tests extend the
+existing gated exact-target CredMan lane. Cross-vet/compilation do not prove
+native success; hosted results remain required. Unix behavior is unchanged.
+
+Steps 7 and 8 (Windows hooks and the full isolated native matrix), plus final
+hosted evidence documentation, remain pending. Installed hooks/manifests and
+release defaults are unchanged.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions

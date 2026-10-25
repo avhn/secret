@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -107,9 +106,6 @@ func TestOperatorRefusesBeforeAccess(t *testing.T) {
 	accesses := 0
 	err = WithOperatorConsent(file, &bytes.Buffer{}, syntheticOperatorRequest(t), func(*OperatorTerminal) error { accesses++; return nil })
 	want := secure.ErrTerminalRequired
-	if runtime.GOOS == "windows" {
-		want = secure.ErrUnsupported
-	}
 	if err != want || accesses != 0 {
 		t.Fatal("public boundary invoked store callback without real terminals")
 	}
