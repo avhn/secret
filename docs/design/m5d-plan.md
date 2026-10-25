@@ -57,6 +57,64 @@ Default Bash CLI, plaintext discovery, providers and installed guards remain unc
   `ParseX25519Identity` takes a string with no wipe API; its copies are a documented best-effort
   cleanup limit, not a claim of key erasure.
 
+### Dependency review (2026-10-25, step 2)
+
+Reviewed `filippo.io/age v1.3.2`, tag `refs/tags/v1.3.2`, upstream commit
+`b74dce4cdbe35b5e5f66c06d9612b72f89028758`. Downloaded with
+`GOTOOLCHAIN=local GOFLAGS=-mod=mod`; Go 1.26.10 compiled a separate core-package
+probe successfully. The dependency declares `go 1.25.0`; its advisory
+`toolchain go1.27.0` does not change the main module toolchain. No cgo is used.
+Only the core package is permitted, not the CLI, SSH, armor or plugins.
+
+Verified module checksum records:
+
+```text
+filippo.io/age v1.3.2 h1:r6RSZLFSMm6rzKepZ7ZAYkKCu14f3/Me8c7uKYh7C8c=
+filippo.io/age v1.3.2/go.mod h1:TH/Yr2sSRhCKbaH4XPxpUV0Us8Gv6txYUpiZQWz8Evk=
+```
+
+`go list -m all` graph delta against the pre-M5d module (a minus is replaced):
+
+```text
++c2sp.org/CCTV/age v0.0.0-20260829155415-4448f2097b2d
++filippo.io/age v1.3.2
++filippo.io/edwards25519 v1.2.0
++filippo.io/hpke v0.4.0
++filippo.io/nistec v0.0.4
+-github.com/rogpeppe/go-internal v1.15.0
++github.com/rogpeppe/go-internal v1.16.0
++golang.org/x/crypto v0.55.0
++golang.org/x/net v0.57.0
++golang.org/x/text v0.41.0
+-golang.org/x/tools v0.38.0
++golang.org/x/tools v0.49.0
+```
+
+License review covered every added or upgraded module: age, edwards25519, hpke,
+nistec, go-internal, x/crypto, x/net, x/text and x/tools each carry BSD-3-Clause
+in their root `LICENSE`. CCTV/age offers 0BSD, CC0-1.0 or Unlicense in
+`README.md`, License section; this review chooses 0BSD. No GPL/AGPL dependency
+was found. CCTV, edwards25519, nistec, go-internal, x/net, x/text and x/tools
+are graph/test dependencies, not imported production packages. The initial
+isolated probe's lazy-loaded graph omitted x/net and x/text; final tidy/graph
+comparison exposed them, and both additional root licenses were reviewed before
+final acceptance. This is a review-timing deviation, not an unreviewed module
+or a runtime import.
+
+`go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...` on the original checkout:
+`No vulnerabilities found.` The same pinned scan on the isolated core-package
+probe: zero reachable or imported-package vulnerabilities, three module-only
+advisories in x/crypto v0.55.0: GO-2026-6355 and GO-2026-6354 (SSH, fixed in
+v0.56.0), and GO-2026-5932 (OpenPGP, no fix). Neither package is imported.
+These are not reachable findings; any reachable finding in subsequent final
+scans blocks this milestone. The exact pin intentionally precedes its first
+codec import; tidy is checked again once that import lands. The final integrated
+checkout scan with the same pinned command also reported zero reachable and
+zero imported-package vulnerabilities, with only those three module-only
+advisories. `go mod verify` reported `all modules verified`; the integrated
+`go mod tidy -diff` was empty. Build, native vet and Windows/Darwin cross-vet
+passed using Go 1.26.10 with `GOTOOLCHAIN=local`.
+
 ## References, identity files and permissions
 
 - Explicit `age:NAME` resolution in `internal/store/resolve.go` maps only to
