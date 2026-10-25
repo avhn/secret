@@ -6,6 +6,28 @@ out of an agent's context when the agent reaches for them by habit or mistake:
 holding a store. It is **not a sandbox** and does not contain an agent that is
 deliberately trying to read a secret.
 
+## Opt-in encrypted stores (M5d, staged Go CLI)
+
+Explicit `age:NAME` stores on Linux/macOS encrypt the whole dotenv payload at
+rest using the pinned, reviewed core age library and native X25519 only. Value
+consumers authenticate the entire stream and its outer-metadata binding before
+selection or child launch. Writes and rekey use anchored locking and verified
+ciphertext-only scratch, file sync, rename and strict directory sync. A sync
+failure after rename means uncertain durability, not rollback. SIGKILL locks
+require human verification and manual removal; they are never stolen.
+
+Key files require explicit absolute paths beneath private
+`HOME/.secrets/.age-keys/`, owner-only modes and non-aliased anchored access.
+Application-owned plaintext/key bytes are cleared, but age's identity parser
+requires immutable strings and has no wipe API. Runtime/library copies, swap
+and core dumps prevent a secure-erasure guarantee. Names-only outer metadata
+is unauthenticated and never authorizes a value read. Names, labels, recipients
+and approximate size remain visible; encryption does not prove sender identity
+or prevent replay. Rekey and migration do not erase older ciphertext or sources.
+Age templates and age-to-plaintext export are prohibited. Windows filesystem
+operations await M5a. See [age workflows and recovery](docs/age.md).
+This is not a sandbox, hook activation or proof of host fail-closed behavior.
+
 ## What it protects
 
 - **Store values never pass through the CLI's own argv or diagnostics.** `show`

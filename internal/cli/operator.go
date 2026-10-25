@@ -207,6 +207,15 @@ func safeOperatorName(name string) bool {
 }
 
 func operatorChallenge(request OperatorRequest) ([]byte, error) {
+	if request.Action == store.ActionAgeInit || request.Action == store.ActionAgeRekey {
+		if !ageRef(request.Target) || !safeOperatorName(request.Target) || request.Source != "" || len(request.Keys) != 0 || len(request.Labels) != 0 {
+			return nil, secure.ErrInvalidRequest
+		}
+		if _, err := (store.Locator{}).Resolve(request.Target); err != nil {
+			return nil, secure.ErrInvalidRequest
+		}
+		return []byte(string(request.Action) + " " + request.Target), nil
+	}
 	if request.Action == store.ActionRegister || !request.Action.Valid() || !safeOperatorName(request.Target) || len(request.Keys) == 0 || len(request.Keys) > 1024 || (request.Source != "" && !safeOperatorName(request.Source)) {
 		return nil, secure.ErrInvalidRequest
 	}
@@ -214,7 +223,7 @@ func operatorChallenge(request OperatorRequest) ([]byte, error) {
 		if !filepath.IsAbs(strings.TrimPrefix(request.Target, "file:")) {
 			return nil, secure.ErrInvalidRequest
 		}
-	} else if providerRef(request.Target) {
+	} else if providerRef(request.Target) || ageRef(request.Target) {
 		if _, err := (store.Locator{}).Resolve(request.Target); err != nil {
 			return nil, secure.ErrInvalidRequest
 		}

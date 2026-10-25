@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/feature"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
@@ -372,7 +373,7 @@ func (c command) operate(sub string, args []string) int {
 }
 
 func (c command) operateTerminal(sub string, args []string, terminal *OperatorTerminal) int {
-	spec := "--env* --label* --audit-dir"
+	spec := "--env* --label* --audit-dir --age-identity"
 	switch sub {
 	case "import":
 		spec += " --from --into --map* --dry-run?"
@@ -383,13 +384,17 @@ func (c command) operateTerminal(sub string, args []string, terminal *OperatorTe
 	if err != nil {
 		return c.failure(err)
 	}
+	c.ageIdentity = option(options, "--age-identity")
+	if c.ageIdentity != "" && !backend.ValidateAgeIdentityPath(c.loc.Home, c.ageIdentity) {
+		return c.failure(secure.ErrInvalidRequest)
+	}
 	sel, err := featureSelectors(options)
 	if err != nil {
 		return c.failure(err)
 	}
 	var audit *feature.AuditLog
 	var auditErr error
-	operator := feature.Operator{SecretsDir: c.dir, Confirm: func(result feature.OperatorResult) error {
+	operator := feature.Operator{SecretsDir: c.dir, Age: c.ageConfig(), Confirm: func(result feature.OperatorResult) error {
 		// Validate and open opt-in persistence before mutation. Invalid or dry-run
 		// requests never create audit files. Declines are recorded after return.
 		if directory := option(options, "--audit-dir"); directory != "" {

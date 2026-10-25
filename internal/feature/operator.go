@@ -30,6 +30,7 @@ const (
 // normal dispatch. Never format this object or a value-bearing mutation.
 type Operator struct {
 	SecretsDir string
+	Age        backend.AgeConfig
 	Providers  map[string]backend.Provider
 	// Confirm must bridge to the already-open real OperatorTerminal.Confirm.
 	// It receives the exact planned identities before any value fetch or write.
@@ -93,7 +94,7 @@ func validOperatorReference(reference string) bool {
 		path := strings.TrimPrefix(reference, "file:")
 		return filepath.IsAbs(path) && filepath.Clean(path) == path && filepath.Base(path) != string(filepath.Separator)
 	}
-	if !store.ProviderReference(reference) {
+	if !store.ProviderReference(reference) && !strings.HasPrefix(reference, "age:") {
 		return false
 	}
 	_, err := (store.Locator{}).Resolve(reference)
@@ -164,12 +165,18 @@ func openOperatorParent(path string) (*os.Root, error) {
 }
 
 func (operator Operator) metadata(reference string, missing bool) (store.Metadata, error) {
+	if strings.HasPrefix(reference, "age:") {
+		return ReadMetadata(reference, operator.SecretsDir)
+	}
 	result := store.Metadata{Version: store.MetadataVersion, Reference: reference, Backend: "file"}
 	if strings.HasPrefix(reference, "file:") {
 		data, err := readOperatorFile(strings.TrimPrefix(reference, "file:"), missing)
 		defer secure.Clear(data)
 		if err != nil {
 			return store.Metadata{}, err
+		}
+		if store.IsAgeStoreBytes(data) {
+			return store.Metadata{}, secure.ErrInvalidRequest
 		}
 		result.Records, _ = store.ParseMetadata(data)
 		return result, nil
@@ -211,6 +218,12 @@ func (operator Operator) provider(reference string) (backend.Provider, string, e
 }
 
 func (operator Operator) transaction(reference string, insertOnly, replaceOnly bool) store.Transaction {
+	if strings.HasPrefix(reference, "age:") {
+		config := operator.Age
+		config.SecretsDir = operator.SecretsDir
+		return backend.AgeTransaction{Config: config, Reference: reference, FailOnConflict: insertOnly, RequireExisting: replaceOnly}
+	}
+
 	if strings.HasPrefix(reference, "file:") {
 		return store.FileTransaction{SecretsDir: operator.SecretsDir, Path: strings.TrimPrefix(reference, "file:"), FailOnConflict: insertOnly, RequireExisting: replaceOnly}
 	}
@@ -248,11 +261,20 @@ func (operator Operator) confirm(result OperatorResult) error {
 
 func operatorError(err error) error {
 	switch err {
-	case nil, backend.ErrReadOnly, secure.ErrInvalidRequest, secure.ErrUnsupported, secure.ErrConflict, secure.ErrNotFound, secure.ErrRecovery, secure.ErrConsent, secure.ErrInput:
+	case nil, backend.ErrReadOnly, store.ErrAgeDurability, secure.ErrInvalidRequest, secure.ErrUnsupported, secure.ErrConflict, secure.ErrNotFound, secure.ErrRecovery, secure.ErrConsent, secure.ErrInput:
 		return err
 	default:
 		return secure.ErrTransaction
 	}
+}
+
+// storagePath maps a provider or age reference to the file that holds its
+// names, so collisions compare storage rather than reference strings.
+func storagePath(directory, reference string) (string, error) {
+	if strings.HasPrefix(reference, "age:") {
+		return store.AgePath(directory, reference)
+	}
+	return store.ManifestPath(directory, reference)
 }
 
 func (operator Operator) exportPlan(request ExportRequest) (OperatorResult, []store.Mutation, []store.MetadataRecord, error) {
@@ -269,8 +291,8 @@ func (operator Operator) exportPlan(request ExportRequest) (OperatorResult, []st
 	}
 	// Compare storage identities, not names: optional suffixes isolate manifests.
 	if !strings.HasPrefix(request.Source, "file:") {
-		sourcePath, sourceErr := store.ManifestPath(operator.SecretsDir, request.Source)
-		targetPath, targetErr := store.ManifestPath(operator.SecretsDir, request.Target)
+		sourcePath, sourceErr := storagePath(operator.SecretsDir, request.Source)
+		targetPath, targetErr := storagePath(operator.SecretsDir, request.Target)
 		if sourceErr != nil || targetErr != nil {
 			return OperatorResult{}, nil, nil, secure.ErrInvalidRequest
 		}
@@ -380,6 +402,43 @@ func (operator Operator) Export(ctx context.Context, request ExportRequest) (Ope
 			found := false
 			for _, record := range parsed {
 				if record.Line == wanted.Line && record.Key == wanted.Key && store.CanonicalLabels(record.Labels) == store.CanonicalLabels(wanted.Labels) {
+					mutations[i].Value = secure.Clone(record.Value)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return result, secure.ErrConflict
+			}
+		}
+	} else if strings.HasPrefix(request.Source, "age:") {
+		config := operator.Age
+		config.SecretsDir = operator.SecretsDir
+		snapshot, err := config.Read(request.Source)
+		if err != nil {
+			return result, operatorError(err)
+		}
+		defer snapshot.Close()
+		metadata := store.Metadata{Version: store.MetadataVersion, Reference: request.Source, Backend: "age"}
+		for _, record := range snapshot.Envelope.Records {
+			metadata.Records = append(metadata.Records, store.MetadataRecord{Key: record.Key, Labels: record.Labels, Account: record.Account})
+		}
+		selection, err := SelectMetadata(metadata, request.Selectors)
+		if err != nil {
+			return result, secure.ErrConflict
+		}
+		// Recompute the complete implicit selection on this authenticated snapshot.
+		if len(request.Keys) == 0 && len(selection.Matched) != len(records) {
+			return result, secure.ErrConflict
+		}
+		for i, wanted := range records {
+			selected, ok := selection.Matched[wanted.Key]
+			if !ok || store.CanonicalLabels(selected.Labels) != store.CanonicalLabels(wanted.Labels) || selected.Account != wanted.Account {
+				return result, secure.ErrConflict
+			}
+			found := false
+			for _, record := range snapshot.Records {
+				if record.Key == wanted.Key && store.CanonicalLabels(record.Labels) == store.CanonicalLabels(wanted.Labels) {
 					mutations[i].Value = secure.Clone(record.Value)
 					found = true
 					break

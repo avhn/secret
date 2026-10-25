@@ -24,11 +24,13 @@ type CompletionRequest struct {
 	Selectors store.Selectors
 }
 
-var completionCommands = []string{"audit", "clip", "completion", "delete", "diff", "doctor", "exec", "export", "get", "hook", "import", "list", "mcp", "rename", "rotate", "run", "show", "stash", "version"}
+var completionCommands = []string{"age-init", "age-rekey", "audit", "clip", "completion", "delete", "diff", "doctor", "exec", "export", "get", "hook", "import", "list", "mcp", "rename", "rotate", "run", "show", "stash", "version"}
 
 var completionFlags = map[string][]string{
-	"audit": {"--action", "--key", "--limit", "--outcome", "--target", "--format=json"},
-	"clip":  {"--env", "--label"}, "completion": {},
+	"age-init":  {"--age-identity", "--age-recipients"},
+	"age-rekey": {"--age-identity", "--age-recipients", "--age-new-identity"},
+	"audit":     {"--action", "--key", "--limit", "--outcome", "--target", "--format=json"},
+	"clip":      {"--env", "--label"}, "completion": {},
 	"delete": {"--env", "--label"}, "diff": {"--env", "--label", "--format=json"},
 	"doctor": {"--format=json"}, "exec": {"--env", "--key", "--label", "--optional-key"},
 	"export": {"--from", "--to", "--env", "--key", "--label", "--on-conflict=fail", "--dry-run"},
@@ -37,6 +39,13 @@ var completionFlags = map[string][]string{
 	"list":   {"--format=json"}, "mcp": {}, "rename": {"--env", "--label"},
 	"rotate": {"--env", "--label"}, "run": {"--env", "--key", "--label", "--optional-key", "--template-file"},
 	"show": {"--env", "--label", "--format=json"}, "stash": {"--env", "--label"}, "version": {},
+}
+
+func init() {
+	for _, command := range []string{"stash", "get", "clip", "run", "exec", "import", "export", "rename", "rotate", "delete"} {
+		completionFlags[command] = append(completionFlags[command], "--age-identity")
+	}
+	completionFlags["list"] = append(completionFlags["list"], "--backend=age")
 }
 
 // Complete never opens a store or invokes a provider. Callers supply only the
@@ -138,7 +147,7 @@ func explicitMetadataReference(reference string) bool {
 	if strings.HasPrefix(reference, "file:") {
 		return absoluteMetadataPath(strings.TrimPrefix(reference, "file:"))
 	}
-	if store.ProviderReference(reference) || strings.HasPrefix(reference, "onepassword:") {
+	if store.ProviderReference(reference) || strings.HasPrefix(reference, "onepassword:") || strings.HasPrefix(reference, "age:") {
 		_, err := (store.Locator{}).Resolve(reference)
 		return err == nil
 	}

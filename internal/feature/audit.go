@@ -205,6 +205,10 @@ func validAuditOutcome(outcome store.AuditOutcome) bool {
 }
 
 func validAuditEvent(event store.AuditEvent) bool {
+	if event.Action == store.ActionAgeInit || event.Action == store.ActionAgeRekey {
+		return event.Version == store.MetadataVersion && !event.Time.IsZero() && validAuditOutcome(event.Outcome) && strings.HasPrefix(event.Target, "age:") && explicitMetadataReference(event.Target) && event.Source == "" && len(event.Keys) == 0 && len(event.Labels) == 0
+	}
+
 	if event.Version != store.MetadataVersion || event.Time.IsZero() || !event.Action.Valid() || !validAuditOutcome(event.Outcome) || !explicitMetadataReference(event.Target) || len(event.Keys) == 0 || len(event.Keys) > 1024 || len(event.Labels) > 128 || store.ValidateIdentity("KEY", event.Labels) != nil {
 		return false
 	}

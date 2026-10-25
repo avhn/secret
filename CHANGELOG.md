@@ -22,6 +22,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
   GitHub pass/GPG fixtures. Native runner evidence is pending, not inferred from
   local mocks. No Bash CLI, hook policy, plugin or installed-default changes.
   See [pass support and manual recovery](docs/pass.md).
+- Add opt-in `age:NAME` encrypted stores to the staged Go CLI on Linux/macOS.
+  Pin the reviewed core `filippo.io/age v1.3.2` library. Bounded envelopes bind
+  names-only metadata to fully authenticated, warning-free dotenv payloads;
+  anchored transactions persist ciphertext only. Add create-only `age-init`,
+  proven-candidate `age-rekey`, explicit protected `--age-identity` files,
+  names-only inventory/MCP and consent-gated transfers to initialized age stores.
+  Reject age-to-plaintext routes, source selection drift and age templates.
+  Add synthetic recipient, fault, concurrency, fuzz, Unix PTY and killed-writer
+  tests, with module verification and matrix CI gates. Hosted CI remains pending.
+  Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
+  Windows age filesystem operations remain unsupported pending M5a.
 
 ## [0.2.3] - 2026-10-24
 

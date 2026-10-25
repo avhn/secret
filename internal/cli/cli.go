@@ -27,6 +27,7 @@ var Version = "dev"
 type command struct {
 	in          *os.File
 	out, errOut io.Writer
+	ageIdentity string
 	dir         string
 	loc         store.Locator
 	openRead    func(context.Context, string, string) ([]store.ManifestRecord, backend.Provider, string, error)
@@ -104,7 +105,7 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 			return c.fail("get is human-terminal-only; use show or run instead", 1)
 		}
 	case "list", "show", "stash", "clip", "run", "exec",
-		"register", "import", "export", "rename", "rotate", "delete", "diff", "doctor", "completion", "audit", "mcp":
+		"register", "age-init", "age-rekey", "import", "export", "rename", "rotate", "delete", "diff", "doctor", "completion", "audit", "mcp":
 	default:
 		return c.fail("unknown subcommand; use secret help", 1)
 	}
@@ -119,6 +120,24 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	}
 	c.dir = dir
 	c.loc = store.Locator{Home: home, SecretsDir: dir, SecretsEnv: env, IsFile: func(p string) bool { s, e := os.Stat(p); return e == nil && s.Mode().IsRegular() }, Glob: filepath.Glob}
+	if sub == "age-init" || sub == "age-rekey" {
+		return c.ageOperate(sub, args)
+	}
+	switch sub {
+	case "stash", "get", "clip", "run", "exec":
+		var err error
+		args, c.ageIdentity, err = ageIdentityOption(args, home)
+		if err != nil {
+			return c.failure(err)
+		}
+	}
+	if sub == "list" {
+		for _, arg := range args {
+			if arg == "--backend" || strings.HasPrefix(arg, "--backend=") {
+				return c.ageList(args)
+			}
+		}
+	}
 	if status, handled := c.featureCommand(sub, args); handled {
 		return status
 	}
@@ -197,7 +216,9 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 			return c.failure(er)
 		}
 		defer clear(value)
-		if providerRef(ref) {
+		if ageRef(ref) {
+			er = (backend.AgeTransaction{Config: c.ageConfig(), Reference: ref}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: rest[1], Labels: sel, Value: value}})
+		} else if providerRef(ref) {
 			er = backend.Stash(dir, ref, rest[1], sel, value, nil)
 		} else {
 			er = store.StashWithSecretsDir(dir, strings.TrimPrefix(ref, "file:"), rest[1], sel, value)
@@ -396,8 +417,14 @@ func selectManifest(records []store.ManifestRecord, key string, sel store.Select
 }
 func (c command) show(ref string, sel store.Selectors) ([]string, error) {
 	selected := len(sel) != 0
-	if providerRef(ref) {
-		records, e := backend.ListNames(c.dir, ref)
+	if providerRef(ref) || ageRef(ref) {
+		var records []store.ManifestRecord
+		var e error
+		if ageRef(ref) {
+			records, e = c.ageNames(ref)
+		} else {
+			records, e = backend.ListNames(c.dir, ref)
+		}
 		if e != nil {
 			return nil, e
 		}
@@ -436,6 +463,9 @@ func (c command) show(ref string, sel store.Selectors) ([]string, error) {
 		return nil, errors.New("cannot open store")
 	}
 	defer clear(data)
+	if store.IsAgeStoreBytes(data) {
+		return nil, store.ErrAge
+	}
 	records, warnings := store.Parse(data)
 	defer clearRecords(records)
 	for _, w := range warnings {
@@ -448,6 +478,23 @@ func (c command) show(ref string, sel store.Selectors) ([]string, error) {
 	return store.ShowLines(records, selected, selection), nil
 }
 func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
+	if ageRef(ref) {
+		snapshot, err := c.ageConfig().Read(ref)
+		if err != nil {
+			return nil, err
+		}
+		defer snapshot.Close()
+		selection, err := store.Select(snapshot.Records, sel)
+		if err != nil {
+			return nil, err
+		}
+		record, ok := selection.Matched[key]
+		if !ok {
+			return nil, secure.ErrNotFound
+		}
+		return secure.Clone(record.Value), nil
+	}
+
 	if providerRef(ref) {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -479,6 +526,9 @@ func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
 		return nil, errors.New("cannot open store")
 	}
 	defer clear(data)
+	if store.IsAgeStoreBytes(data) {
+		return nil, store.ErrAge
+	}
 	records, warnings := store.Parse(data)
 	defer clearRecords(records)
 	for _, w := range warnings {

@@ -120,6 +120,9 @@ func (operator Operator) importPlan(request ImportRequest) (OperatorResult, []st
 		if err != nil {
 			return OperatorResult{}, nil, err
 		}
+		if store.IsAgeStoreBytes(data) {
+			return OperatorResult{}, nil, secure.ErrInvalidRequest
+		}
 		metadata, warnings := store.ParseMetadata(data)
 		// Unlike legacy show, import refuses ignored/malformed input instead of
 		// silently publishing only a subset. Duplicate assignment warnings are OK.
@@ -194,6 +197,9 @@ func (operator Operator) Import(ctx context.Context, request ImportRequest) (Ope
 		defer secure.Clear(data)
 		if err != nil {
 			return result, err
+		}
+		if store.IsAgeStoreBytes(data) {
+			return result, secure.ErrInvalidRequest
 		}
 		records, _ := store.Parse(data)
 		defer func() {
@@ -271,7 +277,7 @@ func (operator Operator) destinationMetadata(reference string) (store.Metadata, 
 	if err != nil {
 		return store.Metadata{}, err
 	}
-	if !strings.HasPrefix(reference, "file:") {
+	if !strings.HasPrefix(reference, "file:") && !strings.HasPrefix(reference, "age:") {
 		if _, _, err := operator.provider(reference); err != nil {
 			return store.Metadata{}, err
 		}

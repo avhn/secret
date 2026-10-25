@@ -1,12 +1,14 @@
 package cli
 
-const usage = `Usage: secret list [--format=json] | show [--format=json] [--env ENV] [--label N=V ...] [FILE ...] | help
+const usage = `Usage: secret list [--backend age] [--format=json] | show [--format=json] [--env ENV] [--label N=V ...] [FILE ...] | help
        secret run|exec -f FILE [-f FILE ...] [--env ENV] [--label N=V] [--key KEY] [--optional-key KEY] -- CMD [ARG ...]
        secret stash [--env ENV] [--label N=V ...] FILE KEY
        secret get [--env ENV] [--label N=V ...] FILE KEY
        secret clip [--env ENV] [--label N=V ...] FILE KEY [SECONDS]
        secret import --from dotenv:ABS_PATH|op:ID|bw:ID --into REF [--map FIELD=KEY ...] [--label N=V ...] [--dry-run]
-       secret export --from REF --to keychain:NAME|libsecret:NAME|pass:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
+       secret export --from REF --to age:NAME|keychain:NAME|libsecret:NAME|pass:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
+       secret age-init age:NAME --age-recipients FILE --age-identity FILE
+       secret age-rekey age:NAME --age-identity FILE --age-recipients FILE --age-new-identity FILE
        secret rotate|delete REF KEY [--env ENV] [--label N=V ...]
        secret rename REF OLD NEW [--env ENV] [--label N=V ...]
        secret diff [--format=json] [--env LEFT --env RIGHT] [--left-label N=V ...] [--right-label N=V ...] REF [REF]
@@ -17,6 +19,13 @@ const usage = `Usage: secret list [--format=json] | show [--format=json] [--env 
 Bare NAME resolves to ~/.secrets/NAME.secret, then ~/.secrets/.NAME.secret.
 keychain:NAME uses macOS Keychain; libsecret:NAME uses Linux Secret Service.
 pass:NAME uses optional pass 1.7.4 on Linux/macOS; NAME.pass-keys isolates its inventory.
+age:NAME explicitly selects SECRETS_DIR/NAME.secret.age; defaults never discover it.
+Use --age-identity ABS_FILE on stash/get/clip/run/exec/import/export/lifecycle.
+Key files must be private under HOME/.secrets/.age-keys; no identity discovery exists.
+Age metadata is unauthenticated and names-only; value use authenticates the whole store.
+age-init is create-only; rekey proves the new identity before publishing ciphertext.
+Age sources use export, never import; plaintext export targets remain prohibited.
+Age plus --template-file is rejected. Windows age filesystem support awaits M5a.
 SECRET_KEYCHAIN selects an explicit keychain path (without spaces or quoting).
 file:PATH forces a literal file path. Keystore names must be
 simple names, not paths. Legacy provider manifests live at ~/.secrets/NAME.keys.
@@ -51,7 +60,7 @@ can leave protected plaintext. Cleanup is not guaranteed erasure.
 Operator commands require stdin AND stdout terminals before access, then exact
 hidden controlling-terminal confirmation of every target/key/label identity. No yes
 flag, piped confirmation or operator JSON exists. Invoke directly in your terminal,
-never through agent tools. REF must be file:ABS_PATH or keychain:NAME/libsecret:NAME/pass:NAME.
+never through agent tools. REF must be file:ABS_PATH, age:NAME or keychain:NAME/libsecret:NAME/pass:NAME.
 Rotation reads a hidden value, capped at 64 KiB; oversize input rejects, not truncates.
 Import/export are insert-only. op/bw require explicit mappings; export without
 selectors selects unlabeled keys only. Dry-run is names/conflicts only and still

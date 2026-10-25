@@ -100,6 +100,19 @@ cp ~/.local/share/secret/examples/ripgreprc ~/.config/ripgrep/config
 export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"  # in your shell profile
 ```
 
+## Opt-in age stores in the staged Go CLI
+
+M5d adds explicit `age:NAME` encrypted file stores on Linux/macOS, with reviewed
+`filippo.io/age v1.3.2`, whole-store authenticated reads and ciphertext-only
+atomic writes. `age-init` is create-only and `age-rekey` verifies the new identity
+before publication; both require real terminals and exact target confirmation.
+Key files must be private under `HOME/.secrets/.age-keys/`, and value-consuming
+commands require explicit `--age-identity FILE`. Names-only interfaces need no
+identity, but their outer metadata is unauthenticated. Use `list --backend age`;
+default discovery and the Bash CLI are unchanged. Windows filesystem support
+waits for M5a. See [age setup, migration, recovery and limits](docs/age.md).
+Hosted CI is pending; this does not activate hooks or authorize a release.
+
 ## Usage
 
 Stores use `KEY=VALUE` lines: `~/.secrets.env` and `~/.secrets/*.secret`

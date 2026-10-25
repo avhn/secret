@@ -158,7 +158,24 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 		}
 	}()
 	for _, ref := range o.files {
-		if providerRef(ref) {
+		if ageRef(ref) {
+			if o.templateFile != "" {
+				return nil, nil, nil, secure.ErrInvalidRequest
+			}
+			snapshot, e := c.ageConfig().Read(ref)
+			if e != nil {
+				return nil, nil, nil, e
+			}
+			selected, e := store.Select(snapshot.Records, o.selectors)
+			if e != nil {
+				snapshot.Close()
+				return nil, nil, nil, e
+			}
+			// Selection borrows all independently owned record values. Transfer
+			// them to launch cleanup after clearing the dotenv source buffer.
+			secure.Clear(snapshot.Dotenv)
+			selections = append(selections, selected)
+		} else if providerRef(ref) {
 			records, p, service, e := c.openProviderRead(ctx, ref)
 			if e != nil {
 				return nil, nil, nil, e
@@ -189,6 +206,10 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 			data, e := os.ReadFile(path)
 			if e != nil {
 				return nil, nil, nil, errors.New("cannot open store")
+			}
+			if store.IsAgeStoreBytes(data) {
+				secure.Clear(data)
+				return nil, nil, nil, store.ErrAge
 			}
 			parsed, warnings := store.Parse(data)
 			for _, w := range warnings {
@@ -237,6 +258,13 @@ func (c command) launch(mode string, args []string) (status int) {
 	}
 	if mode == "exec" && o.templateFile != "" {
 		return c.fail("templates require supervised run", 1)
+	}
+	if o.templateFile != "" {
+		for _, ref := range o.files {
+			if ageRef(ref) {
+				return c.failure(secure.ErrInvalidRequest)
+			}
+		}
 	}
 	env, values, selected, e := c.prepareLaunch(o)
 	if e != nil {

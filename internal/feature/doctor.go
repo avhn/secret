@@ -176,6 +176,21 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			add("recovery", reference, "unavailable", "explicit manifest directory required")
 			continue
 		}
+		if strings.HasPrefix(reference, "age:") {
+			path, err := store.AgePath(options.SecretsDir, reference)
+			if err != nil {
+				return DoctorReport{}, secure.ErrInvalidRequest
+			}
+			doctorPath(path, add)
+			status := "unverified"
+			detail := "outer metadata is unauthenticated; no identity or decryption probe performed"
+			if runtime.GOOS == "windows" {
+				status = "unsupported"
+				detail = "age filesystem operations await the Windows permission gate"
+			}
+			add("backend", reference, status, detail)
+			continue
+		}
 		kind, _, _ := strings.Cut(reference, ":")
 		path, pathErr := store.ManifestPath(options.SecretsDir, reference)
 		if pathErr != nil {

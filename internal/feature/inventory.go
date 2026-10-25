@@ -113,6 +113,21 @@ func ReadMetadata(reference, directory string) (store.Metadata, error) {
 		}
 		return result, nil
 	}
+	if strings.HasPrefix(reference, "age:") {
+		path, err := store.AgePath(directory, reference)
+		if err != nil {
+			return store.Metadata{}, ErrMetadata
+		}
+		envelope, err := store.ReadAgeEnvelope(path)
+		if err != nil {
+			return store.Metadata{}, ErrMetadataRead
+		}
+		result.Backend = "age"
+		for _, record := range envelope.Records {
+			result.Records = append(result.Records, store.MetadataRecord{Key: record.Key, Labels: copyMetadataLabels(record.Labels), Account: record.Account})
+		}
+		return result, nil
+	}
 	path := strings.TrimPrefix(reference, "file:")
 	if path == "" {
 		return store.Metadata{}, ErrMetadata
@@ -126,6 +141,9 @@ func ReadMetadata(reference, directory string) (store.Metadata, error) {
 	defer secure.Clear(data)
 	if err != nil {
 		return store.Metadata{}, ErrMetadataRead
+	}
+	if store.IsAgeStoreBytes(data) {
+		return store.Metadata{}, ErrMetadata
 	}
 	records, _ := store.ParseMetadata(data)
 	result.Records = append(result.Records, records...)
@@ -289,7 +307,7 @@ func validateMetadataSelectors(selectors store.Selectors) error {
 }
 
 func validateMetadata(metadata store.Metadata) error {
-	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "onepassword" && !store.ProviderReference(metadata.Backend+":name")) {
+	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "onepassword" && metadata.Backend != "age" && !store.ProviderReference(metadata.Backend+":name")) {
 		return ErrMetadata
 	}
 	if metadata.Reference == "" {
