@@ -32,6 +32,40 @@ func Mkdir(path string, mode os.FileMode) error {
 	return secure.CreatePrivateDirectory(root, filepath.Base(path))
 }
 
+// MkdirAll creates private fixture ancestors without repairing existing ACLs.
+func MkdirAll(path string, mode os.FileMode) error {
+	if mode != 0700 {
+		return os.MkdirAll(path, mode)
+	}
+	err := Mkdir(path, mode)
+	if os.IsNotExist(err) {
+		parent := filepath.Dir(path)
+		if parent == path {
+			return err
+		}
+		if err := MkdirAll(parent, mode); err != nil {
+			return err
+		}
+		err = Mkdir(path, mode)
+	}
+	if !os.IsExist(err) {
+		return err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return secure.ErrPrivateFile
+	}
+	return secure.CheckPrivate(file)
+}
+
 func WriteFile(path string, data []byte, mode os.FileMode) error {
 	if mode != 0600 {
 		// Deliberately insecure fixture. It must not pass the protected-DACL check.

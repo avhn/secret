@@ -35,6 +35,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Reject Windows reserved DOS device components regardless of extension or OS
+  version, including console aliases and COM/LPT superscript digits. Backend stub
+  fixtures now create protected private ancestors instead of inherited DACLs, and
+  the template parser test uses a native absolute store path. Production ACL
+  requirements are unchanged; native windows-latest confirmation remains pending.
+
 - Add M5a wincred v1 names-only manifests and recovery under NAME.wincred-keys,
   outside unchanged Bash discovery, with centralized provider manifest paths.
   Native Windows Credential Manager transport uses exact generic targets,

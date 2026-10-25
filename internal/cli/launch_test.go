@@ -89,6 +89,7 @@ func syntheticTemplateHome(t *testing.T) string {
 
 func TestParseLaunchTemplate(t *testing.T) {
 	loc := store.Locator{}
+	storeRef := "file:" + filepath.Join(t.TempDir(), "synthetic.store")
 	for _, tc := range []struct {
 		options []string
 		want    string
@@ -102,7 +103,7 @@ func TestParseLaunchTemplate(t *testing.T) {
 		{[]string{"--output-dir", "elsewhere"}, "", true},
 		{[]string{"--template-output-dir", "elsewhere"}, "", true},
 	} {
-		args := append([]string{"-f", "file:/synthetic/store"}, tc.options...)
+		args := append([]string{"-f", storeRef}, tc.options...)
 		args = append(args, "--", "synthetic-child")
 		o, err := parseLaunch(args, loc)
 		if (err != nil) != tc.bad || !tc.bad && o.templateFile != tc.want {

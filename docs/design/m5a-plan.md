@@ -206,6 +206,20 @@ Step 6 still owns transaction success/failure and recovery lifecycle coverage on
 native Windows before lifting its guard. Steps 5-8 are not implemented by this
 transport change.
 
+## Initial native Windows unit-test corrections
+
+The first native unit-test lane failed in reserved path validation, backend stub
+writes and the template parser fixture. Go 1.26.10 filepath.IsLocal delegates device
+names with extensions to the running Windows version, which may accept them;
+store validation now rejects reserved device bases explicitly, including console
+aliases and COM/LPT superscript digits, in every component. Stub provider ancestors
+must be created through the private test helper: os.MkdirAll inherits an unprotected
+DACL even beneath a protected parent, so private-file creation correctly rejects
+it. The template parser fixture uses a native absolute path instead of the
+volume-less /synthetic/store path. Production protected owner-only checks and
+ambiguous-path rejection stay intact. Hosted confirmation of these corrections
+remains pending; cross-vet and compilation do not establish native success.
+
 ## Native verification matrix and CI
 
 | Required Windows lane | Evidence and failure assertions |

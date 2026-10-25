@@ -71,6 +71,20 @@ func validWindowsComponent(name string) bool {
 			return false
 		}
 	}
+	// Go's IsLocal follows the running Windows version, which can allow device
+	// names with extensions. Store names reject those aliases on every version.
+	base, _, _ := strings.Cut(name, ".")
+	base = strings.ToUpper(strings.TrimRight(base, " "))
+	switch base {
+	case "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$":
+		return false
+	}
+	if strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT") {
+		switch base[3:] {
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9", "¹", "²", "³":
+			return false
+		}
+	}
 	return true
 }
 

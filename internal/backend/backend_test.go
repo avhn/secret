@@ -57,7 +57,7 @@ func (s *stub) Put(service, account, label string, value []byte) error {
 		return errors.New("stub put failure")
 	}
 	path := s.path(service, account)
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := testutil.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
 	return testutil.WriteFile(path, value, 0600)
@@ -93,7 +93,7 @@ func TestBackendOrdering(t *testing.T) {
 	// orphan_exists, failed_publish_existing, prior_record_intact, mismatch.
 	dir := testutil.TempDir(t)
 	s := &stub{dir: filepath.Join(dir, "stub")}
-	if err := os.MkdirAll(s.dir, 0700); err != nil {
+	if err := testutil.MkdirAll(s.dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	manifest := filepath.Join(dir, "demo.keys")

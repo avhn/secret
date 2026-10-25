@@ -22,6 +22,42 @@ func TestWindowsStorePaths(t *testing.T) {
 	}
 }
 
+func TestWindowsReservedStoreComponents(t *testing.T) {
+	reserved := []string{"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+	for _, prefix := range []string{"COM", "LPT"} {
+		for _, digit := range []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "¹", "²", "³"} {
+			reserved = append(reserved, prefix+digit)
+		}
+	}
+	for _, base := range reserved {
+		for _, spelling := range []string{base, strings.ToLower(base)} {
+			for _, suffix := range []string{"", ".txt", ".tar.gz", ".", " ", ".txt. ", " .txt"} {
+				component := spelling + suffix
+				for _, name := range []string{
+					component,
+					`C:\private\` + component,
+					`C:\private\` + component + `\file.secret`,
+					`relative/` + component + `/file.secret`,
+					`\\server\share\` + component + `\file.secret`,
+					`\\` + component + `\share\file.secret`,
+					`\\server\` + component + `\file.secret`,
+				} {
+					if err := ValidateStorePath(name); err != ErrPrivateFile {
+						t.Errorf("reserved component accepted: %q", name)
+					}
+				}
+			}
+		}
+	}
+	for _, component := range []string{"COM0", "COM10", "LPT0", "LPT10", "COMLPT1", "COM1extra", "LPT¹extra", "CONSOLE", "NULextra", "CONIN", "CONOUT", "config.txt"} {
+		for _, name := range []string{component, `C:\private\` + component + `\file.secret`} {
+			if err := ValidateStorePath(name); err != nil {
+				t.Errorf("ordinary component rejected: %q", name)
+			}
+		}
+	}
+}
+
 func TestWindowsUserHome(t *testing.T) {
 	t.Setenv("HOME", "")
 	t.Setenv("USERPROFILE", filepath.Join(t.TempDir(), "profile"))

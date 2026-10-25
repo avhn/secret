@@ -446,6 +446,12 @@ A required-provider windows-latest lifecycle step journals random synthetic exac
 targets before writes and verifies exact cleanup in-process and under always().
 It has not been run locally; hosted native evidence is still required.
 
+The initial native Windows unit-test lane exposed OS-dependent reserved-device
+extension acceptance, inherited-DACL backend stub ancestors and a Unix-only
+absolute path in the template parser fixture. Explicit device-base rejection and
+private/native fixtures address those failures without relaxing production ACLs.
+The corrected lane still requires hosted windows-latest confirmation.
+
 Steps 5-8 (Jobs, console/operator integration, hooks and the full isolated native
 matrix) and final evidence documentation remain pending. Existing higher-level
 operator, provider transaction and launch Windows guards remain in place; there

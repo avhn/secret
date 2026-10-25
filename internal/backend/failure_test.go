@@ -25,7 +25,7 @@ func TestBackendFailureInventory(t *testing.T) {
 		t.Run(tc.inventory, func(t *testing.T) {
 			dir := testutil.TempDir(t)
 			s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
-			if err := os.MkdirAll(s.dir, 0700); err != nil {
+			if err := testutil.MkdirAll(s.dir, 0700); err != nil {
 				t.Fatal(err)
 			}
 			path := filepath.Join(dir, "other.keys")
