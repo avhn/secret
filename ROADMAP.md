@@ -428,7 +428,7 @@ Gate: Windows runner proves ACLs, rename/lock, drive/UNC/junction paths, child l
 
 ## M5b: pass backend
 
-Status: conditional. Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
+Status: in progress (owner-approved 2026-10-25; plan docs/design/m5b-plan.md). Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
 
 - [ ] feat(backend): implement pass stdin writes and private reads with stub and isolated gpg assertions
 - [ ] test(pass): extend provider collision matrix
