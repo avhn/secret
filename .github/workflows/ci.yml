@@ -93,6 +93,46 @@ jobs:
           path: testdata/inventory/keychain.tsv
           if-no-files-found: error
 
+  pass:
+    name: pass (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.10"
+          cache: true
+      - name: Install pass prerequisites and select native tools
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install gnupg bash gnu-getopt
+            brew_prefix="$(brew --prefix)"
+            echo "SECRET_PASS_TOOL_PATH=$brew_prefix/bin:$brew_prefix/sbin:$brew_prefix/opt/gnu-getopt/bin:/usr/bin:/bin" >>"$GITHUB_ENV"
+            echo "SECRET_PASS_BASH=$brew_prefix/bin/bash" >>"$GITHUB_ENV"
+            echo "SECRET_PASS_GETOPT=$brew_prefix/opt/gnu-getopt/bin/getopt" >>"$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y gnupg bash coreutils util-linux tree git curl make xz-utils
+            echo "SECRET_PASS_TOOL_PATH=/usr/bin:/bin" >>"$GITHUB_ENV"
+            echo "SECRET_PASS_BASH=/usr/bin/bash" >>"$GITHUB_ENV"
+          fi
+          echo "SECRET_PASS_PREFIX=$RUNNER_TEMP/pass-1.7.4" >>"$GITHUB_ENV"
+      - name: Install checksum-pinned upstream pass with platform file
+        shell: bash
+        run: PATH="$SECRET_PASS_TOOL_PATH:$PATH" sh scripts/install-test-pass.sh "$SECRET_PASS_PREFIX"
+      - name: Build staged Go CLI
+        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+      - name: Isolated native pass and operator matrix
+        shell: bash
+        run: PATH="$SECRET_PASS_PREFIX/bin:$SECRET_PASS_TOOL_PATH:$PATH" python3 -I tests/test-pass.py "$RUNNER_TEMP/secret-go"
+
   test:
     strategy:
       fail-fast: false
@@ -181,6 +221,9 @@ jobs:
       - name: Vet Go packages
         shell: bash
         run: go vet ./...
+      - name: Test explicit backend stub build
+        shell: bash
+        run: go test -tags secretstub -count=1 ./internal/backend
       - name: Test Windows policy package
         if: runner.os == 'Windows'
         shell: bash
