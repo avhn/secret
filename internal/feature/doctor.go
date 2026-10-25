@@ -159,6 +159,11 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			add("backend", kind, "present", "provider executable found; no service or unlock probe performed")
 		}
 	}
+	if runtime.GOOS == "windows" {
+		add("backend", "wincred", "unverified", "native exact-target transport compiled; no credential or service probe performed")
+	} else {
+		add("backend", "wincred", "unsupported", "provider is not supported on this platform")
+	}
 	for _, reference := range options.References {
 		if strings.HasPrefix(reference, "onepassword:") {
 			if _, err := lookPath("op"); err != nil {

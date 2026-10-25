@@ -181,6 +181,31 @@ The plan review (2026-10-25) required these changes; they override earlier text:
 7. wincred manifests use the `NAME.wincred-keys` suffix (see design section 2), not v2 in
    `NAME.keys`.
 
+## Steps 3 and 4 implementation status
+
+The names-only v1 wincred manifest/recovery path and exact native transport are
+implemented, not runtime-certified. Reference-to-path construction is centralized
+in store.ManifestPath; NAME.wincred-keys never enters the Bash *.keys glob.
+Metadata interfaces work without native provider access, including on Unix;
+credential dispatch outside Windows returns unsupported. The step 3 split must
+retain Locator's explicit wincred rejection until step 4 wires every provider
+consumer, so no intermediate revision treats wincred:NAME as a plaintext file.
+
+CredMan uses raw blobs with a 2560-byte bound and generic exact targets only.
+API-owned read buffers are cleared before CredFree; write copies are cleared
+without changing caller buffers. Portable injected API tests cover failure and
+identity checks. The Windows-only required-provider tests use random synthetic
+services, probe absence before writes, flush exact targets to a names-only journal
+and register cleanup before writes. CI independently replays that journal under
+always() and verifies absence, never enumerating or wildcard-deleting records.
+No real provider access runs when SECRET_REQUIRE_WINCRED is unset. Hosted results
+remain required; cross-vet and test compilation are not native evidence.
+
+Windows operator/Transaction, launch, template and audit persistence guards remain.
+Step 6 still owns transaction success/failure and recovery lifecycle coverage on
+native Windows before lifting its guard. Steps 5-8 are not implemented by this
+transport change.
+
 ## Native verification matrix and CI
 
 | Required Windows lane | Evidence and failure assertions |
@@ -221,7 +246,7 @@ The plan review (2026-10-25) required these changes; they override earlier text:
 - Ordered signed commits, each with focused synthetic tests:
   1. `docs(windows): define m5a runtime and evidence contract`
   2. `feat(windows): add private handle-based storage and native paths`
-  3. `feat(store): add names-only wincred manifests outside bash discovery`
+  3. `feat(store): add inactive wincred manifest paths`
   4. `feat(backend): add exact credential manager transport`
   5. `feat(cli): supervise windows children with kill-on-close jobs`
   6. `feat(cli): add native console and private operator workflows`

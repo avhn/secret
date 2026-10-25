@@ -235,6 +235,27 @@ jobs:
       - name: Test explicit backend stub build
         shell: bash
         run: go test -tags secretstub -count=1 ./internal/backend
+      - name: Exact disposable Windows Credential Manager lifecycle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GOTOOLCHAIN: local
+          SECRET_REQUIRE_WINCRED: "1"
+        run: |
+          $env:SECRET_WINCRED_TARGETS = Join-Path $env:RUNNER_TEMP 'secret-wincred-targets.jsonl'
+          if (Test-Path -LiteralPath $env:SECRET_WINCRED_TARGETS) { throw 'cleanup journal already exists' }
+          go test -v -count=1 -run '^TestWincredIntegration$' ./internal/backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify exact Windows credential cleanup
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GOTOOLCHAIN: local
+          SECRET_REQUIRE_WINCRED: "1"
+        run: |
+          $env:SECRET_WINCRED_TARGETS = Join-Path $env:RUNNER_TEMP 'secret-wincred-targets.jsonl'
+          go test -v -count=1 -run '^TestWincredCleanup$' ./internal/backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Test Windows policy package
         if: runner.os == 'Windows'
         shell: bash

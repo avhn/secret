@@ -6,7 +6,7 @@ const usage = `Usage: secret list [--backend age] [--format=json] | show [--form
        secret get [--env ENV] [--label N=V ...] FILE KEY
        secret clip [--env ENV] [--label N=V ...] FILE KEY [SECONDS]
        secret import --from dotenv:ABS_PATH|op:ID|bw:ID --into REF [--map FIELD=KEY ...] [--label N=V ...] [--dry-run]
-       secret export --from REF --to age:NAME|keychain:NAME|libsecret:NAME|pass:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
+       secret export --from REF --to age:NAME|keychain:NAME|libsecret:NAME|pass:NAME|wincred:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
        secret age-init age:NAME --age-recipients FILE --age-identity FILE
        secret age-rekey age:NAME --age-identity FILE --age-recipients FILE --age-new-identity FILE
        secret rotate|delete REF KEY [--env ENV] [--label N=V ...]
@@ -29,6 +29,10 @@ Age plus --template-file is rejected. Windows age filesystem support awaits M5a.
 SECRET_KEYCHAIN selects an explicit keychain path (without spaces or quoting).
 file:PATH forces a literal file path. Keystore names must be
 simple names, not paths. Legacy provider manifests live at ~/.secrets/NAME.keys.
+wincred:NAME uses native Windows Credential Manager (2560-byte raw blob limit),
+with names-only NAME.wincred-keys manifests outside Bash discovery. Metadata can
+be read on other platforms; credential access is unsupported there. Windows
+run/exec and operator workflows remain unavailable pending their native gates.
 list prints store references; show prints file lengths or keystore <stored>.
 run and exec require explicit files and --. Later files win. Selectors export
 only selected keys; required keys must be nonempty, missing optional keys vanish.
@@ -60,7 +64,7 @@ can leave protected plaintext. Cleanup is not guaranteed erasure.
 Operator commands require stdin AND stdout terminals before access, then exact
 hidden controlling-terminal confirmation of every target/key/label identity. No yes
 flag, piped confirmation or operator JSON exists. Invoke directly in your terminal,
-never through agent tools. REF must be file:ABS_PATH, age:NAME or keychain:NAME/libsecret:NAME/pass:NAME.
+never through agent tools. REF must be file:ABS_PATH, age:NAME or keychain:NAME/libsecret:NAME/pass:NAME/wincred:NAME.
 Rotation reads a hidden value, capped at 64 KiB; oversize input rejects, not truncates.
 Import/export are insert-only. op/bw require explicit mappings; export without
 selectors selects unlabeled keys only. Dry-run is names/conflicts only and still

@@ -376,6 +376,11 @@ func (c command) defaults() ([]string, error) {
 			refs = append(refs, ref)
 		}
 	}
+	wincredRefs, e := c.wincredDefaults()
+	if e != nil {
+		return nil, e
+	}
+	refs = append(refs, wincredRefs...)
 	files, e := c.loc.Defaults()
 	if e != nil {
 		return nil, e

@@ -35,6 +35,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Add M5a wincred v1 names-only manifests and recovery under NAME.wincred-keys,
+  outside unchanged Bash discovery, with centralized provider manifest paths.
+  Native Windows Credential Manager transport uses exact generic targets,
+  current-user local-machine persistence and raw byte blobs up to 2560 bytes.
+  Owned buffers are cleared; native errors never include provider values.
+  Names-only inventory, JSON, completion, audit identities, doctor and MCP share
+  reference validation without credential fetches. Non-Windows value dispatch
+  returns unsupported, never plaintext fallback. Portable fake-API tests and a
+  gated hosted-Windows synthetic lifecycle with journaled exact-target cleanup
+  are added; native runtime evidence is pending. Windows launch and operator
+  guards stay in place until their later prerequisites are verified.
+
 - Integrate M5a native Windows private storage: protected owner-only DACLs checked
   on opened handles for store reads, lock directories/tokens, marked scratch,
   atomic replacements, v1 manifests and names-only recovery. File mutations share

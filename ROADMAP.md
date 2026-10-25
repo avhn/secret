@@ -432,10 +432,24 @@ contention, open-reader/failed/untorn replacement, killed writers and manual
 recovery, exact ownership cleanup, loopback UNC and junction-plus-parent traversal.
 UNC/share and reparse fixtures are required, not silently skipped. These tests
 compile locally but still require windows-latest runtime evidence. No M5a item is
-complete. Steps 3-8 (wincred manifest/transport, Jobs, console/operator integration,
-hooks and the isolated native matrix) and final evidence documentation remain
-pending. Existing higher-level operator, provider transaction and launch Windows
-guards remain in place; there are no installed hook or release changes.
+complete.
+
+Steps 3 and 4 are implemented locally: wincred v1 manifests and recovery use
+NAME.wincred-keys and NAME.wincred-keys.recovery, outside unchanged Bash *.keys
+discovery. Centralized reference-to-manifest paths cover metadata and recovery
+consumers. Native generic CredMan calls use only exact secret/NAME/ACCOUNT targets,
+current-user local-machine persistence, bounded raw blobs and clear-before-free
+ownership. Names-only show, JSON, completion, audit identities and MCP do not fetch
+credentials; non-Windows credential dispatch is explicitly unsupported. Portable
+injected API tests cover boundaries, wrong identities, failures and buffer cleanup.
+A required-provider windows-latest lifecycle step journals random synthetic exact
+targets before writes and verifies exact cleanup in-process and under always().
+It has not been run locally; hosted native evidence is still required.
+
+Steps 5-8 (Jobs, console/operator integration, hooks and the full isolated native
+matrix) and final evidence documentation remain pending. Existing higher-level
+operator, provider transaction and launch Windows guards remain in place; there
+are no installed hook or release changes.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions

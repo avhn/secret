@@ -132,9 +132,13 @@ func DispatchWith(ref string, provider Provider) (Provider, string, string, erro
 		provider = testProvider(backend)
 	}
 	if provider == nil {
-		if backend == "pass" {
+		if backend == "pass" || backend == "wincred" {
 			var err error
-			provider, err = newPass()
+			if backend == "pass" {
+				provider, err = newPass()
+			} else {
+				provider, err = newWincred()
+			}
 			if err != nil {
 				return nil, "", "", err
 			}
@@ -169,13 +173,6 @@ func ListNames(dir, ref string) ([]store.ManifestRecord, error) {
 		return nil, err
 	}
 	kind, _, _ := strings.Cut(ref, ":")
-	// Preserve legacy configuration validation without requiring optional pass
-	// configuration or executables for names-only inventory.
-	if kind != "pass" {
-		if _, _, _, err := Dispatch(ref); err != nil {
-			return nil, err
-		}
-	}
 	return store.ReadManifest(path, kind)
 }
 
@@ -194,6 +191,7 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 		return err
 	}
 	normalized, err := store.NormalizeValue(value)
+	defer secure.Clear(normalized)
 	if err != nil {
 		return err
 	}
@@ -205,7 +203,10 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 		return err
 	}
 	_, name, _ := strings.Cut(ref, ":")
-	path := filepath.Join(dir, name+".keys")
+	path, err := store.ManifestPath(dir, ref)
+	if err != nil {
+		return err
+	}
 	return store.WithWriteLock(dir, func() error {
 		records, err := store.ReadManifest(path, backend)
 		if err != nil && !os.IsNotExist(err) {
@@ -241,6 +242,7 @@ func stashWithPublish(dir, ref, key string, labels map[string]string, value []by
 			return errors.New("backend put failed")
 		}
 		got, err := p.Get(service, account)
+		defer secure.Clear(got)
 		if err != nil || !bytes.Equal(got, normalized) {
 			return errors.New("backend lookup failed")
 		}

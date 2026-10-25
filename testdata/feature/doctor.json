@@ -146,6 +146,12 @@
       "detail": "<platform>"
     },
     {
+      "kind": "backend",
+      "target": "wincred",
+      "status": "<platform>",
+      "detail": "<platform>"
+    },
+    {
       "kind": "alias",
       "target": "<root>/stores/tracked.keys",
       "status": "direct",
