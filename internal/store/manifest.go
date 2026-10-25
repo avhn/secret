@@ -24,7 +24,30 @@ type ManifestRecord struct {
 	Account string            `json:"account"`
 }
 
-func manifestBackend(backend string) bool { return backend == "keychain" || backend == "libsecret" }
+func manifestBackend(backend string) bool {
+	return backend == "keychain" || backend == "libsecret" || backend == "pass"
+}
+
+// ProviderReference classifies reserved provider prefixes before any file fallback.
+// Classification is syntax-only and never opens a provider or its configuration.
+func ProviderReference(reference string) bool {
+	kind, _, ok := strings.Cut(reference, ":")
+	return ok && manifestBackend(kind)
+}
+
+// ManifestPath is the single reference-to-inventory mapping, including recovery.
+// New v1 providers use isolated suffixes invisible to legacy Bash discovery.
+func ManifestPath(directory, reference string) (string, error) {
+	kind, name, ok := strings.Cut(reference, ":")
+	if !ok || !manifestBackend(kind) || !backendName.MatchString(name) {
+		return "", ErrInvalidKeystoreName
+	}
+	suffix := ".keys"
+	if kind == "pass" {
+		suffix = ".pass-keys"
+	}
+	return filepath.Join(directory, name+suffix), nil
+}
 func validRecord(record ManifestRecord) bool {
 	if !keyName.MatchString(record.Key) || !accountID.MatchString(record.Account) {
 		return false
