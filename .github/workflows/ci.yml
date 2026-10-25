@@ -131,7 +131,10 @@ jobs:
         run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
       - name: Isolated native pass and operator matrix
         shell: bash
-        run: PATH="$SECRET_PASS_PREFIX/bin:$SECRET_PASS_TOOL_PATH:$PATH" python3 -I tests/test-pass.py "$RUNNER_TEMP/secret-go"
+        run: |
+          # Keep the pinned setup-go toolchain ahead of any runner image Go in /usr/bin.
+          go_bin=$(go env GOROOT)/bin
+          PATH="$SECRET_PASS_PREFIX/bin:$go_bin:$SECRET_PASS_TOOL_PATH:$PATH" python3 -I tests/test-pass.py "$RUNNER_TEMP/secret-go"
 
   test:
     strategy:
