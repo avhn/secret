@@ -83,6 +83,14 @@ function Assert-NoValues([byte[]] $Bytes) {
 function Invoke-Fixture($Request) {
     $bytes = $script:Utf8.GetBytes(($Request | ConvertTo-Json -Depth 8 -Compress))
     $got = Invoke-Captured $ConsoleFixture @() $bytes
+    if ($got.Code -ne 0 -or $got.Err.Length -ne 0) {
+        # Fixture diagnostics are fixed strings; still prove no synthetic value
+        # is present before printing a bounded excerpt for CI triage.
+        Assert-NoValues $got.Err
+        $detail = $script:Utf8.GetString($got.Err)
+        if ($detail.Length -gt 400) { $detail = $detail.Substring(0, 400) }
+        Write-Output ('fixture mode ' + $Request.Mode + ' exited ' + $got.Code + ': ' + $detail.Trim())
+    }
     Assert-True ($got.Code -eq 0 -and $got.Err.Length -eq 0) 'native fixture succeeds'
     $reply = $script:Utf8.GetString($got.Out) | ConvertFrom-Json
     if ($null -ne $reply.Output) { Assert-NoValues ([Convert]::FromBase64String($reply.Output)) }
@@ -187,6 +195,7 @@ function Test-HookPath([string] $Shell, [string] $Path, [bool] $Denied) {
     else { Assert-True ($got.Code -eq 0 -and $got.Out.Length -eq 0 -and $got.Err.Length -eq 0) 'public shim control allowed' }
 }
 
+$script:Primary = $null
 try {
     Write-Output ('Runner OS build: ' + [Environment]::OSVersion.VersionString)
     Write-Output ('Runner image: ' + $env:ImageOS + ' ' + $env:ImageVersion + '; architecture: ' + [Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
@@ -362,6 +371,10 @@ $bytes = $encoding.GetBytes('err:' + $env:TOKEN + ':done')
         Assert-Deny (Invoke-Shell $shell $missingShim @() $script:Utf8.GetBytes('{}')) 'secret: development binary unavailable; build hooks/secret.exe'
     }
     Write-Output 'PASS fixed missing-binary shim denial (not host fail-closed evidence)'
+} catch {
+    # Report the first failure before cleanup so a later cleanup error cannot hide it.
+    $script:Primary = $_
+    Write-Output ('FAIL primary: ' + $_.Exception.Message + ' (' + $_.InvocationInfo.ScriptName + ':' + $_.InvocationInfo.ScriptLineNumber + ')')
 } finally {
     # Attempt every cleanup even after assertion failure. Leave the journal for the
     # independent always() process, which must verify absence again.
@@ -387,6 +400,7 @@ $bytes = $encoding.GetBytes('err:' + $env:TOKEN + ':done')
         Assert-True (-not (Test-Path -LiteralPath $root)) 'disposable root removed'
     } catch { $cleanupFailed = $true; Write-Output 'FAIL disposable filesystem cleanup' }
     if ($cleanupFailed) { throw 'Windows integration cleanup could not prove absence' }
+    if ($null -ne $script:Primary) { throw $script:Primary }
 }
 Write-Output 'PASS isolated native Windows CLI matrix; hosted host protection is not established'
 exit 0

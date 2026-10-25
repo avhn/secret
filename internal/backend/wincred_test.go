@@ -230,6 +230,13 @@ func TestWincredManifestDispatch(t *testing.T) {
 	values := make(map[string][]byte)
 	api := fakeWincredAPI{
 		writeCall: func(target string, blob []byte) error { values[target] = bytes.Clone(blob); return nil },
+		deleteCall: func(target string) error {
+			if _, ok := values[target]; !ok {
+				return errWincredMissing
+			}
+			delete(values, target)
+			return nil
+		},
 		readCall: func(target string) (*wincredRecord, error) {
 			blob, ok := values[target]
 			if !ok {
