@@ -39,7 +39,7 @@ func TestImporterPreflightNoValueCalls(t *testing.T) {
 			case "relative target":
 				request.Target = "file:relative"
 			case "unsupported target":
-				request.Target = "pass:target"
+				request.Target = "unknown:target"
 			case "missing map":
 				request.Mappings = nil
 			case "bad field":

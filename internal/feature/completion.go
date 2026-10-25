@@ -138,7 +138,7 @@ func explicitMetadataReference(reference string) bool {
 	if strings.HasPrefix(reference, "file:") {
 		return absoluteMetadataPath(strings.TrimPrefix(reference, "file:"))
 	}
-	if strings.HasPrefix(reference, "keychain:") || strings.HasPrefix(reference, "libsecret:") || strings.HasPrefix(reference, "onepassword:") {
+	if store.ProviderReference(reference) || strings.HasPrefix(reference, "onepassword:") {
 		_, err := (store.Locator{}).Resolve(reference)
 		return err == nil
 	}

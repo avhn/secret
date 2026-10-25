@@ -140,6 +140,12 @@
       "detail": "<platform>"
     },
     {
+      "kind": "backend",
+      "target": "pass",
+      "status": "<platform>",
+      "detail": "<platform>"
+    },
+    {
       "kind": "alias",
       "target": "<root>/stores/tracked.keys",
       "status": "direct",

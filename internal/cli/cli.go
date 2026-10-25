@@ -286,7 +286,7 @@ func selectors(args []string) (store.Selectors, []string, error) {
 	return s, args[i:], nil
 }
 func providerRef(ref string) bool {
-	return strings.HasPrefix(ref, "keychain:") || strings.HasPrefix(ref, "libsecret:") || strings.HasPrefix(ref, "onepassword:")
+	return store.ProviderReference(ref) || strings.HasPrefix(ref, "onepassword:")
 }
 func (c command) defaults() ([]string, error) {
 	var refs []string
@@ -294,6 +294,11 @@ func (c command) defaults() ([]string, error) {
 	if e != nil {
 		return nil, e
 	}
+	passKeys, e := filepath.Glob(filepath.Join(c.dir, "*.pass-keys"))
+	if e != nil {
+		return nil, e
+	}
+	keys = append(keys, passKeys...)
 	for _, path := range keys {
 		info, er := os.Lstat(path)
 		if er != nil {
@@ -307,14 +312,22 @@ func (c command) defaults() ([]string, error) {
 			return nil, errors.New("cannot read manifest")
 		}
 		backendName := ""
+		suffix := ".keys"
 		if bytes.HasPrefix(data, []byte("secret-manifest-v1\nbackend=keychain\n")) {
 			backendName = "keychain"
 		} else if bytes.HasPrefix(data, []byte("secret-manifest-v1\nbackend=libsecret\n")) {
 			backendName = "libsecret"
+		} else if strings.HasSuffix(path, ".pass-keys") && bytes.HasPrefix(data, []byte("secret-manifest-v1\nbackend=pass\n")) {
+			backendName = "pass"
+			suffix = ".pass-keys"
 		} else {
 			return nil, errors.New("invalid manifest backend")
 		}
-		ref := backendName + ":" + strings.TrimSuffix(filepath.Base(path), ".keys")
+		ref := backendName + ":" + strings.TrimSuffix(filepath.Base(path), suffix)
+		expected, er := store.ManifestPath(c.dir, ref)
+		if er != nil || expected != path {
+			return nil, errors.New("invalid manifest backend")
+		}
 		if _, er = backend.ListNames(c.dir, ref); er != nil {
 			return nil, er
 		}

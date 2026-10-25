@@ -140,11 +140,14 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			add("config_certification", options.RipgrepConfig, "unsafe", "ripgrep configuration cannot be certified")
 		}
 	}
-	for _, kind := range []string{"libsecret", "keychain"} {
+	for _, kind := range []string{"libsecret", "keychain", "pass"} {
 		tool := "secret-tool"
 		supported := runtime.GOOS == "linux"
 		if kind == "keychain" {
 			tool, supported = "security", runtime.GOOS == "darwin"
+		}
+		if kind == "pass" {
+			tool, supported = "pass", runtime.GOOS == "linux" || runtime.GOOS == "darwin"
 		}
 		if !supported {
 			add("backend", kind, "unsupported", "provider is not supported on this platform")
@@ -173,8 +176,11 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 			add("recovery", reference, "unavailable", "explicit manifest directory required")
 			continue
 		}
-		kind, name, _ := strings.Cut(reference, ":")
-		path := filepath.Join(options.SecretsDir, name+".keys")
+		kind, _, _ := strings.Cut(reference, ":")
+		path, pathErr := store.ManifestPath(options.SecretsDir, reference)
+		if pathErr != nil {
+			return DoctorReport{}, ErrMetadata
+		}
 		doctorPath(path, add)
 		if runtime.GOOS == "windows" {
 			add("recovery", reference, "unsupported", "private recovery inspection awaits the Windows permission gate")

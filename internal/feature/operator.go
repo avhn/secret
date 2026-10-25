@@ -93,7 +93,7 @@ func validOperatorReference(reference string) bool {
 		path := strings.TrimPrefix(reference, "file:")
 		return filepath.IsAbs(path) && filepath.Clean(path) == path && filepath.Base(path) != string(filepath.Separator)
 	}
-	if !strings.HasPrefix(reference, "keychain:") && !strings.HasPrefix(reference, "libsecret:") {
+	if !store.ProviderReference(reference) {
 		return false
 	}
 	_, err := (store.Locator{}).Resolve(reference)
@@ -174,8 +174,11 @@ func (operator Operator) metadata(reference string, missing bool) (store.Metadat
 		result.Records, _ = store.ParseMetadata(data)
 		return result, nil
 	}
-	kind, name, _ := strings.Cut(reference, ":")
-	path := filepath.Join(operator.SecretsDir, name+".keys")
+	kind, _, _ := strings.Cut(reference, ":")
+	path, err := store.ManifestPath(operator.SecretsDir, reference)
+	if err != nil {
+		return store.Metadata{}, secure.ErrInvalidRequest
+	}
 	data, err := readOperatorFile(path, missing)
 	defer secure.Clear(data)
 	if err != nil {
@@ -264,10 +267,16 @@ func (operator Operator) exportPlan(request ExportRequest) (OperatorResult, []st
 	if !validOperatorReference(request.Source) || !validOperatorReference(request.Target) || strings.HasPrefix(request.Target, "file:") || request.Source == request.Target || request.OnConflict != "fail" || store.ValidateIdentity("KEY", request.Selectors) != nil || len(request.Keys) > maxOperatorRecords {
 		return OperatorResult{}, nil, nil, secure.ErrInvalidRequest
 	}
-	// Both backends share NAME.keys in one directory. The same name across
-	// backends is a manifest collision even though the reference strings differ.
-	if !strings.HasPrefix(request.Source, "file:") && strings.SplitN(request.Source, ":", 2)[1] == strings.SplitN(request.Target, ":", 2)[1] {
-		return OperatorResult{}, nil, nil, secure.ErrConflict
+	// Compare storage identities, not names: optional suffixes isolate manifests.
+	if !strings.HasPrefix(request.Source, "file:") {
+		sourcePath, sourceErr := store.ManifestPath(operator.SecretsDir, request.Source)
+		targetPath, targetErr := store.ManifestPath(operator.SecretsDir, request.Target)
+		if sourceErr != nil || targetErr != nil {
+			return OperatorResult{}, nil, nil, secure.ErrInvalidRequest
+		}
+		if sourcePath == targetPath {
+			return OperatorResult{}, nil, nil, secure.ErrConflict
+		}
 	}
 	seen := make(map[string]bool)
 	for _, key := range request.Keys {

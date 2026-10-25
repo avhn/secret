@@ -275,8 +275,12 @@ func (operator Operator) destinationMetadata(reference string) (store.Metadata, 
 		if _, _, err := operator.provider(reference); err != nil {
 			return store.Metadata{}, err
 		}
-		kind, name, _ := strings.Cut(reference, ":")
-		_, err := store.ReadRecovery(filepath.Join(operator.SecretsDir, name+".keys"), kind)
+		kind, _, _ := strings.Cut(reference, ":")
+		path, pathErr := store.ManifestPath(operator.SecretsDir, reference)
+		if pathErr != nil {
+			return store.Metadata{}, secure.ErrInvalidRequest
+		}
+		_, err := store.ReadRecovery(path, kind)
 		if err == nil || !os.IsNotExist(err) {
 			return store.Metadata{}, secure.ErrRecovery
 		}

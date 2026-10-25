@@ -4,7 +4,6 @@ package feature
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/avhn/secret/internal/backend"
@@ -79,8 +78,8 @@ var (
 	ErrMetadataAmbiguous = errors.New("ambiguous metadata selection")
 )
 
-// ReadMetadata accepts a resolved file path, file:PATH, keychain:NAME or
-// libsecret:NAME. Directory is the explicit manifest directory, never discovered
+// ReadMetadata accepts a resolved file path, file:PATH, keychain:NAME,
+// libsecret:NAME or pass:NAME. Directory is the explicit manifest directory, never discovered
 // from ambient provider configuration. Provider records come only from manifests;
 // these reads never invoke a value provider. File bytes are cleared after parsing.
 // Parser warnings are names-only and omitted here; legacy text show remains separate.
@@ -92,15 +91,19 @@ func ReadMetadata(reference, directory string) (store.Metadata, error) {
 		return readOnePasswordMetadata(reference, directory)
 	}
 	result := store.Metadata{Version: store.MetadataVersion, Reference: reference, Backend: "file", Records: make([]store.MetadataRecord, 0)}
-	if strings.HasPrefix(reference, "keychain:") || strings.HasPrefix(reference, "libsecret:") {
+	if store.ProviderReference(reference) {
 		if _, err := (store.Locator{}).Resolve(reference); err != nil {
 			return store.Metadata{}, ErrMetadata
 		}
-		backend, name, _ := strings.Cut(reference, ":")
+		backend, _, _ := strings.Cut(reference, ":")
 		if directory == "" {
 			return store.Metadata{}, ErrMetadata
 		}
-		records, err := store.ReadManifest(filepath.Join(directory, name+".keys"), backend)
+		path, err := store.ManifestPath(directory, reference)
+		if err != nil {
+			return store.Metadata{}, ErrMetadata
+		}
+		records, err := store.ReadManifest(path, backend)
 		if err != nil {
 			return store.Metadata{}, ErrMetadataRead
 		}
@@ -286,7 +289,7 @@ func validateMetadataSelectors(selectors store.Selectors) error {
 }
 
 func validateMetadata(metadata store.Metadata) error {
-	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "keychain" && metadata.Backend != "libsecret" && metadata.Backend != "onepassword") {
+	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "onepassword" && !store.ProviderReference(metadata.Backend+":name")) {
 		return ErrMetadata
 	}
 	if metadata.Reference == "" {

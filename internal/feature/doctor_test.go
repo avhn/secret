@@ -119,8 +119,8 @@ func TestDoctorMetadataOnlyAndNoInventedVerification(t *testing.T) {
 		if calls != 0 {
 			t.Fatal("Windows probed unsupported providers")
 		}
-	} else if calls != 1 {
-		t.Fatal("availability must perform only one supported executable presence check")
+	} else if calls != 2 {
+		t.Fatal("availability must perform only supported executable presence checks")
 	}
 	for _, check := range report.Checks {
 		if check.Kind == "hook_activation" && check.Status != "unverified" {
