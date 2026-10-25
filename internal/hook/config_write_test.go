@@ -83,6 +83,7 @@ func TestGitConfigFileToolWrites(t *testing.T) {
 
 func TestOrdinaryWriteRemainsAllowed(t *testing.T) {
 	root := t.TempDir()
+	t.Setenv("HOME", root)
 	payload, err := json.Marshal(map[string]any{
 		"tool_name": "Write", "cwd": root,
 		"tool_input": map[string]string{"file_path": filepath.Join(root, "src", "new.ts"), "content": "synthetic"},

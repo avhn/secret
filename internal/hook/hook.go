@@ -85,7 +85,7 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 	cwd := e.CWD
 	// A relative host cwd cannot anchor a relative workdir or file operand.
 	// Native absolute only: on Windows a rooted slash path is drive-relative.
-	if !filepath.IsAbs(cwd) {
+	if !filepath.IsAbs(cwd) || !paths.ValidPath(cwd) {
 		_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
 		return err
 	}
@@ -94,7 +94,12 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 	if e.Tool == "apply_patch" {
 		workdir = e.String("workdir")
 	}
-	protected := func(name string) bool { return paths.Protected(name, cwd, workdir, os.Getenv("HOME")) }
+	home := paths.Home()
+	if !paths.ValidHome(home) {
+		_, err = out.Write(input.Deny("command too complex to analyse for secret access; split it or use secret run", false))
+		return err
+	}
+	protected := func(name string) bool { return paths.FileProtected(name, cwd, workdir, home) }
 	switch e.Tool {
 	case "Read", "Edit", "Write", "MultiEdit", "NotebookEdit":
 		names := []string{e.String("file_path")}
@@ -102,21 +107,29 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 			names = []string{e.String("notebook_path")}
 		}
 		for _, name := range names {
-			if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", os.Getenv("HOME"), os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
+			if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 				reason = "file access targets a protected store"
 				break
 			}
 		}
 	case "Glob":
-		reason = search.ToolGlob(e.String("path"), cwd, os.Getenv("HOME"))
+		if !paths.ValidPath(e.String("path")) || paths.NativeProtected(e.String("path"), cwd, "", home) {
+			reason = "file access targets a protected store"
+		} else {
+			reason = search.ToolGlob(e.String("path"), cwd, home)
+		}
 	case "apply_patch":
-		reason = patch.Decision(e.String("command"), cwd, workdir, os.Getenv("HOME"))
+		reason = patch.Decision(e.String("command"), cwd, workdir, home)
 	case "Grep":
 		mode := e.String("output_mode")
 		if _, present := e.Fields["output_mode"]; !present {
 			mode = "files_with_matches"
 		}
-		reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), mode, cwd, os.Getenv("HOME"))
+		if !paths.ValidPath(e.String("path")) || paths.NativeProtected(e.String("path"), cwd, "", home) {
+			reason = "file access targets a protected store"
+		} else {
+			reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), mode, cwd, home)
+		}
 	case "Bash":
 		reason = bashDecision(e, cwd, protected)
 	}

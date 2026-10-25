@@ -41,6 +41,7 @@ func TestAudit22MalformedEnvelopes(t *testing.T) {
 			for _, host := range []string{"claude", "codex"} {
 				var output bytes.Buffer
 				body := strings.ReplaceAll(tc.Payload, "@CWD@", filepath.ToSlash(work))
+				requireBashEnvelope(t, []byte(body))
 				if err := Decide(host, strings.NewReader(body), &output); err != nil {
 					t.Fatal(err)
 				}

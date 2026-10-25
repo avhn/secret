@@ -35,6 +35,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Implement M5a native Windows file/patch hook checks and fixed shell denial,
+  without treating Windows string or argv requests as Bash. Retain malformed
+  envelope denial and native USERPROFILE home discovery. File targets reject
+  drive-relative, device, ADS and reserved-name ambiguity; metadata-only handle
+  identities retain reparse, resolvable 8.3 and case/volume/UNC aliases. Synthetic
+  Windows tests pair protected cases with public controls and patch moves. Add a
+  development-only guard-go.cmd using only its sibling secret.exe, with fixed
+  missing-binary denial. Native runtime evidence remains pending. Unix hook
+  decisions, inventories, installed guards and all manifests are unchanged.
+
 - Correct M5a Windows bare-image resolution to skip empty, dot and relative PATH
   entries, retaining explicit relative image paths. Windows run filters raw
   loaded values and UTF-16LE/BE encodings of valid UTF-8 values. Derived bytes are

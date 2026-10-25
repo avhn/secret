@@ -2233,3 +2233,37 @@ options that launch a protected reader. The exception is not a general approval
 of Make eval, nonliteral expansion or unrelated Makefile execution. Replacing
 the second recipe with `cat .env` or `printenv TOKEN` must still deny, even when
 the first recipe is public; no protected expectation is weakened here.
+
+## M5a native Windows file/patch boundary
+
+These are Windows-only decisions, not new Unix divergence categories. The Bash
+adapter is built only on non-Windows systems. Validated native shell requests,
+including harmless strings and argv, receive the fixed unsupported-shell denial
+without Bash parsing. Malformed envelopes retain the shared fixed invalid-input
+denial. Existing Unix corpus expectations and every divergence row are unchanged;
+Unix adapter tests are platform-scoped, and a separate native replay requires
+all retained shell requests to deny.
+
+| Native decision | Classification | Evidence and reason |
+| --- | --- | --- |
+| String and argv shell requests | Windows-only tightening | TestWindowsShellRequestsDeny and TestWindowsShellCorpusDeny require fixed denial, including public commands. PowerShell/CMD semantics are not Bash. |
+| Drive-relative/rooted paths, device namespaces, ADS, reserved device components and trimmed suffixes | Windows-only tightening | TestWindowsFileTools, TestWindowsPatchTools and TestWindowsNativeFileAmbiguity deny ambiguous targets before anchoring, stream stripping or missing-name handling. Public ADS is no longer a file-tool allow; legacy StreamBase shell-policy tests remain separate. |
+| Native junction-plus-parent traversal | Binding native semantics | TestWindowsNativeParentTraversal compares the resolver to an actual Win32 open. Unix physical link/.. expectations remain intact and Unix-only; Windows uses lexical cleaning before native reparse traversal. |
+| Case, separator, reparse, 8.3 and volume/UNC aliases | Protected-role preservation | TestWindowsFileAndPatchAliases, TestWindowsShortFileAndPatchAliases and TestWindowsUNCFileAndPatchAliases pair protected targets and patch moves with public controls. Handle names and file/directory identity retain configured credentials and known home credential directories. Missing suffixes retain their existing ancestor. Dangling reparse points deny rather than borrowing an absent-name exception. |
+
+Aliased known home credential-directory roots also deny explicit Glob/Grep
+requests rather than certifying their descendants from a public share/drive name.
+Public UNC roots/files remain controls; names-only behavior on Unix is unchanged.
+
+FileProtected is the strict file-tool boundary. Protected and StreamBase remain
+shared shell-policy helpers, where an invalid Windows filename can be inert
+command data. No native file or patch target receives that exemption. Home
+lookup uses explicit HOME or native USERPROFILE, and native file tools cannot
+proceed with an unavailable or ambiguous home. Metadata handles request attributes
+only; no credential contents are opened, echoed or evaluated by these checks.
+
+The development-only guard-go.cmd calls only its sibling secret.exe. Missing
+binary and output-failure tests are synthetic and cmd-native. The shim is absent
+from installed manifests; windows-latest runtime evidence and the complete step-8
+PowerShell/CMD matrix remain required. Local cross-checks do not certify native
+aliases or fail-closed host behavior. Host-skipped hooks remain outside coverage.

@@ -13,7 +13,7 @@ import (
 // TestDecide compares the host JSON shape for synthetic paths and empty input.
 func TestDecide(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("cases use Unix host cwds; the Windows hook adapter is M5e")
+		t.Skip("Unix envelope fixtures; native M5a file/patch and shell-denial tests run separately")
 	}
 	cases := []struct{ name, host, payload, reason string }{
 		{"read protected", "claude", `{"tool_name":"Read","cwd":"/synthetic","tool_input":{"file_path":".env"}}`, "file access targets a protected store"},
@@ -54,7 +54,7 @@ func TestDecide(t *testing.T) {
 // separate Git directory. An unrelated file_path is not an additional target.
 func TestNotebookEditPaths(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("cases use Unix host cwds; the Windows hook adapter is M5e")
+		t.Skip("Unix envelope fixtures; native M5a file/patch and shell-denial tests run separately")
 	}
 	root := t.TempDir()
 	gitdir := filepath.Join(root, "metadata")

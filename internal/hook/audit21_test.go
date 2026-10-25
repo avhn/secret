@@ -65,6 +65,7 @@ func testAuditEnvelopes(t *testing.T, filename string) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				requireBashEnvelope(t, body)
 				var output bytes.Buffer
 				if err := Decide(host, bytes.NewReader(body), &output); err != nil {
 					t.Fatal(err)

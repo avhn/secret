@@ -103,5 +103,5 @@ func ConfiguredTreeProtected(root, cwd, home, config string, literals ...string)
 }
 
 func sameCredentialPath(a, b string) bool {
-	return strings.EqualFold(a, b)
+	return strings.EqualFold(a, b) || sameNativePath(a, b)
 }

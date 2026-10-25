@@ -19,7 +19,7 @@ const (
 // Decision classifies every source and destination header before accepting a
 // patch. Bodies are checked only for grammar, never applied, opened or echoed.
 func Decision(text, cwd, workdir, home string) string {
-	if len(text) > maxBytes || !paths.RawWithinLimits(cwd) || !paths.RawWithinLimits(workdir) {
+	if len(text) > maxBytes || !paths.RawWithinLimits(cwd) || !paths.RawWithinLimits(workdir) || !paths.ValidPath(cwd) || !paths.ValidPath(workdir) {
 		return invalidReason
 	}
 	lines := strings.Split(text, "\n")
@@ -33,8 +33,11 @@ func Decision(text, cwd, workdir, home string) string {
 		// Validate every raw target before an earlier protected header can
 		// short-circuit metadata classification with a different denial reason.
 		for _, prefix := range []string{"*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "} {
-			if strings.HasPrefix(header, prefix) && !paths.RawWithinLimits(strings.TrimPrefix(header, prefix)) {
-				return invalidReason
+			if strings.HasPrefix(header, prefix) {
+				name := strings.TrimPrefix(header, prefix)
+				if !paths.RawWithinLimits(name) || !paths.ValidPath(name) {
+					return invalidReason
+				}
 			}
 		}
 	}
@@ -45,7 +48,7 @@ func Decision(text, cwd, workdir, home string) string {
 		for _, prefix := range []string{"*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "} {
 			if strings.HasPrefix(line, prefix) {
 				name := strings.TrimPrefix(line, prefix)
-				if name != "" && (paths.Protected(name, cwd, workdir, home) || paths.ConfigWriteProtected(name, cwd, workdir, home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
+				if name != "" && (paths.FileProtected(name, cwd, workdir, home) || paths.ConfigWriteProtected(name, cwd, workdir, home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 					return protectedReason
 				}
 			}

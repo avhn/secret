@@ -18,6 +18,7 @@ func TestAudit24Envelopes(t *testing.T) {
 }
 
 func TestAudit24MissingCredentialTargets(t *testing.T) {
+	requireBashAnalysis(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	if err := os.Mkdir(home, 0700); err != nil {

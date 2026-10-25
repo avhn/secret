@@ -30,6 +30,9 @@ func audit28ToolsFixture(t *testing.T) (string, string) {
 
 func audit28ToolCheck(t *testing.T, tool, cwd string, fields map[string]any, deny bool) {
 	t.Helper()
+	if tool == "Bash" {
+		requireBashAnalysis(t)
+	}
 	payload, err := json.Marshal(map[string]any{"tool_name": tool, "cwd": cwd, "tool_input": fields})
 	if err != nil {
 		t.Fatal(err)

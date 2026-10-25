@@ -14,6 +14,7 @@ import (
 // disposable metadata; no candidate interpreter, printer or reader is launched.
 func audit26EnvelopeCheck(t *testing.T) func(*testing.T, any, bool) {
 	t.Helper()
+	requireBashAnalysis(t)
 	root := t.TempDir()
 	home, work := filepath.Join(root, "home"), filepath.Join(root, "work")
 	for _, dir := range []string{home, work} {

@@ -71,6 +71,7 @@ func TestM21PatchRoutes(t *testing.T) {
 					tool := "apply_patch"
 					var command any = patch
 					if route != "native" {
+						requireBashAnalysis(t)
 						tool = "Bash"
 						source := "apply_patch <<'PATCH'\n" + patch + "\nPATCH"
 						command = source

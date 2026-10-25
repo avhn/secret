@@ -3,12 +3,17 @@ package paths
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
 // ConfigWriteProtected identifies Git configuration writes, including gitfile
 // worktrees and paths reached through symlinks. It never loads Git config.
 func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
+	if !ValidPath(name) || !ValidPath(cwd) || !ValidPath(workdir) || !ValidPath(home) || !ValidPath(xdg) || !ValidPath(global) {
+		return true
+	}
+	name = nativeName(name)
 	if strings.HasPrefix(name, "~") && !strings.HasPrefix(name, "~/") {
 		return true
 	}
@@ -22,6 +27,10 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
 	if check(raw) {
 		return true
+	}
+	if runtime.GOOS == "windows" {
+		target, err := physical(raw)
+		return err != nil || check(target) || nativeConfigProtected(target, cwd, home, xdg, global)
 	}
 	if target, err := filepath.EvalSymlinks(raw); err == nil && check(target) {
 		return true

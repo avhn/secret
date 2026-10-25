@@ -12,6 +12,7 @@ import (
 
 // unresolved anchors path text without collapsing .. across a symlink.
 func unresolved(name, cwd, workdir, home string) string {
+	name = nativeName(name)
 	join := func(a, b string) string { return a + string(os.PathSeparator) + b }
 	if workdir != "" {
 		if filepath.IsAbs(workdir) {
@@ -48,9 +49,22 @@ func expandXDG(name, home, xdg string) string {
 }
 
 // Resolve anchors a path while preserving components for physical OS lookup.
-// In particular, link/.. must not be collapsed before the link is followed.
+// Unix link/.. is not collapsed before following links. Windows physical lookup
+// instead follows native lexical cleaning and retains this raw lexical witness.
 func Resolve(name, cwd, workdir, home string) string {
 	return unresolved(name, cwd, workdir, home)
+}
+
+// FileProtected adds native file-tool validation before the shared path policy.
+// Shell-policy operands may be inert non-path data; file-tool targets may not.
+func FileProtected(name, cwd, workdir, home string) bool {
+	return !ValidPath(name) || !ValidPath(cwd) || !ValidPath(workdir) || !ValidHome(home) || Protected(name, cwd, workdir, home) || NativeProtected(name, cwd, workdir, home)
+}
+
+// NativeProtected retains home credential roles hidden by Windows volume/share
+// aliases. Unix adapters retain their existing explicit-root and names-only rules.
+func NativeProtected(name, cwd, workdir, home string) bool {
+	return nativeProtected(unresolved(name, cwd, workdir, home), home)
 }
 
 // Protected checks both lexical intent and physical component traversal. It
@@ -75,6 +89,9 @@ func physical(raw string) (string, error) {
 }
 
 func physicalWith(raw string, lstat func(string) (os.FileInfo, error), readlink, canonical func(string) (string, error)) (string, error) {
+	if runtime.GOOS == "windows" {
+		return nativePhysical(raw)
+	}
 	volume := filepath.VolumeName(raw)
 	root := volume + string(os.PathSeparator)
 	current := root
@@ -119,12 +136,6 @@ func physicalWith(raw string, lstat func(string) (os.FileInfo, error), readlink,
 		pending = append(strings.Split(filepath.ToSlash(target), "/"), pending...)
 	}
 	current = filepath.Clean(current)
-	if runtime.GOOS == "windows" {
-		// EvalSymlinks also expands 8.3 aliases on Windows. The component
-		// walk above preserves link/.. semantics; canonicalize its result,
-		// including the existing prefix of a not-yet-created target.
-		return canonicalExisting(current, canonical)
-	}
 	return current, nil
 }
 

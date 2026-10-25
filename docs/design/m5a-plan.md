@@ -326,8 +326,46 @@ paste, overflow draining, Ctrl+C, console events, error restoration and redirect
 stdin ordering. Portable parser and consent-ordering tests remain active. Native
 ACL/template/audit/operator, transaction and Job-before-template-cleanup fixtures
 compile locally, but this Linux host cannot establish their runtime success.
-Step 6 is implemented, not native-certified. Steps 7 and 8, final hosted evidence
-and documentation remain outstanding; installed hooks/manifests are unchanged.
+Step 6 is implemented, not native-certified. Step 7 progress is recorded below;
+step 8, final hosted evidence and documentation remain outstanding. Installed
+hooks/manifests are unchanged.
+
+## Step 7 implementation status
+
+The Windows hook shell boundary returns a fixed denial for validated string and
+argv requests; it never sends them to the Bash analyzer. The Unix adapter is
+build-tagged !windows and unchanged beneath that tag. Malformed-envelope checks
+remain shared. Native home lookup honors explicit HOME and otherwise USERPROFILE;
+an unavailable or ambiguous native home cannot certify a file-tool request.
+
+File-tool and patch targets reject drive-relative/rooted ambiguity, device
+namespaces, ADS, reserved device components and Win32-trimmed names before
+anchoring or normalization. Shared shell-policy helpers retain inert-data operand
+rules, but those are not file-tool exemptions. Windows physical lookup cleans
+lexically like Win32/os.Root and obtains reparse/8.3 target names from metadata-only
+handles, preserving existing prefixes for missing suffixes. Lexical protected
+names remain witnesses. File identity also retains configured credentials and
+known home credential directories across volume/UNC spellings. This is a bounded
+decision-time metadata snapshot, not protection against filesystem races.
+
+Windows-only tests cover native home fallback, shell strings/argv and retained
+shell corpus denial, malformed envelopes, public file controls, protected aliases,
+patch sources/moves, required symlinks/junctions/loopback UNC shares and a real
+native-open junction-parent witness. Resolvable 8.3 aliases are checked; volumes
+without short basenames are reported rather than represented as alias coverage.
+Unix Bash expectation tests remain scoped to their original adapter, with no
+removed cases or changed corpus expectations. The separate native corpus enforces
+all-shell denial. The development-only hooks/guard-go.cmd uses a fixed sibling
+hooks/secret.exe, not PATH or supplied command text. Native cmd tests exercise
+paths with spaces/exclamation marks, a planted PATH binary, missing-binary denial
+and an unwritable output handle. No installed manifest references this shim.
+
+Cross-vet and Windows test compilation are local evidence only. Step 8 still owns
+the complete isolated PowerShell/CMD CLI and shim matrix, native runner evidence
+(including all mandatory filesystem, lifecycle, console and exact CredMan cases),
+explicit cleanup assertions and environment/toolchain recording. Host-skipped or
+failed-to-start hooks remain potentially fail-open. No host protection, release
+activation or milestone completion is claimed.
 
 ## Native verification matrix and CI
 

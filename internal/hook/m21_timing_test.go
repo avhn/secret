@@ -14,6 +14,7 @@ func TestM21DelayedStdin(t *testing.T) {
 		t.Fatal("update the documented four-second decision bound and its tests together")
 	}
 	root := t.TempDir()
+	t.Setenv("HOME", root)
 	data, err := json.Marshal(map[string]any{"tool_name": "Read", "cwd": root, "tool_input": map[string]string{"file_path": "public.txt"}})
 	if err != nil {
 		t.Fatal(err)

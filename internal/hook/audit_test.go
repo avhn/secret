@@ -177,6 +177,7 @@ func TestAudit2Envelopes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			requireBashEnvelope(t, body)
 			for _, host := range []string{"claude", "codex"} {
 				if host == "codex" && tc.Tool == "Grep" || host == "claude" && tc.Tool == "apply_patch" {
 					continue

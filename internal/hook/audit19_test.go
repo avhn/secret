@@ -69,6 +69,7 @@ func TestAudit19Envelopes(t *testing.T) {
 				if host == "codex" && tc.Tool == "Grep" {
 					continue
 				}
+				requireBashEnvelope(t, payload(tc.Fields))
 				var output bytes.Buffer
 				if err := Decide(host, bytes.NewReader(payload(tc.Fields)), &output); err != nil {
 					t.Fatal(err)

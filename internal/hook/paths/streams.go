@@ -7,7 +7,8 @@ import (
 )
 
 // StreamBase retains the base file's role for Windows alternate data streams.
-// On other platforms a colon is an ordinary filename character.
+// Native file/patch tools reject stream syntax through ValidPath before using
+// this legacy shell-policy helper. Unix colons remain ordinary name characters.
 func StreamBase(name string) string {
 	if runtime.GOOS != "windows" {
 		return name

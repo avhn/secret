@@ -23,10 +23,13 @@ func TestAudit20InvalidEnvelopes(t *testing.T) {
 	if err := json.Unmarshal(data, &corpus); err != nil {
 		t.Fatal(err)
 	}
-	replace := strings.NewReplacer("@CWD@", filepath.ToSlash(t.TempDir()), "@INVALID_UTF8@", string([]byte{0xff}))
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	replace := strings.NewReplacer("@CWD@", filepath.ToSlash(root), "@INVALID_UTF8@", string([]byte{0xff}))
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			for _, host := range []string{"claude", "codex"} {
+				requireBashEnvelope(t, []byte(replace.Replace(tc.Payload)))
 				var out bytes.Buffer
 				if err := Decide(host, strings.NewReader(replace.Replace(tc.Payload)), &out); err != nil {
 					t.Fatal(err)

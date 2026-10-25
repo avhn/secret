@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -56,6 +57,9 @@ func TestMetadataMatchesUncachedClassification(t *testing.T) {
 }
 
 func TestMetadataPreservesRawPathsAndAnalysisScope(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix physical link/.. contract; Windows counterpart covers native traversal and metadata scope")
+	}
 	root := t.TempDir()
 	t.Setenv("HOME", root)
 	for _, key := range []string{"KUBECONFIG", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE"} {

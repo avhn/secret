@@ -485,9 +485,20 @@ ConPTY cases run only on windows-latest, and real transaction tests extend the
 existing gated exact-target CredMan lane. Cross-vet/compilation do not prove
 native success; hosted results remain required. Unix behavior is unchanged.
 
-Steps 7 and 8 (Windows hooks and the full isolated native matrix), plus final
-hosted evidence documentation, remain pending. Installed hooks/manifests and
-release defaults are unchanged.
+Step 7 is implemented locally: Windows shell envelopes deny with a fixed reason
+without Bash parsing, while malformed calls retain their existing denial. Native
+file/patch tools use USERPROFILE fallback, strict ambiguous-path rejection,
+handle-derived reparse/8.3 identities and case/volume/UNC alias metadata witnesses.
+Synthetic Windows tests include public controls, protected aliases, patch moves,
+required junction/symlink/loopback-UNC fixtures and native junction-parent opens.
+The development-only hooks/guard-go.cmd invokes only its sibling secret.exe and
+denies when it is absent. It is not referenced by installed manifests. Unix
+adapter expectations and divergence inventories remain unchanged. These native
+tests compile locally; windows-latest runtime confirmation remains required.
+
+Step 8 (the full isolated native matrix), plus final hosted evidence
+documentation, remains pending. Installed hooks/manifests and release defaults
+are unchanged; neither local checks nor the development shim prove host protection.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions
