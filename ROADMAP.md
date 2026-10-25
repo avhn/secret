@@ -455,7 +455,7 @@ Gate: named licensing review, sanitized whoami identity evidence from a pinned C
 
 ## M5d: age store
 
-Status: conditional. Estimate: 4-7 days. Goal: opt-in encrypted file storage.
+Status: in progress (owner-approved 2026-10-25; plan docs/design/m5d-plan.md). Estimate: 4-7 days. Goal: opt-in encrypted file storage.
 
 - [ ] feat(backend): add opt-in encrypted file store with envelope and crash assertions
 - [ ] test(age): expand fuzz corpus and recipient matrix
