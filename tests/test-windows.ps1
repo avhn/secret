@@ -207,8 +207,11 @@ try {
     $homeRoot = Join-Path $root 'home space'
     $storeRoot = Join-Path $root 'store space'
     $tempRoot = Join-Path $root 'temp space'
-    $script:Work = Join-Path $root 'work space'
-    foreach ($dir in @($homeRoot, $storeRoot, $tempRoot, $script:Work)) { New-PrivateDirectory $dir }
+    $workRoot = Join-Path $root 'work space'
+    # ACL verification launches icacls. Keep its cwd at RUNNER_TEMP until every
+    # directory exists, including when setup fails before the work root is made.
+    foreach ($dir in @($homeRoot, $storeRoot, $tempRoot, $workRoot)) { New-PrivateDirectory $dir }
+    $script:Work = $workRoot
     $env:USERPROFILE = $homeRoot
     $env:HOME = $homeRoot
     $env:SECRETS_DIR = $storeRoot

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -239,6 +240,8 @@ func TestGuardDeniedCorpus(t *testing.T) {
 	// Subtest names contain # for duplicate cases. A URL would interpret that
 	// byte as a fragment, changing a synthetic path before the policy sees it.
 	fixtures := corpusFixtures{root: t.TempDir(), repository: root, snapshots: corpus.Snapshots}
+	lexicalVariants := windowsLexicalVariants(t, corpus.Cases)
+	lexicalChecked := make(map[corpusVariant]bool)
 	count, failures := 0, 0
 	for _, tc := range corpus.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -281,6 +284,20 @@ func TestGuardDeniedCorpus(t *testing.T) {
 			}
 			for i, decision := range replayCorpus(t, tc, replace, check) {
 				count++
+				if runtime.GOOS == "windows" {
+					if command, listed := lexicalVariants[corpusVariant{tc.Name, i}]; listed {
+						lexicalChecked[corpusVariant{tc.Name, i}] = true
+						if decision.command != command {
+							t.Fatalf("listed Windows lexical replay changed: variant %d", i)
+						}
+						if decision.reason != "" {
+							t.Errorf("listed Windows lexical variant %d now denies: %s; review classification", i, decision.reason)
+						} else {
+							t.Logf("skip variant %d: Windows lexical-traversal rule, not Unix physical symlink/.. traversal; TestWindowsLexicalTraversalShellVariantsDeny verifies both host boundaries", i)
+						}
+						continue
+					}
+				}
 				if decision.reason == "" {
 					failures++
 					if failures <= 80 {
@@ -291,6 +308,13 @@ func TestGuardDeniedCorpus(t *testing.T) {
 				}
 			}
 		})
+	}
+	if runtime.GOOS == "windows" {
+		for key := range lexicalVariants {
+			if !lexicalChecked[key] {
+				t.Errorf("listed Windows lexical variant was not checked: %s variant %d", key.name, key.index)
+			}
+		}
 	}
 	t.Logf("%d variants from %d Bash-deny cases, %d allows", count, len(corpus.Cases), failures)
 }

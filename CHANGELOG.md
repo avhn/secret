@@ -6,6 +6,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
   mark both milestones done. Installed defaults remain the Bash CLI and guard.
+- Correct M5a Windows hook over-denials: impossible Win32 data operands are not
+  credential identities, generic Bash-policy arguments are not strict file-tool
+  targets, and a dangling symbolic HEAD alone is not a Git directory signature.
+  Keep protected alias checks, native shell denial and Unix expectations intact.
+  Add portable identity regressions and native public controls. Keep the native
+  CLI harness cwd at RUNNER_TEMP until its disposable work directory exists,
+  preserving primary-failure reporting and cleanup. Classify only the eight
+  explicitly listed audit-cases6-9 variants that depend on Unix physical
+  symlink/parent traversal: Windows keeps native lexical traversal, detects
+  classification drift and requires both host hook boundaries to deny every
+  listed command. Original audit expectations and inventories remain unchanged.
+  Native CI remains required.
+
 - Add the unconditional M5a Windows native CLI and CredMan CI job, retaining all
   existing gates. Its PowerShell 7 harness consumes freshly built binaries and
   isolates HOME/USERPROFILE, stores and temp beneath RUNNER_TEMP. Exercise cmd

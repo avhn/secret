@@ -37,25 +37,7 @@ func nativeName(name string) string { return strings.ReplaceAll(name, `\`, "/") 
 // Volume letters and UNC/mapped spellings need not have identical final names.
 // Compare metadata identities, retaining equal missing suffixes conservatively.
 func sameNativePath(a, b string) bool {
-	for count := 0; count < 128; count++ {
-		left, leftErr := nativeStat(a)
-		right, rightErr := nativeStat(b)
-		if leftErr == nil && rightErr == nil {
-			return os.SameFile(left, right)
-		}
-		if leftErr != nil && !os.IsNotExist(leftErr) || rightErr != nil && !os.IsNotExist(rightErr) {
-			return true
-		}
-		if leftErr == nil || rightErr == nil || !strings.EqualFold(filepath.Base(a), filepath.Base(b)) {
-			return false
-		}
-		parentA, parentB := filepath.Dir(a), filepath.Dir(b)
-		if parentA == a || parentB == b {
-			return false
-		}
-		a, b = parentA, parentB
-	}
-	return true
+	return samePathIdentity(a, b, nativeStat, invalidWindowsOperand)
 }
 
 // A share or drive can expose a home credential directory under a public name.

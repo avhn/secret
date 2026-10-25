@@ -99,6 +99,24 @@ func TestWindowsNativeFileAmbiguity(t *testing.T) {
 	}
 }
 
+func TestWindowsConfiguredIdentityPublicControls(t *testing.T) {
+	root := t.TempDir()
+	for _, key := range []string{"AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE", "GH_CONFIG_DIR", "XDG_CONFIG_HOME"} {
+		t.Setenv(key, "")
+	}
+	configured := filepath.Join(root, "custom.cfg")
+	t.Setenv("KUBECONFIG", configured)
+	for _, name := range []string{"README.md", `print(open("README.md").read())`, `open my $f, "<", "README.md"; print <$f>`} {
+		var metadata Metadata
+		if Protected(name, root, "", root) || metadata.Protected(name, root, "", root) {
+			t.Errorf("public operand matched missing configured identity: %q", name)
+		}
+	}
+	if !ConfiguredProtected("custom.cfg", root, "", root, configured) {
+		t.Fatal("missing configured target lost its lexical witness")
+	}
+}
+
 func TestWindowsGitIdentityAndResolutionErrors(t *testing.T) {
 	root := t.TempDir()
 	repo, git, public := filepath.Join(root, "repo"), filepath.Join(root, "metadata"), filepath.Join(root, "public")

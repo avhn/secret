@@ -2269,6 +2269,46 @@ created shares and substituted drives. These tests require windows-latest runtim
 evidence; cross-compilation does not establish native alias coverage. No Unix
 expectation, installed guard, plugin manifest or divergence inventory changes.
 
+The run 40232530209 public-control corrections are over-denial repairs, not
+new Unix divergence categories. TestSamePathIdentity injects Win32 invalid-name,
+bad-pathname and non-directory errors on every platform: impossible operands
+cannot establish identity, while access/I/O errors and bounded-proof exhaustion
+remain conservative. Equal missing suffixes require identical existing ancestors;
+a shared temp/volume ancestor alone is not a match. Native configured-path public
+controls retain a missing custom.cfg witness without treating interpreter source
+or README.md as that credential. Generic Bash-policy argument probing skips
+impossible native paths such as regexes, image tags and Unix executable names;
+known output roles and strict file/patch checks keep their existing validation.
+The Windows shell adapter continues to deny all requests without Bash analysis.
+Git signature discovery requires an existing regular HEAD, so an undeclared
+legacy directory with a dangling symbolic HEAD does not gain a Git role solely
+from a metadata error. Explicit gitdirs, inherited Git roots and alias denials
+remain independently protected. Existing audit expectations are unchanged.
+
+### M5a classification: windows-lexical-symlink-parent
+
+The saved log's eight policy allows for audit-cases6-9 are a binding native
+traversal difference, not a Windows shell allow. The synthetic awsx symlink
+reaches .aws/cli: Unix physical awsx/../credentials reaches .aws/credentials,
+whereas Windows lexical cleaning reaches the public/missing worktree credentials
+path. Keep the original deny expectation and all Unix corpus checks unchanged.
+
+Only audit-cases6-9 variant indices 0, 1, 2, 3, 4, 5, 6 and 7 are classified.
+The explicit testdata/hook/windows-lexical-variants.json list records each exact
+command, shared by the policy and hook tests. On Windows, TestGuardDeniedCorpus
+logs and excludes only those exact variant decisions from its Unix deny check.
+It still analyzes them and fails if any starts denying or is not replayed.
+TestWindowsLexicalVariantsMatchCorpus validates the case, index and command text
+on every platform, failing if an entry disappears, changes or is duplicated.
+There is no command-pattern or blanket case exclusion.
+
+TestWindowsLexicalTraversalShellVariantsDeny sends all eight shared commands
+through hook.Decide as Bash envelopes for both claude and codex and requires
+the exact Windows all-shell denial. The native shell boundary therefore retains
+all eight denials without changing file traversal, protected-role checks,
+original audit expectations or Unix divergence inventories. Native runtime
+confirmation remains required; this classification is not a host-protection claim.
+
 Aliased known home credential-directory roots also deny explicit Glob/Grep
 requests rather than certifying their descendants from a public share/drive name.
 Public UNC roots/files remain controls; names-only behavior on Unix is unchanged.

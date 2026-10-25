@@ -36,7 +36,7 @@ func nativeGitProtected(name, cwd, workdir, home string) bool {
 	}
 	for candidate, count := filepath.Clean(name), 0; count < 128; count++ {
 		info, err := nativeStat(candidate)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !missingOperand(err) {
 			return true
 		}
 		if err == nil {
@@ -111,7 +111,11 @@ func nativeRepositoryGitDir(start string) (string, error) {
 }
 
 func nativeGitDirectory(dir string) bool {
-	head, err := nativeStat(filepath.Join(dir, "HEAD"))
+	// A signature requires an existing regular HEAD, like gitConfigTarget.
+	// nativeStat intentionally turns a dangling reparse point into uncertainty
+	// for protected-target lookup, but that is not evidence of a Git role.
+	// Explicit repository/inherited roots above remain protected independently.
+	head, err := os.Stat(filepath.Join(dir, "HEAD"))
 	if err != nil {
 		return !os.IsNotExist(err)
 	}
