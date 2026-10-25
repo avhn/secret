@@ -53,14 +53,20 @@ func TestWindowsNativeParentTraversal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved, err := physical(raw)
+	resolved, err := nativePhysical(raw)
 	if err != nil || !strings.EqualFold(resolved, strings.TrimPrefix(opened, `\\?\`)) {
 		t.Fatalf("hook target %q (%v) differs from native-open identity %q", resolved, err, opened)
+	}
+	// The Bash analyzer still certifies its legacy physical link/.. witness.
+	// Native file tools must instead match the real Win32 open above.
+	var shell Metadata
+	if !Protected(raw, root, "", root) || !shell.Protected(raw, root, "", root) {
+		t.Fatal("Bash policy lost its physical link/.. credential witness")
 	}
 	if FileProtected(raw, root, "", root) {
 		t.Fatal("native public parent traversal borrowed Unix link/.. semantics")
 	}
-	var metadata Metadata
+	metadata := Metadata{fileTools: true}
 	if metadata.Protected(raw, root, "", root) {
 		t.Fatal("cached resolver differs from the native public traversal")
 	}
@@ -79,7 +85,7 @@ func TestWindowsNativeParentTraversal(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, ".aws", "credentials"), alias); err != nil {
 		t.Fatal(err)
 	}
-	var next Metadata
+	next := Metadata{fileTools: true}
 	if !next.Protected(alias, root, "", root) {
 		t.Fatal("native metadata survived into another analysis")
 	}
@@ -154,5 +160,38 @@ func TestWindowsGitIdentityAndResolutionErrors(t *testing.T) {
 		if !nativeGitProtected(filepath.Join(public, "new.txt"), repo, "", root) {
 			t.Errorf("ambiguous repository marker did not deny: %q", contents)
 		}
+	}
+}
+
+func TestWindowsPolicyAndFileToolIdentityModes(t *testing.T) {
+	root := t.TempDir()
+	for _, key := range []string{"KUBECONFIG", "AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE", "GH_CONFIG_DIR", "XDG_CONFIG_HOME", "GIT_CONFIG_GLOBAL", "GIT_DIR", "GIT_COMMON_DIR"} {
+		t.Setenv(key, "")
+	}
+	for _, name := range []string{"README.md", `print(open("README.md").read())`, `n = 5 // 2`, "public:stream", "node:20", "-ihttps://synthetic.invalid/simple"} {
+		t.Run(name, func(t *testing.T) {
+			var metadata Metadata
+			if Protected(name, root, "", root) || metadata.Protected(name, root, "", root) || ConfigWriteProtected(name, root, "", root, "", "") {
+				t.Fatal("inert Bash operand borrowed native file-tool validation or identity")
+			}
+			if !ValidPath(name) && (!FileProtected(name, root, "", root) || !FileConfigWriteProtected(name, root, "", root, "", "")) {
+				t.Fatal("ambiguous native file target borrowed the Bash operand exemption")
+			}
+		})
+	}
+	configured, alias := filepath.Join(root, "custom.cfg"), filepath.Join(root, "public.cfg")
+	if err := os.WriteFile(configured, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(configured, alias); err != nil {
+		t.Fatalf("required identity alias: %v", err)
+	}
+	t.Setenv("KUBECONFIG", configured)
+	var metadata Metadata
+	if Protected(alias, root, "", root) || metadata.Protected(alias, root, "", root) || ConfiguredProtected(alias, root, "", root, configured) {
+		t.Fatal("Bash policy gained native hardlink identity matching")
+	}
+	if !FileProtected(alias, root, "", root) || !FileConfiguredProtected(alias, root, "", root, configured) || !NativeProtected(alias, root, "", root) {
+		t.Fatal("native file/search tools lost configured credential identity")
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/avhn/secret/internal/hook/paths"
@@ -166,13 +165,6 @@ func (a *analyzer) configArgument(name string, args []string, cwd string) bool {
 		}
 		for _, value := range values {
 			if strings.HasPrefix(value, "-") || strings.HasPrefix(value, "~") && !strings.HasPrefix(value, "~/") || strings.ContainsAny(value, "; \n\t") {
-				continue
-			}
-			// Generic arguments include regexes, URLs and image tags, not just
-			// paths. An impossible native operand cannot identify a Git file.
-			// Known output roles and strict file/patch validation stay separate;
-			// the Windows shell adapter denies without invoking this analyzer.
-			if runtime.GOOS == "windows" && !paths.ValidPath(value) {
 				continue
 			}
 			if a.configPath(value, cwd) {

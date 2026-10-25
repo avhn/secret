@@ -89,7 +89,7 @@ function Invoke-Fixture($Request) {
         Assert-NoValues $got.Err
         $detail = $script:Utf8.GetString($got.Err)
         if ($detail.Length -gt 400) { $detail = $detail.Substring(0, 400) }
-        Write-Output ('fixture mode ' + $Request.Mode + ' exited ' + $got.Code + ': ' + $detail.Trim())
+        Write-Host ('fixture mode ' + $Request.Mode + ' exited ' + $got.Code + ': ' + $detail.Trim())
     }
     Assert-True ($got.Code -eq 0 -and $got.Err.Length -eq 0) 'native fixture succeeds'
     $reply = $script:Utf8.GetString($got.Out) | ConvertFrom-Json

@@ -12,12 +12,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
   Keep protected alias checks, native shell denial and Unix expectations intact.
   Add portable identity regressions and native public controls. Keep the native
   CLI harness cwd at RUNNER_TEMP until its disposable work directory exists,
-  preserving primary-failure reporting and cleanup. Classify only the eight
-  explicitly listed audit-cases6-9 variants that depend on Unix physical
-  symlink/parent traversal: Windows keeps native lexical traversal, detects
-  classification drift and requires both host hook boundaries to deny every
-  listed command. Original audit expectations and inventories remain unchanged.
-  Native CI remains required.
+  preserving primary-failure reporting and cleanup. Restore the pre-step-7 Bash
+  policy path behavior on Windows, including physical symlink/parent traversal,
+  inert-data handling and inherited Git roots. Route strict Win32 validation,
+  handle identity and native Git discovery only through file/patch APIs and
+  explicit native search mode. Remove the audit-cases6-9 Windows skip list and
+  classification; retain both-host all-shell denial tests and every native alias
+  protection. Add mode-separation and configured hardlink-identity regressions.
+  Original audit expectations and inventories remain unchanged. Native CI remains
+  required.
 
 - Add the unconditional M5a Windows native CLI and CredMan CI job, retaining all
   existing gates. Its PowerShell 7 harness consumes freshly built binaries and

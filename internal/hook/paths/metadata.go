@@ -3,6 +3,7 @@ package paths
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // Metadata retains name-resolution results for one bounded analysis only. It is
@@ -10,6 +11,10 @@ import (
 // the existing fail-closed semantics; raw paths are keys so link/.. is not lost.
 // This is a metadata snapshot, not a filesystem race or sandbox guarantee.
 type Metadata struct {
+	// fileTools selects native Windows file/patch semantics. The zero value is
+	// the legacy Bash policy, including its inert-data and link/.. rules.
+	fileTools bool
+
 	physical  map[string]pathResult
 	canonical map[string]pathResult
 	links     map[string]pathResult
@@ -58,6 +63,9 @@ func (m *Metadata) lstat(name string) (os.FileInfo, error) {
 
 func (m *Metadata) resolve(name string) (string, error) {
 	return rememberPath(&m.physical, name, func(name string) (string, error) {
+		if m.fileTools && runtime.GOOS == "windows" {
+			return nativePhysical(name)
+		}
 		return physicalWith(name, m.lstat, func(name string) (string, error) {
 			return rememberPath(&m.links, name, os.Readlink)
 		}, func(name string) (string, error) {
@@ -90,6 +98,9 @@ func (m *Metadata) LexicalProtected(name, cwd, home string) bool {
 
 // Protected checks physical paths without changing ordinary metadata errors.
 func (m *Metadata) Protected(name, cwd, workdir, home string) bool {
+	if m.fileTools && runtime.GOOS == "windows" {
+		return fileProtected(name, cwd, workdir, home, m.resolve)
+	}
 	raw := StreamBase(unresolved(name, cwd, workdir, home))
 	if raw == "/proc/self/status" {
 		return false

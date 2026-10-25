@@ -3,17 +3,12 @@ package paths
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
 // ConfigWriteProtected identifies Git configuration writes, including gitfile
 // worktrees and paths reached through symlinks. It never loads Git config.
 func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
-	if !ValidPath(name) || !ValidPath(cwd) || !ValidPath(workdir) || !ValidPath(home) || !ValidPath(xdg) || !ValidPath(global) {
-		return true
-	}
-	name = nativeName(name)
 	if strings.HasPrefix(name, "~") && !strings.HasPrefix(name, "~/") {
 		return true
 	}
@@ -25,10 +20,6 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 		return true
 	}
 	check := func(target string) bool { return gitConfigTarget(target, cwd, home, xdg, global) }
-	if runtime.GOOS == "windows" {
-		target, err := physical(raw)
-		return err != nil || nativeGitProtected(target, cwd, workdir, home) || check(raw) || check(target) || nativeConfigProtected(target, cwd, home, xdg, global)
-	}
 	if check(raw) {
 		return true
 	}
@@ -52,6 +43,10 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 // an unborn legacy symbolic HEAD need not resolve to an existing regular file.
 // Retain lexical intent as well as physical aliases, including missing leaves.
 func inheritedGitRootTarget(name, cwd, workdir, home string) bool {
+	return inheritedGitRootTargetWith(name, cwd, workdir, home, Resolve, physical)
+}
+
+func inheritedGitRootTargetWith(name, cwd, workdir, home string, anchor func(string, string, string, string) string, resolve func(string) (string, error)) bool {
 	normalize := func(value string) string { return strings.ToLower(filepath.ToSlash(filepath.Clean(value))) }
 	within := func(target, root string) bool {
 		target, root = normalize(target), normalize(root)
@@ -63,16 +58,16 @@ func inheritedGitRootTarget(name, cwd, workdir, home string) bool {
 		if value == "" {
 			continue
 		}
-		root := Resolve(value, cwd, workdir, home)
+		root := anchor(value, cwd, workdir, home)
 		if within(name, root) {
 			return true
 		}
-		physicalRoot, err := physical(root)
+		physicalRoot, err := resolve(root)
 		if err != nil {
 			return true
 		}
 		if resolved == "" {
-			resolved, err = physical(name)
+			resolved, err = resolve(name)
 			if err != nil {
 				return true
 			}

@@ -16,7 +16,7 @@ func nativeGitProtected(name, cwd, workdir, home string) bool {
 	var roots []os.FileInfo
 	starts := []string{cwd}
 	if workdir != "" {
-		starts = append(starts, Resolve(".", cwd, workdir, home))
+		starts = append(starts, FileResolve(".", cwd, workdir, home))
 	}
 	for _, start := range starts {
 		if start == "" {

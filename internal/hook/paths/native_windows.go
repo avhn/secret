@@ -45,7 +45,7 @@ func sameNativePath(a, b string) bool {
 // spelling. Inspect names and attributes only, never credential file contents.
 func nativeProtected(name, home string) bool {
 	resolved, err := nativePhysical(name)
-	if err != nil || lexical(resolved) || homeCredential(resolved, home) {
+	if err != nil || lexical(resolved) || fileHomeCredential(resolved, home) {
 		return true
 	}
 	// Directory roles apply outside HOME too, including a share that hides the
@@ -81,7 +81,7 @@ func nativeProtected(name, home string) bool {
 						return true
 					}
 					witness := filepath.Join(root.name, tail)
-					if lexical(witness) || homeCredential(witness, home) {
+					if lexical(witness) || fileHomeCredential(witness, home) {
 						return true
 					}
 				}
@@ -98,7 +98,7 @@ func nativeProtected(name, home string) bool {
 }
 
 func nativeConfigProtected(name, cwd, home, xdg, global string) bool {
-	if sameNativePath(name, filepath.Join(home, ".gitconfig")) || global != "" && sameNativePath(name, Resolve(global, cwd, "", home)) {
+	if sameNativePath(name, filepath.Join(home, ".gitconfig")) || global != "" && sameNativePath(name, FileResolve(global, cwd, "", home)) {
 		return true
 	}
 	roots := []string{filepath.Join(home, ".config", "git")}
@@ -107,7 +107,7 @@ func nativeConfigProtected(name, cwd, home, xdg, global string) bool {
 	}
 	for _, key := range []string{"GIT_DIR", "GIT_COMMON_DIR"} {
 		if value := os.Getenv(key); value != "" {
-			roots = append(roots, Resolve(value, cwd, "", home))
+			roots = append(roots, FileResolve(value, cwd, "", home))
 		}
 	}
 	for candidate, count := filepath.Clean(name), 0; count < 128; count++ {

@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 )
@@ -112,9 +111,6 @@ func TestTreeProtected(t *testing.T) {
 
 // TestPhysicalDotDot prevents lexical cleanup from hiding a protected target.
 func TestPhysicalDotDot(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Unix physical link/.. contract; Windows native-open counterpart covers lexical traversal")
-	}
 	root := t.TempDir()
 	for _, dir := range []string{"proj", "home/.aws/cli", "safe/sub"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0700); err != nil {

@@ -107,7 +107,7 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 			names = []string{e.String("notebook_path")}
 		}
 		for _, name := range names {
-			if name != "" && (protected(name) || e.Tool != "Read" && paths.ConfigWriteProtected(name, cwd, "", home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
+			if name != "" && (protected(name) || e.Tool != "Read" && paths.FileConfigWriteProtected(name, cwd, "", home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 				reason = "file access targets a protected store"
 				break
 			}

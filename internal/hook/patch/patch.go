@@ -48,7 +48,7 @@ func Decision(text, cwd, workdir, home string) string {
 		for _, prefix := range []string{"*** Add File: ", "*** Update File: ", "*** Delete File: ", "*** Move to: "} {
 			if strings.HasPrefix(line, prefix) {
 				name := strings.TrimPrefix(line, prefix)
-				if name != "" && (paths.FileProtected(name, cwd, workdir, home) || paths.ConfigWriteProtected(name, cwd, workdir, home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
+				if name != "" && (paths.FileProtected(name, cwd, workdir, home) || paths.FileConfigWriteProtected(name, cwd, workdir, home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("GIT_CONFIG_GLOBAL"))) {
 					return protectedReason
 				}
 			}

@@ -26,8 +26,19 @@ func FilteredScopeConfigured(root, glob, typ, cwd, home, config string, literals
 // certifiedSelectors is used only for a Grep union whose individual selectors
 // have passed CanNarrow, including directory selectors such as src/**.
 func filteredScopeConfigured(root, glob, typ, cwd, home, config string, certifiedSelectors bool, literals ...string) string {
+	return filteredScopeWith(root, glob, typ, cwd, home, config, certifiedSelectors, false, literals...)
+}
+
+// fileTools is explicit: native file-tool identity must never change Bash scope.
+func filteredScopeWith(root, glob, typ, cwd, home, config string, certifiedSelectors, fileTools bool, literals ...string) string {
+	resolve, pathProtected := paths.Resolve, paths.Protected
+	configured, configuredTree, tree := paths.ConfiguredProtected, paths.ConfiguredTreeProtected, paths.TreeProtectedScope
+	if fileTools {
+		resolve, pathProtected = paths.FileResolve, paths.FileProtected
+		configured, configuredTree, tree = paths.FileConfiguredProtected, paths.FileConfiguredTreeProtected, paths.FileTreeProtectedScope
+	}
 	protected := func(name string) bool {
-		return paths.ConfiguredProtected(name, cwd, "", home, config, literals...) || paths.Protected(name, cwd, "", home)
+		return configured(name, cwd, "", home, config, literals...) || pathProtected(name, cwd, "", home)
 	}
 	if glob == "" {
 		glob = typeGlob(typ)
@@ -40,12 +51,12 @@ func filteredScopeConfigured(root, glob, typ, cwd, home, config string, certifie
 			return ScopeReason
 		}
 	}
-	root = paths.Resolve(root, cwd, "", home)
+	root = resolve(root, cwd, "", home)
 	if dir, ok := globDirectory(glob); ok {
 		// Keep parent traversal after symlink lookup, in both the root and
 		// the selector prefix. Join would silently scan a different directory.
 		directory := root + string(os.PathSeparator) + filepath.FromSlash(dir)
-		if paths.ConfiguredTreeProtected(directory, cwd, home, config, literals...) || paths.TreeProtectedScope(directory, cwd, home, true) {
+		if configuredTree(directory, cwd, home, config, literals...) || tree(directory, cwd, home, true) {
 			return ScopeReason
 		}
 		return ""

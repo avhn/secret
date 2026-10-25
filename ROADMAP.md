@@ -513,11 +513,18 @@ matching for real objects/equal missing suffixes, uncertainty denial for real
 metadata failures, and strict native file/patch validation. Portable injected
 identity tests cover invalid names and shared ancestors. The PowerShell harness
 also retains RUNNER_TEMP as cwd until the disposable work directory exists.
-Native rerun evidence remains required. The unchanged audit-cases6-9 corpus
-expectation assumes Unix physical symlink/parent traversal. Only its eight
-explicitly enumerated variants are classified on Windows under the binding
-lexical-cleaning rule, with drift checks and both-host hook-level denial tests.
-No original audit expectation or inventory row changes.
+Run 40236374785 still exposed twelve policy public-control failures because
+native file semantics remained in shared Bash helpers. Restore all Bash-reachable
+path/search behavior to the passing b8399a1 policy: component-wise physical
+traversal, case-folded configured-path comparison and legacy Git write checks.
+Native validation, metadata identity, home discovery and Git-directory discovery
+stay behind file/patch entry points and explicit native Grep scan mode. Native
+junction-parent and configured hardlink tests distinguish the two modes. Remove
+the audit-cases6-9 Windows exception list and classification: the restored policy
+again checks its physical credential witness without a skip. Both-host fixed
+all-shell denial and all native UNC/admin-share/subst/junction/gitdir tests remain.
+Native rerun evidence remains required; local Windows vet/test compilation is not
+runtime evidence. No original audit expectation or inventory row changes.
 
 Step 8 is implemented locally, with native evidence pending CI. The unconditional
 windows native cli and credman job builds a fresh CLI and separate test-only

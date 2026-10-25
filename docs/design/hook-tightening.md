@@ -2248,7 +2248,7 @@ all retained shell requests to deny.
 | --- | --- | --- |
 | String and argv shell requests | Windows-only tightening | TestWindowsShellRequestsDeny and TestWindowsShellCorpusDeny require fixed denial, including public commands. PowerShell/CMD semantics are not Bash. |
 | Drive-relative/rooted paths, device namespaces, ADS, reserved device components and trimmed suffixes | Windows-only tightening | TestWindowsFileTools, TestWindowsPatchTools and TestWindowsNativeFileAmbiguity deny ambiguous targets before anchoring, stream stripping or missing-name handling. Public ADS is no longer a file-tool allow; legacy StreamBase shell-policy tests remain separate. |
-| Native junction-plus-parent traversal | Binding native semantics | TestWindowsNativeParentTraversal compares the resolver to an actual Win32 open. Unix physical link/.. expectations remain intact and Unix-only; Windows uses lexical cleaning before native reparse traversal. |
+| Native junction-plus-parent traversal | Binding native semantics | TestWindowsNativeParentTraversal compares the resolver to an actual Win32 open. Bash policy retains its physical link/.. expectations on every platform; only native Windows file/patch tools use lexical cleaning before native reparse traversal. |
 | Case, separator, reparse, 8.3 and volume/UNC aliases | Protected-role preservation | TestWindowsFileAndPatchAliases, TestWindowsShortFileAndPatchAliases and TestWindowsUNCFileAndPatchAliases pair protected targets and patch moves with public controls. Handle names and file/directory identity retain configured credentials and known home credential directories. Missing suffixes retain their existing ancestor. Dangling reparse points deny rather than borrowing an absent-name exception. |
 
 ### M5a review: local share and Git identity preservation
@@ -2276,38 +2276,50 @@ cannot establish identity, while access/I/O errors and bounded-proof exhaustion
 remain conservative. Equal missing suffixes require identical existing ancestors;
 a shared temp/volume ancestor alone is not a match. Native configured-path public
 controls retain a missing custom.cfg witness without treating interpreter source
-or README.md as that credential. Generic Bash-policy argument probing skips
-impossible native paths such as regexes, image tags and Unix executable names;
-known output roles and strict file/patch checks keep their existing validation.
+or README.md as that credential. Bash-policy argument probing retains its
+pre-step-7 inert-data rules, without consulting strict native path validation or
+handle identity. Strict file/patch checks keep their native validation.
 The Windows shell adapter continues to deny all requests without Bash analysis.
 Git signature discovery requires an existing regular HEAD, so an undeclared
 legacy directory with a dangling symbolic HEAD does not gain a Git role solely
 from a metadata error. Explicit gitdirs, inherited Git roots and alias denials
 remain independently protected. Existing audit expectations are unchanged.
 
-### M5a classification: windows-lexical-symlink-parent
+### M5a review: separate Bash policy from native file semantics
 
-The saved log's eight policy allows for audit-cases6-9 are a binding native
-traversal difference, not a Windows shell allow. The synthetic awsx symlink
-reaches .aws/cli: Unix physical awsx/../credentials reaches .aws/credentials,
-whereas Windows lexical cleaning reaches the public/missing worktree credentials
-path. Keep the original deny expectation and all Unix corpus checks unchanged.
+Run 40236374785 at 9a35a4a still denied public interpreter source, UV URLs and
+Docker arguments, and lost an inherited Git-root witness. The root cause was
+native validation, handle identity and lexical traversal in shared path helpers,
+not a missing Bash exception. The Windows hook already denies every shell request
+before analysis. The plan's native path rules apply to file/patch tools only.
 
-Only audit-cases6-9 variant indices 0, 1, 2, 3, 4, 5, 6 and 7 are classified.
-The explicit testdata/hook/windows-lexical-variants.json list records each exact
-command, shared by the policy and hook tests. On Windows, TestGuardDeniedCorpus
-logs and excludes only those exact variant decisions from its Unix deny check.
-It still analyzes them and fails if any starts denying or is not replayed.
-TestWindowsLexicalVariantsMatchCorpus validates the case, index and command text
-on every platform, failing if an entry disappears, changes or is duplicated.
-There is no command-pattern or blanket case exclusion.
+Restore Bash-reachable behavior to the passing b8399a1 implementation: Resolve
+preserves raw operands, physicalWith walks components before Windows alias
+canonicalization, configured credentials compare case-folded paths rather than
+handle identity, and ConfigWriteProtected retains legacy Git discovery. Zero-value
+Metadata follows the same rules. No audit expectation or inert-data exemption is
+changed to accommodate native file semantics.
 
-TestWindowsLexicalTraversalShellVariantsDeny sends all eight shared commands
-through hook.Decide as Bash envelopes for both claude and codex and requires
-the exact Windows all-shell denial. The native shell boundary therefore retains
-all eight denials without changing file traversal, protected-role checks,
-original audit expectations or Unix divergence inventories. Native runtime
-confirmation remains required; this classification is not a host-protection claim.
+FileResolve, FileProtected, FileConfigWriteProtected and the File* search helpers
+select native normalization, validation and handle identity. Only FileProtected
+constructs native-mode Metadata; Bash metadata remains zero-value. ToolGlob and
+ToolGrep use file APIs; filteredScopeWith selects them only for an explicit native
+file-tool scan. Scope and FilteredScopeConfigured keep the Bash mode. Native home
+and Git discovery stay at the file/patch boundary. All local UNC/admin-share,
+subst, junction, gitdir-share and portable identity regressions are retained.
+
+The audit-cases6-9 Windows skip list and its classification are removed. Restoring
+the legacy component walker restores the .aws/credentials physical witness behind
+awsx/../credentials, so TestGuardDeniedCorpus again requires every variant to deny
+without an exception. TestWindowsLexicalTraversalShellVariantsDeny separately
+retains both hosts' fixed all-shell denial for all eight commands.
+TestWindowsNativeParentTraversal pairs legacy policy denial with the public native
+Win32-open result; TestWindowsPolicyAndFileToolIdentityModes pairs inert Bash data
+with strict native targets and a configured hardlink identity.
+TestWindowsFileSearchIdentityMode retains that identity for native Glob/Grep
+content/count requests while Bash filtered scope keeps its legacy behavior and
+native names-only/public-file controls remain available. Native runtime
+confirmation remains required; cross-compilation is not a host-protection claim.
 
 Aliased known home credential-directory roots also deny explicit Glob/Grep
 requests rather than certifying their descendants from a public share/drive name.

@@ -160,7 +160,7 @@ func selectorAt(glob string, depth int) bool {
 
 // ToolGlob protects only explicit roots; Glob returns names, not file bytes.
 func ToolGlob(root, cwd, home string) string {
-	if root != "" && paths.Protected(root, cwd, "", home) {
+	if root != "" && paths.FileProtected(root, cwd, "", home) {
 		return "file access targets a protected store"
 	}
 	return ""
@@ -199,10 +199,10 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 		}
 		narrow = narrow && CanNarrow(selector)
 	}
-	if paths.Protected(root, cwd, "", home) {
-		p := paths.Resolve(root, cwd, "", home)
+	if paths.FileProtected(root, cwd, "", home) {
+		p := paths.FileResolve(root, cwd, "", home)
 		info, err := os.Lstat(p)
-		if !names || paths.LexicalProtected(root, cwd, home) || err != nil || info.Mode()&os.ModeSymlink == 0 {
+		if !names || paths.FileLexicalProtected(root, cwd, home) || err != nil || info.Mode()&os.ModeSymlink == 0 {
 			return "Grep targets a protected store"
 		}
 	}
@@ -215,9 +215,9 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 			// selector a separate filesystem scan and deadline.
 			filter = "{" + strings.Join(selectors, ",") + "}"
 		}
-		return filteredScopeConfigured(root, filter, typ, cwd, home, "", narrow)
+		return filteredScopeWith(root, filter, typ, cwd, home, "", narrow, true)
 	}
-	if !names && paths.TreeProtectedScope(root, cwd, home, glob != "") {
+	if !names && paths.FileTreeProtectedScope(root, cwd, home, glob != "") {
 		return "Grep content/count tree contains protected names or its scan is incomplete (depth, error, deadline); use files_with_matches or narrow the path"
 	}
 	return ""
