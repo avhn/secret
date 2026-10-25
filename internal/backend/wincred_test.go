@@ -265,8 +265,9 @@ func TestWincredManifestDispatch(t *testing.T) {
 	}
 	if runtime.GOOS == "windows" {
 		// Step 6 lifted the Windows operator guard with native transaction tests;
-		// a transaction through the injected API must now publish names only.
-		if err := (Transaction{SecretsDir: dir, Reference: "wincred:synthetic", Provider: p}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: "TOKEN", Value: []byte("synthetic")}}); err != nil {
+		// rotating the stashed identity through the injected API must keep one
+		// names-only record.
+		if err := (Transaction{SecretsDir: dir, Reference: "wincred:synthetic", Provider: p}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: "TOKEN", Labels: map[string]string{"env": "test"}, Value: []byte("synthetic")}}); err != nil {
 			t.Fatal("Windows operator transaction failed")
 		}
 		records, err := ListNames(dir, "wincred:synthetic")

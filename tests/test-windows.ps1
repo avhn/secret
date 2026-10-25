@@ -108,7 +108,7 @@ $drive = $null
 $junction = $null
 $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
 $subst = Join-Path $env:SystemRoot 'System32\subst.exe'
-$pwsh = (Get-Command pwsh -CommandType Application).Source
+$pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
 
 function New-PrivateDirectory([string] $Path) {
     $null = [IO.Directory]::CreateDirectory($Path)
@@ -191,7 +191,7 @@ try {
     Write-Output ('Runner OS build: ' + [Environment]::OSVersion.VersionString)
     Write-Output ('Runner image: ' + $env:ImageOS + ' ' + $env:ImageVersion + '; architecture: ' + [Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
     Write-Output ('PowerShell: ' + $PSVersionTable.PSVersion.ToString())
-    $version = Invoke-Captured (Get-Command go -CommandType Application).Source @('version')
+    $version = Invoke-Captured (Get-Command go -CommandType Application | Select-Object -First 1).Source @('version')
     Assert-True ($version.Code -eq 0 -and $script:Utf8.GetString($version.Out).Contains('go1.26.10')) 'pinned Go version'
     Write-Output ($script:Utf8.GetString($version.Out).Trim())
     New-PrivateDirectory $root
