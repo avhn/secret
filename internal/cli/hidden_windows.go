@@ -83,7 +83,10 @@ func recordUnit(record *consoleInputRecord) (uint16, uint16, bool) {
 		return 0, 0, false
 	}
 	if record.down == 0 {
-		return record.char, 0, record.key == windows.VK_MENU
+		if record.key != windows.VK_MENU {
+			return 0, 0, false
+		}
+		return record.char, 0, true
 	}
 	if record.repeat == 0 {
 		return 0, 0, false
