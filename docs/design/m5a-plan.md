@@ -367,6 +367,49 @@ explicit cleanup assertions and environment/toolchain recording. Host-skipped or
 failed-to-start hooks remain potentially fail-open. No host protection, release
 activation or milestone completion is claimed.
 
+## Step 8 implementation status
+
+The unconditional `windows native cli and credman` CI job builds a fresh native
+CLI and a separate `windowsfixture`-tagged helper from `testdata/windows/`.
+`tests/test-windows.ps1` builds nothing: it requires absolute paths to both
+inputs, PowerShell 7 strict mode and the hosted Windows/provider gates. It
+records OS build, runner image/architecture, PowerShell and pinned Go versions.
+Disposable HOME/USERPROFILE, stores, temp and working directories live under
+RUNNER_TEMP and contain spaces. The test-only helper receives requests and
+synthetic values on stdin and supplies hidden stash input through required
+ConPTY after observing the prompt; no value enters child argv or test logs.
+
+Both cmd and PowerShell exercise file stash, names-only show/list, terminal get
+validated privately against stdin-supplied expected bytes (no transcript returned),
+a get command submitted on shell stdin (redirected stdout must reject), two-stream run
+redaction in UTF-8/UTF-16LE/UTF-16BE, supervised exec and its nonzero status,
+nonconsole consent/stash rejection before persistence, protected owner-only
+DACLs via Get-Acl/icacls, reserved/ADS/drive-relative paths, and the development
+shim's shell/protected/public/missing-binary decisions. Captured streams are
+checked privately for synthetic sentinels, never dumped on assertion failures.
+Required loopback UNC, junction and subst fixtures fail instead of skipping;
+8.3 basename availability is reported explicitly without inventing coverage.
+
+The lane also runs the existing required-provider blob and transaction tests.
+For CLI CredMan reads, the helper reserves random exact synthetic targets,
+probes absence and flushes a names-only journal before native writes/readback
+and private manifest publication. No credential enumeration is used. In-process
+finally cleanup and a separate always-step helper delete only that journal's
+validated targets and require independent native reads to prove absence. The
+existing provider journal also retains its independent always-step cleanup.
+Cleanup uncertainty fails the job. Filesystem fixtures are removed in finally.
+
+Implementation is not native certification. Local Linux build, vet and Windows
+test compilation cannot prove this harness's runtime or PowerShell parsing when
+pwsh is unavailable. All existing Go matrix, provider, shell and inventory gates
+remain intact. Hosted evidence is pending. Step 9 must cite a green run for the
+reviewed revision, show both shell matrices and exact cleanup assertions, record
+8.3 availability and no skipped mandatory fixtures, and retain the native package
+console/Job/storage/hook evidence. Its support table and limitations must still
+cover console-only input/get, supervised exec, ACL/durability, unsupported age
+filesystem/provider paths, literal-redaction limits and potentially fail-open
+hosts. No milestone completion, installed hook activation or release is claimed.
+
 ## Native verification matrix and CI
 
 | Required Windows lane | Evidence and failure assertions |
@@ -377,10 +420,10 @@ activation or milestone completion is claimed.
 | CredMan and CLI | Synthetic blobs at size boundaries, exact target/type/readback, adjacent-target isolation, missing records, labels, filtering, operator recovery and delete; names-only JSON/audit/MCP, no sentinels in argv, diagnostics or filtered streams. |
 | Shim, not host protection | Binary and shim under cmd/pwsh from paths with spaces; fixed shell denial, file/patch decisions, missing binary and output failure. Host-skipped hooks remain unproven and potentially fail-open. |
 
-- Extend `.github/workflows/ci.yml` `go (windows-latest)` with native build and integration steps
-  (PowerShell where native paths matter), `GOTOOLCHAIN=local`, disposable HOME/USERPROFILE/store
-  roots and explicit exit checks. Record runner image, OS, architecture and toolchain; keep every
-  existing gate.
+- Retain `.github/workflows/ci.yml` `go (windows-latest)` and require the dedicated
+  `windows native cli and credman` job for native build and CLI integration (PowerShell where
+  native paths matter), `GOTOOLCHAIN=local`, disposable HOME/USERPROFILE/store roots and explicit
+  exit checks. Record runner image, OS, architecture and toolchain; keep every existing gate.
 - Add `internal/backend/wincred_windows_test.go`, platform tests and `tests/test-windows.ps1` with
   fixtures under `testdata/windows/`. Real CredMan calls only with `SECRET_REQUIRE_WINCRED=1` on
   hosted Windows CI; unset means no provider access; enabled means missing coverage fails. Unit

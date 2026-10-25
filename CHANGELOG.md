@@ -6,6 +6,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
   mark both milestones done. Installed defaults remain the Bash CLI and guard.
+- Add the unconditional M5a Windows native CLI and CredMan CI job, retaining all
+  existing gates. Its PowerShell 7 harness consumes freshly built binaries and
+  isolates HOME/USERPROFILE, stores and temp beneath RUNNER_TEMP. Exercise cmd
+  and PowerShell from paths with spaces, required ConPTY hidden stash, names-only
+  show/list, private terminal get and get-by-stdin rejection, two-stream
+  UTF-8/UTF-16 redaction, supervised
+  exec, redirected consent rejection, private protected DACLs and the development
+  shim. Require loopback UNC, junction and subst fixtures; report 8.3 availability.
+  Journal exact synthetic CredMan targets before writes and independently verify
+  cleanup under always(). Native evidence and final support documentation remain
+  pending CI; no installed/default, release or host protection change is claimed.
+
 - Tighten Windows-only hook path checks across local UNC shares, administrative
   shares and substituted drives. Verify local-share mappings against opened
   handle identities, retain protected directory roles outside HOME and deny

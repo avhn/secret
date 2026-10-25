@@ -506,9 +506,21 @@ shares, extended-UNC denial, subst drives, junctions, gitfiles and public contro
 Unavailable required share/subst fixtures fail explicitly rather than skipping.
 Unix decisions and inventories remain unchanged; native results are still pending.
 
-Step 8 (the full isolated native matrix), plus final hosted evidence
-documentation, remains pending. Installed hooks/manifests and release defaults
-are unchanged; neither local checks nor the development shim prove host protection.
+Step 8 is implemented locally, with native evidence pending CI. The unconditional
+windows native cli and credman job builds a fresh CLI and separate test-only
+ConPTY fixture, then runs tests/test-windows.ps1 with disposable space-containing
+HOME/USERPROFILE, store and temp roots. Both cmd and PowerShell cover hidden
+stash, names-only inventory, private stdin-verified terminal get, redirected
+get-by-stdin rejection, UTF-8/UTF-16LE/BE two-stream filtering, supervised exec, consent ordering, owner-only protected
+DACLs, ambiguous paths and the development shim. Required loopback UNC, junction
+and subst fixtures fail rather than skip; 8.3 availability is explicit. Exact
+synthetic CredMan targets are journaled and flushed before writes, with cleanup
+and independent always-step absence verification. Existing native provider,
+console, Job, storage and hook package gates remain intact. No native success is
+inferred from Linux checks. Step 9 must link green hosted results, account for
+mandatory cases and document support/limits before any completion claim.
+Installed hooks/manifests and release defaults are unchanged; neither local
+checks nor the development shim prove host protection.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions

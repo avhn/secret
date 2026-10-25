@@ -208,6 +208,67 @@ jobs:
           /bin/bash tests/test-guard-context.sh
           BASH_BIN=/bin/bash bash tests/inventory.sh --check
 
+  windows-cli:
+    name: windows native cli and credman
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GOTOOLCHAIN: local
+      SECRET_REQUIRE_WINCRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.10"
+          cache: true
+      - name: Parse isolated Windows harness
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tests/test-windows.ps1'), [ref]$tokens, [ref]$errors)
+          if ($errors.Count -ne 0) { throw 'Windows harness has parser errors' }
+      - name: Build fresh native CLI and test-only console fixture
+        id: native_build
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP 'secret native build'
+          if (Test-Path -LiteralPath $build) { throw 'native build directory already exists' }
+          $null = New-Item -ItemType Directory -Path $build
+          go build -trimpath -o (Join-Path $build 'secret.exe') ./cmd/secret
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -tags windowsfixture -o (Join-Path $build 'windows-fixture.exe') ./testdata/windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -tags windowsfixture -count=1 ./testdata/windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Required exact CredMan blob and transaction lifecycle
+        shell: pwsh
+        run: |
+          $env:SECRET_WINCRED_TARGETS = Join-Path $env:RUNNER_TEMP 'secret-wincred-targets.jsonl'
+          if (Test-Path -LiteralPath $env:SECRET_WINCRED_TARGETS) { throw 'cleanup journal already exists' }
+          go test -v -count=1 -run '^TestWincred(Integration|TransactionIntegration)$' ./internal/backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Required isolated cmd and PowerShell CLI matrix
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP 'secret native build'
+          & ./tests/test-windows.ps1 -SecretExe (Join-Path $build 'secret.exe') -ConsoleFixture (Join-Path $build 'windows-fixture.exe')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Independently verify CLI exact-target cleanup
+        if: always() && steps.native_build.outcome == 'success'
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP 'secret native build'
+          & ./tests/test-windows.ps1 -SecretExe (Join-Path $build 'secret.exe') -ConsoleFixture (Join-Path $build 'windows-fixture.exe') -CleanupOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Independently verify provider exact-target cleanup
+        if: always()
+        shell: pwsh
+        run: |
+          $env:SECRET_WINCRED_TARGETS = Join-Path $env:RUNNER_TEMP 'secret-wincred-targets.jsonl'
+          go test -v -count=1 -run '^TestWincredCleanup$' ./internal/backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   go:
     name: go (${{ matrix.os }})
     timeout-minutes: 60
