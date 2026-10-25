@@ -6,6 +6,27 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
   mark both milestones done. Installed defaults remain the Bash CLI and guard.
+- Correct native Windows test and ConPTY harness assumptions without changing
+  operator terminal gates, private ACL checks or atomic Job enrollment. Expect
+  terminal refusal before operator parsing, use private template fixtures and
+  native test children, derive audit retention from encoded event bytes, and
+  check each consent identity through rename/delete. Observe importer descendants
+  through pinned process handles rather than TCP EOF, and pin template descendant
+  identity before checking cleanup order. Suppress redirected host handle copies
+  in the unit ConPTY launcher, initialize the cancellation fixture's console
+  input and CTRL_C processing explicitly, and match prompts without trailing blank
+  cells that ConPTY can render as cursor movement. Add fixed, value-free console
+  failure stages. Native runtime confirmation remains required.
+
+- Preserve legacy physical link/parent credential witnesses alongside native
+  Windows file-tool identity checks. Recognize Go 1.26 junction metadata without
+  changing Unix traversal. Restore Grep names-only credential-directory and
+  existing file-symlink behavior while retaining content/count, opaque-directory,
+  dangling-reparse and configured-identity denials. Point native Git identity
+  regressions at the file-write API and disable VCS stamping in the isolated
+  development shim build. Audit expectations and inventories remain unchanged;
+  native Windows runtime confirmation is still required.
+
 - Correct M5a Windows hook over-denials: impossible Win32 data operands are not
   credential identities, generic Bash-policy arguments are not strict file-tool
   targets, and a dangling symbolic HEAD alone is not a Git directory signature.

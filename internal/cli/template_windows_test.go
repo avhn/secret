@@ -4,7 +4,6 @@ package cli
 
 import (
 	"bytes"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,7 +33,42 @@ func TestWindowsTemplateJobCleanup(t *testing.T) {
 				c.out = failingWriter{}
 			}
 			args := []string{"run", "-f", "file:" + store, "--template-file", template, "--", os.Args[0], "-test.run=^TestWindowsTemplateChild$", "--", home, "parent"}
-			status := Main(args, c.in, c.out, c.errOut)
+			finished := make(chan int, 1)
+			go func() { finished <- Main(args, c.in, c.out, c.errOut) }()
+			pidPath := filepath.Join(home, "template-descendant.pid")
+			deadline := time.Now().Add(10 * time.Second)
+			var pidBytes []byte
+			var err error
+			for {
+				pidBytes, err = os.ReadFile(pidPath)
+				if err == nil && len(pidBytes) != 0 {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("template descendant did not start")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			pid, err := strconv.Atoi(string(pidBytes))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Keep the live process identity pinned before allowing its parent
+			// to exit. Reopening a PID after cleanup can observe a reused PID.
+			handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(pid))
+			if err != nil {
+				t.Fatal("cannot observe template descendant")
+			}
+			t.Cleanup(func() { windows.TerminateProcess(handle, 1); windows.CloseHandle(handle) })
+			if err := os.WriteFile(filepath.Join(home, "release"), []byte("ready"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var status int
+			select {
+			case status = <-finished:
+			case <-time.After(5 * time.Second):
+				t.Fatal("template supervisor exceeded cleanup bound")
+			}
 			if failOutput {
 				if status == 0 {
 					t.Fatal("output failure accepted")
@@ -49,23 +83,8 @@ func TestWindowsTemplateJobCleanup(t *testing.T) {
 			if _, err := os.Stat(string(data)); !os.IsNotExist(err) {
 				t.Fatal("private template survived supervisor return")
 			}
-			pidBytes, err := os.ReadFile(filepath.Join(home, "template-descendant.pid"))
-			if err != nil {
-				t.Fatal("template descendant did not start")
-			}
-			pid, err := strconv.Atoi(string(pidBytes))
-			if err != nil {
-				t.Fatal(err)
-			}
-			handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
-			if err != nil && !errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
-				t.Fatal("cannot verify template descendant exit")
-			}
-			if err == nil {
-				defer windows.CloseHandle(handle)
-				if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != windows.WAIT_OBJECT_0 {
-					t.Fatal("template cleanup preceded Job containment completion")
-				}
+			if status, err := windows.WaitForSingleObject(handle, 0); err != nil || status != windows.WAIT_OBJECT_0 {
+				t.Fatal("template cleanup preceded Job containment completion")
 			}
 		})
 	}
@@ -107,6 +126,15 @@ func TestWindowsTemplateChild(t *testing.T) {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "template-descendant.pid")); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			os.Exit(2)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "release")); err == nil {
 			break
 		}
 		if time.Now().After(deadline) {

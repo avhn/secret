@@ -410,6 +410,34 @@ cover console-only input/get, supervised exec, ACL/durability, unsupported age
 filesystem/provider paths, literal-redaction limits and potentially fail-open
 hosts. No milestone completion, installed hook activation or release is claimed.
 
+## Native CLI/feature verification follow-up
+
+The first general package run exposed stale pre-M5a unsupported expectations in
+terminal-gate tests, mode-only template fixtures, a fixed audit event-count cap
+that did not follow the JSONL byte bound, and a lifecycle consent callback that
+still expected TOKEN after rename. The corrected tests retain terminal refusal
+before parsing and persistence, private DACLs, exact action/target/key/new-key
+confirmation and the existing inventory. Unix behavior is unchanged.
+
+Windows process tests pin a live descendant handle before releasing the synthetic
+parent. TCP closure can report a reset on forced termination, not only EOF, and a
+post-cleanup PID lookup can observe a reused identity. Native handle waits are the
+liveness oracle; the template test still requires its pinned descendant to be
+signaled immediately when the supervisor returns. Atomic JOB_LIST enrollment,
+KILL_ON_JOB_CLOSE, no breakaway and bounded cleanup remain unchanged.
+
+The unit ConPTY launcher now uses STARTF_USESTDHANDLES with null handles, matching
+the native CLI fixture: it suppresses copying a redirected runner's handles while
+ConPTY establishes console handles. This flag is intentional, not a reason to
+relax GetConsoleMode checks or open CONIN$/CONOUT$ before the terminal gate.
+The cancellation helper opens its own console input and clears inherited CTRL_C
+ignore state. Prompt matching uses the last nonblank prompt character because
+ConPTY's screen renderer may encode trailing blanks as cursor movement. Console
+fixture failures identify fixed creation, pre-prompt exit, prompt-wait, process-wait
+or get-verification stages without returning captured output or input values.
+The new generic-failure stage cannot be established on Linux; hosted execution
+must confirm this diagnosis and all native console and lifecycle assertions.
+
 ## Native verification matrix and CI
 
 | Required Windows lane | Evidence and failure assertions |

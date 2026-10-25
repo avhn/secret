@@ -74,9 +74,6 @@ func TestOperatorDispatchRefusesBeforeAccess(t *testing.T) {
 			t.Fatal("nonterminal operator accepted")
 		}
 		want := secure.ErrTerminalRequired
-		if runtime.GOOS == "windows" {
-			want = secure.ErrUnsupported
-		}
 		if diagnostic.String() != "secret: "+want.Error()+"\n" {
 			t.Fatalf("gate did not precede parsing: %s", diagnostic.String())
 		}

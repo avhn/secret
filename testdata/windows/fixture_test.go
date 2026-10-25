@@ -63,3 +63,20 @@ func TestJournalRequiresHostedProviderGate(t *testing.T) {
 		t.Fatal("relative journal root accepted")
 	}
 }
+
+func TestConsolePromptSeen(t *testing.T) {
+	for _, tc := range []struct {
+		output, prompt string
+		seen           bool
+	}{
+		{"TOKEN: ", "TOKEN: ", true},
+		{"\x1b[2JTOKEN:\x1b[8G", "TOKEN: ", true},
+		{"TOKEN", "TOKEN: ", false},
+		{"", "TOKEN: ", false},
+		{"anything", " ", false},
+	} {
+		if consolePromptSeen([]byte(tc.output), tc.prompt) != tc.seen {
+			t.Fatal("console prompt marker mismatch")
+		}
+	}
+}

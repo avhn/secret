@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 	"github.com/avhn/secret/internal/testutil"
 )
@@ -29,6 +30,10 @@ func TestHumanBoundary(t *testing.T) {
 		{"show option needs argument", []string{"show", "--env"}, "", "secret: option needs an argument\n", 1},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && tt.args[0] == "stash" {
+				// Native stash rejects redirected input before reading any bytes.
+				tt.stderr = "secret: " + secure.ErrTerminalRequired.Error() + "\n"
+			}
 			f, err := os.CreateTemp(home, "stdin-*")
 			if err != nil {
 				t.Fatal(err)

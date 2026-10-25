@@ -222,6 +222,13 @@ func TestWindowsRunDeadline(t *testing.T) {
 	}
 }
 
+func templateFailureChild(kind, dir string, _ []string) []string {
+	if kind == "spawn" {
+		return []string{filepath.Join(dir, "missing.exe")}
+	}
+	return windowsCLIArgs("template "+kind, dir)
+}
+
 func TestWindowsRunConsoleCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -229,7 +236,7 @@ func TestWindowsRunConsoleCancellation(t *testing.T) {
 	parent := exec.CommandContext(ctx, args[0], args[1:]...)
 	parent.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NEW_CONSOLE}
 	if err := parent.Run(); err != nil {
-		t.Fatal("Windows supervisor did not forward console cancellation")
+		t.Fatalf("Windows supervisor did not forward console cancellation: %v", err)
 	}
 }
 
@@ -247,6 +254,18 @@ func TestWindowsCLIChild(t *testing.T) {
 	mode, dir := os.Args[index+1], os.Args[index+2]
 	switch mode {
 	case "console supervisor":
+		// exec.Command fills STARTF_USESTDHANDLES with NUL/pipe handles on a
+		// redirected runner. Own real console handles, and clear the inherited
+		// CTRL_C-ignore attribute before testing the supervisor's signal path.
+		console, err := openWindowsConsole()
+		if err != nil {
+			os.Exit(3)
+		}
+		defer console.Close()
+		reset := windows.NewLazySystemDLL("kernel32.dll").NewProc("SetConsoleCtrlHandler")
+		if ok, _, _ := reset.Call(0, 0); ok == 0 {
+			os.Exit(3)
+		}
 		go func() {
 			deadline := time.Now().Add(10 * time.Second)
 			for time.Now().Before(deadline) {
@@ -259,7 +278,7 @@ func TestWindowsCLIChild(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}()
-		c := command{in: os.Stdin, out: io.Discard, errOut: io.Discard}
+		c := command{in: console.(*controllingConsole).input, out: io.Discard, errOut: io.Discard}
 		status := c.runChild(windowsCLIArgs("console child", dir), os.Environ(), nil)
 		if _, err := os.Stat(filepath.Join(dir, "console caught")); err != nil || status != 130 {
 			os.Exit(2)
@@ -280,6 +299,22 @@ func TestWindowsCLIChild(t *testing.T) {
 		case <-time.After(10 * time.Second):
 			os.Exit(2)
 		}
+	case "template pipe drain":
+		childArgs := windowsCLIArgs("descendant", dir)
+		child := exec.Command(childArgs[0], childArgs[1:]...)
+		child.Stdout, child.Stderr = os.Stdout, os.Stderr
+		if child.Start() != nil {
+			os.Exit(2)
+		}
+		fallthrough
+	case "template filter", "template missing placeholder", "template unselected key", "template exec", "template oversize", "template directory":
+		value, err := os.ReadFile(os.Getenv("SECRET_TEMPLATE_FILE"))
+		if err != nil {
+			os.Exit(2)
+		}
+		os.Stdout.Write(value)
+		clear(value)
+		os.Exit(0)
 	case "emit utf16":
 		var value []byte
 		for _, unit := range utf16.Encode([]rune(os.Getenv("TOKEN"))) {

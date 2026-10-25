@@ -128,9 +128,6 @@ func TestAgeCommandsTerminalGate(t *testing.T) {
 			t.Fatal("nonterminal init")
 		}
 		want := secure.ErrTerminalRequired
-		if runtime.GOOS == "windows" {
-			want = secure.ErrUnsupported
-		}
 		if diagnostic.String() != "secret: "+want.Error()+"\n" {
 			t.Fatal("terminal gate ordering")
 		}

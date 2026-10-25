@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -77,6 +78,11 @@ func main() {
 		err = errors.New("invalid fixture mode")
 	}
 	if err != nil {
+		if req.Mode == "console" || req.Mode == "get" {
+			// Console errors contain fixed stage names only, never captured
+			// output, native error text, request data or synthetic values.
+			_, _ = fmt.Fprintln(os.Stderr, err)
+		}
 		fail()
 	}
 	defer secure.Clear(got.Output)
@@ -90,9 +96,16 @@ func fail() {
 	os.Exit(1)
 }
 
+// ConPTY is a rendered screen stream, not a byte-for-byte WriteConsole log.
+// Its VT renderer may move the cursor rather than emit trailing blank cells.
+func consolePromptSeen(output []byte, prompt string) bool {
+	marker := strings.TrimRight(prompt, " \t\r\n")
+	return marker != "" && bytes.Contains(output, []byte(marker))
+}
+
 func console(req request) (result, error) {
 	failure := errors.New("disposable console failed")
-	if !filepath.IsAbs(req.Executable) || (req.Mode != "get" && req.Prompt == "") || len(req.Value) == 0 || bytes.ContainsAny(req.Value, "\r\n\x00") {
+	if !filepath.IsAbs(req.Executable) || (req.Mode != "get" && strings.TrimSpace(req.Prompt) == "") || len(req.Value) == 0 || bytes.ContainsAny(req.Value, "\r\n\x00") {
 		return result{}, failure
 	}
 	input, inputWrite, err := os.Pipe()
@@ -155,8 +168,9 @@ func console(req request) (result, error) {
 	startup := windows.StartupInfoEx{}
 	startup.Cb = uint32(unsafe.Sizeof(startup))
 	startup.ProcThreadAttributeList = attributes.List()
-	// Null standard handles bind the child to the pseudoconsole; otherwise a
-	// harness with redirected stdio can leak its pipes into the operator child.
+	// STARTF_USESTDHANDLES with null handles suppresses the redirected host
+	// handle copies. ConPTY initializes the child console handles instead.
+	// Do not pass the host's pipes or loosen the product's terminal gate.
 	startup.StartupInfo.Flags |= windows.STARTF_USESTDHANDLES
 	application, err := windows.UTF16PtrFromString(req.Executable)
 	if err != nil {
@@ -168,7 +182,7 @@ func console(req request) (result, error) {
 	}
 	var process windows.ProcessInformation
 	if windows.CreateProcess(application, &line[0], nil, nil, false, windows.EXTENDED_STARTUPINFO_PRESENT, nil, nil, &startup.StartupInfo, &process) != nil {
-		return result{}, failure
+		return result{}, errors.New("disposable console process creation failed")
 	}
 	windows.CloseHandle(process.Thread)
 	defer windows.CloseHandle(process.Process)
@@ -179,13 +193,16 @@ func console(req request) (result, error) {
 		deadline := time.Now().Add(20 * time.Second)
 		for {
 			mu.Lock()
-			found := bytes.Contains(captured.Bytes(), []byte(req.Prompt))
+			found := consolePromptSeen(captured.Bytes(), req.Prompt)
 			mu.Unlock()
 			if found {
 				break
 			}
+			if status, err := windows.WaitForSingleObject(process.Process, 0); err != nil || status == windows.WAIT_OBJECT_0 {
+				return result{}, errors.New("disposable console exited before prompt")
+			}
 			if time.Now().After(deadline) {
-				return result{}, failure
+				return result{}, errors.New("disposable console prompt wait failed")
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -199,7 +216,7 @@ func console(req request) (result, error) {
 	status, err := windows.WaitForSingleObject(process.Process, 20000)
 	var code uint32
 	if err != nil || status != windows.WAIT_OBJECT_0 || windows.GetExitCodeProcess(process.Process, &code) != nil {
-		return result{}, failure
+		return result{}, errors.New("disposable console process wait failed")
 	}
 	// The process is gone; close the console while its output is still drained.
 	windows.ClosePseudoConsole(terminal)
@@ -214,7 +231,7 @@ func console(req request) (result, error) {
 		// A human-terminal get intentionally returns a value. Validate it privately
 		// against stdin-supplied bytes, then clear it without returning a transcript.
 		if code != 0 || bytes.Count(captured.Bytes(), req.Value) != 1 {
-			return result{}, failure
+			return result{}, errors.New("disposable console get verification failed")
 		}
 		return result{Code: code}, nil
 	}

@@ -420,6 +420,22 @@ Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks miss
 
 Status: in progress (owner-approved 2026-10-25; plan docs/design/m5a-plan.md). Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
 
+Native CLI/feature follow-up corrects pre-M5a refusal expectations, private
+fixtures, audit retention and lifecycle consent assertions. ConPTY fixtures
+suppress redirected standard-handle copies and do not require trailing blank
+screen cells to appear literally in VT output. Native cancellation owns its
+console input and explicitly enables CTRL_C processing; descendant checks retain
+live process handles, not socket EOF or reopened post-exit PIDs. Fixed fixture
+failure stages expose startup versus prompt/wait failures without transcripts.
+Cross-checks are not native runtime evidence; the hosted gate remains pending.
+
+The 4c7fbbf native hook follow-up retains both legacy physical traversal and native
+alias proofs at file-tool boundaries, including Go 1.26 junction metadata. Grep
+names-only directory and file-symlink exceptions no longer depend on ancestor
+8.3 spellings or bypass native opaque-root denials. Git identity regressions use
+the native file-write API; the development shim test disables VCS stamping after
+replacing HOME. Native Windows confirmation remains required.
+
 Step 2 storage integration is implemented locally: handle-checked owner-only
 protected DACLs now cover production locks/tokens, reads, scratch, replacement
 files, v1 manifests, recovery and file mutations. Native path validation and

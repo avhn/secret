@@ -5,6 +5,7 @@ package feature
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,8 +117,13 @@ func TestWindowsPrivateAudit(t *testing.T) {
 		}
 	}
 	result, err := log.Query(AuditQuery{})
-	if err != nil || len(result.Events) == 0 || len(result.Events) > 6 {
-		t.Fatal("private audit rotation/query failed")
+	encoded, encodeErr := json.Marshal(event)
+	// Retention is bounded by bytes, not a fixed count borrowed from a
+	// differently sized provider reference. Include each JSONL newline.
+	perFile := log.config.MaxBytes / (len(encoded) + 1)
+	want := min(8, perFile*log.config.MaxFiles)
+	if encodeErr != nil || err != nil || len(result.Events) != want {
+		t.Fatalf("private audit rotation/query failed: %v, got %d events, want %d", err, len(result.Events), want)
 	}
 	assertWindowsPrivate(t, dir)
 	entries, err := os.ReadDir(dir)
@@ -159,8 +165,12 @@ func TestWindowsOperatorPrivateWorkflows(t *testing.T) {
 	if _, err := operator.Import(context.Background(), request); err != secure.ErrConsent || provider.gets+provider.puts+provider.deletes != 0 {
 		t.Fatal("decline reached provider")
 	}
+	wantTarget, wantKey, wantNewKey := request.Target, "TOKEN", ""
+	wantAction := store.ActionImport
+	confirmations := 0
 	operator.Confirm = func(result OperatorResult) error {
-		if len(result.Records) != 1 || result.Records[0].Key != "TOKEN" {
+		confirmations++
+		if result.Action != wantAction || result.Target != wantTarget || len(result.Records) != 1 || result.Records[0].Key != wantKey || result.Records[0].NewKey != wantNewKey {
 			t.Fatal("consent omitted exact identity")
 		}
 		return nil
@@ -170,12 +180,15 @@ func TestWindowsOperatorPrivateWorkflows(t *testing.T) {
 	}
 	path, _ := store.ManifestPath(dir, "wincred:synthetic")
 	assertWindowsPrivate(t, path)
+	wantAction = store.ActionRotate
 	if _, err := operator.Lifecycle(LifecycleRequest{Action: store.ActionRotate, Reference: "wincred:synthetic", Key: "TOKEN"}, func() ([]byte, error) { return []byte("synthetic-rotated"), nil }); err != nil {
 		t.Fatal(err)
 	}
+	wantAction, wantNewKey = store.ActionRename, "RENAMED"
 	if _, err := operator.Lifecycle(LifecycleRequest{Action: store.ActionRename, Reference: "wincred:synthetic", Key: "TOKEN", NewKey: "RENAMED"}, nil); err != nil {
 		t.Fatal(err)
 	}
+	wantAction, wantKey, wantNewKey = store.ActionDelete, "RENAMED", ""
 	if _, err := operator.Lifecycle(LifecycleRequest{Action: store.ActionDelete, Reference: "wincred:synthetic", Key: "RENAMED"}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -184,10 +197,14 @@ func TestWindowsOperatorPrivateWorkflows(t *testing.T) {
 	}
 	// The same hidden-input lifecycle goes through private file transactions.
 	file := "file:" + source
+	wantAction, wantTarget, wantKey = store.ActionRotate, file, "TOKEN"
 	if _, err := operator.Lifecycle(LifecycleRequest{Action: store.ActionRotate, Reference: file, Key: "TOKEN"}, func() ([]byte, error) { return []byte("synthetic-file-rotation"), nil }); err != nil {
 		t.Fatal(err)
 	}
 	assertWindowsPrivate(t, source)
+	if confirmations != 5 {
+		t.Fatal("operator skipped exact consent")
+	}
 	for _, value := range provider.reads {
 		if !bytes.Equal(value, make([]byte, len(value))) {
 			t.Fatal("operator retained provider bytes")

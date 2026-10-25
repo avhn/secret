@@ -12,6 +12,7 @@ import (
 	"github.com/avhn/secret/internal/feature"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func TestChildEnvironment(t *testing.T) {
@@ -80,7 +81,7 @@ func TestChildEnvironmentFilePrecedence(t *testing.T) {
 
 func syntheticTemplateHome(t *testing.T) string {
 	t.Helper()
-	home, err := filepath.EvalSymlinks(t.TempDir())
+	home, err := filepath.EvalSymlinks(testutil.TempDir(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +154,7 @@ func TestLaunchTemplateFailures(t *testing.T) {
 			t.Setenv("SECRETS_DIR", filepath.Join(home, "overridden"))
 			storePath := filepath.Join(home, "synthetic.store")
 			templatePath := filepath.Join(home, "synthetic.tmpl")
-			if err := os.WriteFile(storePath, []byte("A=synthetic-selected\nB=synthetic-other\n"), 0600); err != nil {
+			if err := testutil.WriteFile(storePath, []byte("A=synthetic-selected\nB=synthetic-other\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			input := []byte("{{A}}")
@@ -166,7 +167,7 @@ func TestLaunchTemplateFailures(t *testing.T) {
 			if kind == "oversize" {
 				input = bytes.Repeat([]byte("x"), feature.MaxTemplateBytes+1)
 			}
-			if err := os.WriteFile(templatePath, input, 0600); err != nil {
+			if err := testutil.WriteFile(templatePath, input, 0600); err != nil {
 				t.Fatal(err)
 			}
 			if kind == "directory" {
@@ -183,6 +184,7 @@ func TestLaunchTemplateFailures(t *testing.T) {
 			if kind == "pipe drain" {
 				child = []string{"sh", "-c", `sleep 10 & cat "$SECRET_TEMPLATE_FILE"`}
 			}
+			child = templateFailureChild(kind, home, child)
 			args := []string{mode, "-f", "file:" + storePath, "--key", "A", "--template-file", templatePath, "--"}
 			var out, errOut bytes.Buffer
 			var output interface{ Write([]byte) (int, error) } = &out
@@ -199,9 +201,6 @@ func TestLaunchTemplateFailures(t *testing.T) {
 			entries, err := os.ReadDir(filepath.Join(home, ".secrets", ".rendered"))
 			if err != nil && !errors.Is(err, os.ErrNotExist) || len(entries) != 0 {
 				t.Fatal("failure left a rendered payload")
-			}
-			if runtime.GOOS == "windows" && !strings.Contains(errOut.String(), "unsupported on Windows") {
-				t.Fatal("Windows did not refuse early")
 			}
 		})
 	}

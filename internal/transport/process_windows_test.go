@@ -235,7 +235,9 @@ func TestWindowsProcessIncompatibleEnclosingJob(t *testing.T) {
 	dir := t.TempDir()
 	args := windowsFixtureArgs("restricted parent", dir)
 	if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
-		t.Fatal("incompatible enclosing Job fixture failed")
+		// Exit 3 means the enclosing Job premise could not be established;
+		// exit 2 means the launch was not refused with ErrWindowsProcess.
+		t.Fatalf("incompatible enclosing Job fixture failed: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "child.pid")); !os.IsNotExist(err) {
 		t.Fatal("incompatible Job launched a child outside containment")

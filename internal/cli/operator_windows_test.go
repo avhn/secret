@@ -69,6 +69,9 @@ func testWindowsConsole(t *testing.T, mode string) {
 	startup := windows.StartupInfoEx{}
 	startup.Cb = uint32(unsafe.Sizeof(startup))
 	startup.ProcThreadAttributeList = attributes.List()
+	// Prevent the redirected runner's standard handles from being copied into
+	// the child. Null handles let ConPTY initialize its own console handles.
+	startup.Flags = windows.STARTF_USESTDHANDLES
 	args := []string{os.Args[0], "-test.run=^TestWindowsConsoleHelper$", "-test.v", "--", mode, t.TempDir()}
 	line, err := windows.UTF16FromString(windows.ComposeCommandLine(args))
 	if err != nil {
@@ -156,7 +159,7 @@ func testWindowsConsole(t *testing.T, mode string) {
 	case "success", "cancel confirmation", "cancel value":
 		waitFor("input hidden")
 		// The final prompt proves mode setup completed before synthetic paste.
-		waitFor("> ")
+		waitFor(">")
 		if mode == "cancel confirmation" {
 			write([]byte{3})
 		} else {
@@ -169,12 +172,12 @@ func testWindowsConsole(t *testing.T, mode string) {
 			}
 		}
 	case "paste":
-		waitFor("PASTE> ")
+		waitFor("PASTE>")
 		write(append(bytes.Repeat([]byte{'s'}, 5000), '\r'))
 	case "overflow":
-		waitFor("HIDDEN> ")
+		waitFor("HIDDEN>")
 		write([]byte("123456789\r"))
-		waitFor("NEXT> ")
+		waitFor("NEXT>")
 		write([]byte("next\r"))
 	}
 	waitFor("WINDOWS_CONSOLE_OK")
@@ -294,6 +297,10 @@ func TestWindowsConsoleHelper(t *testing.T) {
 		}
 		assertMode()
 	case "console event":
+		reset := windows.NewLazySystemDLL("kernel32.dll").NewProc("SetConsoleCtrlHandler")
+		if ok, _, _ := reset.Call(0, 0); ok == 0 {
+			t.Fatal("cannot enable disposable console events")
+		}
 		go func() {
 			time.Sleep(200 * time.Millisecond)
 			_ = windows.GenerateConsoleCtrlEvent(windows.CTRL_C_EVENT, 0)
