@@ -2285,6 +2285,16 @@ legacy directory with a dangling symbolic HEAD does not gain a Git role solely
 from a metadata error. Explicit gitdirs, inherited Git roots and alias denials
 remain independently protected. Existing audit expectations are unchanged.
 
+### dangling symbolic HEAD Git-signature gap
+
+Open, cross-platform tightening acknowledged during M5a review, not fixed in
+M5a. Unix `writes.go` `gitConfigTarget` and Windows `nativeGitDirectory` require
+an existing regular HEAD for signature discovery. A legacy directory with a
+dangling symbolic HEAD is therefore not treated as a Git directory by that
+check; a Git config write beneath it relies on other proofs. Explicit gitdirs,
+inherited Git roots and alias denials remain independently protected as noted
+above. This reviewed tightening is deferred, not a changed guard expectation.
+
 ### M5a review: separate Bash policy from native file semantics
 
 Run 40236374785 at 9a35a4a still denied public interpreter source, UV URLs and

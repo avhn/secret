@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass) and M5d (age) are done in the staged Go CLI, M5c (1Password) is scaffolded with dispatch disabled, and M5a (Windows) is in progress. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e stays conditional. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -418,7 +418,12 @@ Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks miss
 
 ## M5a: Windows CLI and Credential Manager
 
-Status: in progress (owner-approved 2026-10-25; plan docs/design/m5a-plan.md). Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
+Status: done (2026-10-26, PR #29; all eleven ci.yml jobs green, including both
+native Windows lanes, in run
+[40246119003](https://github.com/avhn/secret/actions/runs/40246119003) at code head
+`cf44103`; later commits are documentation only) (owner-approved 2026-10-25;
+[binding plan](docs/design/m5a-plan.md)). Estimate: 5-8 days. Goal: native Windows
+CLI and names-only CredMan integration. See [Windows support and limits](docs/windows.md).
 
 The four-failure native follow-up adds descendant-handle waits to successful
 Job shutdown, retaining identities before early Kill calls as well as Close.
@@ -557,6 +562,14 @@ again checks its physical credential witness without a skip. Both-host fixed
 all-shell denial and all native UNC/admin-share/subst/junction/gitdir tests remain.
 Native rerun evidence remains required; local Windows vet/test compilation is not
 runtime evidence. No original audit expectation or inventory row changes.
+
+Open item: **dangling symbolic HEAD Git-signature gap** (cross-platform). Unix
+`writes.go` `gitConfigTarget` and Windows `nativeGitDirectory` require a regular
+HEAD for signature discovery. A legacy directory with a dangling symbolic HEAD
+is not recognized by that signature check, so Git config writes there rely on
+other proofs. Acknowledged during M5a review and deferred as a reviewed
+cross-platform tightening, not fixed in M5a. See the
+[named review entry](docs/design/hook-tightening.md#dangling-symbolic-head-git-signature-gap).
 
 Step 8 is implemented locally, with native evidence pending CI. The unconditional
 windows native cli and credman job builds a fresh CLI and separate test-only

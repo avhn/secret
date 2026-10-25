@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Document staged Windows Go CLI support, wincred manifests and explicit
+  console, Job, ACL, durability and redaction limits in [Windows support](docs/windows.md).
+  Record the cross-platform dangling symbolic HEAD Git-signature gap as deferred.
+  Mark M5a done on hosted run 40246119003 (no native 8.3 short-name evidence);
+  installed Bash defaults and manifests are unchanged, with no host fail-closed
+  claim.
+
 - Accept hidden Windows console characters delivered on the Alt key-up record,
   as Alt+Numpad entry and ConPTY synthesize them for characters outside the
   keyboard layout; other key-up records stay ignored. Previously such characters
