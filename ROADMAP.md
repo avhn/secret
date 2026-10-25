@@ -437,7 +437,7 @@ Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and 
 
 ## M5c: 1Password backend
 
-Status: conditional. Estimate: 3-5 days. Goal: registered item reads without value exposure.
+Status: in progress (owner-approved 2026-10-25; plan docs/design/m5c-plan.md; enabling dispatch needs owner-provisioned provider evidence). Estimate: 3-5 days. Goal: registered item reads without value exposure.
 
 - [ ] feat(backend): add registered item reads with isolated cli and failure assertions
 - [ ] test(onepassword): extend unsupported-write and redaction matrix
