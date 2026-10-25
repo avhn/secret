@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 
-	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/feature"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
@@ -138,6 +139,8 @@ func childEnvironment(ambient []string, selection store.Selection, required, opt
 }
 
 func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, selected map[string][]byte, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 	var selections []store.Selection
 	var owned [][]byte
 	defer func() {
@@ -156,11 +159,7 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 	}()
 	for _, ref := range o.files {
 		if providerRef(ref) {
-			records, e := backend.ListNames(c.dir, ref)
-			if e != nil {
-				return nil, nil, nil, e
-			}
-			p, _, service, e := backend.Dispatch(ref)
+			records, p, service, e := c.openProviderRead(ctx, ref)
 			if e != nil {
 				return nil, nil, nil, e
 			}
@@ -170,6 +169,7 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 			for _, r := range records {
 				v, er := p.Get(service, r.Account)
 				if er != nil {
+					clear(v)
 					return nil, nil, nil, errors.New("backend lookup failed")
 				}
 				owned = append(owned, v)

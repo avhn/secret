@@ -89,6 +89,8 @@ func (c command) jsonDocument(document any) int {
 
 func (c command) featureCommand(sub string, args []string) (int, bool) {
 	switch sub {
+	case "register":
+		return c.register(args), true
 	case "import", "export", "rename", "rotate", "delete":
 		return c.operate(sub, args), true
 	case "diff":
@@ -357,6 +359,9 @@ func recordOperatorEvents(sink store.AuditSink, result feature.OperatorResult, o
 }
 
 func (c command) operate(sub string, args []string) int {
+	if err := preflightOnePasswordOperator(args); err != nil {
+		return c.failure(err)
+	}
 	// This gate precedes parsing, path resolution, metadata reads and audit setup.
 	terminal, err := RequireOperatorTerminal(c.in, c.out)
 	if err != nil {

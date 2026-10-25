@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Scaffold the Go-only, read-only 1Password backend behind a disabled source gate.
+  Add the strict names-only v2 container, immutable registration consent, bound
+  fake-op reads, detached bounded subprocesses, exact-byte validation and early
+  read-only preflights. Synthetic metadata, launch/redaction and PTY coverage do
+  not establish real-provider compatibility. Default registration, discovery and
+  reads remain disabled pending pinned provider evidence and licensing review.
+  Bash defaults, hooks and plugin manifests are unchanged.
+
 ## [0.2.3] - 2026-10-24
 
 First published release: reproducible, attested Linux and macOS Go binaries

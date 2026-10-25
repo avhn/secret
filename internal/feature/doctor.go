@@ -75,7 +75,7 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 		}
 	}
 	for _, reference := range options.References {
-		if !validOperatorReference(reference) {
+		if !validOperatorReference(reference) && !(strings.HasPrefix(reference, "onepassword:") && explicitMetadataReference(reference)) {
 			return DoctorReport{}, secure.ErrInvalidRequest
 		}
 	}
@@ -157,6 +157,14 @@ func runDoctor(options DoctorOptions, lookPath func(string) (string, error)) (Do
 		}
 	}
 	for _, reference := range options.References {
+		if strings.HasPrefix(reference, "onepassword:") {
+			if _, err := lookPath("op"); err != nil {
+				add("backend", "onepassword", "unavailable", "provider executable not found; dispatch disabled")
+			} else {
+				add("backend", "onepassword", "present", "executable found only; dispatch disabled pending provider evidence and licensing review")
+			}
+			continue
+		}
 		if strings.HasPrefix(reference, "file:") {
 			doctorPath(strings.TrimPrefix(reference, "file:"), add)
 			continue

@@ -80,7 +80,7 @@ func Complete(request CompletionRequest, metadata []store.Metadata) ([]string, e
 					if item.Backend == "file" && validOperatorReference("file:"+path) {
 						add("dotenv:" + path)
 					}
-				} else if request.Flag != "--to" || item.Backend != "file" {
+				} else if (request.Flag != "--to" || item.Backend != "file") && !(item.Backend == "onepassword" && (request.Flag == "--to" || request.Flag == "--into" || request.Command == "export")) {
 					add(item.Reference)
 				}
 			case "--key", "--optional-key":
@@ -138,7 +138,7 @@ func explicitMetadataReference(reference string) bool {
 	if strings.HasPrefix(reference, "file:") {
 		return absoluteMetadataPath(strings.TrimPrefix(reference, "file:"))
 	}
-	if strings.HasPrefix(reference, "keychain:") || strings.HasPrefix(reference, "libsecret:") {
+	if strings.HasPrefix(reference, "keychain:") || strings.HasPrefix(reference, "libsecret:") || strings.HasPrefix(reference, "onepassword:") {
 		_, err := (store.Locator{}).Resolve(reference)
 		return err == nil
 	}

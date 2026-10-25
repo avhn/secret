@@ -437,12 +437,14 @@ Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and 
 
 ## M5c: 1Password backend
 
-Status: in progress (owner-approved 2026-10-25; plan docs/design/m5c-plan.md; enabling dispatch needs owner-provisioned provider evidence). Estimate: 3-5 days. Goal: registered item reads without value exposure.
+Status: scaffolded, dispatch disabled pending provider evidence and licensing review. Owner-approved scope 2026-10-25; plan docs/design/m5c-plan.md. Estimate: 3-5 days. Goal: registered item reads without value exposure.
 
 - [ ] feat(backend): add registered item reads with isolated cli and failure assertions
 - [ ] test(onepassword): extend unsupported-write and redaction matrix
 
-Gate: fixed-reference read and all-record redaction integration; writes/export only with tested stdin/API transport and exact readback, else read-only.
+Synthetic scaffolding: strict v2 schema/writer, service-account-only fake-op transport, exact registration consent, names-only projections, early read-only rejection and all-record launch/redaction tests. Offline native CI includes a controlling-PTY parent assertion. The required-provider test skips unless explicitly required, then fails while evidence is unavailable.
+
+Gate: named licensing review, sanitized whoami identity evidence from a pinned CLI v2 release (2.18.0 or later), owner-provisioned isolated synthetic-vault integration and green applicable hosted CI before activation or M5c completion. No real op was exercised. Writes/export and session auth remain out of scope. See docs/onepassword.md.
 
 ## M5d: age store
 

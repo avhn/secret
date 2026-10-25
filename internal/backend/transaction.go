@@ -46,6 +46,9 @@ func (transaction Transaction) Apply(mutations []store.Mutation) error {
 }
 
 func (transaction Transaction) apply(mutations []store.Mutation, steps transactionSteps) error {
+	if err := ReadOnlyReference(transaction.Reference); err != nil {
+		return err
+	}
 	if runtime.GOOS == "windows" {
 		return secure.ErrUnsupported
 	}

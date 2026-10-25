@@ -88,17 +88,18 @@ type Transaction interface {
 type OperatorAction string
 
 const (
-	ActionImport OperatorAction = "import"
-	ActionExport OperatorAction = "export"
-	ActionRotate OperatorAction = "rotate"
-	ActionRename OperatorAction = "rename"
-	ActionDelete OperatorAction = "delete"
+	ActionRegister OperatorAction = "register"
+	ActionImport   OperatorAction = "import"
+	ActionExport   OperatorAction = "export"
+	ActionRotate   OperatorAction = "rotate"
+	ActionRename   OperatorAction = "rename"
+	ActionDelete   OperatorAction = "delete"
 )
 
-// Valid reports whether the action is an M3 consent-gated operator.
+// Valid reports whether the action is an allowlisted consent-gated action.
 func (action OperatorAction) Valid() bool {
 	switch action {
-	case ActionImport, ActionExport, ActionRotate, ActionRename, ActionDelete:
+	case ActionRegister, ActionImport, ActionExport, ActionRotate, ActionRename, ActionDelete:
 		return true
 	}
 	return false

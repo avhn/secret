@@ -400,3 +400,17 @@ context, including symlink resolution. Repeated `fd --extension` filters are
 alternatives, not a way to replace an earlier sensitive extension. Ripgrep's
 JSON output remains a content mode even when combined with a count option;
 the names/count exemption is not a general exemption for content printers.
+
+## Inactive 1Password scaffolding
+
+The Go 1Password source gate remains disabled pending licensing review and real
+provider evidence. Fake-op tests are synthetic, not authentication or provider
+compatibility evidence. Registration stores only immutable coordinates and local
+random IDs, never tokens or values. Reads use detached bounded subprocesses and
+reject non-exact stash-compatible bytes; they cover only registered fields, not
+an entire vault. Service-account tokens would remain inherited environment data,
+including in launched children, and are not added to the literal redaction set.
+A trusted PATH is required. Values can change between separate field reads.
+Best-effort byte clearing does not guarantee secure erasure, and unfiltered exec
+remains agent-denied. No installed-hook or host fail-closed claim follows from
+these tests. See [1Password limitations](docs/onepassword.md).

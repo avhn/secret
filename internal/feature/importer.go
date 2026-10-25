@@ -13,6 +13,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 )
@@ -72,6 +73,9 @@ func validImportField(kind, field string) bool {
 }
 
 func validateImportRequest(request ImportRequest) (string, string, error) {
+	if err := backend.ReadOnlyReference(request.Target); err != nil {
+		return "", "", err
+	}
 	kind, item, ok := strings.Cut(request.Source, ":")
 	if !ok || !validOperatorReference(request.Target) || store.ValidateIdentity("KEY", request.Labels) != nil || len(request.Mappings) > maxOperatorRecords {
 		return "", "", secure.ErrInvalidRequest
@@ -99,6 +103,9 @@ func validateImportRequest(request ImportRequest) (string, string, error) {
 }
 
 func (operator Operator) importPlan(request ImportRequest) (OperatorResult, []store.Mutation, error) {
+	if err := backend.ReadOnlyReference(request.Target); err != nil {
+		return OperatorResult{}, nil, err
+	}
 	if err := operator.validate(); err != nil {
 		return OperatorResult{}, nil, err
 	}

@@ -265,3 +265,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR guidance and
 ## License
 
 [GPL-3.0-or-later](LICENSE), copyright Mert Dede.
+
+### 1Password scaffolding (inactive)
+
+The staged Go implementation includes test-only read-only 1Password scaffolding.
+Default registration, discovery and reads are disabled pending isolated provider
+evidence and licensing review. There is no environment switch to enable it.
+The Bash CLI, installed hooks and plugin manifests are unchanged. See
+[the contract and limitations](docs/onepassword.md); do not point the Bash CLI at
+a Go v2 manifest.

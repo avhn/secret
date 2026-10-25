@@ -112,6 +112,9 @@ func Dispatch(ref string) (Provider, string, string, error) { return DispatchWit
 
 // DispatchWith permits explicit test injection, not environment activation.
 func DispatchWith(ref string, provider Provider) (Provider, string, string, error) {
+	if strings.HasPrefix(ref, "onepassword:") {
+		return nil, "", "", ErrUnsupported
+	}
 	backend, name, ok := strings.Cut(ref, ":")
 	if !ok || (backend != "keychain" && backend != "libsecret") {
 		return nil, "", "", store.ErrInvalidKeystoreName
@@ -139,6 +142,17 @@ func DispatchWith(ref string, provider Provider) (Provider, string, string, erro
 
 // ListNames validates the inventory without consulting the provider.
 func ListNames(dir, ref string) ([]store.ManifestRecord, error) {
+	if strings.HasPrefix(ref, "onepassword:") {
+		if !OnePasswordEnabled() {
+			return nil, ErrUnsupported
+		}
+		if _, err := (store.Locator{}).Resolve(ref); err != nil {
+			return nil, err
+		}
+		_, name, _ := strings.Cut(ref, ":")
+		records, err := store.ReadManifestV2(filepath.Join(dir, name+".onepassword-keys"), "onepassword")
+		return store.ProjectManifestV2(records), err
+	}
 	_, backend, _, err := Dispatch(ref)
 	if err != nil {
 		return nil, err
@@ -155,6 +169,9 @@ func Stash(dir, ref, key string, labels map[string]string, value []byte, provide
 
 // stashWithPublish injects only the publish step for failure-path tests.
 func stashWithPublish(dir, ref, key string, labels map[string]string, value []byte, provider Provider, publish func(string, string, string, map[string]string, string) error) error {
+	if err := ReadOnlyReference(ref); err != nil {
+		return err
+	}
 	normalized, err := store.NormalizeValue(value)
 	if err != nil {
 		return err

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
 )
@@ -81,9 +82,15 @@ var (
 // ReadMetadata accepts a resolved file path, file:PATH, keychain:NAME or
 // libsecret:NAME. Directory is the explicit manifest directory, never discovered
 // from ambient provider configuration. Provider records come only from manifests;
-// this package has no provider dependency. File bytes are cleared after parsing.
+// these reads never invoke a value provider. File bytes are cleared after parsing.
 // Parser warnings are names-only and omitted here; legacy text show remains separate.
 func ReadMetadata(reference, directory string) (store.Metadata, error) {
+	if strings.HasPrefix(reference, "onepassword:") {
+		if !backend.OnePasswordEnabled() {
+			return store.Metadata{}, secure.ErrUnsupported
+		}
+		return readOnePasswordMetadata(reference, directory)
+	}
 	result := store.Metadata{Version: store.MetadataVersion, Reference: reference, Backend: "file", Records: make([]store.MetadataRecord, 0)}
 	if strings.HasPrefix(reference, "keychain:") || strings.HasPrefix(reference, "libsecret:") {
 		if _, err := (store.Locator{}).Resolve(reference); err != nil {
@@ -279,7 +286,7 @@ func validateMetadataSelectors(selectors store.Selectors) error {
 }
 
 func validateMetadata(metadata store.Metadata) error {
-	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "keychain" && metadata.Backend != "libsecret") {
+	if metadata.Version != store.MetadataVersion || (metadata.Backend != "file" && metadata.Backend != "keychain" && metadata.Backend != "libsecret" && metadata.Backend != "onepassword") {
 		return ErrMetadata
 	}
 	if metadata.Reference == "" {

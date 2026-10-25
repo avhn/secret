@@ -208,3 +208,19 @@ Core M0-M4 plus M6 implementation estimate (M4.1 host evidence wait and cutover 
 3. Confirm whether operator audit should be strictly opt-in and whether local names/labels/path metadata may be exposed through MCP and JSON to agent tools. Recommended: audit off, MCP disabled until explicitly configured, names-only JSON allowed.
 
 Main technical risks: mvdan parser differences from host Bash/zsh and dynamic word expansion; an rg exclusion certification accidentally widened by flags; TOCTOU in path checks; Go GC and `os/exec` value copies; child descendants or closed output consumers; keystore put/manifest orphaning; plugin download bootstrap and Codex hook re-trust; Windows shell host/workdir envelope gaps. Mitigate with curated differential tests, conservative uncertain decisions, bounded scans, fault injection, isolated real-provider CI and a retained Bash rollback, not with sandbox claims.
+
+### M5c inactive implementation boundary
+
+The read-only 1Password scaffolding uses `NAME.onepassword-keys` and the frozen
+`secret-manifest-v2` JSON-lines container, never v1 account-field overloading or
+automatic migration. The metadata `account` field remains the random local record
+ID, not the 1Password account UUID. Registration, discovery and reads stay behind
+a disabled source gate; no environment variable, secretstub build or injected
+DispatchWith provider enables them. Service-account authentication only is in
+scope. Detached fake-op reads and composed CLI launch/redaction tests provide
+synthetic evidence only. The candidate whoami `account_uuid` fixture is synthetic,
+not proof of a pinned real CLI schema. A named licensing review, sanitized pinned
+CLI fixture and owner-provisioned isolated provider integration remain mandatory
+before activation or completion. Session auth and all provider writes/export are
+deferred. The installed Bash CLI, guard and manifests remain unchanged. See
+[the M5c plan](m5c-plan.md) and [1Password contract](../onepassword.md).

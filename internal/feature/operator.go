@@ -245,7 +245,7 @@ func (operator Operator) confirm(result OperatorResult) error {
 
 func operatorError(err error) error {
 	switch err {
-	case nil, secure.ErrInvalidRequest, secure.ErrUnsupported, secure.ErrConflict, secure.ErrNotFound, secure.ErrRecovery, secure.ErrConsent, secure.ErrInput:
+	case nil, backend.ErrReadOnly, secure.ErrInvalidRequest, secure.ErrUnsupported, secure.ErrConflict, secure.ErrNotFound, secure.ErrRecovery, secure.ErrConsent, secure.ErrInput:
 		return err
 	default:
 		return secure.ErrTransaction
@@ -253,6 +253,11 @@ func operatorError(err error) error {
 }
 
 func (operator Operator) exportPlan(request ExportRequest) (OperatorResult, []store.Mutation, []store.MetadataRecord, error) {
+	for _, ref := range []string{request.Source, request.Target} {
+		if err := backend.ReadOnlyReference(ref); err != nil {
+			return OperatorResult{}, nil, nil, err
+		}
+	}
 	if err := operator.validate(); err != nil {
 		return OperatorResult{}, nil, nil, err
 	}
@@ -404,6 +409,9 @@ func (operator Operator) Export(ctx context.Context, request ExportRequest) (Ope
 }
 
 func (operator Operator) lifecyclePlan(request LifecycleRequest) (OperatorResult, []store.Mutation, error) {
+	if err := backend.ReadOnlyReference(request.Reference); err != nil {
+		return OperatorResult{}, nil, err
+	}
 	if err := operator.validate(); err != nil {
 		return OperatorResult{}, nil, err
 	}

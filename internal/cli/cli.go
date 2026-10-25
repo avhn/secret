@@ -3,6 +3,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,9 @@ type command struct {
 	out, errOut io.Writer
 	dir         string
 	loc         store.Locator
+	openRead    func(context.Context, string, string) ([]store.ManifestRecord, backend.Provider, string, error)
+	// Explicit package-test injection only, never set by Main or the environment.
+	onePasswordTest bool
 }
 
 func (c command) fail(message string, status int) int {
@@ -100,7 +104,7 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 			return c.fail("get is human-terminal-only; use show or run instead", 1)
 		}
 	case "list", "show", "stash", "clip", "run", "exec",
-		"import", "export", "rename", "rotate", "delete", "diff", "doctor", "completion", "audit", "mcp":
+		"register", "import", "export", "rename", "rotate", "delete", "diff", "doctor", "completion", "audit", "mcp":
 	default:
 		return c.fail("unknown subcommand; use secret help", 1)
 	}
@@ -183,6 +187,9 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 		}
 		ref, er := c.loc.Resolve(rest[0])
 		if er != nil {
+			return c.failure(er)
+		}
+		if er = backend.ReadOnlyReference(ref); er != nil {
 			return c.failure(er)
 		}
 		value, er := c.input(rest[1])
@@ -279,7 +286,7 @@ func selectors(args []string) (store.Selectors, []string, error) {
 	return s, args[i:], nil
 }
 func providerRef(ref string) bool {
-	return strings.HasPrefix(ref, "keychain:") || strings.HasPrefix(ref, "libsecret:")
+	return strings.HasPrefix(ref, "keychain:") || strings.HasPrefix(ref, "libsecret:") || strings.HasPrefix(ref, "onepassword:")
 }
 func (c command) defaults() ([]string, error) {
 	var refs []string
@@ -312,6 +319,22 @@ func (c command) defaults() ([]string, error) {
 			return nil, er
 		}
 		refs = append(refs, ref)
+	}
+	if backend.OnePasswordEnabled() || c.onePasswordTest {
+		names, err := filepath.Glob(filepath.Join(c.dir, "*.onepassword-keys"))
+		if err != nil {
+			return nil, err
+		}
+		for _, path := range names {
+			if _, err := store.ReadManifestV2(path, "onepassword"); err != nil {
+				return nil, err
+			}
+			ref := "onepassword:" + strings.TrimSuffix(filepath.Base(path), ".onepassword-keys")
+			if _, err := c.loc.Resolve(ref); err != nil {
+				return nil, err
+			}
+			refs = append(refs, ref)
+		}
 	}
 	files, e := c.loc.Defaults()
 	if e != nil {
@@ -413,7 +436,9 @@ func (c command) show(ref string, sel store.Selectors) ([]string, error) {
 }
 func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
 	if providerRef(ref) {
-		records, e := backend.ListNames(c.dir, ref)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		records, p, service, e := c.openProviderRead(ctx, ref)
 		if e != nil {
 			return nil, e
 		}
@@ -424,12 +449,9 @@ func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
 		if r == nil {
 			return nil, errors.New("key is not set")
 		}
-		p, _, service, e := backend.Dispatch(ref)
-		if e != nil {
-			return nil, e
-		}
 		value, e := p.Get(service, r.Account)
 		if e != nil {
+			clear(value)
 			return nil, errors.New("backend lookup failed")
 		}
 		return value, nil

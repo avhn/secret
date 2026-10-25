@@ -207,7 +207,7 @@ func safeOperatorName(name string) bool {
 }
 
 func operatorChallenge(request OperatorRequest) ([]byte, error) {
-	if !request.Action.Valid() || !safeOperatorName(request.Target) || len(request.Keys) == 0 || len(request.Keys) > 1024 || (request.Source != "" && !safeOperatorName(request.Source)) {
+	if request.Action == store.ActionRegister || !request.Action.Valid() || !safeOperatorName(request.Target) || len(request.Keys) == 0 || len(request.Keys) > 1024 || (request.Source != "" && !safeOperatorName(request.Source)) {
 		return nil, secure.ErrInvalidRequest
 	}
 	if strings.HasPrefix(request.Target, "file:") {

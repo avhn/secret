@@ -208,6 +208,9 @@ func validAuditEvent(event store.AuditEvent) bool {
 	if event.Version != store.MetadataVersion || event.Time.IsZero() || !event.Action.Valid() || !validAuditOutcome(event.Outcome) || !explicitMetadataReference(event.Target) || len(event.Keys) == 0 || len(event.Keys) > 1024 || len(event.Labels) > 128 || store.ValidateIdentity("KEY", event.Labels) != nil {
 		return false
 	}
+	if event.Action == store.ActionRegister && (!strings.HasPrefix(event.Target, "onepassword:") || event.Source != "" || len(event.Keys) != 1) {
+		return false
+	}
 	if event.Source != "" && !explicitMetadataReference(event.Source) {
 		if event.Action != store.ActionImport || !validAuditImportSource(event.Source) {
 			return false
