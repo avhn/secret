@@ -91,13 +91,15 @@ func WindowsExecutable(name string, env []string) (string, error) {
 // Wait reports the full native uint32 exit code as int on supported Windows amd64.
 // Close must complete before a caller removes any child-visible private payload.
 type WindowsProcess struct {
-	mu     sync.Mutex
-	job    windows.Handle
-	handle windows.Handle // Retain process identity until Job cleanup and forwarding finish.
-	pid    uint32
-	done   chan struct{}
-	status int
-	err    error
+	mu        sync.Mutex
+	members   map[uint32]windows.Handle // Pin descendant identities before initiating termination.
+	memberErr error
+	job       windows.Handle
+	handle    windows.Handle // Retain process identity until Job cleanup and forwarding finish.
+	pid       uint32
+	done      chan struct{}
+	status    int
+	err       error
 }
 
 func StartWindowsProcess(args, env []string, stdin, stdout, stderr *os.File) (*WindowsProcess, error) {
@@ -219,10 +221,56 @@ func (process *WindowsProcess) Wait() (int, error) {
 	return process.status, process.err
 }
 
+// retainMembers runs under mu before each termination request, including Kill
+// calls made by the stream supervisor before Close. Job accounting reaching zero
+// is not a wait on each descendant's process object. Retain those identities so
+// Close also waits for native termination, not just the accounting transition.
+func (process *WindowsProcess) retainMembers(deadline time.Time) {
+	// JOBOBJECT_BASIC_PROCESS_ID_LIST has two DWORDs followed by ULONG_PTRs.
+	// Grow on ERROR_MORE_DATA: the Job may gain members during enumeration.
+	type header struct{ assigned, count uint32 }
+	words := int(unsafe.Sizeof(header{}) / unsafe.Sizeof(uintptr(0)))
+	buffer := make([]uintptr, words+64)
+	var ids []uintptr
+	for {
+		list := (*header)(unsafe.Pointer(&buffer[0]))
+		err := windows.QueryInformationJobObject(process.job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&buffer[0])), uint32(len(buffer))*uint32(unsafe.Sizeof(buffer[0])), nil)
+		if err == nil && int(list.count) <= len(buffer)-words && list.assigned <= list.count {
+			ids = buffer[words : words+int(list.count)]
+			break
+		}
+		if err != nil && err != windows.ERROR_MORE_DATA || !time.Now().Before(deadline) {
+			process.memberErr = ErrWindowsProcess
+			return
+		}
+		buffer = make([]uintptr, words+max(int(list.assigned), 2*(len(buffer)-words)))
+	}
+	if process.members == nil {
+		process.members = make(map[uint32]windows.Handle)
+	}
+	for _, id := range ids {
+		pid := uint32(id)
+		if pid == process.pid || process.members[pid] != 0 {
+			continue
+		}
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE, false, pid)
+		if err == windows.ERROR_INVALID_PARAMETER {
+			// The process object has already gone away, so termination completed.
+			continue
+		}
+		if err != nil {
+			process.memberErr = ErrWindowsProcess
+			continue
+		}
+		process.members[pid] = handle
+	}
+}
+
 func (process *WindowsProcess) Kill() {
 	process.mu.Lock()
 	defer process.mu.Unlock()
 	if process.job != 0 {
+		process.retainMembers(time.Now().Add(2 * time.Second))
 		_ = windows.TerminateJobObject(process.job, 1)
 	}
 }
@@ -247,6 +295,10 @@ func (process *WindowsProcess) Close() error {
 	defer func() {
 		windows.CloseHandle(process.job)
 		process.job = 0
+		for _, handle := range process.members {
+			windows.CloseHandle(handle)
+		}
+		process.members = nil
 		// Never close a handle underneath an outstanding native wait. A failed
 		// shutdown still closes the kill-on-close Job immediately; the waiter
 		// releases the process handle when the kernel confirms termination.
@@ -260,11 +312,15 @@ func (process *WindowsProcess) Close() error {
 			}()
 		}
 	}()
+	deadline := time.Now().Add(2 * time.Second)
+	process.retainMembers(deadline)
 	if windows.TerminateJobObject(process.job, 1) != nil {
 		return ErrWindowsProcess
 	}
-	deadline := time.Now().Add(2 * time.Second)
 	for {
+		// Include any member created between the pre-termination snapshot and
+		// the kernel making the Job terminating (which blocks new enrollment).
+		process.retainMembers(deadline)
 		var accounting struct {
 			Times                                                            [4]int64
 			PageFaults, TotalProcesses, ActiveProcesses, TerminatedProcesses uint32
@@ -274,9 +330,19 @@ func (process *WindowsProcess) Close() error {
 			return ErrWindowsProcess
 		}
 		if accounting.ActiveProcesses == 0 {
+			for _, handle := range process.members {
+				remaining := time.Until(deadline)
+				if remaining <= 0 {
+					return ErrWindowsProcess
+				}
+				result, err := windows.WaitForSingleObject(handle, uint32((remaining+time.Millisecond-1)/time.Millisecond))
+				if err != nil || result != windows.WAIT_OBJECT_0 {
+					return ErrWindowsProcess
+				}
+			}
 			select {
 			case <-process.done:
-				return nil
+				return process.memberErr
 			case <-time.After(time.Until(deadline)):
 				return ErrWindowsProcess
 			}

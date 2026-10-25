@@ -196,8 +196,34 @@ func TestWindowsProcessJobContainmentAndHandleList(t *testing.T) {
 	if err := process.Close(); err != nil {
 		t.Fatal(err)
 	}
-	assertWindowsProcessStopped(t, child)
-	assertWindowsProcessStopped(t, grandchild)
+	for _, handle := range []windows.Handle{child, grandchild} {
+		if result, err := windows.WaitForSingleObject(handle, 0); err != nil || result != windows.WAIT_OBJECT_0 {
+			t.Fatal("Close returned before every Job member was signaled")
+		}
+	}
+}
+
+func TestWindowsProcessKillRetainsDescendants(t *testing.T) {
+	dir := t.TempDir()
+	process, err := StartWindowsProcess(windowsFixtureArgs("tree", dir), os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { process.Close() })
+	grandchild := fixtureProcessHandle(t, filepath.Join(dir, "grandchild.pid"))
+	awaitWindowsFixture(t, filepath.Join(dir, "ready"))
+	process.Kill()
+	// The supervisor may call Kill well before Close. Reopening a PID after
+	// termination is not a substitute for retaining the live member identity.
+	if len(process.members) != 1 || process.memberErr != nil {
+		t.Fatal("Kill did not retain the descendant before termination")
+	}
+	if err := process.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if result, err := windows.WaitForSingleObject(grandchild, 0); err != nil || result != windows.WAIT_OBJECT_0 {
+		t.Fatal("Close returned before the previously killed descendant was signaled")
+	}
 }
 
 func TestWindowsProcessParentDeathAtCreationBoundary(t *testing.T) {
@@ -233,7 +259,7 @@ func TestWindowsProcessParentDeathAtCreationBoundary(t *testing.T) {
 
 func TestWindowsProcessIncompatibleEnclosingJob(t *testing.T) {
 	dir := t.TempDir()
-	args := windowsFixtureArgs("restricted parent", dir)
+	args := windowsFixtureArgs("limited parent", dir)
 	if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
 		// Exit 3 means the enclosing Job premise could not be established;
 		// exit 2 means the launch was not refused with ErrWindowsProcess.
@@ -241,6 +267,13 @@ func TestWindowsProcessIncompatibleEnclosingJob(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "child.pid")); !os.IsNotExist(err) {
 		t.Fatal("incompatible Job launched a child outside containment")
+	}
+}
+
+func TestWindowsProcessUIRestrictedEnclosingJob(t *testing.T) {
+	args := windowsFixtureArgs("restricted parent", t.TempDir())
+	if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
+		t.Fatalf("UI-restricted enclosing Job containment failed: %v", err)
 	}
 }
 
@@ -321,8 +354,18 @@ func TestWindowsProcessFixture(t *testing.T) {
 	case "mark":
 		write("child.pid", strconv.Itoa(os.Getpid()))
 		os.Exit(0)
-	case "tree":
+	case "tree", "no breakaway tree":
 		write("child.pid", strconv.Itoa(os.Getpid()))
+		if mode == "no breakaway tree" {
+			args := windowsFixtureArgs("mark", dir)
+			escape := exec.Command(args[0], args[1:]...)
+			escape.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_BREAKAWAY_FROM_JOB}
+			if escape.Start() == nil {
+				escape.Process.Kill()
+				escape.Wait()
+				os.Exit(4)
+			}
+		}
 		if len(args) > 2 {
 			handle, _ := strconv.ParseUint(args[2], 10, 64)
 			_ = windows.SetEvent(windows.Handle(handle))
@@ -352,22 +395,74 @@ func TestWindowsProcessFixture(t *testing.T) {
 			os.Exit(2)
 		}
 		defer process.Close()
-	case "restricted parent":
+	case "restricted parent", "limited parent":
 		job, err := windows.CreateJobObject(nil, nil)
 		if err != nil {
 			os.Exit(3)
 		}
-		var limits windows.JOBOBJECT_BASIC_UI_RESTRICTIONS
-		limits.UIRestrictionsClass = windows.JOB_OBJECT_UILIMIT_HANDLES
-		if _, err := windows.SetInformationJobObject(job, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil || windows.AssignProcessToJobObject(job, windows.CurrentProcess()) != nil {
+		if mode == "restricted parent" {
+			var limits windows.JOBOBJECT_BASIC_UI_RESTRICTIONS
+			limits.UIRestrictionsClass = windows.JOB_OBJECT_UILIMIT_HANDLES
+			if _, err := windows.SetInformationJobObject(job, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
+				os.Exit(3)
+			}
+		} else {
+			// The parent itself consumes the entire active-process allowance.
+			// Unlike a UI restriction, this directly prevents admitting a child.
+			var limits windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+			limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+			limits.BasicLimitInformation.ActiveProcessLimit = 1
+			if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
+				os.Exit(3)
+			}
+		}
+		if windows.AssignProcessToJobObject(job, windows.CurrentProcess()) != nil {
 			os.Exit(3)
 		}
-		process, err := StartWindowsProcess(windowsFixtureArgs("mark", dir), os.Environ(), os.Stdin, os.Stdout, os.Stderr)
-		if process != nil {
-			process.Close()
+		childMode := "mark"
+		if mode == "restricted parent" {
+			childMode = "no breakaway tree"
 		}
-		if err != ErrWindowsProcess {
+		process, err := StartWindowsProcess(windowsFixtureArgs(childMode, dir), os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+		if process == nil {
+			if err != ErrWindowsProcess {
+				os.Exit(2)
+			}
+			os.Exit(0)
+		}
+		if mode == "limited parent" || err != nil {
+			process.Close()
 			os.Exit(2)
+		}
+		// Successful JOB_LIST creation must not be mistaken for an escape.
+		// Prove our exact Job owns both generations and retains all its limits.
+		waitFile("ready")
+		child := fixtureProcessHandle(t, filepath.Join(dir, "child.pid"))
+		grandchild := fixtureProcessHandle(t, filepath.Join(dir, "grandchild.pid"))
+		var members struct {
+			Assigned, Count uint32
+			PIDs            [8]uintptr
+		}
+		var limits windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+		if windows.QueryInformationJobObject(process.job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil) != nil || members.Count != 2 ||
+			windows.QueryInformationJobObject(process.job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits)), nil) != nil || limits.BasicLimitInformation.LimitFlags != windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE {
+			process.Close()
+			os.Exit(2)
+		}
+		if windows.QueryInformationJobObject(job, windows.JobObjectBasicProcessIdList, uintptr(unsafe.Pointer(&members)), uint32(unsafe.Sizeof(members)), nil) != nil || members.Count != 3 {
+			process.Close()
+			os.Exit(2)
+		}
+		// Exercise the early Kill path as well as Close's own termination path.
+		process.Kill()
+		if process.Close() != nil {
+			os.Exit(2)
+		}
+		for _, handle := range []windows.Handle{child, grandchild} {
+			if result, err := windows.WaitForSingleObject(handle, 0); err != nil || result != windows.WAIT_OBJECT_0 {
+				os.Exit(2)
+			}
+			windows.CloseHandle(handle)
 		}
 		os.Exit(0)
 	default:
