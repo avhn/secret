@@ -106,7 +106,7 @@ func TestAgeLaunchLoadsEveryValueAndRejectsTemplate(t *testing.T) {
 	}
 }
 func TestAgeIdentityOptionScope(t *testing.T) {
-	home := filepath.Join(string(filepath.Separator), "synthetic")
+	home := t.TempDir()
 	identity := filepath.Join(home, ".secrets", ".age-keys", "identity")
 	result, got, err := ageIdentityOption([]string{"-f", "age:test", "--age-identity", identity, "--", "child", "--age-identity", "child-data"}, home)
 	if err != nil || got != identity || len(result) != 6 || result[4] != "--age-identity" {
