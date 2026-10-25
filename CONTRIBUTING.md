@@ -66,6 +66,36 @@ still conservatively denies new secret subcommands; do not relax it for tests.
 Hosted PTY/provider results, native OS tests and all prior shell, Bash 3.2,
 inventory, exact hook and race gates are required before calling M3 complete.
 
+## M5d encrypted-store tests
+
+Use Go 1.26.10 with `GOTOOLCHAIN=local`. Review the exact age pin, complete module
+graph, every new license, checksums and reachable vulnerability scan before any
+dependency change. See [the binding M5d plan](docs/design/m5d-plan.md) and
+[age guarantees and recovery](docs/age.md). Core age imports only, never a crypto
+subprocess. Keep plaintext and identity material in owned byte buffers; never
+print it or put it in argv, diagnostics, audit or JSON.
+
+```bash
+go mod verify
+go mod tidy -diff
+go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
+go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
+go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
+python3 -I tests/test-age.py /absolute/fresh/secret-go
+```
+
+Each fuzz invocation runs one target only. The PTY/crash suite builds a test-only
+fixture generator and creates identities independently for every test, writing
+them directly under disposable HOME roots. No private keys belong in corpus
+files or fixtures. Tests cover ciphertext-only persistence, exact consent,
+create-only init, authenticated source selection drift, rekey, private paths,
+full-stream authentication, injected publication failures and killed writers
+whose tokened locks are never stolen. Windows runs codec tests and asserts age
+filesystem rejection before access; native Linux/macOS PTYs remain required.
+Keep all previous Go, race, shell, provider, Bash 3.2 and exact inventory gates.
+M5d is pending hosted CI; do not call it complete from local tests alone.
+
 ## M4 release, launcher and offline host tests
 
 M4 prepares opt-in release tooling; the installed Bash CLI, Claude/Codex hooks

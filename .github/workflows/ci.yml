@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  GOTOOLCHAIN: local
+
 permissions:
   contents: read
 
@@ -169,6 +172,8 @@ jobs:
         run: '"$BASH_BIN" tests/test-launchers.sh'
       - name: Offline 1Password fake-op and detached PTY contract
         run: python3 -I tests/test-onepassword.py
+      - name: Go age terminal and killed-writer integration
+        run: python3 -I tests/test-age.py "$RUNNER_TEMP/secret-go"
       - name: Go operator terminal integration
         run: python3 -I tests/test-operator.py "$RUNNER_TEMP/secret-go"
       - name: Go CLI matrix
@@ -221,6 +226,9 @@ jobs:
       - name: Check gofmt
         shell: bash
         run: test -z "$(gofmt -l .)"
+      - name: Verify module cache
+        shell: bash
+        run: go mod verify
       - name: Vet Go packages
         shell: bash
         run: go vet ./...
@@ -274,6 +282,14 @@ jobs:
         run: |
           for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
             go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
+          done
+      - name: Bounded age fuzzing
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
+          for target in FuzzAgeDecrypt FuzzAgeKeyFiles; do
+            go test ./internal/backend -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
           done
       - name: Check module files
         shell: bash

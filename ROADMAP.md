@@ -455,12 +455,26 @@ Gate: named licensing review, sanitized whoami identity evidence from a pinned C
 
 ## M5d: age store
 
-Status: in progress (owner-approved 2026-10-25; plan docs/design/m5d-plan.md). Estimate: 4-7 days. Goal: opt-in encrypted file storage.
+Status: implemented locally, pending hosted CI (owner-approved 2026-10-25;
+[binding plan](docs/design/m5d-plan.md)). Estimate: 4-7 days. Goal: opt-in encrypted file storage.
 
-- [ ] feat(backend): add opt-in encrypted file store with envelope and crash assertions
-- [ ] test(age): expand fuzz corpus and recipient matrix
+- [ ] build(age): reviewed exact age v1.3.2 pin, checksums, complete graph, permissive licenses and zero reachable vulnerability findings (local evidence recorded; pending CI)
+- [ ] feat(store): bounded envelopes, strict authenticated payload binding and anchored ciphertext publication (local tests; pending CI)
+- [ ] feat(backend): private explicit identities, encryption, stable-account mutation, create-only init and verified rekey (local tests; pending CI)
+- [ ] feat(cli): consent-gated init/rekey, initialized age import destinations, age export sources, authenticated selection-drift rejection and identity-free names-only interfaces (local tests; pending CI)
+- [ ] test(age): per-test keys, recipient/fault/concurrency tests, three bounded fuzz targets, Unix PTY/killed-writer recovery and unchanged inventory gates (pending native hosted Linux/macOS/Windows CI)
 
-Gate: dependency license/security review, no persisted plaintext, atomic recovery and recipient/identity isolation green; otherwise omit.
+Local verification: full Go tests and focused M5d race checks passed. The required
+full internal race run failed unchanged Audit3 cases ar-48 through ar-53;
+the same focused race failure reproduced on original head `56e14b0`. These
+hard-coded `/tmp/audit2/w` fixture expectations remain unresolved, not waived.
+All requested CLI/hook regressions matched the existing inventories. Hosted
+Linux/macOS/Windows evidence is still pending.
+
+Gate: dependency license/security review, no persisted plaintext, atomic recovery
+and recipient/identity isolation green on applicable hosted jobs; otherwise omit.
+See [age usage and limitations](docs/age.md). No Bash/default/plugin activation,
+release authorization, Windows filesystem support or host fail-closed claim.
 
 ## M5e: PowerShell AST
 
