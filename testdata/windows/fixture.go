@@ -155,6 +155,9 @@ func console(req request) (result, error) {
 	startup := windows.StartupInfoEx{}
 	startup.Cb = uint32(unsafe.Sizeof(startup))
 	startup.ProcThreadAttributeList = attributes.List()
+	// Null standard handles bind the child to the pseudoconsole; otherwise a
+	// harness with redirected stdio can leak its pipes into the operator child.
+	startup.StartupInfo.Flags |= windows.STARTF_USESTDHANDLES
 	application, err := windows.UTF16PtrFromString(req.Executable)
 	if err != nil {
 		return result{}, failure

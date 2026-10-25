@@ -99,6 +99,11 @@ func FileConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool
 	if !ValidPath(name) || !ValidPath(cwd) || !ValidPath(workdir) || !ValidPath(home) || !ValidPath(xdg) || !ValidPath(global) {
 		return true
 	}
+	// Keep the component-walk proof: native final paths clean ".." lexically
+	// and would drop a physical parent witness such as link/../root.
+	if ConfigWriteProtected(name, cwd, workdir, home, xdg, global) {
+		return true
+	}
 	name = nativeName(name)
 	if strings.HasPrefix(name, "~") && !strings.HasPrefix(name, "~/") || cwd == "" && !filepath.IsAbs(name) {
 		return true
