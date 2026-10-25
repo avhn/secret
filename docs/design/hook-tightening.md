@@ -2248,7 +2248,7 @@ all retained shell requests to deny.
 | --- | --- | --- |
 | String and argv shell requests | Windows-only tightening | TestWindowsShellRequestsDeny and TestWindowsShellCorpusDeny require fixed denial, including public commands. PowerShell/CMD semantics are not Bash. |
 | Drive-relative/rooted paths, device namespaces, ADS, reserved device components and trimmed suffixes | Windows-only tightening | TestWindowsFileTools, TestWindowsPatchTools and TestWindowsNativeFileAmbiguity deny ambiguous targets before anchoring, stream stripping or missing-name handling. Public ADS is no longer a file-tool allow; legacy StreamBase shell-policy tests remain separate. |
-| Native junction-plus-parent traversal | Binding native semantics | TestWindowsNativeParentTraversal compares the resolver to an actual Win32 open. Bash policy retains its physical link/.. expectations on every platform; only native Windows file/patch tools use lexical cleaning before native reparse traversal. |
+| Native junction-plus-parent traversal | Protected-role preservation | TestWindowsNativeParentTraversal compares the native resolver to an actual Win32 open. File/patch decisions deny if either the legacy physical link/.. proof or native alias proof is protected; lexical Win32 cleaning cannot erase the legacy witness. Go 1.26 irregular directory-reparse metadata participates in the component walk. |
 | Case, separator, reparse, 8.3 and volume/UNC aliases | Protected-role preservation | TestWindowsFileAndPatchAliases, TestWindowsShortFileAndPatchAliases and TestWindowsUNCFileAndPatchAliases pair protected targets and patch moves with public controls. Handle names and file/directory identity retain configured credentials and known home credential directories. Missing suffixes retain their existing ancestor. Dangling reparse points deny rather than borrowing an absent-name exception. |
 
 ### M5a review: local share and Git identity preservation
@@ -2313,8 +2313,9 @@ the legacy component walker restores the .aws/credentials physical witness behin
 awsx/../credentials, so TestGuardDeniedCorpus again requires every variant to deny
 without an exception. TestWindowsLexicalTraversalShellVariantsDeny separately
 retains both hosts' fixed all-shell denial for all eight commands.
-TestWindowsNativeParentTraversal pairs legacy policy denial with the public native
-Win32-open result; TestWindowsPolicyAndFileToolIdentityModes pairs inert Bash data
+TestWindowsNativeParentTraversal retains the public native Win32-open result as a
+resolver witness while requiring file-tool denial from the legacy physical proof;
+TestWindowsPolicyAndFileToolIdentityModes pairs inert Bash data
 with strict native targets and a configured hardlink identity.
 TestWindowsFileSearchIdentityMode retains that identity for native Glob/Grep
 content/count requests while Bash filtered scope keeps its legacy behavior and
@@ -2324,6 +2325,24 @@ confirmation remains required; cross-compilation is not a host-protection claim.
 Aliased known home credential-directory roots also deny explicit Glob/Grep
 requests rather than certifying their descendants from a public share/drive name.
 Public UNC roots/files remain controls; names-only behavior on Unix is unchanged.
+
+The 4c7fbbf native follow-up keeps every file-tool path proof as the union of the
+legacy proof and native identity, including configured paths and tree roots.
+Go 1.26 reports junctions as irregular directory reparse points rather than
+ModeSymlink; the component walker now sends those through Readlink under the
+existing hop/error bounds. Unsupported directory reparses still deny. Git native
+identity assertions call FileConfigWriteProtected, not the deliberately separate
+Bash-policy ConfigWriteProtected helper.
+
+TestWindowsGrepNamesOnlyCredentialRoles retains names-only Grep on an explicitly
+named .aws directory even when an ancestor has a different physical/8.3 spelling.
+Native directory-role checks compare the retained basename role after resolution
+or identity, not the entire raw path. Opaque shares, drives, junctions and directory
+symlinks remain denied. Grep applies native identity inside its existing names-only
+file-symlink exception, not as an unconditional hook precheck. Existing file aliases
+can return names only; content/count, explicit credential files, configured
+identities and dangling aliases remain denied. The existing audit 28 and audit
+envelope expectations are unchanged, and native Windows CI is still required.
 
 FileProtected is the strict file-tool boundary. Protected and StreamBase remain
 shared shell-policy helpers, where an invalid Windows filename can be inert

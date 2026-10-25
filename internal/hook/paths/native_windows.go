@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -34,6 +35,17 @@ func ValidPath(name string) bool {
 
 func nativeName(name string) string { return strings.ReplaceAll(name, `\`, "/") }
 
+// Go reports junctions as irregular directory reparse points, not symlinks.
+// Readlink handles both; unsupported directory reparses remain resolution errors.
+func physicalLink(info os.FileInfo) bool {
+	if info.Mode()&os.ModeSymlink != 0 {
+		return true
+	}
+	attributes, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	const directoryReparse = windows.FILE_ATTRIBUTE_DIRECTORY | windows.FILE_ATTRIBUTE_REPARSE_POINT
+	return ok && info.Mode()&os.ModeIrregular != 0 && attributes.FileAttributes&directoryReparse == directoryReparse
+}
+
 // Volume letters and UNC/mapped spellings need not have identical final names.
 // Compare metadata identities, retaining equal missing suffixes conservatively.
 func sameNativePath(a, b string) bool {
@@ -50,7 +62,7 @@ func nativeProtected(name, home string) bool {
 	}
 	// Directory roles apply outside HOME too, including a share that hides the
 	// entire store-directory basename. Public files inside .aws/.ssh stay public.
-	if nativeStoreDirectory(resolved) && !strings.EqualFold(filepath.Clean(name), resolved) {
+	if nativeStoreDirectory(resolved) && !sameNativeStoreRole(name, resolved) {
 		return true
 	}
 	type witness struct {
@@ -77,7 +89,7 @@ func nativeProtected(name, home string) bool {
 				if os.SameFile(info, root.info) {
 					// An aliased credential directory cannot borrow a public
 					// root spelling to certify a search of its descendants.
-					if tail == "" && root.name != home && !strings.EqualFold(filepath.Clean(name), root.name) {
+					if tail == "" && root.name != home && !sameNativeStoreRole(name, root.name) {
 						return true
 					}
 					witness := filepath.Join(root.name, tail)
@@ -217,6 +229,14 @@ func nativeDOSPath(name string) string {
 		return `\\` + strings.TrimPrefix(name, `\\?\UNC\`)
 	}
 	return strings.TrimPrefix(name, `\\?\`)
+}
+
+// Ancestor aliases (including 8.3 temp names) must not make an explicitly
+// named credential directory an opaque share/drive root. Compare its role only
+// after the caller has established the directory's resolved path or identity.
+func sameNativeStoreRole(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	return nativeStoreDirectory(a) && nativeStoreDirectory(b) && strings.EqualFold(filepath.Base(a), filepath.Base(b))
 }
 
 func nativeStoreDirectory(name string) bool {

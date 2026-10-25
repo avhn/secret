@@ -199,10 +199,21 @@ func ToolGrep(root, glob, typ, mode, cwd, home string) string {
 		}
 		narrow = narrow && CanNarrow(selector)
 	}
-	if paths.FileProtected(root, cwd, "", home) {
+	native := paths.NativeProtected(root, cwd, "", home)
+	if native || paths.FileProtected(root, cwd, "", home) {
 		p := paths.FileResolve(root, cwd, "", home)
 		info, err := os.Lstat(p)
-		if !names || paths.FileLexicalProtected(root, cwd, home) || err != nil || info.Mode()&os.ModeSymlink == 0 {
+		allowAlias := names && !paths.FileLexicalProtected(root, cwd, home) && err == nil && info.Mode()&os.ModeSymlink != 0
+		if allowAlias && native {
+			// Native opaque directory roots and unresolved reparses still deny.
+			// Only an existing file alias receives the retained names exception.
+			target, err := os.Stat(p)
+			allowAlias = err == nil && target.Mode().IsRegular()
+		}
+		if !allowAlias {
+			if native {
+				return "file access targets a protected store"
+			}
 			return "Grep targets a protected store"
 		}
 	}

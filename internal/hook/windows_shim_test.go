@@ -42,7 +42,7 @@ func TestWindowsDevelopmentShim(t *testing.T) {
 		t.Fatal(err)
 	}
 	binary := filepath.Join(root, "secret.exe")
-	build := exec.Command(goBinary, "build", "-mod=readonly", "-o", binary, "./cmd/secret")
+	build := exec.Command(goBinary, "build", "-buildvcs=false", "-mod=readonly", "-o", binary, "./cmd/secret")
 	build.Dir = "../.."
 	build.Env = append(os.Environ(), "GOMODCACHE="+strings.TrimSpace(caches[0]), "GOCACHE="+strings.TrimSpace(caches[1]))
 	if output, err := build.CombinedOutput(); err != nil {

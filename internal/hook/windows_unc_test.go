@@ -215,7 +215,7 @@ func TestWindowsUNCGitDirectoryRoots(t *testing.T) {
 	checkWindowsGitAlias(t, work, unc+`\missing\new.txt`, true)
 	drive := windowsHookSubst(t, git)
 	checkWindowsGitAlias(t, work, drive+"config", true)
-	if !paths.ConfigWriteProtected(unc, work, "", home, "", "") || !paths.ConfigWriteProtected(drive, work, "", home, "", "") {
+	if !paths.FileConfigWriteProtected(unc, work, "", home, "", "") || !paths.FileConfigWriteProtected(drive, work, "", home, "", "") {
 		t.Fatal("Git metadata at the exposed share/drive root was not recognized")
 	}
 	// Without a signature, discovery from a gitfile still protects by identity.

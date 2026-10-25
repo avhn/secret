@@ -125,7 +125,9 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 		if _, present := e.Fields["output_mode"]; !present {
 			mode = "files_with_matches"
 		}
-		if !paths.ValidPath(e.String("path")) || paths.NativeProtected(e.String("path"), cwd, "", home) {
+		// ToolGrep applies native protection with its names-only symlink rule.
+		// A separate identity precheck would deny that retained exception.
+		if !paths.ValidPath(e.String("path")) {
 			reason = "file access targets a protected store"
 		} else {
 			reason = search.ToolGrep(e.String("path"), e.String("glob"), e.String("type"), mode, cwd, home)

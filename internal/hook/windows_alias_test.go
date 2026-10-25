@@ -218,10 +218,10 @@ func TestWindowsGitDirectoryIdentityAliases(t *testing.T) {
 	drive := windowsHookSubst(t, git)
 	checkWindowsGitAlias(t, work, drive+"config", true)
 	checkWindowsGitAlias(t, work, drive+`missing\new.txt`, true)
-	if !paths.ConfigWriteProtected(drive+"config", home, work, home, "", "") {
+	if !paths.FileConfigWriteProtected(drive+"config", home, work, home, "", "") {
 		t.Fatal("workdir repository identity was not checked")
 	}
-	if !paths.ConfigWriteProtected(drive+"config", work, home, home, "", "") {
+	if !paths.FileConfigWriteProtected(drive+"config", work, home, home, "", "") {
 		t.Fatal("cwd repository identity was lost to workdir")
 	}
 	// A gitfile can name a separate directory with an ordinary basename.
@@ -237,7 +237,7 @@ func TestWindowsGitDirectoryIdentityAliases(t *testing.T) {
 	}
 	other := windowsHookSubst(t, separate)
 	checkWindowsGitAlias(t, work, other+`missing\new.txt`, true)
-	if !paths.ConfigWriteProtected(other+"config", home, work, home, "", "") {
+	if !paths.FileConfigWriteProtected(other+"config", home, work, home, "", "") {
 		t.Fatal("workdir gitfile identity was not checked")
 	}
 	checkWindowsGitAlias(t, work, filepath.Join(home, "public.txt"), false)

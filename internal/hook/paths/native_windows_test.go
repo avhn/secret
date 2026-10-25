@@ -7,11 +7,46 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/avhn/secret/internal/secure"
 	"golang.org/x/sys/windows"
 )
+
+type windowsLinkInfo struct {
+	os.FileInfo
+	mode       os.FileMode
+	attributes uint32
+}
+
+func (info windowsLinkInfo) Mode() os.FileMode { return info.mode }
+func (info windowsLinkInfo) Sys() any {
+	return &syscall.Win32FileAttributeData{FileAttributes: info.attributes}
+}
+
+func TestWindowsPhysicalLinkModes(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		mode       os.FileMode
+		attributes uint32
+		link       bool
+	}{
+		{"symlink", os.ModeSymlink, windows.FILE_ATTRIBUTE_REPARSE_POINT, true},
+		{"junction", os.ModeIrregular, windows.FILE_ATTRIBUTE_REPARSE_POINT | windows.FILE_ATTRIBUTE_DIRECTORY, true},
+		{"unknown directory reparse", os.ModeIrregular, windows.FILE_ATTRIBUTE_REPARSE_POINT | windows.FILE_ATTRIBUTE_DIRECTORY, true},
+		{"ordinary directory", os.ModeDir, windows.FILE_ATTRIBUTE_DIRECTORY, false},
+		{"irregular non-reparse", os.ModeIrregular, windows.FILE_ATTRIBUTE_DIRECTORY, false},
+		{"non-directory reparse", os.ModeIrregular, windows.FILE_ATTRIBUTE_REPARSE_POINT, false},
+		{"regular reparse data", 0, windows.FILE_ATTRIBUTE_REPARSE_POINT, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := physicalLink(windowsLinkInfo{mode: tc.mode, attributes: tc.attributes}); got != tc.link {
+				t.Errorf("physical link=%v want %v", got, tc.link)
+			}
+		})
+	}
+}
 
 func TestWindowsNativeParentTraversal(t *testing.T) {
 	root := t.TempDir()
@@ -57,18 +92,21 @@ func TestWindowsNativeParentTraversal(t *testing.T) {
 	if err != nil || !strings.EqualFold(resolved, strings.TrimPrefix(opened, `\\?\`)) {
 		t.Fatalf("hook target %q (%v) differs from native-open identity %q", resolved, err, opened)
 	}
-	// The Bash analyzer still certifies its legacy physical link/.. witness.
-	// Native file tools must instead match the real Win32 open above.
+	// The native resolver must match Win32, but file-tool protection is the
+	// union of native identity and the legacy physical link/.. witness.
 	var shell Metadata
 	if !Protected(raw, root, "", root) || !shell.Protected(raw, root, "", root) {
 		t.Fatal("Bash policy lost its physical link/.. credential witness")
 	}
-	if FileProtected(raw, root, "", root) {
-		t.Fatal("native public parent traversal borrowed Unix link/.. semantics")
-	}
 	metadata := Metadata{fileTools: true}
-	if metadata.Protected(raw, root, "", root) {
-		t.Fatal("cached resolver differs from the native public traversal")
+	for _, name := range []string{raw, `junction\..\credentials`, "junction/../credentials"} {
+		if !FileProtected(name, root, "", root) || !metadata.Protected(name, root, "", root) {
+			t.Errorf("file tools lost the legacy physical credential witness: %q", name)
+		}
+	}
+	configured := filepath.Join(root, ".aws", "credentials")
+	if !FileConfiguredProtected(raw, root, "", root, configured) || !FileConfiguredTreeProtected(raw, root, root, configured) {
+		t.Fatal("native configured-path checks lost the legacy physical witness")
 	}
 	// Cache identity for one analysis only. The next analysis must observe a
 	// changed reparse target rather than reusing an earlier public resolution.

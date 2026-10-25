@@ -99,7 +99,7 @@ func physicalWith(raw string, lstat func(string) (os.FileInfo, error), readlink,
 			current = next
 			continue
 		}
-		if info.Mode()&os.ModeSymlink == 0 {
+		if !physicalLink(info) {
 			current = next
 			continue
 		}

@@ -14,8 +14,8 @@ func FileResolve(name, cwd, workdir, home string) string {
 	return Resolve(nativeName(name), cwd, workdir, home)
 }
 
-// FileProtected applies native validation and identity only to file/patch tools.
-// The zero-value Metadata and Protected retain the pre-M5a Bash policy on Windows.
+// FileProtected retains the legacy proof and adds native validation and identity
+// only to file/patch tools. Zero-value Metadata and Protected keep Bash semantics.
 func FileProtected(name, cwd, workdir, home string) bool {
 	if runtime.GOOS != "windows" {
 		return Protected(name, cwd, workdir, home)
@@ -26,6 +26,11 @@ func FileProtected(name, cwd, workdir, home string) bool {
 
 func fileProtected(name, cwd, workdir, home string, resolve func(string) (string, error)) bool {
 	if !ValidPath(name) || !ValidPath(cwd) || !ValidPath(workdir) || !ValidHome(home) {
+		return true
+	}
+	// Native final paths clean ".." before traversal. Keep the legacy
+	// component-walk proof as well, so an alias cannot erase that witness.
+	if Protected(name, cwd, workdir, home) {
 		return true
 	}
 	raw := FileResolve(name, cwd, workdir, home)
@@ -67,13 +72,16 @@ func FileLexicalProtected(name, cwd, home string) bool {
 	if runtime.GOOS != "windows" {
 		return LexicalProtected(name, cwd, home)
 	}
-	return fileLexicalProtected(FileResolve(name, cwd, "", home), cwd, home)
+	return LexicalProtected(name, cwd, home) || fileLexicalProtected(FileResolve(name, cwd, "", home), cwd, home)
 }
 
 // FileConfiguredProtected includes native identities, never shell data operands.
 func FileConfiguredProtected(name, cwd, workdir, home, config string, literals ...string) bool {
 	if runtime.GOOS != "windows" {
 		return ConfiguredProtected(name, cwd, workdir, home, config, literals...)
+	}
+	if ConfiguredProtected(name, cwd, workdir, home, config, literals...) {
+		return true
 	}
 	candidate := FileResolve(name, cwd, workdir, home)
 	canonical := func(name string) string { return physicalOrCleanWith(name, nativePhysical) }
@@ -128,6 +136,9 @@ func FileTreeProtectedScope(root, cwd, home string, includeIgnored bool) bool {
 func FileConfiguredTreeProtected(root, cwd, home, config string, literals ...string) bool {
 	if runtime.GOOS != "windows" {
 		return ConfiguredTreeProtected(root, cwd, home, config, literals...)
+	}
+	if ConfiguredTreeProtected(root, cwd, home, config, literals...) {
+		return true
 	}
 	canonical := func(name string) string {
 		return physicalOrCleanWith(FileResolve(name, cwd, "", home), nativePhysical)

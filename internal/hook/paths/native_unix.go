@@ -18,6 +18,8 @@ func ValidPath(_ string) bool { return true }
 
 func nativeName(name string) string { return name }
 
+func physicalLink(info os.FileInfo) bool { return info.Mode()&os.ModeSymlink != 0 }
+
 func sameNativePath(_, _ string) bool { return false }
 
 func nativeProtected(_, _ string) bool { return false }
