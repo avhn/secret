@@ -12,7 +12,7 @@ import (
 
 // Transaction publishes a whole provider batch through fresh random accounts.
 // SecretsDir is the shared lock/manifest directory. Reference is an explicit
-// keychain:NAME or libsecret:NAME. A nil Provider uses production dispatch;
+// keychain:NAME, libsecret:NAME or pass:NAME. A nil Provider uses production dispatch;
 // injected providers are for isolated tests, never environment-selected in a
 // production build. The CLI must obtain operator consent before Apply.
 // FailOnConflict makes put insert-only for import/export. RequireExisting makes
@@ -63,7 +63,10 @@ func (transaction Transaction) apply(mutations []store.Mutation, steps transacti
 		return secure.ErrInvalidRequest
 	}
 	_, name, _ := strings.Cut(transaction.Reference, ":")
-	path := filepath.Join(transaction.SecretsDir, name+".keys")
+	path, err := store.ManifestPath(transaction.SecretsDir, transaction.Reference)
+	if err != nil {
+		return secure.ErrInvalidRequest
+	}
 	return store.WithManifestLock(path, kind, func(editor *store.ManifestEditor) error {
 		previous := editor.Records()
 		metadata := make([]store.MetadataRecord, len(previous))

@@ -81,9 +81,15 @@ func (w *limitedOutput) ReadFrom(r io.Reader) (int64, error) {
 
 // runProvider bounds provider lifetime, inherited pipes, and captured output.
 func runProvider(name string, args []string, input []byte) ([]byte, []byte, error) {
+	return runProviderEnv(name, args, input, nil)
+}
+
+// runProviderEnv supplies an explicit environment without changing legacy transports.
+func runProviderEnv(name string, args []string, input []byte, environment []string) ([]byte, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = environment
 	configureProviderProcess(cmd)
 	cmd.WaitDelay = 250 * time.Millisecond
 	cmd.Stdin = bytes.NewReader(input)
@@ -116,18 +122,23 @@ func DispatchWith(ref string, provider Provider) (Provider, string, string, erro
 		return nil, "", "", ErrUnsupported
 	}
 	backend, name, ok := strings.Cut(ref, ":")
-	if !ok || (backend != "keychain" && backend != "libsecret") {
+	if !ok || !store.ProviderReference(ref) {
 		return nil, "", "", store.ErrInvalidKeystoreName
 	}
-	loc := store.Locator{}
-	if _, err := loc.Resolve(ref); err != nil {
+	if _, err := store.ManifestPath("", ref); err != nil {
 		return nil, "", "", err
 	}
 	if provider == nil {
 		provider = testProvider(backend)
 	}
 	if provider == nil {
-		if backend == "libsecret" {
+		if backend == "pass" {
+			var err error
+			provider, err = newPass()
+			if err != nil {
+				return nil, "", "", err
+			}
+		} else if backend == "libsecret" {
 			provider = libsecret{run: runProvider}
 		} else {
 			selected := newKeychain(runProvider)
@@ -153,17 +164,27 @@ func ListNames(dir, ref string) ([]store.ManifestRecord, error) {
 		records, err := store.ReadManifestV2(filepath.Join(dir, name+".onepassword-keys"), "onepassword")
 		return store.ProjectManifestV2(records), err
 	}
-	_, backend, _, err := Dispatch(ref)
+	path, err := store.ManifestPath(dir, ref)
 	if err != nil {
 		return nil, err
 	}
-	_, name, _ := strings.Cut(ref, ":")
-	return store.ReadManifest(filepath.Join(dir, name+".keys"), backend)
+	kind, _, _ := strings.Cut(ref, ":")
+	// Preserve legacy configuration validation without requiring optional pass
+	// configuration or executables for names-only inventory.
+	if kind != "pass" {
+		if _, _, _, err := Dispatch(ref); err != nil {
+			return nil, err
+		}
+	}
+	return store.ReadManifest(path, kind)
 }
 
 // Stash puts and verifies the bytes before publishing the names-only record.
 // A failed publish leaves an orphan; it never publishes an invalid link.
 func Stash(dir, ref, key string, labels map[string]string, value []byte, provider Provider) error {
+	if strings.HasPrefix(ref, "pass:") {
+		return (Transaction{SecretsDir: dir, Reference: ref, Provider: provider}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: key, Labels: labels, Value: value}})
+	}
 	return stashWithPublish(dir, ref, key, labels, value, provider, store.UpdateManifestLocked)
 }
 
