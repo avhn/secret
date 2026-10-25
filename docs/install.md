@@ -9,9 +9,12 @@ those launchers. Claude cutover, version bumps, `onFailure: "block"`, the
 `compat/secret` path and the Go hook output contract belong entirely to M4.1.
 Do not edit a local hook to activate Go based on a cache or doctor report.
 
-M4 is in progress, pending hosted CI and release approval. No v0.2.3 release or
-committed checksum manifest is available yet. The release procedure below is for
-an approved, published final tag, not a command to run against a candidate branch.
+M4 is complete: [v0.2.3](https://github.com/avhn/secret/releases/tag/v0.2.3)
+was published on 2026-10-24, at checksum commit C
+`79980020b3ffaea14833684592ffa2c97d78aae0` from source S `7141a13`.
+The [recorded release evidence](../ROADMAP.md#m4-releasable-linuxmacos-core)
+includes native published-asset installs on all four Linux/macOS targets.
+The procedure below is for that published final tag, not a candidate branch.
 See [release.md](release.md) for owner approval boundaries.
 
 ## Current Bash installation
@@ -35,15 +38,16 @@ Never use a `latest` URL, candidate S attestation or an arbitrary PATH `secret`.
 
 | Platform | Asset suffixes | Native hosted targets | Evidence status |
 | --- | --- | --- | --- |
-| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | Local Linux amd64 synthetic checks; hosted versions/arches pending CI |
-| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | Both native architectures and stock /bin/bash 3.2 pending hosted CI |
+| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | v0.2.3 native published-asset installs passed on both architectures |
+| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | v0.2.3 native published-asset installs passed on both architectures; retained Bash 3.2 CI passed |
 | Windows | none | Development CI only | No release or protection claim |
 
 `release.yml` uses Ubuntu 24.04 for independent cross-builds. A cross-build is not
 native execution evidence. `plugin.yml` records `uname -srm`, `sw_vers` on macOS,
 ImageOS/ImageVersion and RUNNER_ARCH; the passing run records, not mutable runner
-label names, establish the tested OS versions and architectures. No hosted
-Linux/macOS version is certified by this branch before those jobs pass.
+label names, establish the tested OS versions and architectures. The published
+v0.2.3 install evidence is [run 40130118807](https://github.com/avhn/secret/actions/runs/40130118807);
+subsequent changes still require their applicable native jobs.
 
 The release build pin is Go 1.26.10 with `GOTOOLCHAIN=local`; consumers need no Go
 compiler. Future Claude activation requires at least Claude Code 2.1.295, initially
@@ -60,9 +64,10 @@ Python 3, POSIX sh, ordinary GNU/BSD utilities (`readlink`, `stat`, `awk`, `cmp`
 Cold verification also needs GitHub CLI `gh` with `attestation download`,
 `attestation trusted-root`, and `attestation verify` supporting `--source-digest`,
 `--source-ref`, `--bundle`, `--custom-trusted-root` and JSON output. Local synthetic
-checks use gh 2.102.0. The read-only release rehearsal exercises genuine public
-v0.2.2 provenance with identity-substituted new scripts; real v0.2.3 provenance
-and published-assets/offline behavior remain hosted gates. Online downloading
+checks use gh 2.102.0. The earlier read-only rehearsal used genuine v0.2.2
+provenance with identity-substituted scripts. The published v0.2.3 tag workflow
+and native published-asset install jobs subsequently passed, including offline
+verification; see the recorded release evidence above. Online downloading
 additionally needs curl with HTTPS, redirect, connect and total-time limits. Install these tools through your trusted
 OS/package channel; do not pipe downloaded scripts to a shell.
 
