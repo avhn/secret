@@ -58,6 +58,25 @@ func assertWindowsProcessStopped(t *testing.T, handle windows.Handle) {
 	}
 }
 
+func TestWindowsExecutableRejectsPlantedCWDImage(t *testing.T) {
+	// Plant a real runnable image, not only an .exe-named placeholder.
+	image, err := os.ReadFile(os.Args[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "planted.exe"), image, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	if _, err := WindowsExecutable("planted", []string{"PATH=.;relative;;", "PATHEXT=.EXE"}); err == nil {
+		t.Fatal("planted cwd executable selected through relative PATH entries")
+	}
+	if got, err := WindowsExecutable(`.\planted.exe`, nil); err != nil || !strings.EqualFold(got, filepath.Join(dir, "planted.exe")) {
+		t.Fatal("explicit relative executable path did not opt into cwd resolution")
+	}
+}
+
 func TestWindowsExecutableChildSearch(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("PATH", dir) // Must not supply a fallback for an empty child PATH.
@@ -66,6 +85,12 @@ func TestWindowsExecutableChildSearch(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, name), nil, 0600); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.Mkdir("planted", 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join("planted", "synthetic.exe"), nil, 0600); err != nil {
+		t.Fatal(err)
 	}
 	for _, test := range []struct {
 		name, path, ext, want string
@@ -77,8 +102,10 @@ func TestWindowsExecutableChildSearch(t *testing.T) {
 		{"script", dir, ".CMD", ""},
 		{"script.cmd", dir, ".CMD", ""},
 		{"synthetic", "", ".EXE", ""},
-		{"synthetic", ".", ".EXE", "synthetic.EXE"},
-		{"synthetic", ";", ".EXE", "synthetic.EXE"},
+		{"synthetic", ".", ".EXE", ""},
+		{"synthetic", ";", ".EXE", ""},
+		{"synthetic", "planted", ".EXE", ""},
+		{"synthetic", ".;planted;" + dir, ".EXE", "synthetic.EXE"},
 		{`.\synthetic.exe`, "", ".EXE", "synthetic.exe"},
 		{"synthetic", dir, "", ""},
 		{`C:synthetic.exe`, dir, ".EXE", ""},

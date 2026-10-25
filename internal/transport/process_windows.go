@@ -24,7 +24,7 @@ const procThreadAttributeJobList = 0x0002000d
 
 // WindowsExecutable resolves using only the constructed child PATH/PATHEXT.
 // There is no implicit shell, application-directory, system-directory or cwd
-// search. Explicit paths and explicitly listed relative PATH entries are allowed.
+// search. Relative PATH entries are skipped; explicit relative image paths work.
 // Only .exe/.com images are accepted; .bat/.cmd require an explicit shell command.
 func WindowsExecutable(name string, env []string) (string, error) {
 	if name == "" || !utf8.ValidString(name) || strings.ContainsAny(name, "\x00\"") {
@@ -63,6 +63,9 @@ func WindowsExecutable(name string, env []string) (string, error) {
 		directories = []string{""}
 	}
 	for _, dir := range directories {
+		if !strings.ContainsAny(name, `\/:`) && (!WindowsSearchDirectory(dir) || !filepath.IsAbs(dir)) {
+			continue
+		}
 		for _, suffix := range suffixes {
 			candidate := filepath.Join(dir, name+suffix)
 			ext := filepath.Ext(candidate)

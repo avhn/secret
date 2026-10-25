@@ -335,7 +335,11 @@ documentation or hardening suggestions, but they are not vulnerabilities:
   of that file and use secret transport for token-bearing configuration. The
   example ripgrep config conservatively excludes all `.yarnrc.yml` files.
 - **Transformed output.** Redaction matches literal values. Base64, URL
-  encoding, hex, substrings, reversed or split values are not caught.
+  encoding, hex, substrings, reversed or split values are not caught. Native
+  Windows run additionally matches UTF-16LE and UTF-16BE encodings of valid UTF-8
+  loaded values. Other Windows code pages are not covered; this is not general
+  transformed-output protection. Combined patterns retain the 4 MiB ceiling,
+  with at most five times the raw UTF-8 pattern bytes.
 - **Shell indirection the guard cannot resolve statically.** The guard
   tokenizes commands and never evaluates them. Variables set elsewhere, files
   of commands, `eval`, aliases, functions, interpreters reading paths from
