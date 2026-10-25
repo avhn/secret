@@ -6,10 +6,12 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func TestPassManifestPathsAndGrammar(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	for _, test := range []struct{ ref, suffix string }{
 		{"keychain:team", "team.keys"}, {"libsecret:team", "team.keys"}, {"pass:team", "team.pass-keys"},
 	} {
@@ -50,7 +52,7 @@ func TestPassManifestPathsAndGrammar(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, data, 0600); err != nil {
+		if err := testutil.WriteFile(path, data, 0600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := ReadManifest(path, kind); err != nil {

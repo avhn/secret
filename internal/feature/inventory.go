@@ -137,7 +137,7 @@ func ReadMetadata(reference, directory string) (store.Metadata, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return store.Metadata{}, ErrMetadataRead
 	}
-	data, err := os.ReadFile(path)
+	data, err := store.ReadFile(path)
 	defer secure.Clear(data)
 	if err != nil {
 		return store.Metadata{}, ErrMetadataRead

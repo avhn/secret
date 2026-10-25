@@ -3,6 +3,8 @@ package store
 import (
 	"bytes"
 	"fmt"
+	"github.com/avhn/secret/internal/secure"
+	"github.com/avhn/secret/internal/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,9 +37,9 @@ func TestStashBashBytes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			path := filepath.Join(dir, "case.store")
-			if err = os.WriteFile(path, initial, 0600); err != nil {
+			if err = testutil.WriteFile(path, initial, 0600); err != nil {
 				t.Fatal(err)
 			}
 			labels := map[string]string{}
@@ -72,7 +74,7 @@ func TestStashBashBytes(t *testing.T) {
 					t.Error("replacement mode is not 0600")
 				}
 			} else {
-				t.Log("Windows file ACLs do not expose Unix permission bits")
+				assertPrivateFixture(t, path)
 			}
 		})
 	}
@@ -80,7 +82,7 @@ func TestStashBashBytes(t *testing.T) {
 func TestStashValidationAndTargets(t *testing.T) {
 	for i, v := range []string{"", "\n", "space ", "\tlead", "bad\x00x", "bad\ry", "bad\ny\n", "'pair'", "\"pair\""} {
 		t.Run(fmt.Sprintf("value-%d", i), func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "item.store")
+			path := filepath.Join(testutil.TempDir(t), "item.store")
 			err := testStash(path, "KEY", nil, []byte(v))
 			if err == nil {
 				t.Error("accepted invalid value")
@@ -93,9 +95,9 @@ func TestStashValidationAndTargets(t *testing.T) {
 			}
 		})
 	}
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "item.store")
-	if err := os.Mkdir(path, 0700); err != nil {
+	if err := testutil.Mkdir(path, 0700); err != nil {
 		t.Fatal(err)
 	}
 	if err := testStash(path, "KEY", nil, []byte("safe")); err == nil {
@@ -108,14 +110,14 @@ func TestStashValidationAndTargets(t *testing.T) {
 		if err := testStash(path, "KEY", nil, []byte("safe")); err == nil {
 			t.Error("symlink target accepted")
 		}
-		linkedDir := filepath.Join(t.TempDir(), "linked")
+		linkedDir := filepath.Join(testutil.TempDir(t), "linked")
 		if err := os.Symlink(dir, linkedDir); err == nil {
 			if err := testStash(filepath.Join(linkedDir, "new.store"), "KEY", nil, []byte("safe")); err == nil {
 				t.Error("symlink secrets directory accepted")
 			}
 		}
 	} else if runtime.GOOS == "windows" {
-		t.Log("symlink creation unavailable without Windows developer privileges")
+		t.Fatal("required Windows symlink fixture unavailable")
 	}
 }
 
@@ -131,29 +133,42 @@ func TestMain(m *testing.M) {
 	path := os.Getenv("GO_STORE_PATH")
 	if mode == "hold" {
 		if err := withLock(filepath.Dir(path), 3*time.Second, func() error {
-			// Pause after the same private file write as atomicReplace, before rename.
-			scratch, err := os.MkdirTemp(filepath.Dir(path), ".secret-stash.")
+			// Pause after flushed private bytes, before publication, on every OS.
+			root, err := os.OpenRoot(filepath.Dir(path))
 			if err != nil {
 				return err
 			}
-			defer os.RemoveAll(scratch)
-			if err := os.WriteFile(filepath.Join(scratch, "owner"), []byte("secret-stash-v1\n"), 0600); err != nil {
-				return err
-			}
-			f, err := os.OpenFile(filepath.Join(scratch, "replacement"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			defer root.Close()
+			token, err := newToken()
 			if err != nil {
 				return err
 			}
-			if _, err = f.Write([]byte("KEY=interrupted\n")); err != nil {
-				_ = f.Close()
+			scratch := ".secret-stash." + token
+			if err := secure.CreatePrivateDirectory(root, scratch); err != nil {
 				return err
 			}
-			if err = f.Sync(); err != nil {
-				_ = f.Close()
+			defer root.RemoveAll(scratch)
+			private, err := root.OpenRoot(scratch)
+			if err != nil {
 				return err
 			}
-			if err = f.Close(); err != nil {
-				return err
+			defer private.Close()
+			for name, data := range map[string][]byte{"owner": []byte("secret-stash-v1\n"), "replacement": []byte("KEY=interrupted\n")} {
+				file, err := secure.CreatePrivateFile(private, name)
+				if err != nil {
+					return err
+				}
+				if _, err := file.Write(data); err != nil {
+					file.Close()
+					return err
+				}
+				if err := file.Sync(); err != nil {
+					file.Close()
+					return err
+				}
+				if err := file.Close(); err != nil {
+					return err
+				}
 			}
 			fmt.Println("locked")
 			time.Sleep(30 * time.Second)
@@ -174,7 +189,7 @@ func TestConcurrentStash(t *testing.T) {
 	defer func() { lockWait = old }()
 	for _, subprocess := range []bool{false, true} {
 		t.Run(fmt.Sprint("process-", subprocess), func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "parallel.store")
+			path := filepath.Join(testutil.TempDir(t), "parallel.store")
 			const n = 12
 			var wg sync.WaitGroup
 			errors := make(chan error, n)
@@ -218,13 +233,10 @@ func TestConcurrentStash(t *testing.T) {
 	}
 }
 func TestKilledWriterLeavesLock(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows test runner does not provide POSIX process kill")
-	}
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "item.store")
 	original := []byte("KEY=prior\n")
-	if err := os.WriteFile(path, original, 0600); err != nil {
+	if err := testutil.WriteFile(path, original, 0600); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(os.Args[0])
@@ -248,7 +260,19 @@ func TestKilledWriterLeavesLock(t *testing.T) {
 	if err != nil || !bytes.Equal(got, original) {
 		t.Error("interrupted writer changed the original file")
 	}
-	// As in Bash, SIGKILL cannot run cleanup; an owned lock is left for manual recovery.
+	assertPrivateFixture(t, filepath.Join(dir, ".write-lock"))
+	assertPrivateFixture(t, filepath.Join(dir, ".write-lock", "token"))
+	scratch, err := filepath.Glob(filepath.Join(dir, ".secret-stash.*"))
+	if err != nil || len(scratch) != 1 {
+		t.Fatal("killed writer did not leave exactly one private scratch directory")
+	}
+	for _, path := range []string{scratch[0], filepath.Join(scratch[0], "owner"), filepath.Join(scratch[0], "replacement")} {
+		assertPrivateFixture(t, path)
+	}
+	if err := withLock(dir, 20*time.Millisecond, func() error { t.Fatal("stale lock automatically stolen"); return nil }); err == nil || !strings.Contains(err.Error(), "write lock timed out") {
+		t.Fatal("killed writer did not require manual lock recovery")
+	}
+	// An uncatchable process kill cannot clean up; manual verification is required.
 	if _, err := os.Stat(filepath.Join(dir, ".write-lock", "token")); err != nil {
 		t.Error("killed writer did not leave its ownership token")
 	}
@@ -276,7 +300,7 @@ func FuzzStash(f *testing.F) {
 		f.Add(v)
 	}
 	f.Fuzz(func(t *testing.T, value []byte) {
-		dir := t.TempDir()
+		dir := testutil.TempDir(t)
 		path := filepath.Join(dir, "fuzz.store")
 		err := testStash(path, "KEY", nil, value)
 		normal, valid := NormalizeValue(value)
@@ -304,7 +328,7 @@ func FuzzStash(f *testing.F) {
 }
 
 func TestExplicitStashWaitsForSecretsDirLock(t *testing.T) {
-	base := t.TempDir()
+	base := testutil.TempDir(t)
 	secrets := filepath.Join(base, "secrets")
 	explicit := filepath.Join(base, "elsewhere", "file.store")
 	t.Setenv("SECRETS_DIR", secrets)
@@ -337,8 +361,8 @@ func TestExplicitStashWaitsForSecretsDirLock(t *testing.T) {
 }
 
 func TestWriteLockTimeout(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, ".write-lock"), 0700); err != nil {
+	dir := testutil.TempDir(t)
+	if err := testutil.Mkdir(filepath.Join(dir, ".write-lock"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	err := withLock(dir, 20*time.Millisecond, func() error { t.Error("acquired held lock"); return nil })
@@ -348,9 +372,9 @@ func TestWriteLockTimeout(t *testing.T) {
 }
 
 func TestAnchoredReadRejectsSymlink(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "store")
-	if err := os.WriteFile(path, []byte("KEY=synthetic\n"), 0600); err != nil {
+	if err := testutil.WriteFile(path, []byte("KEY=synthetic\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	root, err := os.OpenRoot(dir)
@@ -360,7 +384,7 @@ func TestAnchoredReadRejectsSymlink(t *testing.T) {
 	defer root.Close()
 	if err := os.Symlink("store", filepath.Join(dir, "alias")); err != nil {
 		if runtime.GOOS == "windows" {
-			t.Skip("symlink privileges unavailable")
+			t.Fatal("required Windows symlink fixture unavailable")
 		}
 		t.Fatal(err)
 	}
@@ -376,12 +400,12 @@ func TestStashProtectsSecretsDirectoryAndResetsTrailingScope(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix directory permissions")
 	}
-	dir := filepath.Join(t.TempDir(), "secrets")
-	if err := os.Mkdir(dir, 0755); err != nil {
+	dir := filepath.Join(testutil.TempDir(t), "secrets")
+	if err := testutil.Mkdir(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "labeled.store")
-	if err := os.WriteFile(path, []byte("[env=dev]\n# keep\n"), 0600); err != nil {
+	if err := testutil.WriteFile(path, []byte("[env=dev]\n# keep\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := StashWithSecretsDir(dir, path, "KEY", nil, []byte("synthetic")); err != nil {
@@ -404,7 +428,8 @@ func TestLockBusyClassification(t *testing.T) {
 		want bool
 	}{
 		{"exists", os.ErrExist, true},
-		{"permission", os.ErrPermission, runtime.GOOS == "windows"},
+		{"permission", os.ErrPermission, false},
+		{"native busy", secure.ErrPrivateBusy, runtime.GOOS == "windows"},
 		{"not exist", os.ErrNotExist, false},
 	} {
 		if got := lockBusy(&os.PathError{Op: "mkdir", Path: ".write-lock", Err: tc.err}); got != tc.want {

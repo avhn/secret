@@ -3,7 +3,6 @@ package store
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/avhn/secret/internal/secure"
 )
@@ -110,7 +109,7 @@ func CheckMutationConflicts(records []MetadataRecord, mutations []Mutation, fail
 // including for files outside that directory. The CLI must obtain consent first.
 // FailOnConflict is the mandatory insert-only policy for import/export, not a
 // consent bypass. RequireExisting makes put replace-only for rotation. These
-// policies are mutually exclusive. Windows rejects before side effects until M5a.
+// policies are mutually exclusive. Windows persistence requires private native ACLs.
 type FileTransaction struct {
 	SecretsDir      string
 	Path            string
@@ -121,10 +120,7 @@ type FileTransaction struct {
 var _ Transaction = FileTransaction{}
 
 func (transaction FileTransaction) Apply(mutations []Mutation) error {
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
-	}
-	if !filepath.IsAbs(transaction.Path) || !filepath.IsAbs(transaction.SecretsDir) || (transaction.FailOnConflict && transaction.RequireExisting) {
+	if !filepath.IsAbs(transaction.Path) || !filepath.IsAbs(transaction.SecretsDir) || secure.ValidateStorePath(transaction.Path) != nil || secure.ValidateStorePath(transaction.SecretsDir) != nil || (transaction.FailOnConflict && transaction.RequireExisting) {
 		return secure.ErrInvalidRequest
 	}
 	if err := ValidateMutations(mutations); err != nil {
@@ -132,16 +128,7 @@ func (transaction FileTransaction) Apply(mutations []Mutation) error {
 	}
 	err := WithWriteLock(transaction.SecretsDir, func() error {
 		dir := filepath.Dir(transaction.Path)
-		if ValidateDirectory(dir) != nil {
-			return secure.ErrTransaction
-		}
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return secure.ErrTransaction
-		}
-		if ValidateDirectory(dir) != nil {
-			return secure.ErrTransaction
-		}
-		root, err := os.OpenRoot(dir)
+		root, err := openWriteRoot(dir)
 		if err != nil {
 			return secure.ErrTransaction
 		}

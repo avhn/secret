@@ -13,22 +13,23 @@ import (
 	"github.com/avhn/secret/internal/feature"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func featureFixture(t *testing.T) (string, string) {
 	t.Helper()
 	// Audit rejects ancestor aliases, including the system /var alias on macOS.
 	// Use the physical disposable root rather than relaxing production checks.
-	home, err := filepath.EvalSymlinks(t.TempDir())
+	home, err := filepath.EvalSymlinks(testutil.TempDir(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(home, "stores")
-	if err := os.Mkdir(dir, 0700); err != nil {
+	if err := testutil.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "synthetic.secret")
-	if err := os.WriteFile(path, []byte("TOKEN=synthetic-private-one\n[env=prod]\nTOKEN=synthetic-private-two\nOTHER=synthetic-private-three\n"), 0600); err != nil {
+	if err := testutil.WriteFile(path, []byte("TOKEN=synthetic-private-one\n[env=prod]\nTOKEN=synthetic-private-two\nOTHER=synthetic-private-three\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
@@ -64,7 +65,7 @@ func TestFeatureDispatchNamesOnly(t *testing.T) {
 }
 
 func TestOperatorDispatchRefusesBeforeAccess(t *testing.T) {
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	t.Setenv("HOME", home)
 	t.Setenv("SECRETS_DIR", filepath.Join(home, "not-created"))
 	for _, sub := range []string{"import", "export", "rotate", "delete", "rename"} {
@@ -104,7 +105,7 @@ func TestFeatureArgumentRejection(t *testing.T) {
 
 func TestFeatureMCPDispatch(t *testing.T) {
 	_, ref := featureFixture(t)
-	input, err := os.CreateTemp(t.TempDir(), "protocol")
+	input, err := os.CreateTemp(testutil.TempDir(t), "protocol")
 	if err != nil {
 		t.Fatal(err)
 	}

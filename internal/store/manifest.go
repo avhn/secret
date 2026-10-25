@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/avhn/secret/internal/secure"
@@ -130,7 +129,7 @@ func ParseManifest(data []byte, backend string) ([]ManifestRecord, error) {
 // ReadManifest requires a private, regular inventory; missing inventories are
 // represented by os.ErrNotExist so the caller can opt into creation explicitly.
 func ReadManifest(path, backend string) ([]ManifestRecord, error) {
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openReadRoot(filepath.Dir(path))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +142,7 @@ func readManifestRoot(root *os.Root, name, backend string) ([]ManifestRecord, er
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) {
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || !privateMode(info) {
 		return nil, errManifest
 	}
 	file, err := openNoFollow(root, name)
@@ -152,7 +151,7 @@ func readManifestRoot(root *os.Root, name, backend string) ([]ManifestRecord, er
 	}
 	defer file.Close()
 	info, err = file.Stat()
-	if err != nil || !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) {
+	if err != nil || !info.Mode().IsRegular() || !privateMode(info) {
 		return nil, errManifest
 	}
 	data, err := io.ReadAll(file)
@@ -178,7 +177,7 @@ func UpdateManifestLocked(path, backend, key string, labels map[string]string, a
 	if !manifestBackend(backend) || !validRecord(ManifestRecord{key, labels, account}) {
 		return errManifest
 	}
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openReadRoot(filepath.Dir(path))
 	if err != nil {
 		return err
 	}
@@ -236,17 +235,14 @@ func EncodeManifest(records []ManifestRecord, backend string) ([]byte, error) {
 // existing secrets-directory write lock. Existing v1 single-record writers keep
 // their stable-account semantics; operators explicitly use this batch publisher.
 func PublishManifestLocked(path, backend string, records []ManifestRecord) error {
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
-	}
-	if !filepath.IsAbs(path) || ValidateDirectory(filepath.Dir(path)) != nil {
+	if !filepath.IsAbs(path) || secure.ValidateStorePath(path) != nil || ValidateDirectory(filepath.Dir(path)) != nil {
 		return secure.ErrInvalidRequest
 	}
 	data, err := EncodeManifest(records, backend)
 	if err != nil {
 		return err
 	}
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openReadRoot(filepath.Dir(path))
 	if err != nil {
 		return secure.ErrTransaction
 	}
@@ -296,7 +292,7 @@ func readRecoveryRoot(root *os.Root, name, backend string) (RecoveryIntent, erro
 	if os.IsNotExist(err) {
 		return intent, os.ErrNotExist
 	}
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+	if err != nil || !info.Mode().IsRegular() || !privateMode(info) {
 		return intent, secure.ErrRecovery
 	}
 	file, err := openNoFollow(root, name)
@@ -305,7 +301,7 @@ func readRecoveryRoot(root *os.Root, name, backend string) (RecoveryIntent, erro
 	}
 	defer file.Close()
 	info, err = file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+	if err != nil || !info.Mode().IsRegular() || !privateMode(info) {
 		return intent, secure.ErrRecovery
 	}
 	data, err := io.ReadAll(io.LimitReader(file, recoveryLimit+1))
@@ -328,13 +324,10 @@ func readRecoveryRoot(root *os.Root, name, backend string) (RecoveryIntent, erro
 // intent returns os.ErrNotExist; corrupt, aliased or insecure intent is a fixed
 // recovery error. Names are tracked candidates, never proof of orphan status.
 func ReadRecovery(path, backend string) (RecoveryIntent, error) {
-	if runtime.GOOS == "windows" {
-		return RecoveryIntent{}, secure.ErrUnsupported
-	}
-	if !filepath.IsAbs(path) || !manifestBackend(backend) || ValidateDirectory(filepath.Dir(path)) != nil {
+	if !filepath.IsAbs(path) || secure.ValidateStorePath(path) != nil || !manifestBackend(backend) || ValidateDirectory(filepath.Dir(path)) != nil {
 		return RecoveryIntent{}, secure.ErrInvalidRequest
 	}
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openReadRoot(filepath.Dir(path))
 	if os.IsNotExist(err) {
 		return RecoveryIntent{}, os.ErrNotExist
 	}
@@ -361,14 +354,11 @@ type ManifestEditor struct {
 // rechecks the manifest and recovery state while holding it. Pending recovery
 // blocks mutation without any provider calls; it is never automatically cleared.
 func WithManifestLock(path, backend string, work func(*ManifestEditor) error) error {
-	if runtime.GOOS == "windows" {
-		return secure.ErrUnsupported
-	}
-	if !filepath.IsAbs(path) || !manifestBackend(backend) || work == nil {
+	if !filepath.IsAbs(path) || secure.ValidateStorePath(path) != nil || !manifestBackend(backend) || work == nil {
 		return secure.ErrInvalidRequest
 	}
 	err := WithWriteLock(filepath.Dir(path), func() error {
-		root, err := os.OpenRoot(filepath.Dir(path))
+		root, err := openReadRoot(filepath.Dir(path))
 		if err != nil {
 			return secure.ErrTransaction
 		}
@@ -460,17 +450,5 @@ func (editor *ManifestEditor) ClearRecovery() error {
 		return err
 	}
 	editor.intent = false
-	return nil
-}
-
-func syncManifestDirectory(root *os.Root) error {
-	dir, err := root.Open(".")
-	if err != nil {
-		return secure.ErrRecovery
-	}
-	defer dir.Close()
-	if dir.Sync() != nil {
-		return secure.ErrRecovery
-	}
 	return nil
 }

@@ -13,13 +13,14 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 const mcpTestInitialize = `{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"synthetic-client","version":"1"}}}` + "\n" + `{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n"
 
 func mcpTestServer(t *testing.T) *MCPServer {
 	t.Helper()
-	server, err := NewMCPServer(MCPConfig{Enabled: true, Stores: []string{"libsecret:synthetic"}, Directory: t.TempDir()})
+	server, err := NewMCPServer(MCPConfig{Enabled: true, Stores: []string{"libsecret:synthetic"}, Directory: testutil.TempDir(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestMCPAllowlistAndForbiddenMethods(t *testing.T) {
 		input += `{"jsonrpc":"2.0","id":1,"method":"` + method + `","params":{"reference":"libsecret:synthetic","value":"synthetic-secret-sentinel","argv":"synthetic-child-argv-sentinel"}}` + "\n"
 		input += mcpTestCall(2, method, map[string]any{"reference": "libsecret:synthetic"})
 	}
-	for _, ref := range []string{"libsecret:synthetic-other", "libsecret:../synthetic", "LIBSECRET:synthetic", "keychain:synthetic", "file:" + filepath.Join(t.TempDir(), "outside.secret"), "synthetic"} {
+	for _, ref := range []string{"libsecret:synthetic-other", "libsecret:../synthetic", "LIBSECRET:synthetic", "keychain:synthetic", "file:" + filepath.Join(testutil.TempDir(t), "outside.secret"), "synthetic"} {
 		input += mcpTestCall(3, "show", map[string]any{"reference": ref})
 		input += mcpTestCall(4, "diff", map[string]any{"left": "libsecret:synthetic", "right": ref})
 	}
@@ -185,16 +186,16 @@ func TestMCPConfigurationAndOwnership(t *testing.T) {
 		{}, {Stores: []string{"libsecret:synthetic"}},
 		{Enabled: true}, {Enabled: true, Stores: []string{"file:relative"}},
 		{Enabled: true, Stores: []string{"libsecret:synthetic"}},
-		{Enabled: true, Stores: []string{"libsecret:../escape"}, Directory: t.TempDir()},
-		{Enabled: true, Stores: []string{"libsecret:synthetic", "libsecret:synthetic"}, Directory: t.TempDir()},
-		{Enabled: true, Stores: []string{"file:" + filepath.Join(t.TempDir(), "bad\npath")}},
+		{Enabled: true, Stores: []string{"libsecret:../escape"}, Directory: testutil.TempDir(t)},
+		{Enabled: true, Stores: []string{"libsecret:synthetic", "libsecret:synthetic"}, Directory: testutil.TempDir(t)},
+		{Enabled: true, Stores: []string{"file:" + filepath.Join(testutil.TempDir(t), "bad\npath")}},
 	} {
 		if _, err := NewMCPServer(config); err == nil {
 			t.Fatal("invalid MCP configuration accepted")
 		}
 	}
 	refs := []string{"libsecret:synthetic"}
-	server, err := NewMCPServer(MCPConfig{Enabled: true, Stores: refs, Directory: t.TempDir()})
+	server, err := NewMCPServer(MCPConfig{Enabled: true, Stores: refs, Directory: testutil.TempDir(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,15 +300,15 @@ func TestMCPTransportAndResponseBounds(t *testing.T) {
 }
 
 func TestCompletionAndMCPNeverFetchProviderValues(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	if runtime.GOOS != "windows" {
 		tools := filepath.Join(dir, "tools")
-		if err := os.Mkdir(tools, 0700); err != nil {
+		if err := testutil.Mkdir(tools, 0700); err != nil {
 			t.Fatal(err)
 		}
 		marker := filepath.Join(dir, "provider-called")
 		for _, name := range []string{"security", "secret-tool"} {
-			if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nprintf called > \"$SYNTH_ITEM7_PROVIDER_MARKER\"\nprintf synthetic-provider-stderr-sentinel >&2\nexit 1\n"), 0700); err != nil {
+			if err := testutil.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nprintf called > \"$SYNTH_ITEM7_PROVIDER_MARKER\"\nprintf synthetic-provider-stderr-sentinel >&2\nexit 1\n"), 0700); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -321,7 +322,7 @@ func TestCompletionAndMCPNeverFetchProviderValues(t *testing.T) {
 	}
 	for _, backend := range []string{"libsecret", "keychain"} {
 		manifest := []byte("secret-manifest-v1\nbackend=" + backend + "\nTOKEN\t\t0123456789abcdef0123456789abcdef\n")
-		if err := os.WriteFile(filepath.Join(dir, "synthetic.keys"), manifest, 0600); err != nil {
+		if err := testutil.WriteFile(filepath.Join(dir, "synthetic.keys"), manifest, 0600); err != nil {
 			t.Fatal(err)
 		}
 		ref := backend + ":synthetic"
@@ -360,7 +361,7 @@ func TestCompletionAndMCPNeverFetchProviderValues(t *testing.T) {
 	var previous []byte
 	for _, value := range [][]byte{[]byte("synthetic-secret-sentinel"), []byte("changed-longer-synthetic-secret-sentinel")} {
 		data := append(append([]byte("TOKEN="), value...), '\n')
-		if err := os.WriteFile(path, data, 0600); err != nil {
+		if err := testutil.WriteFile(path, data, 0600); err != nil {
 			t.Fatal(err)
 		}
 		_, output, err := mcpTestServe(t, server, mcpTestInitialize+mcpTestCall(1, "list", map[string]any{}))

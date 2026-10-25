@@ -9,10 +9,11 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func TestHumanBoundary(t *testing.T) {
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	t.Setenv("HOME", home)
 	t.Setenv("SECRETS_DIR", filepath.Join(home, "stores"))
 	t.Setenv("SECRETS_ENV", filepath.Join(home, "fallback.store"))
@@ -50,16 +51,16 @@ func TestHumanBoundary(t *testing.T) {
 }
 
 func TestManifestInventorySelection(t *testing.T) {
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	dir := filepath.Join(home, "stores")
-	if err := os.Mkdir(dir, 0700); err != nil {
+	if err := testutil.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("SECRETS_DIR", dir)
 	t.Setenv("SECRETS_ENV", filepath.Join(home, "fallback.store"))
 	manifest := "secret-manifest-v1\nbackend=libsecret\nTOKEN\t\t0123456789abcdef0123456789abcdef\nTOKEN\tenv=prod\tfedcba9876543210fedcba9876543210\n"
-	if err := os.WriteFile(filepath.Join(dir, "synthetic.keys"), []byte(manifest), 0600); err != nil {
+	if err := testutil.WriteFile(filepath.Join(dir, "synthetic.keys"), []byte(manifest), 0600); err != nil {
 		t.Fatal(err)
 	}
 	c := command{dir: dir, loc: store.Locator{Home: home, SecretsDir: dir, SecretsEnv: filepath.Join(home, "fallback.store"), IsFile: func(p string) bool { info, err := os.Stat(p); return err == nil && info.Mode().IsRegular() }, Glob: filepath.Glob}}
@@ -92,13 +93,13 @@ func TestListRejectsSymlinkManifest(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink permissions differ on Windows")
 	}
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	dir := filepath.Join(home, "stores")
-	if err := os.Mkdir(dir, 0700); err != nil {
+	if err := testutil.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(home, "synthetic.store")
-	if err := os.WriteFile(target, []byte("TOKEN=synthetic\n"), 0600); err != nil {
+	if err := testutil.WriteFile(target, []byte("TOKEN=synthetic\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, filepath.Join(dir, "synthetic.keys")); err != nil {

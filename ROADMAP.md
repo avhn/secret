@@ -420,6 +420,23 @@ Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks miss
 
 Status: in progress (owner-approved 2026-10-25; plan docs/design/m5a-plan.md). Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
 
+Step 2 storage integration is implemented locally: handle-checked owner-only
+protected DACLs now cover production locks/tokens, reads, scratch, replacement
+files, v1 manifests, recovery and file mutations. Native path validation and
+USERPROFILE fallback are integrated. The pinned Go 1.26.10 os.Root replacement
+uses anchored native rename, never delete-first or copy fallback. Data flushes
+remain mandatory; Windows directory flushing is not a power-loss guarantee and
+successful publication does not remain in recovery solely for that limitation.
+Synthetic native tests cover permanent ACL denial versus delete-pending
+contention, open-reader/failed/untorn replacement, killed writers and manual
+recovery, exact ownership cleanup, loopback UNC and junction-plus-parent traversal.
+UNC/share and reparse fixtures are required, not silently skipped. These tests
+compile locally but still require windows-latest runtime evidence. No M5a item is
+complete. Steps 3-8 (wincred manifest/transport, Jobs, console/operator integration,
+hooks and the isolated native matrix) and final evidence documentation remain
+pending. Existing higher-level operator, provider transaction and launch Windows
+guards remain in place; there are no installed hook or release changes.
+
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions
 - [ ] test(windows): expand real-runner and hook-shim matrix

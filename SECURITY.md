@@ -28,6 +28,24 @@ Age templates and age-to-plaintext export are prohibited. Windows filesystem
 operations await M5a. See [age workflows and recovery](docs/age.md).
 This is not a sandbox, hook activation or proof of host fail-closed behavior.
 
+## Windows development status
+
+M5a is incomplete. Windows store reads and writes now use handle-checked,
+protected owner-only DACLs for parents, locks, tokens, scratch, replacements,
+manifests and recovery. Existing broad/inherited/NULL DACLs and final reparse
+points are rejected, not silently repaired. Native CI must still certify this
+storage contract; cross-compilation cannot do so. Do not use Windows development
+builds with real stores. Higher-level operator, provider transaction and child
+launch guards remain pending later lifecycle and console work.
+
+Successful replacement flushes file data and uses handle-relative native rename
+without deleting the destination first or falling back to a copy. Real flush and
+publication failures remain failures. Windows directory flushing is unavailable
+under this contract, so a successful transaction does not imply power-loss
+durability. Owner-only DACLs do not isolate the same user or administrators and
+do not guarantee secure erasure. No Windows release, child containment, CredMan
+integration or shell/file-hook protection is claimed.
+
 ## What it protects
 
 - **Store values never pass through the CLI's own argv or diagnostics.** `show`

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func passCLI(t *testing.T, args []string, input []byte) (int, string, string) {
@@ -31,9 +32,9 @@ func passCLI(t *testing.T, args []string, input []byte) (int, string, string) {
 }
 func TestPassDiscoveryAndNoFileFallback(t *testing.T) {
 	originalPath := os.Getenv("PATH")
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	dir := filepath.Join(home, "stores")
-	if err := os.Mkdir(dir, 0700); err != nil {
+	if err := testutil.Mkdir(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
@@ -43,7 +44,7 @@ func TestPassDiscoveryAndNoFileFallback(t *testing.T) {
 	for _, kind := range []string{"pass", "libsecret"} {
 		path, _ := store.ManifestPath(dir, kind+":team")
 		data, _ := store.EncodeManifest([]store.ManifestRecord{{Key: "TOKEN", Account: "0123456789abcdef0123456789abcdef"}}, kind)
-		if err := os.WriteFile(path, data, 0600); err != nil {
+		if err := testutil.WriteFile(path, data, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}

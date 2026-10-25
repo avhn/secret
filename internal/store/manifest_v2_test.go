@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/secure"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func v2Record() ManifestV2Record {
@@ -212,4 +213,23 @@ func FuzzManifestV2(f *testing.F) {
 			t.Fatal("accepted noncanonical container")
 		}
 	})
+}
+
+func TestManifestV2PrivateRead(t *testing.T) {
+	directory := testutil.TempDir(t)
+	path := filepath.Join(directory, "synthetic.onepassword-keys")
+	data, err := EncodeManifestV2([]ManifestV2Record{v2Record()}, "onepassword")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := testutil.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	records, err := ReadManifestV2(path, "onepassword")
+	if err != nil || len(records) != 1 || records[0].ID != v2Record().ID {
+		t.Fatal("private v2 manifest read failed")
+	}
+	if _, err := ReadManifestV2(path, "pass"); err == nil {
+		t.Fatal("v2 accepted v1 provider")
+	}
 }

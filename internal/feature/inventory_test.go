@@ -13,6 +13,7 @@ import (
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func syntheticMetadata(data []byte) store.Metadata {
@@ -163,16 +164,16 @@ func TestInventoryValueIndependence(t *testing.T) {
 }
 
 func TestReadMetadataAndNoProviderCalls(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	// External providers are spies only. Any invocation, including Get, is a failure.
 	if runtime.GOOS != "windows" {
 		marker := filepath.Join(dir, "provider-called")
 		tools := filepath.Join(dir, "tools")
-		if err := os.Mkdir(tools, 0700); err != nil {
+		if err := testutil.Mkdir(tools, 0700); err != nil {
 			t.Fatal(err)
 		}
 		for _, name := range []string{"security", "secret-tool"} {
-			if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nprintf called > \"$SYNTH_METADATA_PROVIDER_MARKER\"\nexit 1\n"), 0700); err != nil {
+			if err := testutil.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nprintf called > \"$SYNTH_METADATA_PROVIDER_MARKER\"\nexit 1\n"), 0700); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -189,7 +190,7 @@ func TestReadMetadataAndNoProviderCalls(t *testing.T) {
 	for _, backend := range []string{"keychain", "libsecret"} {
 		t.Run(backend, func(t *testing.T) {
 			manifest := []byte("secret-manifest-v1\nbackend=" + backend + "\nTOKEN\t\t0123456789abcdef0123456789abcdef\nTOKEN\tenv=prod\tfedcba9876543210fedcba9876543210\n")
-			if err := os.WriteFile(filepath.Join(dir, "synthetic.keys"), manifest, 0600); err != nil {
+			if err := testutil.WriteFile(filepath.Join(dir, "synthetic.keys"), manifest, 0600); err != nil {
 				t.Fatal(err)
 			}
 			ref := backend + ":synthetic"
@@ -212,7 +213,7 @@ func TestReadMetadataAndNoProviderCalls(t *testing.T) {
 		})
 	}
 	path := filepath.Join(dir, "synthetic.secret")
-	if err := os.WriteFile(path, []byte("TOKEN=synthetic-secret-not-metadata\n"), 0600); err != nil {
+	if err := testutil.WriteFile(path, []byte("TOKEN=synthetic-secret-not-metadata\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	for _, ref := range []string{path, "file:" + path} {
@@ -224,8 +225,8 @@ func TestReadMetadataAndNoProviderCalls(t *testing.T) {
 }
 
 func TestMetadataReadFailures(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "synthetic.keys"), []byte("secret-manifest-v1\nbackend=libsecret\nTOKEN\t\tsynthetic-provider-output-sentinel\n"), 0600); err != nil {
+	dir := testutil.TempDir(t)
+	if err := testutil.WriteFile(filepath.Join(dir, "synthetic.keys"), []byte("secret-manifest-v1\nbackend=libsecret\nTOKEN\t\tsynthetic-provider-output-sentinel\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	for _, ref := range []string{"", "file:", "keychain:../escape", "libsecret:bad/name", "libsecret:synthetic", "keychain:missing", "file:" + dir, "file:" + filepath.Join(dir, "missing")} {
@@ -275,7 +276,7 @@ func TestMetadataOwnershipAndValidation(t *testing.T) {
 		if _, err := BuildInventory(nil, selectors); !errors.Is(err, store.ErrInvalidSelector) {
 			t.Fatal("empty inventory ignored invalid selector")
 		}
-		if _, err := LoadInventory([]string{"file:" + filepath.Join(t.TempDir(), "missing")}, "", selectors); !errors.Is(err, store.ErrInvalidSelector) {
+		if _, err := LoadInventory([]string{"file:" + filepath.Join(testutil.TempDir(t), "missing")}, "", selectors); !errors.Is(err, store.ErrInvalidSelector) {
 			t.Fatal("load accessed store before rejecting invalid selector")
 		}
 	}

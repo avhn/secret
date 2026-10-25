@@ -85,6 +85,12 @@ After:  Windows Go -> handle-anchored private writes -> file / NAME.wincred-keys
   `GetFinalPathNameByHandle`; retain lexical protection and missing suffixes. Do not collapse
   `link/..` before physical traversal.
 
+Age filesystem operations remain explicitly unsupported on Windows in this stack;
+private ACL foundations do not implement its strict directory-durability contract.
+The pass transport and 1Password registration/value transport also retain their
+Windows rejections. Names-only v1 and v2 reads use the native private-file boundary,
+and their Windows test fixtures must carry protected DACLs rather than mode bits alone.
+
 ### 2. Credential Manager and manifest compatibility
 
 - Add `internal/backend/wincred_windows.go` and `wincred_other.go`. Reuse

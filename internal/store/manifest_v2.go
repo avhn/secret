@@ -123,7 +123,7 @@ func EncodeManifestV2(records []ManifestV2Record, backend string) ([]byte, error
 
 // ReadManifestV2 reuses the private no-follow inventory boundary with a bounded read.
 func ReadManifestV2(path, backend string) ([]ManifestV2Record, error) {
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openReadRoot(filepath.Dir(path))
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func readManifestV2Root(root *os.Root, name, backend string) ([]ManifestV2Record
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) || info.Size() > ManifestV2Limit {
+	if !info.Mode().IsRegular() || !privateMode(info) || info.Size() > ManifestV2Limit {
 		return nil, errManifest
 	}
 	f, err := openNoFollow(root, name)
@@ -144,7 +144,7 @@ func readManifestV2Root(root *os.Root, name, backend string) ([]ManifestV2Record
 	}
 	defer f.Close()
 	opened, err := f.Stat()
-	if err != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || (runtime.GOOS != "windows" && opened.Mode().Perm()&0077 != 0) {
+	if err != nil || !os.SameFile(info, opened) || !opened.Mode().IsRegular() || !privateMode(opened) {
 		return nil, errManifest
 	}
 	data, err := io.ReadAll(io.LimitReader(f, ManifestV2Limit+1))
@@ -169,7 +169,7 @@ func registerManifestV2(path string, record ManifestV2Record, publish func(*os.R
 		return secure.ErrInvalidRequest
 	}
 	return WithWriteLock(filepath.Dir(path), func() error {
-		root, err := os.OpenRoot(filepath.Dir(path))
+		root, err := openReadRoot(filepath.Dir(path))
 		if err != nil {
 			return secure.ErrTransaction
 		}

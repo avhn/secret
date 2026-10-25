@@ -35,6 +35,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Integrate M5a native Windows private storage: protected owner-only DACLs checked
+  on opened handles for store reads, lock directories/tokens, marked scratch,
+  atomic replacements, v1 manifests and names-only recovery. File mutations share
+  the same private persistence path; CLI operator and provider-transaction guards
+  remain until their later native prerequisites are complete. Native paths reject
+  ambiguous drive/device/stream references and HOME falls back to USERPROFILE.
+  Unix store bytes and filename behavior remain unchanged. Windows data flushes
+  and publication errors are required, but directory power-loss durability is not
+  guaranteed. Synthetic Windows ACL, contention, replacement, crash, UNC and
+  junction tests require native CI; cross-compilation is not runtime evidence.
+
 
 ## [0.2.3] - 2026-10-24
 

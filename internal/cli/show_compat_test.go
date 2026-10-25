@@ -2,9 +2,10 @@ package cli
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/avhn/secret/internal/testutil"
 )
 
 // These exact text goldens protect the value-aware legacy show path when the
@@ -58,12 +59,12 @@ func TestShowLegacyTextGoldens(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
+			home := testutil.TempDir(t)
 			t.Setenv("HOME", home)
 			t.Setenv("SECRETS_DIR", filepath.Join(home, "stores"))
 			t.Setenv("SECRETS_ENV", filepath.Join(home, "missing.env"))
 			path := filepath.Join(home, "synthetic.secret")
-			if err := os.WriteFile(path, tt.data, 0600); err != nil {
+			if err := testutil.WriteFile(path, tt.data, 0600); err != nil {
 				t.Fatal(err)
 			}
 			args := append([]string{"show"}, tt.options...)
@@ -78,12 +79,12 @@ func TestShowLegacyTextGoldens(t *testing.T) {
 }
 
 func TestShowLegacyProviderTextGolden(t *testing.T) {
-	home := t.TempDir()
+	home := testutil.TempDir(t)
 	t.Setenv("HOME", home)
 	t.Setenv("SECRETS_DIR", home)
 	t.Setenv("SECRETS_ENV", filepath.Join(home, "missing.env"))
 	manifest := []byte("secret-manifest-v1\nbackend=libsecret\nTOKEN\t\t0123456789abcdef0123456789abcdef\nTOKEN\tenv=prod\tfedcba9876543210fedcba9876543210\nPROD\tenv=prod\t11111111111111111111111111111111\n")
-	if err := os.WriteFile(filepath.Join(home, "synthetic.keys"), manifest, 0600); err != nil {
+	if err := testutil.WriteFile(filepath.Join(home, "synthetic.keys"), manifest, 0600); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {

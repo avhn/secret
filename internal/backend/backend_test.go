@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 // stub is deliberately compiled only into tests. Production dispatch cannot
@@ -59,7 +60,7 @@ func (s *stub) Put(service, account, label string, value []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	return os.WriteFile(path, value, 0600)
+	return testutil.WriteFile(path, value, 0600)
 }
 func (s *stub) Delete(service, account string) error { return os.Remove(s.path(service, account)) }
 
@@ -90,7 +91,7 @@ func TestBackendOrdering(t *testing.T) {
 	// Inventory mapping: stash, reuse, reused_id, backend_value, no_backend_calls,
 	// put_failure, no_manifest, manifest_failure, no_published_record,
 	// orphan_exists, failed_publish_existing, prior_record_intact, mismatch.
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	s := &stub{dir: filepath.Join(dir, "stub")}
 	if err := os.MkdirAll(s.dir, 0700); err != nil {
 		t.Fatal(err)
@@ -187,7 +188,7 @@ func TestBackendOrdering(t *testing.T) {
 		t.Error("publish failure did not leave an orphan")
 	}
 	// A malformed manifest blocks a put and leaves the old inventory intact.
-	if err := os.WriteFile(manifest, []byte("corrupt"), 0600); err != nil {
+	if err := testutil.WriteFile(manifest, []byte("corrupt"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := Stash(dir, "keychain:demo", "OTHER", nil, []byte("synthetic-other"), s); err == nil {
@@ -219,7 +220,7 @@ func TestBackendDisplayLabels(t *testing.T) {
 		{"libsecret:demo", "secret demo TOKEN [env=dev,zone=west]", map[string]string{"zone": "west", "env": "dev"}},
 	} {
 		t.Run(tc.ref+"/"+tc.want, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			s := &labelStub{stub: &stub{dir: filepath.Join(dir, "stub")}}
 			if err := Stash(dir, tc.ref, "TOKEN", tc.labels, []byte("synthetic"), s); err != nil {
 				t.Fatal(err)
@@ -237,7 +238,7 @@ func (s *tooLargeStub) Put(string, string, string, []byte) error { return ErrVal
 
 // The keychain size limit reaches the user like Bash's message, not as a generic failure.
 func TestStashKeepsSizeLimitMessage(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	s := &tooLargeStub{stub: &stub{dir: filepath.Join(dir, "stub")}}
 	err := Stash(dir, "keychain:demo", "TOKEN", nil, []byte("synthetic"), s)
 	if !errors.Is(err, ErrValueTooLarge) {
@@ -246,7 +247,7 @@ func TestStashKeepsSizeLimitMessage(t *testing.T) {
 }
 
 func TestConcurrentBackendSameIdentity(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
 	// Four simultaneous writers still exercise account reuse under contention
 	// without spending most of the production lock timeout in polling sleeps
@@ -285,9 +286,9 @@ func TestRunProviderInheritedPipe(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix shell process inheritance required")
 	}
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	script := filepath.Join(dir, "provider")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 10 &\nprintf synthetic\n"), 0700); err != nil {
+	if err := testutil.WriteFile(script, []byte("#!/bin/sh\nsleep 10 &\nprintf synthetic\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now()
@@ -303,12 +304,12 @@ func TestRunProviderOutputLimit(t *testing.T) {
 	}
 	for _, stream := range []string{"stdout", "stderr"} {
 		t.Run(stream, func(t *testing.T) {
-			script := filepath.Join(t.TempDir(), "provider")
+			script := filepath.Join(testutil.TempDir(t), "provider")
 			redirect := ""
 			if stream == "stderr" {
 				redirect = "1>&2"
 			}
-			if err := os.WriteFile(script, []byte("#!/bin/sh\nhead -c 2097152 /dev/zero "+redirect+"\n"), 0700); err != nil {
+			if err := testutil.WriteFile(script, []byte("#!/bin/sh\nhead -c 2097152 /dev/zero "+redirect+"\n"), 0700); err != nil {
 				t.Fatal(err)
 			}
 			start := time.Now()

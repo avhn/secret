@@ -7,22 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"testing"
 
 	"github.com/avhn/secret/internal/secure"
+	"github.com/avhn/secret/internal/testutil"
 )
 
-func mutationPlatform(t *testing.T) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("operator persistence requires Unix private permissions until M5a")
-	}
-}
-
 func TestFileTransactionBytes(t *testing.T) {
-	mutationPlatform(t)
 	labels := map[string]string{"env": "dev"}
 	for _, tc := range []struct {
 		name, source, want string
@@ -38,9 +30,9 @@ func TestFileTransactionBytes(t *testing.T) {
 		{"batch", "KEY=old\nOTHER=peer\nREMOVE=gone\n", "NEW=old\nOTHER=updated\nADDED=added\n", []Mutation{{Kind: MutationRename, Key: "KEY", NewKey: "NEW"}, {Kind: MutationPut, Key: "OTHER", Value: []byte("updated")}, {Kind: MutationDelete, Key: "REMOVE"}, {Kind: MutationPut, Key: "ADDED", Value: []byte("added\n")}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			path := filepath.Join(dir, "synthetic.store")
-			if err := os.WriteFile(path, []byte(tc.source), 0600); err != nil {
+			if err := testutil.WriteFile(path, []byte(tc.source), 0600); err != nil {
 				t.Fatal(err)
 			}
 			transaction := FileTransaction{SecretsDir: dir, Path: path}
@@ -52,10 +44,7 @@ func TestFileTransactionBytes(t *testing.T) {
 			if err != nil || !bytes.Equal(got, []byte(tc.want)) {
 				t.Fatalf("unaffected-byte golden mismatch: %v", err)
 			}
-			info, err := os.Stat(path)
-			if err != nil || info.Mode().Perm() != 0600 {
-				t.Fatal("replacement is not private")
-			}
+			assertPrivateFixture(t, path)
 		})
 	}
 }
@@ -89,7 +78,6 @@ func TestMutationValidation(t *testing.T) {
 }
 
 func TestFileTransactionPrepublicationFailures(t *testing.T) {
-	mutationPlatform(t)
 	for _, tc := range []struct {
 		name      string
 		mutations []Mutation
@@ -103,10 +91,10 @@ func TestFileTransactionPrepublicationFailures(t *testing.T) {
 		{"late batch conflict", []Mutation{{Kind: MutationPut, Key: "NEW", Value: []byte("new")}, {Kind: MutationDelete, Key: "ABSENT"}}, false, secure.ErrNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			path := filepath.Join(dir, "synthetic.store")
 			original := []byte("# keep\nKEY=old\nOTHER=peer\n")
-			if err := os.WriteFile(path, original, 0600); err != nil {
+			if err := testutil.WriteFile(path, original, 0600); err != nil {
 				t.Fatal(err)
 			}
 			err := (FileTransaction{SecretsDir: dir, Path: path, FailOnConflict: tc.insert}).Apply(tc.mutations)
@@ -122,22 +110,12 @@ func TestFileTransactionPrepublicationFailures(t *testing.T) {
 }
 
 func TestFileTransactionTargetsAndPreflight(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	mutations := []Mutation{{Kind: MutationPut, Key: "KEY", Value: []byte("new")}}
-	if runtime.GOOS == "windows" {
-		path := filepath.Join(dir, "must-not-exist", "synthetic.store")
-		if err := (FileTransaction{SecretsDir: filepath.Dir(path), Path: path}).Apply(mutations); err != secure.ErrUnsupported {
-			t.Fatalf("Windows result: %v", err)
-		}
-		if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
-			t.Fatal("unsupported transaction had side effects")
-		}
-		return
-	}
 	for _, name := range []string{"directory", "symlink"} {
 		path := filepath.Join(dir, name)
 		if name == "directory" {
-			if err := os.Mkdir(path, 0700); err != nil {
+			if err := testutil.Mkdir(path, 0700); err != nil {
 				t.Fatal(err)
 			}
 		} else if err := os.Symlink("directory", path); err != nil {
@@ -171,10 +149,9 @@ func TestFileTransactionChild(t *testing.T) {
 }
 
 func TestFileTransactionConcurrentWriters(t *testing.T) {
-	mutationPlatform(t)
 	for _, subprocess := range []bool{false, true} {
 		t.Run(fmt.Sprint("process-", subprocess), func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			path := filepath.Join(dir, "synthetic.store")
 			const count = 4
 			results := make(chan error, count)
@@ -263,8 +240,7 @@ func TestMutationNamesOnlyPreflight(t *testing.T) {
 }
 
 func TestFileTransactionReplaceOnly(t *testing.T) {
-	mutationPlatform(t)
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "synthetic.store")
 	transaction := FileTransaction{SecretsDir: dir, Path: path, RequireExisting: true}
 	mutations := []Mutation{{Kind: MutationPut, Key: "KEY", Value: []byte("new")}}
@@ -274,7 +250,7 @@ func TestFileTransactionReplaceOnly(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("replace-only put created a missing file")
 	}
-	if err := os.WriteFile(path, []byte("KEY=prior\n"), 0600); err != nil {
+	if err := testutil.WriteFile(path, []byte("KEY=prior\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := transaction.Apply(mutations); err != nil {

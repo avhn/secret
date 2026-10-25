@@ -203,7 +203,7 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 			if e != nil || !info.Mode().IsRegular() {
 				return nil, nil, nil, fmt.Errorf("%s is missing or not a regular file", path)
 			}
-			data, e := os.ReadFile(path)
+			data, e := store.ReadFile(path)
 			if e != nil {
 				return nil, nil, nil, errors.New("cannot open store")
 			}

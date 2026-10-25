@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/avhn/secret/internal/secure"
 )
 
 var ErrInvalidKeystoreName = errors.New("invalid keystore name")
@@ -44,10 +46,19 @@ func (l Locator) Resolve(name string) (string, error) {
 		return name, nil
 	}
 	if strings.HasPrefix(name, "file:") {
+		if secure.ValidateStorePath(strings.TrimPrefix(name, "file:")) != nil {
+			return "", ErrInvalidKeystoreName
+		}
 		return name, nil
 	}
-	if strings.Contains(name, "/") || l.IsFile(name) {
+	if secure.ValidateStorePath(name) != nil {
+		return "", ErrInvalidKeystoreName
+	}
+	if secure.ExplicitStorePath(name) || l.IsFile(name) {
 		return name, nil
+	}
+	if secure.ValidateStorePath(l.dir()) != nil {
+		return "", ErrInvalidKeystoreName
 	}
 	visible := filepath.Join(l.dir(), name+".secret")
 	hidden := filepath.Join(l.dir(), "."+name+".secret")
@@ -60,6 +71,9 @@ func (l Locator) Resolve(name string) (string, error) {
 // Defaults lists file stores in Bash discovery order. Manifest discovery is
 // deferred to the backend layer.
 func (l Locator) Defaults() ([]string, error) {
+	if secure.ValidateStorePath(l.envFile()) != nil || secure.ValidateStorePath(l.dir()) != nil {
+		return nil, ErrInvalidKeystoreName
+	}
 	var files []string
 	if l.IsFile(l.envFile()) {
 		files = append(files, l.envFile())

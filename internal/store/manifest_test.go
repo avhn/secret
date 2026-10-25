@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/secure"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func TestManifestValidation(t *testing.T) {
@@ -43,7 +44,7 @@ func TestManifestValidation(t *testing.T) {
 	}
 }
 func TestManifestPublish(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "demo.keys")
 	a, err := NewAccount()
 	if err != nil {
@@ -64,7 +65,7 @@ func TestManifestPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, content[:len(content)-1], 0600); err != nil {
+	if err := testutil.WriteFile(path, content[:len(content)-1], 0600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := NewAccount()
@@ -84,7 +85,7 @@ func TestManifestPublish(t *testing.T) {
 			t.Error("manifest mode must be 0600")
 		}
 	} else {
-		t.Log("Windows file ACLs do not expose Unix permission bits")
+		assertPrivateFixture(t, path)
 	}
 	if err = UpdateManifest(path, "keychain", "OTHER", nil, b); err == nil {
 		t.Error("backend mismatch accepted")
@@ -101,10 +102,10 @@ func TestManifestPublish(t *testing.T) {
 			t.Error("symlink manifest accepted")
 		}
 	} else if runtime.GOOS == "windows" {
-		t.Log("symlink creation unavailable without Windows developer privileges")
+		t.Fatal("required Windows symlink fixture unavailable")
 	}
 	notFile := filepath.Join(dir, "directory.keys")
-	if err := os.Mkdir(notFile, 0700); err != nil {
+	if err := testutil.Mkdir(notFile, 0700); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ReadManifest(notFile, "libsecret"); err == nil {
@@ -123,8 +124,7 @@ func TestManifestPublish(t *testing.T) {
 }
 
 func TestWholeManifestPublication(t *testing.T) {
-	mutationPlatform(t)
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "synthetic.keys")
 	prior := []ManifestRecord{{Key: "KEY", Account: "11111111111111111111111111111111"}}
 	if err := WithWriteLock(dir, func() error { return PublishManifestLocked(path, "libsecret", prior) }); err != nil {
@@ -159,8 +159,7 @@ func TestWholeManifestPublication(t *testing.T) {
 }
 
 func TestManifestEditorRecoveryProtocol(t *testing.T) {
-	mutationPlatform(t)
-	path := filepath.Join(t.TempDir(), "synthetic.keys")
+	path := filepath.Join(testutil.TempDir(t), "synthetic.keys")
 	prepared := ManifestRecord{Key: "NEW", Labels: map[string]string{"env": "dev"}, Account: "22222222222222222222222222222222"}
 	intent := RecoveryIntent{Version: MetadataVersion, Backend: "keychain", Prepared: []ManifestRecord{prepared}}
 	var expired *ManifestEditor
@@ -179,10 +178,7 @@ func TestManifestEditorRecoveryProtocol(t *testing.T) {
 		if err != nil || len(got.Prepared) != 1 || got.Prepared[0].Account != prepared.Account {
 			t.Fatal("persisted recovery intent differs")
 		}
-		info, err := os.Stat(path + ".recovery")
-		if err != nil || info.Mode().Perm() != 0600 {
-			t.Fatal("recovery intent is not private")
-		}
+		assertPrivateFixture(t, path+".recovery")
 		if err := editor.PersistRecovery(intent); err != secure.ErrRecovery {
 			t.Fatal("overwrote existing recovery")
 		}
@@ -212,7 +208,6 @@ func TestManifestEditorRecoveryProtocol(t *testing.T) {
 }
 
 func TestRecoveryValidationAndAliases(t *testing.T) {
-	mutationPlatform(t)
 	for _, tc := range []struct {
 		name, body string
 		mode       os.FileMode
@@ -225,8 +220,8 @@ func TestRecoveryValidationAndAliases(t *testing.T) {
 		{"oversize", strings.Repeat(" ", recoveryLimit+1), 0600},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "synthetic.keys")
-			if err := os.WriteFile(path+".recovery", []byte(tc.body), tc.mode); err != nil {
+			path := filepath.Join(testutil.TempDir(t), "synthetic.keys")
+			if err := testutil.WriteFile(path+".recovery", []byte(tc.body), tc.mode); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := ReadRecovery(path, "keychain"); err != secure.ErrRecovery {
@@ -234,7 +229,7 @@ func TestRecoveryValidationAndAliases(t *testing.T) {
 			}
 		})
 	}
-	path := filepath.Join(t.TempDir(), "synthetic.keys")
+	path := filepath.Join(testutil.TempDir(t), "synthetic.keys")
 	if err := os.Symlink("missing", path+".recovery"); err != nil {
 		t.Fatal(err)
 	}
@@ -252,24 +247,5 @@ func TestRecoveryValidationAndAliases(t *testing.T) {
 	data, err := json.Marshal(RecoveryIntent{Version: MetadataVersion, Backend: "keychain", Prepared: []ManifestRecord{record}})
 	if err != nil || bytes.Contains(data, []byte("synthetic-sentinel")) || bytes.Contains(data, []byte("value")) || bytes.Contains(data, []byte("length")) || bytes.Contains(data, []byte("digest")) {
 		t.Fatal("recovery contains value-bearing metadata")
-	}
-}
-
-func TestManifestOperatorWindowsRefusal(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Windows early refusal")
-	}
-	path := filepath.Join(t.TempDir(), "missing", "synthetic.keys")
-	if err := WithManifestLock(path, "keychain", func(*ManifestEditor) error { t.Fatal("Windows callback invoked"); return nil }); err != secure.ErrUnsupported {
-		t.Fatal("Windows lock did not reject")
-	}
-	if err := PublishManifestLocked(path, "keychain", nil); err != secure.ErrUnsupported {
-		t.Fatal("Windows publisher did not reject")
-	}
-	if _, err := ReadRecovery(path, "keychain"); err != secure.ErrUnsupported {
-		t.Fatal("Windows recovery did not reject")
-	}
-	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
-		t.Fatal("unsupported operator created a directory")
 	}
 }

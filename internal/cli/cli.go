@@ -109,7 +109,10 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	default:
 		return c.fail("unknown subcommand; use secret help", 1)
 	}
-	home := os.Getenv("HOME")
+	home, homeErr := secure.UserHome()
+	if homeErr != nil && (os.Getenv("SECRETS_DIR") == "" || os.Getenv("SECRETS_ENV") == "") {
+		return c.fail("cannot locate home directory", 1)
+	}
 	dir := os.Getenv("SECRETS_DIR")
 	if dir == "" {
 		dir = filepath.Join(home, ".secrets")
@@ -117,6 +120,9 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	env := os.Getenv("SECRETS_ENV")
 	if env == "" {
 		env = filepath.Join(home, ".secrets.env")
+	}
+	if secure.ValidateStorePath(dir) != nil || secure.ValidateStorePath(env) != nil {
+		return c.failure(store.ErrInvalidKeystoreName)
 	}
 	c.dir = dir
 	c.loc = store.Locator{Home: home, SecretsDir: dir, SecretsEnv: env, IsFile: func(p string) bool { s, e := os.Stat(p); return e == nil && s.Mode().IsRegular() }, Glob: filepath.Glob}
@@ -328,7 +334,7 @@ func (c command) defaults() ([]string, error) {
 		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || (runtime.GOOS != "windows" && info.Mode().Perm()&0077 != 0) {
 			return nil, errors.New("invalid or mismatched manifest")
 		}
-		data, er := os.ReadFile(path)
+		data, er := store.ReadFile(path)
 		if er != nil {
 			return nil, errors.New("cannot read manifest")
 		}
@@ -458,7 +464,7 @@ func (c command) show(ref string, sel store.Selectors) ([]string, error) {
 	if e != nil || !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s is missing or not a regular file", path)
 	}
-	data, e := os.ReadFile(path)
+	data, e := store.ReadFile(path)
 	if e != nil {
 		return nil, errors.New("cannot open store")
 	}
@@ -521,7 +527,7 @@ func (c command) lookup(ref, key string, sel store.Selectors) ([]byte, error) {
 	if e != nil || !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s is missing or not a regular file", path)
 	}
-	data, e := os.ReadFile(path)
+	data, e := store.ReadFile(path)
 	if e != nil {
 		return nil, errors.New("cannot open store")
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func syntheticRegistration() RegisterRequest {
@@ -123,14 +124,14 @@ func TestOnePasswordReadOnlyFeaturePreflight(t *testing.T) {
 	}
 }
 func TestOnePasswordMetadataProjection(t *testing.T) {
-	dir := t.TempDir()
+	dir := testutil.TempDir(t)
 	request := syntheticRegistration()
 	record := store.ManifestV2Record{Key: request.Key, Labels: request.Labels, ID: strings.Repeat("c", 32), Provider: request.Provider}
 	data, err := store.EncodeManifestV2([]store.ManifestV2Record{record}, "onepassword")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "test.onepassword-keys"), data, 0600); err != nil {
+	if err := testutil.WriteFile(filepath.Join(dir, "test.onepassword-keys"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
 	metadata, err := readOnePasswordMetadata("onepassword:test", dir)

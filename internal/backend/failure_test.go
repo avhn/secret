@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/avhn/secret/internal/store"
+	"github.com/avhn/secret/internal/testutil"
 )
 
 func TestBackendFailureInventory(t *testing.T) {
@@ -22,7 +23,7 @@ func TestBackendFailureInventory(t *testing.T) {
 		{"failed_publish_existing/prior_record_intact", false, false, true, true},
 	} {
 		t.Run(tc.inventory, func(t *testing.T) {
-			dir := t.TempDir()
+			dir := testutil.TempDir(t)
 			s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
 			if err := os.MkdirAll(s.dir, 0700); err != nil {
 				t.Fatal(err)
