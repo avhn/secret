@@ -77,7 +77,13 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 	if err := root.Chmod(".", 0700); err != nil {
 		return errors.New("cannot protect secret directory")
 	}
+	return withRootLock(root, wait, func(*os.Root) error { return work() })
+}
+
+// withRootLock keeps the lock, callback and publication on one directory handle.
+func withRootLock(root *os.Root, wait time.Duration, work func(*os.Root) error) error {
 	const lock = ".write-lock"
+	var err error
 	deadline := time.Now().Add(wait)
 	for {
 		err = root.Mkdir(lock, 0700)
@@ -115,7 +121,7 @@ func withLock(dir string, wait time.Duration, work func() error) error {
 	if err := cleanStaleScratch(root); err != nil {
 		return err
 	}
-	return work()
+	return work(root)
 }
 
 // lockBusy reports contention. Windows denies access to a lock directory whose
@@ -200,6 +206,16 @@ func readRegular(root *os.Root, name string) ([]byte, error) {
 
 // atomicReplace creates a private sibling and publishes only after syncing data.
 func atomicReplace(root *os.Root, name string, data []byte) error {
+	return atomicReplaceChecked(root, name, data, false, nil)
+}
+
+func atomicReplaceChecked(root *os.Root, name string, data []byte, strict bool, checkpoint func(string) error) error {
+	check := func(phase string) error {
+		if checkpoint != nil {
+			return checkpoint(phase)
+		}
+		return nil
+	}
 	if err := regularTarget(root, name); err != nil {
 		return err
 	}
@@ -220,11 +236,17 @@ func atomicReplace(root *os.Root, name string, data []byte) error {
 	if err != nil {
 		return errors.New("atomic store update failed")
 	}
-	if _, err = file.Write(data); err != nil {
+	if err = check("scratch-write"); err == nil {
+		_, err = file.Write(data)
+	}
+	if err != nil {
 		_ = file.Close()
 		return errors.New("atomic store update failed")
 	}
-	if err = file.Sync(); err != nil {
+	if err = check("file-sync"); err == nil {
+		err = file.Sync()
+	}
+	if err != nil {
 		_ = file.Close()
 		return errors.New("atomic store update failed")
 	}
@@ -234,10 +256,28 @@ func atomicReplace(root *os.Root, name string, data []byte) error {
 	if err = regularTarget(root, name); err != nil {
 		return err
 	}
-	if err = root.Rename(filepath.Join(scratch, "replacement"), name); err != nil {
+	if err = check("rename"); err == nil {
+		err = root.Rename(filepath.Join(scratch, "replacement"), name)
+	}
+	if err != nil {
 		return errors.New("atomic store update failed")
 	}
-	// Publishing succeeded; directory sync only hardens crash durability.
+	// Age requires directory durability. A post-publication failure is not rollback.
+	if strict {
+		if check("directory-sync") != nil {
+			return ErrAgeDurability
+		}
+		parent, e := root.Open(".")
+		if e != nil {
+			return ErrAgeDurability
+		}
+		defer parent.Close()
+		if parent.Sync() != nil {
+			return ErrAgeDurability
+		}
+		return nil
+	}
+	// Publishing succeeded; directory sync only hardens legacy crash durability.
 	if runtime.GOOS != "windows" {
 		if parentFile, e := root.Open("."); e == nil {
 			_ = parentFile.Sync()
@@ -301,6 +341,9 @@ func StashWithSecretsDir(secretsDir, file, key string, labels map[string]string,
 		}
 		if os.IsNotExist(err) {
 			source = nil
+		}
+		if IsAgeStoreBytes(source) {
+			return ErrAge
 		}
 		return atomicReplace(root, name, rewriteStash(source, key, CanonicalLabels(labels), assignmentLine))
 	})

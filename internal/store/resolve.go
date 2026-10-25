@@ -33,7 +33,7 @@ func (l Locator) dir() string {
 
 // Resolve preserves explicit paths and validates provider references before use.
 func (l Locator) Resolve(name string) (string, error) {
-	if ProviderReference(name) || strings.HasPrefix(name, "onepassword:") {
+	if ProviderReference(name) || strings.HasPrefix(name, "onepassword:") || strings.HasPrefix(name, "age:") {
 		if !backendName.MatchString(name[strings.IndexByte(name, ':')+1:]) {
 			return "", ErrInvalidKeystoreName
 		}

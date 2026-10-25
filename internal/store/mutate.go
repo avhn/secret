@@ -152,19 +152,17 @@ func (transaction FileTransaction) Apply(mutations []Mutation) error {
 		if err != nil && !os.IsNotExist(err) {
 			return secure.ErrTransaction
 		}
+		if IsAgeStoreBytes(source) {
+			return secure.ErrInvalidRequest
+		}
 		records, _ := ParseMetadata(source)
 		if err := CheckMutationConflicts(records, mutations, transaction.FailOnConflict, transaction.RequireExisting); err != nil {
 			return err
 		}
-		result := secure.Clone(source)
-		defer func() { secure.Clear(result) }()
-		for _, mutation := range mutations {
-			next, err := rewriteMutation(result, mutation)
-			secure.Clear(result)
-			if err != nil {
-				return err
-			}
-			result = next
+		result, err := MutateBytes(source, mutations)
+		defer secure.Clear(result)
+		if err != nil {
+			return err
 		}
 		if err := atomicReplace(root, name, result); err != nil {
 			return secure.ErrTransaction
@@ -282,4 +280,22 @@ func insertMutation(source []byte, wanted string, line []byte) []byte {
 	}
 	result = append(result, line...)
 	return append(result, source[at:]...)
+}
+
+// MutateBytes applies a synchronous byte batch without filesystem access. It
+// returns owned bytes; source and mutations remain borrowed and unchanged.
+func MutateBytes(source []byte, mutations []Mutation) ([]byte, error) {
+	if err := ValidateMutations(mutations); err != nil {
+		return nil, err
+	}
+	result := secure.Clone(source)
+	for _, mutation := range mutations {
+		next, err := rewriteMutation(result, mutation)
+		secure.Clear(result)
+		if err != nil {
+			return nil, err
+		}
+		result = next
+	}
+	return result, nil
 }

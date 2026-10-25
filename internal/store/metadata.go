@@ -89,6 +89,8 @@ type OperatorAction string
 
 const (
 	ActionRegister OperatorAction = "register"
+	ActionAgeInit  OperatorAction = "age-init"
+	ActionAgeRekey OperatorAction = "age-rekey"
 	ActionImport   OperatorAction = "import"
 	ActionExport   OperatorAction = "export"
 	ActionRotate   OperatorAction = "rotate"
@@ -99,7 +101,7 @@ const (
 // Valid reports whether the action is an allowlisted consent-gated action.
 func (action OperatorAction) Valid() bool {
 	switch action {
-	case ActionRegister, ActionImport, ActionExport, ActionRotate, ActionRename, ActionDelete:
+	case ActionRegister, ActionAgeInit, ActionAgeRekey, ActionImport, ActionExport, ActionRotate, ActionRename, ActionDelete:
 		return true
 	}
 	return false

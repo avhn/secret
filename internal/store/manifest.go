@@ -25,6 +25,12 @@ type ManifestRecord struct {
 }
 
 func manifestBackend(backend string) bool {
+	return providerManifestBackend(backend) || backend == "age"
+}
+
+// providerManifestBackend lists providers with standalone manifests; age embeds
+// its v1 manifest in the encrypted envelope and has its own store path.
+func providerManifestBackend(backend string) bool {
 	return backend == "keychain" || backend == "libsecret" || backend == "pass"
 }
 
@@ -32,14 +38,14 @@ func manifestBackend(backend string) bool {
 // Classification is syntax-only and never opens a provider or its configuration.
 func ProviderReference(reference string) bool {
 	kind, _, ok := strings.Cut(reference, ":")
-	return ok && manifestBackend(kind)
+	return ok && providerManifestBackend(kind)
 }
 
 // ManifestPath is the single reference-to-inventory mapping, including recovery.
 // New v1 providers use isolated suffixes invisible to legacy Bash discovery.
 func ManifestPath(directory, reference string) (string, error) {
 	kind, name, ok := strings.Cut(reference, ":")
-	if !ok || !manifestBackend(kind) || !backendName.MatchString(name) {
+	if !ok || !providerManifestBackend(kind) || !backendName.MatchString(name) {
 		return "", ErrInvalidKeystoreName
 	}
 	suffix := ".keys"
