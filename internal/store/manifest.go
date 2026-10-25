@@ -30,7 +30,7 @@ func manifestBackend(backend string) bool {
 // providerManifestBackend lists providers with standalone manifests; age embeds
 // its v1 manifest in the encrypted envelope and has its own store path.
 func providerManifestBackend(backend string) bool {
-	return backend == "keychain" || backend == "libsecret" || backend == "pass"
+	return backend == "keychain" || backend == "libsecret" || backend == "pass" || backend == "wincred"
 }
 
 // ProviderReference classifies reserved provider prefixes before any file fallback.
@@ -48,8 +48,11 @@ func ManifestPath(directory, reference string) (string, error) {
 		return "", ErrInvalidKeystoreName
 	}
 	suffix := ".keys"
-	if kind == "pass" {
+	switch kind {
+	case "pass":
 		suffix = ".pass-keys"
+	case "wincred":
+		suffix = ".wincred-keys"
 	}
 	return filepath.Join(directory, name+suffix), nil
 }

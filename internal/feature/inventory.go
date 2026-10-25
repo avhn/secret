@@ -79,7 +79,7 @@ var (
 )
 
 // ReadMetadata accepts a resolved file path, file:PATH, keychain:NAME,
-// libsecret:NAME or pass:NAME. Directory is the explicit manifest directory, never discovered
+// libsecret:NAME, pass:NAME or wincred:NAME. Directory is the explicit manifest directory, never discovered
 // from ambient provider configuration. Provider records come only from manifests;
 // these reads never invoke a value provider. File bytes are cleared after parsing.
 // Parser warnings are names-only and omitted here; legacy text show remains separate.
