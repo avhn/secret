@@ -8,8 +8,7 @@ if not exist "%~dp0secret.exe" goto unavailable
 exit /b %errorlevel%
 :unavailable
 echo {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"secret: development binary unavailable; build hooks/secret.exe"}}
-if errorlevel 1 goto output_failure
-exit /b 0
-:output_failure
+rem ECHO can fail on a redirected handle without setting ERRORLEVEL. Exit 2 is a
+rem blocking hook status even when the denial JSON is lost; 1 would not block.
 echo secret: development binary unavailable 1>&2
 exit /b 2

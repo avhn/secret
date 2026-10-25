@@ -68,6 +68,18 @@ func TestWindowsDevelopmentShim(t *testing.T) {
 	if err != nil || !bytes.Equal(bytes.TrimSpace(output), bytes.TrimSpace(input.Deny(windowsShellReason, true))) {
 		t.Fatalf("native sibling invocation failed: %v (%s)", err, output)
 	}
+	readOnly, err := os.Open(shim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer readOnly.Close()
+	cmd = invoke(payload)
+	cmd.Stdout = readOnly
+	err = cmd.Run()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 2 {
+		t.Fatalf("sibling binary output failure status did not propagate: %v", err)
+	}
 	planted := filepath.Join(root, "planted")
 	if err := os.Mkdir(planted, 0700); err != nil {
 		t.Fatal(err)
@@ -79,20 +91,16 @@ func TestWindowsDevelopmentShim(t *testing.T) {
 	cmd = invoke(payload)
 	output, err = cmd.Output()
 	missing := input.Deny("secret: development binary unavailable; build hooks/secret.exe", false)
-	if err != nil || !bytes.Equal(bytes.TrimSpace(output), bytes.TrimSpace(missing)) {
-		t.Fatalf("missing sibling did not deny independently of PATH: %v (%s)", err, output)
+	exit = nil
+	if !errors.As(err, &exit) || exit.ExitCode() != 2 || !bytes.Equal(bytes.TrimSpace(output), bytes.TrimSpace(missing)) {
+		t.Fatalf("missing sibling did not fail and deny independently of PATH: %v (%s)", err, output)
 	}
-	readOnly, err := os.Open(shim)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer readOnly.Close()
 	cmd = invoke(payload)
 	cmd.Stdout = readOnly
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err = cmd.Run()
-	var exit *exec.ExitError
+	exit = nil
 	if !errors.As(err, &exit) || exit.ExitCode() != 2 || !strings.Contains(stderr.String(), "secret: development binary unavailable") {
 		t.Fatalf("missing-binary output failure did not propagate: %v (%s)", err, stderr.Bytes())
 	}

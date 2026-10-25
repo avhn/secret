@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Strengthen Windows Job shutdown by pinning descendant process handles before
+  termination, including early supervisor kills, and waiting for their native
+  termination as well as zero active Job processes before successful cleanup.
+  Replace the UI-only incompatible-Job premise with an exhausted active-process
+  allowance; accepted UI-restricted launches must prove two-generation Job
+  membership, kill-on-close limits and denied breakaway. Normalize VT sequences
+  and line wraps in ConPTY test witnesses, and inspect hidden-input echo only
+  after closing and draining the pseudoconsole. A missing development shim
+  sibling now always exits with blocking status 2, including when denial output
+  cannot be written (status 1 would let a host proceed);
+  real binary exit status still propagates. Installed manifests, Unix behavior
+  and inventories are unchanged. Native Windows rerun evidence remains required.
+
 - Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
   mark both milestones done. Installed defaults remain the Bash CLI and guard.
 - Correct native Windows test and ConPTY harness assumptions without changing

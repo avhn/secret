@@ -438,6 +438,58 @@ or get-verification stages without returning captured output or input values.
 The new generic-failure stage cannot be established on Linux; hosted execution
 must confirm this diagnosis and all native console and lifecycle assertions.
 
+## Four-failure native lifecycle and shim follow-up
+
+The UI-only enclosing-Job fixture conflated an accepted CreateProcess call with
+an escape. Windows documents nesting since Windows 8, UI restrictions on explicit
+Job nesting, and ordered creation-time assignment through JOB_LIST. The
+API-specific AssignProcessToJobObject contract prohibits UI limits on the newly
+assigned Job when the process is already in a Job; our new Job has no UI limits.
+The nested-Job overview describes the UI restriction more broadly. Given the
+hosted acceptance, a UI setting alone is not a sufficient incompatibility oracle.
+The replacement refusal fixture consumes its enclosing Job's entire active-process
+allowance with the parent. A separate UI-restricted case accepts only refusal
+before execution or verified two-generation membership in the new Job and retained
+membership in the enclosing Job (two and three members respectively), its exact
+KILL_ON_JOB_CLOSE flags and a failed explicit breakaway attempt. There is no
+unenrolled fallback or change to production process creation.
+
+The template assertion remains an immediate wait on a previously pinned live
+descendant, not a delayed PID lookup. Close already polled ActiveProcesses, but
+that alone did not establish the process-object signal observed by the native
+fixture. TerminateJobObject initiates TerminateProcess-style termination, which
+is asynchronous. Kill and Close now retain Job-member handles before termination;
+Close also captures members during shutdown, waits for zero active processes and
+waits for retained member handles plus the direct child within its existing
+2-second budget. Enumeration, open or wait failures retain fixed failure output.
+No Job limit is removed and the template assertion is not relaxed.
+
+Error-path decision: launch.go's outer rendered.Close defer runs after the native
+process.Close defer. When bounded shutdown cannot confirm containment, the run has
+already failed with "child supervision failed", and the payload is still removed.
+Retaining it would persist plaintext with no owner, which the private template
+contract forbids; removal never widens exposure, and a removal failure reports
+ErrTemplateCleanup. A failure-injection seam for native Close is a named follow-up;
+until it lands, this path is covered by review, not by native evidence.
+
+ConPTY marker matching ignores VT control sequences and physical line wraps,
+with portable synthetic parser cases including incomplete sequences and hidden
+Unicode witnesses. Successful helpers must still exit zero, restore exact input
+modes and preserve exact consent/value bytes. The pseudoconsole closes while its
+reader drains; echo checks cover the complete raw and normalized output. No
+captured transcript is printed. The development-only CMD shim always exits 2 for
+a missing sibling, even when ECHO fails without changing ERRORLEVEL; hosts treat
+2 as blocking without the JSON, while 1 is a non-blocking hook error. Its normal
+binary invocation retains exit /b %errorlevel%; native tests also require the
+binary's own output-failure status to propagate. Installed manifests are unchanged.
+All new native assertions remain pending a hosted rerun, not proven by cross-vet.
+
+References: [nested Jobs](https://learn.microsoft.com/en-us/windows/win32/procthread/nested-jobs),
+[creation-time Job lists](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute),
+[active-process limit refusal](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject),
+[Job termination](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject)
+and [asynchronous process termination](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess).
+
 ## Native verification matrix and CI
 
 | Required Windows lane | Evidence and failure assertions |

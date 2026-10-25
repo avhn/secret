@@ -177,8 +177,13 @@ function Invoke-Shell([string] $Shell, [string] $Image, [string[]] $Arguments, [
     return Invoke-Captured $launch.Executable $launch.Args $InputBytes
 }
 
-function Assert-Deny($Got, [string] $Reason) {
-    Assert-True ($Got.Code -eq 0 -and $Got.Err.Length -eq 0) 'shim exits successfully with decision'
+function Assert-Deny($Got, [string] $Reason, [switch] $Unavailable) {
+    if ($Unavailable) {
+        Assert-True ($Got.Code -eq 2 -and $script:Utf8.GetString($Got.Err).Trim() -ceq
+            'secret: development binary unavailable') 'missing sibling blocks with status 2'
+    } else {
+        Assert-True ($Got.Code -eq 0 -and $Got.Err.Length -eq 0) 'shim exits successfully with decision'
+    }
     $decision = ($script:Utf8.GetString($Got.Out) | ConvertFrom-Json).hookSpecificOutput
     $expected = $Reason
     if (-not $Reason.StartsWith('secret:')) {
@@ -371,7 +376,7 @@ $bytes = $encoding.GetBytes('err:' + $env:TOKEN + ':done')
     $missingShim = Join-Path $missing 'guard-go.cmd'
     Copy-Item -LiteralPath $script:Shim -Destination $missingShim
     foreach ($shell in @('cmd', 'pwsh')) {
-        Assert-Deny (Invoke-Shell $shell $missingShim @() $script:Utf8.GetBytes('{}')) 'secret: development binary unavailable; build hooks/secret.exe'
+        Assert-Deny (Invoke-Shell $shell $missingShim @() $script:Utf8.GetBytes('{}')) 'secret: development binary unavailable; build hooks/secret.exe' -Unavailable
     }
     Write-Output 'PASS fixed missing-binary shim denial (not host fail-closed evidence)'
 } catch {

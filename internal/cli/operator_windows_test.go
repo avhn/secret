@@ -125,9 +125,11 @@ func testWindowsConsole(t *testing.T, mode string) {
 	defer func() {
 		// Drain while ConPTY closes, including failure paths, to avoid its
 		// synchronous output-flush shutdown waiting on an unread pipe.
-		windows.TerminateProcess(process.Process, 2)
-		windows.ClosePseudoConsole(console)
-		consoleClosed = true
+		if !consoleClosed {
+			windows.TerminateProcess(process.Process, 2)
+			windows.ClosePseudoConsole(console)
+			consoleClosed = true
+		}
 		outputRead.Close()
 		<-drained
 	}()
@@ -137,7 +139,7 @@ func testWindowsConsole(t *testing.T, mode string) {
 		defer deadline.Stop()
 		for {
 			mu.Lock()
-			found := bytes.Contains(captured.Bytes(), []byte(marker))
+			found := bytes.Contains(consoleVisibleText(captured.Bytes()), []byte(marker))
 			mu.Unlock()
 			if found {
 				return
@@ -180,17 +182,35 @@ func testWindowsConsole(t *testing.T, mode string) {
 		waitFor("NEXT>")
 		write([]byte("next\r"))
 	}
-	waitFor("WINDOWS_CONSOLE_OK")
+	// Do not require the final render before observing exit. ConPTY may buffer
+	// that render until shutdown; keep draining while waiting for the helper.
 	status, err := windows.WaitForSingleObject(process.Process, 20000)
 	var code uint32
 	if err != nil || status != windows.WAIT_OBJECT_0 || windows.GetExitCodeProcess(process.Process, &code) != nil || code != 0 {
 		t.Fatal("native console child failed or did not exit")
 	}
+	// Process exit alone need not flush ConPTY's last rendered output. Close it
+	// while the reader is still draining, then inspect the complete transcript.
+	windows.ClosePseudoConsole(console)
+	consoleClosed = true
+	select {
+	case <-drained:
+	case <-time.After(5 * time.Second):
+		t.Fatal("console output did not drain after pseudoconsole close")
+	}
 	mu.Lock()
-	leaked := bytes.Contains(captured.Bytes(), []byte("synthetic-é-𐐷")) || bytes.Contains(captured.Bytes(), []byte("123456789")) || bytes.Contains(captured.Bytes(), bytes.Repeat([]byte{'s'}, 64))
+	visible := consoleVisibleText(captured.Bytes())
+	completed := bytes.Contains(visible, []byte("WINDOWS_CONSOLE_OK"))
+	leaked := false
+	for _, witness := range [][]byte{[]byte("synthetic-é-𐐷"), []byte("123456789"), bytes.Repeat([]byte{'s'}, 64)} {
+		leaked = leaked || bytes.Contains(captured.Bytes(), witness) || bytes.Contains(visible, witness)
+	}
 	mu.Unlock()
 	if leaked {
 		t.Fatal("hidden synthetic input echoed")
+	}
+	if !completed {
+		t.Fatal("native console child omitted its completion witness")
 	}
 }
 

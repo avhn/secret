@@ -420,6 +420,22 @@ Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks miss
 
 Status: in progress (owner-approved 2026-10-25; plan docs/design/m5a-plan.md). Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
 
+The four-failure native follow-up adds descendant-handle waits to successful
+Job shutdown, retaining identities before early Kill calls as well as Close.
+The incompatible-Job fixture exhausts an enclosing active-process allowance;
+UI-restricted launches either fail before execution or must demonstrate exact
+Job membership, kill-on-close and no breakaway across two generations. ConPTY
+witnesses normalize VT/line-wrap rendering and check hidden-input echo after
+final output drain. The development-only CMD shim returns blocking status 2 for a missing sibling
+regardless of ECHO's errorlevel behavior, and preserves the binary's own status.
+Native runtime confirmation is still required; no milestone completion is claimed.
+Template cleanup ordering: the native Close defer runs before the outer template
+defer, so a successful run removes the payload only after confirmed containment.
+After an unconfirmed Close the run already fails with a fixed diagnostic, and the
+payload is still removed because retaining plaintext would persist values; a
+failed removal reports the existing cleanup error. A Close failure-injection seam
+for this path is a named follow-up, not covered by native evidence.
+
 Native CLI/feature follow-up corrects pre-M5a refusal expectations, private
 fixtures, audit retention and lifecycle consent assertions. ConPTY fixtures
 suppress redirected standard-handle copies and do not require trailing blank
