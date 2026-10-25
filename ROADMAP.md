@@ -430,8 +430,15 @@ Gate: Windows runner proves ACLs, rename/lock, drive/UNC/junction paths, child l
 
 Status: in progress (owner-approved 2026-10-25; plan docs/design/m5b-plan.md). Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
 
-- [ ] feat(backend): implement pass stdin writes and private reads with stub and isolated gpg assertions
-- [ ] test(pass): extend provider collision matrix
+- [x] feat(backend): implement pass stdin writes and private reads with synthetic transport and isolated native driver
+- [x] test(pass): extend provider reservation, cleanup verification, byte and recovery matrix
+- [ ] Native GitHub pass jobs green on Linux and macOS (required before M5b completion)
+
+Staged implementation uses `NAME.pass-keys`, fresh-account transactions, frozen
+GPG options and validated signature policy. Same-name cross-backend export uses
+centralized manifest paths. See [pass support and recovery](docs/pass.md). The
+pinned upstream archive digest and disposable Makefile install are checked in;
+local synthetic results do not establish native provider or installed protection.
 
 Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and licensing review green; otherwise disabled.
 

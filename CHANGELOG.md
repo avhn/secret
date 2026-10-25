@@ -11,6 +11,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
   not establish real-provider compatibility. Default registration, discovery and
   reads remain disabled pending pinned provider evidence and licensing review.
   Bash defaults, hooks and plugin manifests are unchanged.
+- Add optional staged Go `pass:NAME` support on Linux/macOS for pass 1.7.4.
+  Private `NAME.pass-keys` v1 inventories are invisible to unchanged Bash
+  discovery. Fresh-account stash/operator transactions reserve before stdin
+  insertion, verify bytes before publication, and prove anchored absence after
+  deletion, including pass's exit-zero `rm` failure. Freeze GPG options against
+  config output/status injection and preserve validated signing fingerprints.
+  Metadata remains provider-free; same-name exports compare manifest paths.
+  Add synthetic collision/recovery/redaction tests and checksum-pinned native
+  GitHub pass/GPG fixtures. Native runner evidence is pending, not inferred from
+  local mocks. No Bash CLI, hook policy, plugin or installed-default changes.
+  See [pass support and manual recovery](docs/pass.md).
 
 ## [0.2.3] - 2026-10-24
 

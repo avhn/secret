@@ -6,7 +6,7 @@ const usage = `Usage: secret list [--format=json] | show [--format=json] [--env 
        secret get [--env ENV] [--label N=V ...] FILE KEY
        secret clip [--env ENV] [--label N=V ...] FILE KEY [SECONDS]
        secret import --from dotenv:ABS_PATH|op:ID|bw:ID --into REF [--map FIELD=KEY ...] [--label N=V ...] [--dry-run]
-       secret export --from REF --to keychain:NAME|libsecret:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
+       secret export --from REF --to keychain:NAME|libsecret:NAME|pass:NAME --on-conflict=fail [--env ENV] [--label N=V ...] [--key KEY ...] [--dry-run]
        secret rotate|delete REF KEY [--env ENV] [--label N=V ...]
        secret rename REF OLD NEW [--env ENV] [--label N=V ...]
        secret diff [--format=json] [--env LEFT --env RIGHT] [--left-label N=V ...] [--right-label N=V ...] REF [REF]
@@ -16,9 +16,10 @@ const usage = `Usage: secret list [--format=json] | show [--format=json] [--env 
        secret mcp --store REF [--store REF ...]
 Bare NAME resolves to ~/.secrets/NAME.secret, then ~/.secrets/.NAME.secret.
 keychain:NAME uses macOS Keychain; libsecret:NAME uses Linux Secret Service.
+pass:NAME uses optional pass 1.7.4 on Linux/macOS; NAME.pass-keys isolates its inventory.
 SECRET_KEYCHAIN selects an explicit keychain path (without spaces or quoting).
 file:PATH forces a literal file path. Keystore names must be
-simple names, not paths. Their names-only manifests live at ~/.secrets/NAME.keys.
+simple names, not paths. Legacy provider manifests live at ~/.secrets/NAME.keys.
 list prints store references; show prints file lengths or keystore <stored>.
 run and exec require explicit files and --. Later files win. Selectors export
 only selected keys; required keys must be nonempty, missing optional keys vanish.
@@ -50,7 +51,7 @@ can leave protected plaintext. Cleanup is not guaranteed erasure.
 Operator commands require stdin AND stdout terminals before access, then exact
 hidden controlling-terminal confirmation of every target/key/label identity. No yes
 flag, piped confirmation or operator JSON exists. Invoke directly in your terminal,
-never through agent tools. REF must be file:ABS_PATH or keychain:NAME/libsecret:NAME.
+never through agent tools. REF must be file:ABS_PATH or keychain:NAME/libsecret:NAME/pass:NAME.
 Rotation reads a hidden value, capped at 64 KiB; oversize input rejects, not truncates.
 Import/export are insert-only. op/bw require explicit mappings; export without
 selectors selects unlabeled keys only. Dry-run is names/conflicts only and still
