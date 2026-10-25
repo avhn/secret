@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -187,7 +188,17 @@ func testWindowsConsole(t *testing.T, mode string) {
 	status, err := windows.WaitForSingleObject(process.Process, 20000)
 	var code uint32
 	if err != nil || status != windows.WAIT_OBJECT_0 || windows.GetExitCodeProcess(process.Process, &code) != nil || code != 0 {
-		t.Fatal("native console child failed or did not exit")
+		windows.ClosePseudoConsole(console)
+		consoleClosed = true
+		select {
+		case <-drained:
+		case <-time.After(5 * time.Second):
+		}
+		mu.Lock()
+		// Report only the helper's fixed assertion text, never the transcript.
+		failure := consoleHelperFailure.Find(consoleVisibleText(captured.Bytes()))
+		mu.Unlock()
+		t.Fatalf("native console child failed or did not exit: %s", failure)
 	}
 	// Process exit alone need not flush ConPTY's last rendered output. Close it
 	// while the reader is still draining, then inspect the complete transcript.
@@ -213,6 +224,8 @@ func testWindowsConsole(t *testing.T, mode string) {
 		t.Fatal("native console child omitted its completion witness")
 	}
 }
+
+var consoleHelperFailure = regexp.MustCompile(`operator_windows_test\.go:[0-9]+: [A-Za-z+ ]+`)
 
 func TestWindowsConsoleHelper(t *testing.T) {
 	index := -1

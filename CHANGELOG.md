@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Accept hidden Windows console characters delivered on the Alt key-up record,
+  as Alt+Numpad entry and ConPTY synthesize them for characters outside the
+  keyboard layout; other key-up records stay ignored. Previously such characters
+  were silently dropped from hidden values.
 - Strengthen Windows Job shutdown by pinning descendant process handles before
   termination, including early supervisor kills, and waiting for their native
   termination as well as zero active Job processes before successful cleanup.

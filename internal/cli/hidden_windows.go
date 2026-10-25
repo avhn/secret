@@ -63,17 +63,33 @@ func (reader *consoleReader) nextUnit() (uint16, error) {
 			clearRecord(&record)
 			return 0, secure.ErrInput
 		}
-		if record.kind != 1 || record.down == 0 || record.char == 0 || record.repeat == 0 {
-			clearRecord(&record)
+		unit, repeat, accepted := recordUnit(&record)
+		clearRecord(&record)
+		if !accepted {
 			continue
 		}
-		reader.unit, reader.repeat = record.char, record.repeat-1
-		clearRecord(&record)
+		reader.unit, reader.repeat = unit, repeat
 		return reader.unit, nil
 	}
 }
 
 func clearRecord(record *consoleInputRecord) { *record = consoleInputRecord{} }
+
+// recordUnit returns one UTF-16 unit and its remaining repeats. Characters outside
+// the keyboard layout (Alt+Numpad entry, including ConPTY-synthesized input) are
+// delivered once, on the Alt key-up record; other key-up records carry no input.
+func recordUnit(record *consoleInputRecord) (uint16, uint16, bool) {
+	if record.kind != 1 || record.char == 0 {
+		return 0, 0, false
+	}
+	if record.down == 0 {
+		return record.char, 0, record.key == windows.VK_MENU
+	}
+	if record.repeat == 0 {
+		return 0, 0, false
+	}
+	return record.char, record.repeat - 1, true
+}
 
 func (reader *consoleReader) Read(data []byte) (int, error) {
 	if len(data) == 0 {
