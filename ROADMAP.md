@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass) and M5d (age) are done in the staged Go CLI, M5c (1Password) is scaffolded with dispatch disabled, and M5a (Windows) is in progress. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -428,17 +428,20 @@ Gate: Windows runner proves ACLs, rename/lock, drive/UNC/junction paths, child l
 
 ## M5b: pass backend
 
-Status: in progress (owner-approved 2026-10-25; plan docs/design/m5b-plan.md). Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
+Status: done (2026-10-25, PR #26 merged at `f64be81`; owner-approved scope; plan docs/design/m5b-plan.md). Estimate: 2-4 days. Goal: private stdin writes and reads via pass.
 
 - [x] feat(backend): implement pass stdin writes and private reads with synthetic transport and isolated native driver
 - [x] test(pass): extend provider reservation, cleanup verification, byte and recovery matrix
-- [ ] Native GitHub pass jobs green on Linux and macOS (required before M5b completion)
+- [x] Native GitHub pass jobs green on Linux and macOS: CI run [40207016515](https://github.com/avhn/secret/actions/runs/40207016515) at `f64be81`, `pass (ubuntu-latest)` and `pass (macos-latest)` with every other required job green
 
 Staged implementation uses `NAME.pass-keys`, fresh-account transactions, frozen
 GPG options and validated signature policy. Same-name cross-backend export uses
-centralized manifest paths. See [pass support and recovery](docs/pass.md). The
-pinned upstream archive digest and disposable Makefile install are checked in;
-local synthetic results do not establish native provider or installed protection.
+centralized storage paths. See [pass support and recovery](docs/pass.md). The
+pinned upstream archive digest and disposable Makefile install are checked in.
+Licensing: pass 1.7.4 is GPLv2+ and is only invoked as an optional external
+executable, never linked, vendored or bundled (plan Risks section). Support is
+staged in the Go CLI only; the installed Bash CLI, guard and plugin manifests are
+unchanged and no installed protection is claimed.
 
 Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and licensing review green; otherwise disabled.
 
@@ -455,21 +458,21 @@ Gate: named licensing review, sanitized whoami identity evidence from a pinned C
 
 ## M5d: age store
 
-Status: implemented locally, pending hosted CI (owner-approved 2026-10-25;
+Status: done (2026-10-25, PR #28 merged at `c322ac7`; owner-approved scope;
 [binding plan](docs/design/m5d-plan.md)). Estimate: 4-7 days. Goal: opt-in encrypted file storage.
 
-- [ ] build(age): reviewed exact age v1.3.2 pin, checksums, complete graph, permissive licenses and zero reachable vulnerability findings (local evidence recorded; pending CI)
-- [ ] feat(store): bounded envelopes, strict authenticated payload binding and anchored ciphertext publication (local tests; pending CI)
-- [ ] feat(backend): private explicit identities, encryption, stable-account mutation, create-only init and verified rekey (local tests; pending CI)
-- [ ] feat(cli): consent-gated init/rekey, initialized age import destinations, age export sources, authenticated selection-drift rejection and identity-free names-only interfaces (local tests; pending CI)
-- [ ] test(age): per-test keys, recipient/fault/concurrency tests, three bounded fuzz targets, Unix PTY/killed-writer recovery and unchanged inventory gates (pending native hosted Linux/macOS/Windows CI)
+- [x] build(age): reviewed exact age v1.3.2 pin, checksums, complete graph, permissive licenses and zero reachable vulnerability findings
+- [x] feat(store): bounded envelopes, strict authenticated payload binding and anchored ciphertext publication
+- [x] feat(backend): private explicit identities, encryption, stable-account mutation, create-only init and verified rekey
+- [x] feat(cli): consent-gated init/rekey, initialized age import destinations, age export sources, authenticated selection-drift rejection and identity-free names-only interfaces
+- [x] test(age): per-test keys, recipient/fault/concurrency tests, three bounded fuzz targets, Unix PTY/killed-writer recovery and unchanged inventory gates
 
-Local verification: full Go tests and focused M5d race checks passed. The required
-full internal race run failed unchanged Audit3 cases ar-48 through ar-53;
-the same focused race failure reproduced on original head `56e14b0`. These
-hard-coded `/tmp/audit2/w` fixture expectations remain unresolved, not waived.
-All requested CLI/hook regressions matched the existing inventories. Hosted
-Linux/macOS/Windows evidence is still pending.
+Hosted evidence: CI run [40219133634](https://github.com/avhn/secret/actions/runs/40219133634)
+at `c322ac7` (stacked on pass), all Linux/macOS/Windows Go, shell, provider and
+plugin jobs green. Windows age filesystem operations stay explicitly unsupported
+until M5a. The local-only Audit3 ar-48 through ar-53 failures came from a stale
+`/tmp/audit2/w` directory on one development machine (they also fail on unchanged
+main there) and do not reproduce on hosted runners.
 
 Gate: dependency license/security review, no persisted plaintext, atomic recovery
 and recipient/identity isolation green on applicable hosted jobs; otherwise omit.

@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Record hosted evidence for the staged Go pass (M5b) and age (M5d) backends and
+  mark both milestones done. Installed defaults remain the Bash CLI and guard.
 - Scaffold the Go-only, read-only 1Password backend behind a disabled source gate.
   Add the strict names-only v2 container, immutable registration consent, bound
   fake-op reads, detached bounded subprocesses, exact-byte validation and early
