@@ -124,6 +124,8 @@ jobs:
         run: python3 -I tests/test-release.py
       - name: Release launcher matrix (current Bash)
         run: '"$BASH_BIN" tests/test-launchers.sh'
+      - name: Offline 1Password fake-op and detached PTY contract
+        run: python3 -I tests/test-onepassword.py
       - name: Go operator terminal integration
         run: python3 -I tests/test-operator.py "$RUNNER_TEMP/secret-go"
       - name: Go CLI matrix
