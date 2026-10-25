@@ -418,7 +418,7 @@ Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks miss
 
 ## M5a: Windows CLI and Credential Manager
 
-Status: conditional. Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
+Status: in progress (owner-approved 2026-10-25; plan docs/design/m5a-plan.md). Estimate: 5-8 days. Goal: native Windows CLI and names-only CredMan integration.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions

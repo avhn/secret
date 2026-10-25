@@ -33,6 +33,10 @@ func (l Locator) dir() string {
 
 // Resolve preserves explicit paths and validates provider references before use.
 func (l Locator) Resolve(name string) (string, error) {
+	if strings.HasPrefix(name, "wincred:") {
+		// wincred stays inactive until Credential Manager dispatch is wired.
+		return "", ErrInvalidKeystoreName
+	}
 	if ProviderReference(name) || strings.HasPrefix(name, "onepassword:") || strings.HasPrefix(name, "age:") {
 		if !backendName.MatchString(name[strings.IndexByte(name, ':')+1:]) {
 			return "", ErrInvalidKeystoreName
