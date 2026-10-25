@@ -264,9 +264,17 @@ func TestWincredManifestDispatch(t *testing.T) {
 		}
 	}
 	if runtime.GOOS == "windows" {
-		// Step 6, not transport availability, owns lifting this prerequisite.
-		if err := (Transaction{SecretsDir: dir, Reference: "wincred:synthetic", Provider: p}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: "TOKEN", Value: []byte("synthetic")}}); !errors.Is(err, secure.ErrUnsupported) {
-			t.Fatal("Windows operator guard lifted early")
+		// Step 6 lifted the Windows operator guard with native transaction tests;
+		// a transaction through the injected API must now publish names only.
+		if err := (Transaction{SecretsDir: dir, Reference: "wincred:synthetic", Provider: p}).Apply([]store.Mutation{{Kind: store.MutationPut, Key: "TOKEN", Value: []byte("synthetic")}}); err != nil {
+			t.Fatal("Windows operator transaction failed")
+		}
+		records, err := ListNames(dir, "wincred:synthetic")
+		if err != nil || len(records) != 1 || records[0].Key != "TOKEN" {
+			t.Fatal("transaction inventory changed shape")
+		}
+		if data, err := os.ReadFile(path); err != nil || bytes.Contains(data, []byte("synthetic-value")) {
+			t.Fatal("value entered manifest")
 		}
 	}
 }
