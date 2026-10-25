@@ -3,13 +3,10 @@ package feature
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -315,26 +312,6 @@ func (output *importerOutput) Write(data []byte) (int, error) {
 	}
 	output.count += len(data)
 	return len(data), nil
-}
-
-func runImporter(ctx context.Context, name string, args []string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, name, args...)
-	configureImporterProcess(command)
-	command.WaitDelay = 250 * time.Millisecond
-	stdout := &importerOutput{data: make([]byte, MaxImporterOutputBytes), cancel: cancel}
-	stderr := &importerOutput{discard: true, cancel: cancel}
-	command.Stdout, command.Stderr = stdout, stderr
-	err := command.Run()
-	if errors.Is(err, exec.ErrWaitDelay) {
-		stopImporterProcess(command)
-	}
-	if err != nil || stdout.failed || stderr.failed || ctx.Err() != nil {
-		secure.Clear(stdout.data)
-		return nil, secure.ErrTransaction
-	}
-	return stdout.data[:stdout.count], nil
 }
 
 // privateJSON is a bounded byte-only parser tree. Even member names and ignored

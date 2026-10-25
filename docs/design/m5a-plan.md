@@ -201,10 +201,10 @@ always() and verifies absence, never enumerating or wildcard-deleting records.
 No real provider access runs when SECRET_REQUIRE_WINCRED is unset. Hosted results
 remain required; cross-vet and test compilation are not native evidence.
 
-Windows operator/Transaction, launch, template and audit persistence guards remain.
+Windows operator/Transaction, template and audit persistence guards remain.
 Step 6 still owns transaction success/failure and recovery lifecycle coverage on
-native Windows before lifting its guard. Steps 5-8 are not implemented by this
-transport change.
+native Windows before lifting its guard. Steps 5-8 were not implemented by the
+CredMan transport change; step 5 progress is recorded separately below.
 
 ## Initial native Windows unit-test corrections
 
@@ -219,6 +219,66 @@ it. The template parser fixture uses a native absolute path instead of the
 volume-less /synthetic/store path. Production protected owner-only checks and
 ambiguous-path rejection stay intact. Hosted confirmation of these corrections
 remains pending; cross-vet and compilation do not establish native success.
+
+## Step 5 implementation status
+
+Native run, exec and importer creation now share internal/transport's Windows
+process primitive. An unnamed non-inheritable Job has KILL_ON_JOB_CLOSE and no
+breakaway flags. STARTUPINFOEX carries both PROC_THREAD_ATTRIBUTE_JOB_LIST and an
+explicit list of duplicated stdio handles. CreateProcess is the only enrollment
+boundary: setup or incompatible enclosing-Job failures return a fixed error,
+without an unenrolled retry, suspended fallback or assign-after-start window.
+The parent's death closes its only Job handle and contains descendants even
+before the supervisor's wait goroutine exists.
+
+The extracted two-stream loop preserves Unix process-group behavior, including
+INT/TERM/HUP/QUIT forwarding and its existing drain/grace policy. Windows run and
+unfiltered supervised exec have a 15-second runtime deadline, 250 ms inherited-pipe
+wait and 2-second cancellation grace. Scoped CTRL_BREAK is forwarded to a new
+console process group for catchable console cancellation: Windows cannot scope
+CTRL_C to that group. Forwarding failures never cause a broadcast; bounded Job
+termination follows. With no attached console there is no console event to
+forward. Normal exit, output/filter failure, timeout and cancellation terminate
+remaining Job members. Job shutdown waits at most 2 seconds and reports fixed
+failure if containment completion cannot be confirmed. Native uint32 exit codes
+are preserved on Windows amd64. Importers keep the existing 15-second context,
+250 ms pipe wait, bounded byte-only stdout and counted/discarded stderr, and now
+clean up Job descendants on normal completion as well as failure. Operator
+entry points remain disabled until step 6.
+
+Environment blocks are explicitly encoded, sorted by case-insensitive UTF-16
+name and double-NUL terminated, including the empty block and native =C: drive-cwd
+entries. Invalid UTF-8 cannot round-trip and is rejected before creation, as are
+NUL, invalid names and case-insensitive collisions. Store/optional ambient-name
+removal is case-insensitive only on Windows; colliding loaded store keys fail.
+Owned UTF-16 blocks are cleared after native creation. Go's existing string
+environment copies remain GC-managed, not erasable; no secret is added to argv,
+errors, logs, JSON or audit. File and injected wincred-source tests assert invalid
+UTF-8 prevents launch; raw wincred NUL values also fail at export. File parsing
+already excludes NUL assignments on all platforms. Raw CredMan storage is unchanged.
+
+Executable resolution deliberately uses only child PATH and PATHEXT, with
+case-insensitive environment names. Bare names search PATH in its listed order;
+there is no implicit cwd, application-directory or system-directory search.
+Explicit relative paths and relative/empty entries explicitly present in PATH
+refer to the parent's current directory. An absent/empty PATH does not search cwd.
+An explicit extension is used literally; otherwise allowed PATHEXT suffixes are
+tried in order (default .COM;.EXE when PATHEXT is absent). Only .exe/.com images
+are launched. Batch files require an explicit shell executable and its arguments;
+no shell is inserted. Drive-relative and volume-less rooted executable paths are
+rejected. An absolute resolved application name and Go's Windows argv quoting
+are passed to CreateProcess, without printing resolver or native errors.
+
+Portable tests cover environment bytes, sort/termination, Unicode and rejection.
+Windows-only tests cover Job membership, restricted handle inheritance, parent
+death immediately before/after atomic creation with a grandchild, incompatible
+enclosing Jobs, scoped console forwarding, environment and argv round-trip,
+full exit codes, two-stream filtering, unfiltered exec, inherited/closed pipes,
+output failures/stalls, runtime deadlines and importer descendants. They run in
+the existing windows-latest package/race lanes, not on the Linux cross-check host.
+Hosted runtime confirmation remains required. Templates/private rendering,
+console consent, operator/transaction persistence, hooks and the full isolated
+native matrix remain steps 6-8; installed CLI/hooks/manifests are unchanged.
 
 ## Native verification matrix and CI
 

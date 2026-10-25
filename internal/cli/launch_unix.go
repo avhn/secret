@@ -4,7 +4,6 @@ package cli
 
 import (
 	"errors"
-	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,7 +15,7 @@ import (
 	"github.com/avhn/secret/internal/transport"
 )
 
-func launchUnsupported() bool { return false }
+func launchTemplateUnsupported() bool { return false }
 
 // childPath looks up bare names in the constructed environment, not the parent's PATH.
 func childPath(name string, env []string) (string, error) {
@@ -64,35 +63,6 @@ func childStatus(e error) int {
 		}
 		return exit.ExitCode()
 	}
-	return 1
-}
-
-// timedWriter leaves at most one blocked writer behind and never bypasses filtering.
-type timedWriter struct{ out io.Writer }
-
-func (w timedWriter) Write(p []byte) (int, error) {
-	result := make(chan struct {
-		n   int
-		err error
-	}, 1)
-	go func() {
-		n, err := w.out.Write(p)
-		result <- struct {
-			n   int
-			err error
-		}{n, err}
-	}()
-	select {
-	case r := <-result:
-		return r.n, r.err
-	case <-time.After(2 * time.Second):
-		return 0, errors.New("redaction output stalled")
-	}
-}
-
-// A stalled stderr consumer must not hold template cleanup behind diagnostics.
-func (c command) runFailure(message string) int {
-	_, _ = (timedWriter{c.errOut}).Write([]byte("secret: " + message + "\n"))
 	return 1
 }
 
@@ -147,72 +117,10 @@ func (c command) runTemplateChild(args, env []string, values [][]byte, signals <
 	}
 	outWrite.Close()
 	errWrite.Close()
-	defer stdout.Close()
-	defer stderr.Close()
-	// A descendant can close both pipes and outlive the direct child. Always
-	// stop the process group before returning, including successful completion,
-	// so the caller can remove a template only after explicit group shutdown.
-	defer func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }()
-	filters := make(chan error, 2)
-	go func() { filters <- matcher.Filter(stdout, timedWriter{c.out}) }()
-	go func() { filters <- matcher.Filter(stderr, timedWriter{c.errOut}) }()
-	waited := make(chan error, 1)
-	go func() { waited <- cmd.Wait() }()
-	var drain, terminate <-chan time.Time
-	var timeout, signalTimeout *time.Timer
-	defer func() {
-		if timeout != nil {
-			timeout.Stop()
-		}
-		if signalTimeout != nil {
-			signalTimeout.Stop()
-		}
-	}()
-	received := 0
-	failed := false
-	var status error
-	waitDone := false
-	interrupted := 0
-	for received < 2 || !waitDone {
-		select {
-		case s := <-signals:
-			sig := s.(syscall.Signal)
-			_ = syscall.Kill(-cmd.Process.Pid, sig)
-			if interrupted == 0 {
-				interrupted = 128 + int(sig)
-				signalTimeout = time.NewTimer(2 * time.Second)
-				terminate = signalTimeout.C
-			}
-		case <-terminate:
-			// Do not let an ignored catchable signal keep plaintext alive.
-			terminate = nil
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		case er := <-filters:
-			received++
-			if er != nil {
-				failed = true
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-				_ = stdout.Close()
-				_ = stderr.Close()
-			}
-		case status = <-waited:
-			waitDone = true
-			if received < 2 {
-				timeout = time.NewTimer(2 * time.Second)
-				drain = timeout.C
-			}
-		case <-drain:
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-			_ = stdout.Close()
-			_ = stderr.Close()
-			return c.runFailure("redaction filter failed")
-		}
+	process := supervisedProcess{
+		wait:    func() int { return childStatus(cmd.Wait()) },
+		kill:    func() { _ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) },
+		forward: func(s os.Signal) { _ = syscall.Kill(-cmd.Process.Pid, s.(syscall.Signal)) },
 	}
-	if failed {
-		return c.runFailure("redaction filter failed")
-	}
-	if interrupted != 0 {
-		return interrupted
-	}
-	return childStatus(status)
+	return c.superviseChild(process, stdout, stderr, matcher.Filter, signals, 0, 2*time.Second)
 }

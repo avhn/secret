@@ -35,6 +35,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
   tests, with module verification and matrix CI gates. Hosted CI remains pending.
   Plaintext defaults, Bash CLI, installed hooks and plugin manifests are unchanged;
   Windows age filesystem operations remain unsupported pending M5a.
+- Implement M5a Windows run, supervised unfiltered exec and importer children with
+  atomic PROC_THREAD_ATTRIBUTE_JOB_LIST enrollment, kill-on-close Jobs and stdio-only
+  handle inheritance, never assignment after creation. Bound runtime, pipe drain,
+  console-control forwarding and descendant cleanup; preserve native exit codes
+  and run's literal redaction on both streams. Explicit sorted UTF-16 environment
+  blocks reject lossy encoding, NUL and case-colliding names. Executable lookup
+  uses child PATH/PATHEXT, without an implicit shell or implicit cwd search.
+  Portable encoding tests and Windows-only lifecycle fixtures cover containment,
+  parent death with a grandchild, console forwarding, environment round-trip and
+  failures. Native windows-latest evidence is pending. Templates, native console
+  consent and operator/transaction workflows remain gated; Unix behavior and
+  installed hooks are unchanged.
+
 - Reject Windows reserved DOS device components regardless of extension or OS
   version, including console aliases and COM/LPT superscript digits. Backend stub
   fixtures now create protected private ancestors instead of inherited DACLs, and
@@ -50,7 +63,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
   reference validation without credential fetches. Non-Windows value dispatch
   returns unsupported, never plaintext fallback. Portable fake-API tests and a
   gated hosted-Windows synthetic lifecycle with journaled exact-target cleanup
-  are added; native runtime evidence is pending. Windows launch and operator
+  are added; native runtime evidence is pending. Windows operator and template
   guards stay in place until their later prerequisites are verified.
 
 - Integrate M5a native Windows private storage: protected owner-only DACLs checked

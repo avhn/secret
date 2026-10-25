@@ -452,10 +452,23 @@ absolute path in the template parser fixture. Explicit device-base rejection and
 private/native fixtures address those failures without relaxing production ACLs.
 The corrected lane still requires hosted windows-latest confirmation.
 
-Steps 5-8 (Jobs, console/operator integration, hooks and the full isolated native
-matrix) and final evidence documentation remain pending. Existing higher-level
-operator, provider transaction and launch Windows guards remain in place; there
-are no installed hook or release changes.
+Step 5 is implemented locally: run, supervised unfiltered exec and importer
+children use native STARTUPINFOEX with PROC_THREAD_ATTRIBUTE_JOB_LIST, restricted
+stdio inheritance and a non-inheritable kill-on-close Job. No assign-after-start,
+suspended fallback or breakaway is used. Windows supervision bounds runtime to
+15 seconds, inherited-pipe drain to 250 ms and console-signal grace to 2 seconds;
+Job shutdown is bounded before returning. Run retains two-stream literal
+redaction. Explicit UTF-16 environment blocks reject lossy values, NUL and
+case-colliding names, and native executable search uses child PATH/PATHEXT without
+an implicit shell or implicit cwd search. Portable encoding tests and native
+Job, parent-death/grandchild, console-forwarding, environment, exit and cleanup
+tests are added to the existing Windows package lanes. Cross-checks are not native
+runtime evidence; windows-latest confirmation is still required.
+
+Steps 6-8 (console/operator integration, hooks and the full isolated native
+matrix) and final evidence documentation remain pending. Higher-level operator,
+provider transaction and template Windows guards remain in place; there are no
+installed hook or release changes.
 
 - [ ] feat(windows): implement handle-safe paths acl and job cleanup
 - [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions

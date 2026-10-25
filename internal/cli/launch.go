@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/avhn/secret/internal/backend"
 	"github.com/avhn/secret/internal/feature"
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
@@ -19,7 +20,7 @@ import (
 
 var launchKey = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// Unix supplies a signal-aware supervisor; Windows rejects before rendering.
+// Platform supervisors share filtering; Windows templates remain gated on private rendering.
 // Keeping one channel from creation through cleanup avoids a pre-spawn signal gap.
 type templateSupervisor interface {
 	runTemplateChild(args, env []string, values [][]byte, signals <-chan os.Signal) int
@@ -90,12 +91,15 @@ func parseLaunch(args []string, loc store.Locator) (launchOptions, error) {
 // Go's process APIs require string environment entries: those copies and GC
 // visibility cannot be erased. Secret bytes never enter command arguments.
 func childEnvironment(ambient []string, selection store.Selection, required, optional []string, envFile string) ([]string, error) {
+	if err := validateEnvironmentSelection(selection); err != nil {
+		return nil, err
+	}
 	remove := map[string]bool{"SECRET_CHILD_DATA": true, "SECRET_CHILD_UNSET": true}
 	for _, k := range selection.Keys {
-		remove[k] = true
+		remove[environmentKey(k)] = true
 	}
 	for _, k := range optional {
-		remove[k] = true
+		remove[environmentKey(k)] = true
 	}
 	chosen := map[string]bool{}
 	for _, k := range append(append([]string(nil), required...), optional...) {
@@ -124,8 +128,8 @@ func childEnvironment(ambient []string, selection store.Selection, required, opt
 	// Preserve the ambient order while replacing only store and optional names.
 	result := make([]string, 0, len(ambient)+len(chosen))
 	for _, entry := range ambient {
-		k, _, ok := strings.Cut(entry, "=")
-		if ok && !remove[k] {
+		k, ok := environmentEntryKey(entry)
+		if ok && !remove[environmentKey(k)] {
 			result = append(result, entry)
 		}
 	}
@@ -135,10 +139,18 @@ func childEnvironment(ambient []string, selection store.Selection, required, opt
 			delete(chosen, k)
 		}
 	}
+	if err := validateChildEnvironment(result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
 func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, selected map[string][]byte, err error) {
+	return c.prepareLaunchWith(o, nil)
+}
+
+// Explicit provider injection is for synthetic tests, never environment activation.
+func (c command) prepareLaunchWith(o launchOptions, dispatch func(string) (backend.Provider, string, string, error)) (env []string, all [][]byte, selected map[string][]byte, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var selections []store.Selection
@@ -176,7 +188,18 @@ func (c command) prepareLaunch(o launchOptions) (env []string, all [][]byte, sel
 			secure.Clear(snapshot.Dotenv)
 			selections = append(selections, selected)
 		} else if providerRef(ref) {
-			records, p, service, e := c.openProviderRead(ctx, ref)
+			var records []store.ManifestRecord
+			var p backend.Provider
+			var service string
+			var e error
+			if dispatch == nil {
+				records, p, service, e = c.openProviderRead(ctx, ref)
+			} else {
+				records, e = backend.ListNames(c.dir, ref)
+				if e == nil {
+					p, _, service, e = dispatch(ref)
+				}
+			}
 			if e != nil {
 				return nil, nil, nil, e
 			}
@@ -253,8 +276,8 @@ func (c command) launch(mode string, args []string) (status int) {
 		}
 		return c.failure(e)
 	}
-	if launchUnsupported() {
-		return c.fail("run and exec are unsupported on Windows before M5a", 1)
+	if o.templateFile != "" && launchTemplateUnsupported() {
+		return c.fail("templates are unsupported on Windows before native private rendering", 1)
 	}
 	if mode == "exec" && o.templateFile != "" {
 		return c.fail("templates require supervised run", 1)
@@ -314,7 +337,7 @@ func (c command) launch(mode string, args []string) (status int) {
 		// path. Contents never enter argv or this environment entry.
 		filtered := make([]string, 0, len(env)+1)
 		for _, entry := range env {
-			if !strings.HasPrefix(entry, "SECRET_TEMPLATE_FILE=") {
+			if key, ok := environmentEntryKey(entry); ok && environmentKey(key) != environmentKey("SECRET_TEMPLATE_FILE") {
 				filtered = append(filtered, entry)
 			}
 		}

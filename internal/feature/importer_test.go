@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
 	"time"
 
@@ -310,9 +309,6 @@ func TestPrivateJSONByteStringsAndCleanup(t *testing.T) {
 }
 
 func TestImporterRunnerBoundsCancellationAndStderr(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("subprocess helper timing covered on Unix")
-	}
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
