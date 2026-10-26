@@ -45,6 +45,15 @@ func WithWriteLock(dir string, work func() error) error {
 
 var lockWait = 3 * time.Second
 
+// SetLockWaitForTest changes the process-wide write-lock budget for tests only.
+// Call it before starting writers and restore it after all writers have stopped.
+// Tests using it must not run in parallel with other store operations or setters.
+func SetLockWaitForTest(d time.Duration) (restore func()) {
+	previous := lockWait
+	lockWait = d
+	return func() { lockWait = previous }
+}
+
 // ValidateIdentity checks a key and complete selector set before any write.
 func ValidateIdentity(key string, labels map[string]string) error {
 	if !keyName.MatchString(key) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/store"
@@ -330,6 +331,7 @@ func TestPassTransactionRecoveryAndFreshAccounts(t *testing.T) {
 	}
 }
 func TestPassConcurrentWritersAndReservations(t *testing.T) {
+	t.Cleanup(store.SetLockWaitForTest(30 * time.Second))
 	p, _ := passFixture(t)
 	// Separate providers use the same root, just as independent processes do.
 	var wait sync.WaitGroup

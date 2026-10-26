@@ -247,11 +247,11 @@ func TestStashKeepsSizeLimitMessage(t *testing.T) {
 }
 
 func TestConcurrentBackendSameIdentity(t *testing.T) {
+	t.Cleanup(store.SetLockWaitForTest(30 * time.Second))
 	dir := testutil.TempDir(t)
 	s := &stub{dir: filepath.Join(dir, "stub"), backend: "libsecret"}
-	// Four simultaneous writers still exercise account reuse under contention
-	// without spending most of the production lock timeout in polling sleeps
-	// on loaded CI runners. The start barrier keeps the writes concurrent.
+	// Account reuse, not the production timeout, is under test. Allow loaded
+	// runners more time while the start barrier keeps the writes concurrent.
 	const count = 4
 	errs := make(chan error, count)
 	start := make(chan struct{})

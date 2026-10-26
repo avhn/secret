@@ -125,7 +125,7 @@ func TestStashValidationAndTargets(t *testing.T) {
 func TestMain(m *testing.M) {
 	mode := os.Getenv("GO_STORE_CHILD")
 	if mode != "" {
-		lockWait = 30 * time.Second
+		SetLockWaitForTest(30 * time.Second)
 	}
 	if mode == "" {
 		os.Exit(m.Run())
@@ -184,9 +184,7 @@ func TestMain(m *testing.M) {
 	os.Exit(0)
 }
 func TestConcurrentStash(t *testing.T) {
-	old := lockWait
-	lockWait = 30 * time.Second
-	defer func() { lockWait = old }()
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	for _, subprocess := range []bool{false, true} {
 		t.Run(fmt.Sprint("process-", subprocess), func(t *testing.T) {
 			path := filepath.Join(testutil.TempDir(t), "parallel.store")
@@ -328,6 +326,7 @@ func FuzzStash(f *testing.F) {
 }
 
 func TestExplicitStashWaitsForSecretsDirLock(t *testing.T) {
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	base := testutil.TempDir(t)
 	secrets := filepath.Join(base, "secrets")
 	explicit := filepath.Join(base, "elsewhere", "file.store")

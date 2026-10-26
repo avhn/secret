@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"filippo.io/age"
 	"github.com/avhn/secret/internal/secure"
@@ -203,6 +204,7 @@ func TestAgeCryptoFailuresPreserveOld(t *testing.T) {
 	}
 }
 func TestAgeConcurrentWritersReaders(t *testing.T) {
+	t.Cleanup(store.SetLockWaitForTest(30 * time.Second))
 	config, reference, recipients := ageTestConfig(t)
 	if err := config.Init(reference, recipients); err != nil {
 		t.Fatal(err)

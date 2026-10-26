@@ -363,6 +363,7 @@ func TestTransactionInvalidTargets(t *testing.T) {
 }
 
 func TestTransactionConcurrentWriters(t *testing.T) {
+	t.Cleanup(store.SetLockWaitForTest(30 * time.Second))
 	transactionPlatform(t)
 	dir := t.TempDir()
 	provider := &stub{dir: filepath.Join(dir, "provider"), backend: "libsecret"}

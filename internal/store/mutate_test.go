@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/testutil"
@@ -142,6 +143,7 @@ func TestFileTransactionChild(t *testing.T) {
 	if path == "" {
 		return
 	}
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	key := os.Getenv("GO_MUTATION_CHILD_KEY")
 	if err := (FileTransaction{SecretsDir: filepath.Dir(path), Path: path, FailOnConflict: true}).Apply([]Mutation{{Kind: MutationPut, Key: key, Value: []byte("synthetic")}}); err != nil {
 		t.Fatal(err)
@@ -149,6 +151,7 @@ func TestFileTransactionChild(t *testing.T) {
 }
 
 func TestFileTransactionConcurrentWriters(t *testing.T) {
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	for _, subprocess := range []bool{false, true} {
 		t.Run(fmt.Sprint("process-", subprocess), func(t *testing.T) {
 			dir := testutil.TempDir(t)

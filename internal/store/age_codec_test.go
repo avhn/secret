@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
 	"filippo.io/age"
 	"github.com/avhn/secret/internal/secure"
@@ -92,6 +93,7 @@ func TestAgeRecipients(t *testing.T) {
 	}
 }
 func TestAgeAnchoredTransactions(t *testing.T) {
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	if runtime.GOOS == "windows" {
 		if err := WithAgeLock("missing", false, func(*AgeEditor) error { t.Fatal("opened"); return nil }); err != secure.ErrUnsupported {
 			t.Fatal(err)

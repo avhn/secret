@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/testutil"
@@ -119,6 +120,7 @@ func TestManifestV2PrivateRegistration(t *testing.T) {
 	}
 }
 func TestManifestV2ConcurrentRegistration(t *testing.T) {
+	t.Cleanup(SetLockWaitForTest(30 * time.Second))
 	if runtime.GOOS == "windows" {
 		t.Skip("private Unix writer")
 	}
@@ -135,6 +137,8 @@ func TestManifestV2ConcurrentRegistration(t *testing.T) {
 	for err := range results {
 		if err == nil {
 			successes++
+		} else if !errors.Is(err, secure.ErrConflict) {
+			t.Fatal(err)
 		}
 	}
 	if successes != 1 {
