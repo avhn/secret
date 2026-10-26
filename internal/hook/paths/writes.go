@@ -79,24 +79,23 @@ func inheritedGitRootTargetWith(name, cwd, workdir, home string, anchor func(str
 	return false
 }
 
-// gitHeadSignature preserves regular HEAD discovery and Git validate_headref's
-// legacy symlink rule: the link text must start with "refs/", even when unborn.
-// Metadata errors alone cannot establish a Git role. Lstat also excludes Windows
-// junctions, which are not symbolic links for this signature.
+// gitHeadSignature is the union of two HEAD rules. Git validate_headref accepts a
+// symlink whose text starts with "refs/", even when unborn; some builds (Git for
+// Windows, NO_SYMLINK_HEAD) follow the link instead, so a HEAD that stats to a
+// regular file also counts. Missing or unresolvable HEADs and junctions to
+// directories do not; native Windows callers add their own fail-closed errors.
 func gitHeadSignature(name string) bool {
-	return gitHeadSignatureWith(name, os.Lstat, os.Readlink)
+	return gitHeadSignatureWith(name, os.Lstat, os.Readlink, os.Stat)
 }
 
-func gitHeadSignatureWith(name string, lstat func(string) (os.FileInfo, error), readlink func(string) (string, error)) bool {
-	info, err := lstat(name)
-	if err != nil {
-		return false
+func gitHeadSignatureWith(name string, lstat func(string) (os.FileInfo, error), readlink func(string) (string, error), stat func(string) (os.FileInfo, error)) bool {
+	if info, err := lstat(name); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		if target, err := readlink(name); err == nil && strings.HasPrefix(target, "refs/") {
+			return true
+		}
 	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		target, err := readlink(name)
-		return err == nil && strings.HasPrefix(target, "refs/")
-	}
-	return info.Mode().IsRegular()
+	info, err := stat(name)
+	return err == nil && info.Mode().IsRegular()
 }
 
 func gitConfigTarget(name, cwd, home, xdg, global string) bool {

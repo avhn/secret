@@ -565,10 +565,10 @@ Native rerun evidence remains required; local Windows vet/test compilation is no
 runtime evidence. No original audit expectation or inventory row changes.
 
 Resolved follow-up: **dangling symbolic HEAD Git-signature gap** (cross-platform,
-Go hook only). Signature discovery now follows Git `validate_headref`: a symlink
-HEAD whose text starts with `refs/` counts even when unborn; other links, junction
-HEADs and metadata errors do not. Inventories are unchanged; the frozen Bash guard
-is unchanged. See the
+Go hook only). Signature discovery adds Git `validate_headref`: a symlink HEAD
+whose text starts with `refs/` counts even when unborn, alongside the earlier
+regular-file rule and Windows fail-closed unresolvable HEADs. Inventories are
+unchanged; the frozen Bash guard is unchanged. See the
 [named review entry](docs/design/hook-tightening.md#dangling-symbolic-head-git-signature-gap).
 
 Step 8 is implemented locally, with native evidence pending CI. The unconditional

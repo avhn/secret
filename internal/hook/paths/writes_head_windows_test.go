@@ -27,7 +27,7 @@ func gitHeadSymlink(target, name string) error {
 }
 
 func TestWindowsGitHeadSignatures(t *testing.T) {
-	testGitHeadSignatures(t, func(t *testing.T, root, dir string, want bool) {
+	testGitHeadSignatures(t, true, func(t *testing.T, root, dir string, want bool) {
 		t.Helper()
 		if got := nativeGitDirectory(dir); got != want {
 			t.Errorf("nativeGitDirectory = %v, want %v", got, want)

@@ -8,7 +8,7 @@ import (
 )
 
 func TestGitHeadSignatures(t *testing.T) {
-	testGitHeadSignatures(t, func(t *testing.T, root, dir string, want bool) {
+	testGitHeadSignatures(t, false, func(t *testing.T, root, dir string, want bool) {
 		t.Helper()
 		if got := gitHeadSignature(filepath.Join(dir, "HEAD")); got != want {
 			t.Errorf("HEAD signature = %v, want %v", got, want)
@@ -23,7 +23,7 @@ func TestGitHeadSignatures(t *testing.T) {
 
 // Both the portable and native Windows discovery paths must apply the same
 // HEAD rule, independently of objects/refs versus linked-worktree metadata.
-func testGitHeadSignatures(t *testing.T, check func(*testing.T, string, string, bool)) {
+func testGitHeadSignatures(t *testing.T, native bool, check func(*testing.T, string, string, bool)) {
 	t.Helper()
 	for _, key := range []string{"GIT_DIR", "GIT_COMMON_DIR", "GIT_CONFIG_GLOBAL", "XDG_CONFIG_HOME"} {
 		t.Setenv(key, "")
@@ -41,7 +41,7 @@ func testGitHeadSignatures(t *testing.T, check func(*testing.T, string, string, 
 			{"refs_prefix_only", "link", "refs/", true},
 			{"existing_refs", "existing_link", "refs/heads/main", true},
 			{"dangling_non_refs", "link", "public/missing", false},
-			{"existing_non_refs", "existing_link", "public/main", false},
+			{"existing_non_refs", "existing_link", "public/main", true},
 			{"relative_refs", "link", "./refs/heads/main", false},
 			{"refs_neighbor", "link", "refs-public/main", false},
 			{"case_sensitive_prefix", "link", "REFS/heads/main", false},
@@ -94,7 +94,12 @@ func testGitHeadSignatures(t *testing.T, check func(*testing.T, string, string, 
 						t.Fatalf("HEAD link text = %q, %v; want %q", text, err, tc.target)
 					}
 				}
-				check(t, root, dir, tc.want)
+				want := tc.want
+				if native && tc.name == "link_loop" {
+					// Native discovery keeps unresolvable existing HEADs fail-closed.
+					want = true
+				}
+				check(t, root, dir, want)
 			})
 		}
 	}
@@ -122,7 +127,7 @@ func TestGitHeadSignatureMetadataErrors(t *testing.T) {
 				} else {
 					readlink = func(string) (string, error) { return "refs/heads/main", cause }
 				}
-				if gitHeadSignatureWith(head, lstat, readlink) {
+				if gitHeadSignatureWith(head, lstat, readlink, os.Stat) {
 					t.Fatal("metadata error established a Git HEAD signature")
 				}
 			})

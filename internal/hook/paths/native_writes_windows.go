@@ -112,9 +112,14 @@ func nativeRepositoryGitDir(start string) (string, error) {
 
 func nativeGitDirectory(dir string) bool {
 	// Share HEAD semantics with gitConfigTarget, including unborn refs/ links.
-	// nativeStat's reparse uncertainty is not evidence of a Git HEAD signature.
+	// A HEAD that exists but cannot be resolved stays fail-closed here, while a
+	// missing or dangling non-refs HEAD (os.Stat not-exist) is not a signature.
 	// Explicit repository/inherited roots above remain protected independently.
-	if !gitHeadSignature(filepath.Join(dir, "HEAD")) {
+	head := filepath.Join(dir, "HEAD")
+	if _, err := os.Stat(head); err != nil && !os.IsNotExist(err) {
+		return true
+	}
+	if !gitHeadSignature(head) {
 		return false
 	}
 	objects, objErr := nativeStat(filepath.Join(dir, "objects"))

@@ -6,9 +6,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Recognize legacy unborn symlink HEADs whose text starts with `refs/` as Git
   directory signatures in the staged Go hook, matching Git `validate_headref`, so
-  config writes beneath them deny. Non-refs links, junction HEADs and metadata
-  errors no longer establish a Git role, as in Git. The Bash guard and
-  inventories are unchanged.
+  config writes beneath them deny. The earlier "HEAD stats to a regular file"
+  rule and Windows fail-closed handling of unresolvable HEADs are kept, since
+  Git for Windows may follow HEAD links. The Bash guard and inventories are
+  unchanged.
 - Add a Windows regression that injects a failed native Close and requires the
   fixed supervision diagnostic and template payload removal.
 - Give store and backend contention tests a test-only lock budget so loaded

@@ -2292,12 +2292,16 @@ Resolved as a classified cross-platform tightening in the staged Go hook only.
 Git's [`setup.c` `is_git_directory` and `validate_headref`](https://github.com/git/git/blob/master/setup.c)
 use lstat and accept a symbolic HEAD when readlink succeeds and its literal text
 starts with `refs/`, without requiring that target to exist. Shared
-`writes.go` `gitHeadSignature` now applies that rule to both `gitConfigTarget`
-and Windows `nativeGitDirectory`. Existing regular HEAD discovery and
-objects/refs or commondir requirements are unchanged. A non-refs link, including
-one pointing to a regular file, does not establish a Git role; neither do lstat
-or readlink errors. Windows junction HEADs do not count as symbolic links.
-This preserves the run 40232530209 metadata-error over-classification repair.
+`writes.go` `gitHeadSignature` applies the union of that rule and the earlier
+"HEAD stats to a regular file" rule, because Git for Windows and NO_SYMLINK_HEAD
+builds may follow a HEAD link rather than validate its text. So a non-refs link
+to a regular file still counts, as before, while a dangling non-refs link,
+lstat or readlink errors alone, and a junction HEAD to a directory do not.
+Windows `nativeGitDirectory` keeps its earlier fail-closed answer when HEAD
+exists but cannot be resolved (os.Stat errors other than not-exist). Existing
+objects/refs or commondir requirements are unchanged. This preserves the run
+40232530209 metadata-error over-classification repair, which concerned missing
+HEAD resolution, and is strictly tighter than both previous rules.
 Explicit gitdirs, inherited Git roots and alias denials remain independent.
 The frozen Bash guard and installed manifests are unchanged.
 
@@ -2306,7 +2310,7 @@ Exact synthetic regressions:
 - `TestGitHeadSignatures` covers regular and empty regular HEADs, missing and
   directory HEADs, unborn and existing refs/ links, a refs/ prefix-only link,
   dangling and existing non-refs links, ./refs/, refs-neighbor, case and backslash
-  prefixes, and a symlink loop. Each runs with objects/refs and commondir layouts
+  prefixes, and a symlink loop (fail-closed in native discovery). Each runs with objects/refs and commondir layouts
   and checks config and missing hooks/new writes.
 - `TestGitHeadSignatureMetadataErrors` injects missing, permission and invalid
   errors at lstat/readlink, including partial refs/ text returned with an error.
