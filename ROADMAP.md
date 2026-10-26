@@ -438,8 +438,9 @@ Template cleanup ordering: the native Close defer runs before the outer template
 defer, so a successful run removes the payload only after confirmed containment.
 After an unconfirmed Close the run already fails with a fixed diagnostic, and the
 payload is still removed because retaining plaintext would persist values; a
-failed removal reports the existing cleanup error. A Close failure-injection seam
-for this path is a named follow-up, not covered by native evidence.
+failed removal reports the existing cleanup error. Follow-up
+`TestWindowsTemplateCloseFailureCleanup` injects a failed native Close and requires
+the fixed diagnostic and payload removal after Close (windows-latest only).
 
 Native CLI/feature follow-up corrects pre-M5a refusal expectations, private
 fixtures, audit retention and lifecycle consent assertions. ConPTY fixtures
@@ -563,12 +564,11 @@ all-shell denial and all native UNC/admin-share/subst/junction/gitdir tests rema
 Native rerun evidence remains required; local Windows vet/test compilation is not
 runtime evidence. No original audit expectation or inventory row changes.
 
-Open item: **dangling symbolic HEAD Git-signature gap** (cross-platform). Unix
-`writes.go` `gitConfigTarget` and Windows `nativeGitDirectory` require a regular
-HEAD for signature discovery. A legacy directory with a dangling symbolic HEAD
-is not recognized by that signature check, so Git config writes there rely on
-other proofs. Acknowledged during M5a review and deferred as a reviewed
-cross-platform tightening, not fixed in M5a. See the
+Resolved follow-up: **dangling symbolic HEAD Git-signature gap** (cross-platform,
+Go hook only). Signature discovery now follows Git `validate_headref`: a symlink
+HEAD whose text starts with `refs/` counts even when unborn; other links, junction
+HEADs and metadata errors do not. Inventories are unchanged; the frozen Bash guard
+is unchanged. See the
 [named review entry](docs/design/hook-tightening.md#dangling-symbolic-head-git-signature-gap).
 
 Step 8 is implemented locally, with native evidence pending CI. The unconditional
@@ -587,9 +587,9 @@ mandatory cases and document support/limits before any completion claim.
 Installed hooks/manifests and release defaults are unchanged; neither local
 checks nor the development shim prove host protection.
 
-- [ ] feat(windows): implement handle-safe paths acl and job cleanup
-- [ ] feat(backend): add credential manager with names-only manifest and disposable-target assertions
-- [ ] test(windows): expand real-runner and hook-shim matrix
+- [x] feat(windows): implement handle-safe paths acl and job cleanup (fb3086c, 7e84197, 9018346, bea5ab5, 9e622c7)
+- [x] feat(backend): add credential manager with names-only manifest and disposable-target assertions (5f9a2b6, dce01bd)
+- [x] test(windows): expand real-runner and hook-shim matrix (2184176, d865201, ee39018, 9165951, d077c60, ebca7fd)
 
 Gate: Windows runner proves ACLs, rename/lock, drive/UNC/junction paths, child lifecycle, exact fetch, no value in argv/output, and file/patch hooks. Shell calls deny when shim runs; document fail-open hosts. Publish Windows assets/Scoop only after M4-equivalent provenance gate.
 

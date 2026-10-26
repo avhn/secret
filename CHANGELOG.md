@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Recognize legacy unborn symlink HEADs whose text starts with `refs/` as Git
+  directory signatures in the staged Go hook, matching Git `validate_headref`, so
+  config writes beneath them deny. Non-refs links, junction HEADs and metadata
+  errors no longer establish a Git role, as in Git. The Bash guard and
+  inventories are unchanged.
+- Add a Windows regression that injects a failed native Close and requires the
+  fixed supervision diagnostic and template payload removal.
+- Give store and backend contention tests a test-only lock budget so loaded
+  runners do not time out; the production 3-second lock wait is unchanged.
+
 - Document staged Windows Go CLI support, wincred manifests and explicit
   console, Job, ACL, durability and redaction limits in [Windows support](docs/windows.md).
   Record the cross-platform dangling symbolic HEAD Git-signature gap as deferred.

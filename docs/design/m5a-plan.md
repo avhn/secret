@@ -469,8 +469,9 @@ process.Close defer. When bounded shutdown cannot confirm containment, the run h
 already failed with "child supervision failed", and the payload is still removed.
 Retaining it would persist plaintext with no owner, which the private template
 contract forbids; removal never widens exposure, and a removal failure reports
-ErrTemplateCleanup. A failure-injection seam for native Close is a named follow-up;
-until it lands, this path is covered by review, not by native evidence.
+ErrTemplateCleanup. The follow-up seam closeWindowsProcess lets
+TestWindowsTemplateCloseFailureCleanup inject a failed native Close after real
+cleanup and require the fixed diagnostic and payload removal after Close.
 
 ConPTY marker matching ignores VT control sequences and physical line wraps,
 with portable synthetic parser cases including incomplete sequences and hidden
