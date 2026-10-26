@@ -269,6 +269,65 @@ jobs:
           go test -v -count=1 -run '^TestWincredCleanup$' ./internal/backend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+  powershell-oracle:
+    name: powershell oracle (${{ matrix.edition }})
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [Desktop, Core]
+    env:
+      GOTOOLCHAIN: local
+      SECRET_PS_ORACLE_BUDGET: "2000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.10"
+          cache: true
+          cache-dependency-path: go.mod
+      - name: Record native image and toolchain
+        shell: pwsh
+        run: |
+          Write-Output "ImageOS=$env:ImageOS ImageVersion=$env:ImageVersion"
+          Write-Output ([Environment]::OSVersion.VersionString)
+          go version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify and extract pinned official PowerShell Core
+        if: matrix.edition == 'Core'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $download = Join-Path $env:RUNNER_TEMP 'powershell-oracle-download'
+          $extract = Join-Path $env:RUNNER_TEMP 'powershell-oracle-7.6.7'
+          foreach ($directory in @($download, $extract)) {
+            if (Test-Path -LiteralPath $directory) { throw 'Oracle asset directory already exists' }
+            $null = New-Item -ItemType Directory -Path $directory
+          }
+          $zip = Join-Path $download 'PowerShell-7.6.7-win-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/PowerShell/PowerShell/releases/download/v7.6.7/PowerShell-7.6.7-win-x64.zip' -OutFile $zip
+          $expected = 'd2f952ebdbf24386cb8923553aa58e41a846db35a6155ea04c58142a4b16dbb7'
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Output "PowerShell-7.6.7-win-x64.zip SHA256=$actual"
+          if ($actual -ne $expected) { throw 'Pinned PowerShell SHA-256 mismatch' }
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+      - name: Required inbox Windows PowerShell 5.1 oracle
+        if: matrix.edition == 'Desktop'
+        shell: pwsh
+        run: |
+          $oracle = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+          & $oracle -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-powershell.ps1 -Edition Desktop -Oracle $oracle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Required checksum-pinned PowerShell 7.6.7 oracle
+        if: matrix.edition == 'Core'
+        shell: pwsh
+        # The runner's pwsh orchestrates only; it is never the Core oracle.
+        run: |
+          $oracle = Join-Path $env:RUNNER_TEMP 'powershell-oracle-7.6.7\pwsh.exe'
+          & $oracle -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-powershell.ps1 -Edition Core -Oracle $oracle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   go:
     name: go (${{ matrix.os }})
     timeout-minutes: 60

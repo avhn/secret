@@ -1,0 +1,49 @@
+{"source":"Write-Output -InputObject:'-dash' | ForEach-Object -Process { Write-Output 'literal' }","origin":"mandatory replay control: colon binding and nested block","decision":"allow"}
+{"source":"Write-Output 'literal' 2>&1 | Out-Null","origin":"mandatory replay control: stream merge and edge","decision":"allow"}
+{"source":"Get-Content -LiteralPath public.txt | Out-Null","origin":"mandatory replay control: explicit reader","decision":"allow"}
+{"source":"Write-Output a,b","origin":"grammar control: argument-mode comma, conservative rejection","decision":"deny"}
+{"source":"Write-Output 'a'\"b\"","origin":"grammar control: quote adjacency, conservative rejection","decision":"deny"}
+{"source":"Write-Output x 2 > output.txt","origin":"grammar control: stream-number adjacency","decision":"deny"}
+{"source":"","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"# ordinary comment\r\n","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output 'it''s literal'","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output \"non expanding\"","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output -InputObject:'-dash'","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Get-Content -Path:'public.txt' -Raw","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Select-String pattern public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Select-String -Path public.txt 'literal pattern' -SimpleMatch -CaseSensitive","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Copy-Item -Destination dest.txt public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Copy-Item -LiteralPath public.txt dest.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Set-Content -LiteralPath public.txt '-dash data'","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Set-Content -Value x public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x | Set-Content public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x | Add-Content -Path:public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x | Out-File -FilePath public.txt -Append","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Get-Content public.txt | # comment\r\n Out-Null","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output '\ud801\udc00'","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output 'first\nsecond'","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 1> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 1>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 2> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 2>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 3> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 3>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 4> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 4>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 5> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 5>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 6> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 6>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 2>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 3>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 4>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 5>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x 6>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x *> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x *>> public.txt","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Write-Output x *>&1","decision":"allow","origin":"mandatory binding, token, span and stream replay control"}
+{"source":"Get-Content -PSPath public.txt","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
+{"source":"Get-Content -LP public.txt","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
+{"source":"Write-Output public | Get-Content -PSPath public.txt","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
+{"source":"Write-Output public | Set-Content","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
+{"source":"Write-Output public | Out-File","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}

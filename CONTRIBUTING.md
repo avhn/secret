@@ -66,6 +66,45 @@ still conservatively denies new secret subcommands; do not relax it for tests.
 Hosted PTY/provider results, native OS tests and all prior shell, Bash 3.2,
 inventory, exact hook and race gates are required before calling M3 complete.
 
+## M5e PowerShell oracle tests (Windows only)
+
+Production PowerShell classification remains disabled. These tests use synthetic
+source, parse and statically bind without execution, and exercise a Windows-only
+test adapter through the full Go hook. They do not install hooks, invoke models,
+access credential providers or prove real-host failure blocking.
+
+Use Go 1.26.10 with `GOTOOLCHAIN=local`. From the checkout on Windows, invoke the
+committed driver under each tested executable, not an arbitrary `pwsh` on PATH:
+
+```powershell
+$env:GOTOOLCHAIN = 'local'
+$desktop = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+& $desktop -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-powershell.ps1 -Edition Desktop -Oracle $desktop
+if ($LASTEXITCODE -ne 0) { throw 'Desktop oracle failed' }
+# Download the official 7.6.7 x64 zip into a new empty directory, verify its
+# pinned SHA-256, then extract into another new empty directory. See the fixture
+# README and ci.yml for the exact URL, digest and verification commands.
+$core = 'C:\absolute\disposable\PowerShell-7.6.7\pwsh.exe'
+& $core -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-powershell.ps1 -Edition Core -Oracle $core
+if ($LASTEXITCODE -ne 0) { throw 'Core oracle failed' }
+```
+
+The driver asserts Desktop 5.1 or exactly Core 7.6.7 and verifies its own executable
+matches the oracle path. It runs the Go tests without building or installing a CLI.
+Both edition lanes are required in CI, record the runner image/full versions and
+fail on missing or broken oracles. On other systems the native tests skip unless
+`SECRET_PS_ORACLE` is set; `SECRET_PS_ORACLE_REQUIRED=1` forbids that skip.
+
+The differential pass uses a fixed seed and 2,000 mutations per edition. Optional
+`SECRET_PS_ORACLE_BUDGET` changes the local generation count, not the required CI
+budget. Persist any printed minimized synthetic counterexample in
+`testdata/hook/powershell/replay.jsonl` before fixing a mismatch. Replay is always
+loaded alongside the corpus. Oracle fault tests run without PowerShell. Native
+logs include classifier p99 and worst-case 40 KiB timing, public/protected path
+controls, symlink availability and 8.3 support. Keep all prior Go, Windows, shell
+and inventory gates. See the [pins and evidence contract](testdata/hook/powershell/README.md)
+and [M5e plan](docs/design/m5e-plan.md); passing parser CI does not finish M5e.
+
 ## M5d encrypted-store tests
 
 Use Go 1.26.10 with `GOTOOLCHAIN=local`. Review the exact age pin, complete module

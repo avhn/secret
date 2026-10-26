@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Gate the PowerShell classifier in CI against inbox Windows PowerShell 5.1 and
+  the SHA-256 pinned official PowerShell 7.6.7 zip: test-only AST and static
+  binding comparisons, a fixed-seed differential generation pass with mandatory
+  replay rows, oracle fault tests, native junction, symlink, subst and UNC path
+  controls and classifier timing. Production PowerShell routing still denies.
 - Add the unwired `internal/hook/ps` PowerShell classifier: a bounded literal
   subset parser, exact command and parameter roles, non-expanding operand
   anchoring, `#requires` and signature denial, a synthetic corpus, fuzz targets
