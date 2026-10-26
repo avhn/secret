@@ -99,9 +99,13 @@ The differential pass uses a fixed seed and 2,000 mutations per edition. Optiona
 `SECRET_PS_ORACLE_BUDGET` changes the local generation count, not the required CI
 budget. Persist any printed minimized synthetic counterexample in
 `testdata/hook/powershell/replay.jsonl` before fixing a mismatch. Replay is always
-loaded alongside the corpus. Oracle fault tests run without PowerShell. Native
-logs include classifier p99 and worst-case 40 KiB timing, public/protected path
-controls, symlink availability and 8.3 support. Keep all prior Go, Windows, shell
+loaded alongside the corpus. The runner sends bounded batches of up to 250
+sources per fresh no-profile process, with indexed projections/errors and strict
+count, order and field checks. See the fixture README for protocol and capture/
+watchdog bounds; no hook deadline or CI generation budget changes. Oracle fault
+tests run without PowerShell. Native logs include classifier p99 and worst-case
+40 KiB timing, public/protected path controls, symlink availability and 8.3 support
+on the named fixture volume. Keep all prior Go, Windows, shell
 and inventory gates. See the [pins and evidence contract](testdata/hook/powershell/README.md)
 and [M5e plan](docs/design/m5e-plan.md); passing parser CI does not finish M5e.
 

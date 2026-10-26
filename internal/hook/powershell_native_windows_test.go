@@ -282,9 +282,9 @@ func TestPowerShellNativePathAliases(t *testing.T) {
 		}
 		short := windows.UTF16ToString(buffer[:n])
 		if strings.EqualFold(filepath.Base(short), filepath.Base(long)) {
-			t.Log("8.3 basename support absent on fixture volume; no short-alias evidence claimed")
+			t.Logf("8.3 basename support absent on fixture volume %s; no short-alias evidence claimed", filepath.VolumeName(long))
 		} else {
-			t.Log("8.3 basename support present; native identity witness tested")
+			t.Logf("8.3 basename support present on fixture volume %s; native identity witness tested", filepath.VolumeName(long))
 		}
 		powerShellNativeCheck(t, work, "Get-Content "+psQuote(short), true)
 		t.Setenv("AWS_CONFIG_FILE", long)

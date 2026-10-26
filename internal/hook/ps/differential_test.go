@@ -121,13 +121,25 @@ func TestOracleDifferentialGeneration(t *testing.T) {
 		}
 		budget = value
 	}
-	accepted := 0
+	var sources []string
+	var indices []int
 	for i, source := range generatedSources(corpusSources(t), budget) {
-		if !Classify([]byte(source), fakeContext()).Allow {
-			continue
+		if Classify([]byte(source), fakeContext()).Allow {
+			sources = append(sources, source)
+			indices = append(indices, i)
 		}
-		accepted++
-		if err := compareOracle(runner, source); err != nil {
+	}
+	offset := 0
+	for _, batch := range oracleBatches(sources) {
+		comparisons, err := compareOracleBatch(runner, batch)
+		if err != nil {
+			t.Fatalf("oracle infrastructure failure at generated batch index=%d: %v", indices[offset], err)
+		}
+		for j, err := range comparisons {
+			if err == nil {
+				continue
+			}
+			i, source := indices[offset+j], batch[j]
 			var infrastructure *oracleInfrastructureError
 			if errors.As(err, &infrastructure) {
 				t.Fatalf("oracle infrastructure failure at generated index=%d: %v", i, err)
@@ -151,11 +163,12 @@ func TestOracleDifferentialGeneration(t *testing.T) {
 			}
 			t.Fatalf("edition executable=%s generated index=%d: %v\noriginal synthetic source=%q\nminimized synthetic replay=%s\nPersist this case in testdata/hook/powershell/replay.jsonl before fixing the discrepancy.", runner.executable, i, err, source, row)
 		}
+		offset += len(batch)
 	}
-	if accepted == 0 {
+	if len(sources) == 0 {
 		t.Fatal("no generated Go-accepted native comparisons")
 	}
-	t.Logf("native generation %s: fixed seed=0x50534f5241434c45 generated=%d accepted/compared=%d", runner.executable, budget, accepted)
+	t.Logf("native generation %s: fixed seed=0x50534f5241434c45 generated=%d accepted/compared=%d", runner.executable, budget, len(sources))
 }
 
 func minimizeSynthetic(source string, budget int, fails func(string) bool) string {

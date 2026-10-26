@@ -30,7 +30,8 @@ Write-Output ('OS={0} runner_image={1} image_os={2}' -f [Environment]::OSVersion
 $env:GOTOOLCHAIN = 'local'
 $env:SECRET_PS_ORACLE = $Oracle
 $env:SECRET_PS_ORACLE_REQUIRED = '1'
-# Each oracle invocation has its own 15-second watchdog and bounded capture.
+# Each oracle batch has a bounded count/byte protocol, capture and watchdog
+# (30 seconds startup plus 250 ms per extra source, capped at two minutes).
 # The test-suite limit does not change hook read/analysis/overall deadlines.
 $failed = $false
 go test -v -count=1 -timeout 45m ./internal/hook/ps -run '^Test(Oracle|Differential)'

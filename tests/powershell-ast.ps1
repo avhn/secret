@@ -1,7 +1,8 @@
 # Test-only parse/binding oracle. Run a fixed absolute script with a fixed
 # powershell.exe/pwsh.exe -NoProfile -NonInteractive -File path, isolated cwd and
 # environment, bounded output capture and an external process-tree watchdog.
-# Candidate text is UTF-8 stdin, never an argument and never executed.
+# Candidate texts are a bounded UTF-8 JSON array on stdin, never arguments
+# and never executed. Each indexed result contains a projection or a fixed error.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
@@ -131,8 +132,13 @@ function Get-Metadata {
     foreach ($name in @($names | Sort-Object)) {
         # Only fixed built-in names, never candidate-controlled command discovery.
         $command = Get-Command -Name $name -CommandType Cmdlet -ErrorAction Stop
+        if ($null -eq $command -or $command -isnot [System.Management.Automation.CmdletInfo]) {
+            throw 'oracle cmdlet unavailable'
+        }
+        $parameterSets = $command.ParameterSets
+        if ($null -eq $parameterSets -or $parameterSets.Count -eq 0) { throw 'oracle parameter sets unavailable' }
         $sets = @()
-        foreach ($set in @($command.ParameterSets | Sort-Object Name)) {
+        foreach ($set in @($parameterSets | Sort-Object Name)) {
             $parameters = @()
             foreach ($parameter in @($set.Parameters | Sort-Object Name)) {
                 $position = [int]$parameter.Position
@@ -150,19 +156,17 @@ function Get-Metadata {
     }
 }
 
-try {
-    # Bound bytes before UTF-8 decoding. The watchdog, not ReadToEnd, bounds a
-    # writer that never closes stdin. No candidate text is sent to stderr.
-    $inputStream = [Console]::OpenStandardInput()
-    $buffer = New-Object byte[] 4096
-    $bytes = New-Object System.IO.MemoryStream
-    while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-        if ($bytes.Length + $count -gt 40960) { throw 'oracle input limit' }
-        $bytes.Write($buffer, 0, $count)
-    }
-    $utf8 = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList @($false, $true)
-    [Console]::OutputEncoding = $utf8
-    $source = $utf8.GetString($bytes.ToArray())
+# ErrorRecord identifiers only, never Exception.Message, source or environment.
+# Restrict even identifiers to a short value-free spelling before emitting them.
+function Get-OracleError($Record) {
+    $id = [string]$Record.FullyQualifiedErrorId
+    if ($id.Length -eq 0 -or $id.Length -gt 160 -or $id -cnotmatch '^[A-Za-z0-9_.:,+-]+$') { $id = 'unavailable' }
+    $line = 0
+    if ($null -ne $Record.InvocationInfo) { $line = [int]$Record.InvocationInfo.ScriptLineNumber }
+    return [ordered]@{ id = $id; line = $line }
+}
+function Get-Projection([string]$Source) {
+    if ($script:utf8.GetByteCount($Source) -gt 40960) { throw 'oracle source limit' }
     $script:tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$script:tokens, [ref]$errors)
     if ($script:tokens.Count -gt 4097) { throw 'oracle token limit' }
@@ -211,18 +215,64 @@ try {
     if ($commands.Count -gt 2048) { throw 'oracle node limit' }
     $bindings = @()
     foreach ($command in $commands) { $bindings += Get-Binding $command }
-    # Fixed default-session alias evidence, never candidate-controlled discovery.
-    $aliases = @{}
+    return [ordered]@{ aliases = $script:aliases; tokens = @($tokenProjection); parseErrors = @($parseErrors);
+        scriptRequirements = $requirements; statements = @($statements); bindings = @($bindings);
+        metadata = @($script:metadata); unsupported = @($script:unsupported | Sort-Object) }
+}
+
+try {
+    # Bound bytes before UTF-8/JSON decoding. The external watchdog bounds a
+    # writer that never closes stdin. No candidate text is sent to stderr.
+    $inputStream = [Console]::OpenStandardInput()
+    $buffer = New-Object byte[] 4096
+    $bytes = New-Object System.IO.MemoryStream
+    while (($count = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+        if ($bytes.Length + $count -gt 8388608) { throw 'oracle input limit' }
+        $bytes.Write($buffer, 0, $count)
+    }
+    $script:utf8 = New-Object -TypeName System.Text.UTF8Encoding -ArgumentList @($false, $true)
+    [Console]::OutputEncoding = $script:utf8
+    $document = $script:utf8.GetString($bytes.ToArray())
+    if (-not $document.TrimStart().StartsWith('[')) { throw 'oracle input array required' }
+    # 5.1 emits the root array as one object; 7.x enumerates it by default.
+    # Preserve the actual root array, including singleton/empty strings and
+    # invalid nested arrays, without relying on pipeline collection flattening.
+    if ($PSVersionTable.PSVersion.Major -ge 7) {
+        $sources = ConvertFrom-Json -InputObject $document -NoEnumerate -ErrorAction Stop
+    } else {
+        $sources = ConvertFrom-Json -InputObject $document -ErrorAction Stop
+    }
+    if ($sources -isnot [array]) { throw 'oracle input array required' }
+    if ($sources.Count -lt 1 -or $sources.Count -gt 250) { throw 'oracle batch count limit' }
+
+    # Capture aliases before any binder or metadata lookup can autoload their
+    # target modules. AliasInfo.Definition is the static target name on 5.1/7.x;
+    # ResolvedCommand can be null when that module has not been loaded.
+    $script:aliases = @{}
     foreach ($name in @('gc', 'cat', 'type', 'sls', 'gci', 'ls', 'dir', 'cp', 'copy', 'cpi', '%', 'foreach')) {
         $alias = Get-Alias -Name $name -ErrorAction Stop
-        $aliases[$name] = [string]$alias.ResolvedCommand.Name
+        $script:aliases[$name] = [string]$alias.Definition
     }
-    $result = [ordered]@{ aliases = $aliases; tokens = @($tokenProjection); parseErrors = @($parseErrors);
-        scriptRequirements = $requirements; statements = @($statements); bindings = @($bindings);
-        metadata = @(Get-Metadata); unsupported = @($script:unsupported | Sort-Object) }
-    [Console]::Out.Write(($result | ConvertTo-Json -Depth 100 -Compress))
-    [Console]::Out.WriteLine()
+    # Fixed built-ins only. Candidate text cannot mutate this fresh no-profile
+    # session, so immutable metadata can be shared by every source in the batch.
+    $script:metadata = @(Get-Metadata)
+    [Console]::Out.Write('[')
+    for ($index = 0; $index -lt $sources.Count; $index++) {
+        if ($index -gt 0) { [Console]::Out.Write(',') }
+        try {
+            if ($sources[$index] -isnot [string]) { throw 'oracle source string required' }
+            $projection = Get-Projection $sources[$index]
+            $result = [ordered]@{ index = $index; projection = $projection; error = $null }
+            $json = ConvertTo-Json -InputObject $result -Depth 100 -Compress
+        } catch {
+            $result = [ordered]@{ index = $index; projection = $null; error = (Get-OracleError $_) }
+            $json = ConvertTo-Json -InputObject $result -Depth 100 -Compress
+        }
+        [Console]::Out.Write($json)
+    }
+    [Console]::Out.WriteLine(']')
 } catch {
-    [Console]::Error.WriteLine('powershell oracle failed')
+    $failure = Get-OracleError $_
+    [Console]::Error.WriteLine(('powershell oracle failed id={0} line={1}' -f $failure.id, $failure.line))
     exit 2
 }

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Batch the test-only PowerShell oracle's synthetic sources to amortize native
+  startup, with bounded indexed projections, isolated per-source failures and
+  value-free failure identifiers. Capture default aliases without resolving
+  unloaded modules and log the actual 8.3 fixture volume. Native rerun evidence
+  remains required; the Go classifier, comparisons, corpus, production denial
+  and 2,000-input per-edition differential budget are unchanged.
 - Gate the PowerShell classifier in CI against inbox Windows PowerShell 5.1 and
   the SHA-256 pinned official PowerShell 7.6.7 zip: test-only AST and static
   binding comparisons, a fixed-seed differential generation pass with mandatory

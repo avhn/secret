@@ -2,9 +2,12 @@ package ps
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -119,5 +122,127 @@ func TestOracleMetadataComparison(t *testing.T) {
 				t.Fatalf("incorrect %s evidence passed", field)
 			}
 		})
+	}
+}
+
+func TestOracleRunnerBatch(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := oracleRunner{executable: executable, script: "unused", directory: t.TempDir(), environment: []string{"SECRET_PS_FAULT_HELPER=valid"}, prefix: []string{"-test.run=^TestOracleFaultHelper$", "--"}, timeout: 15 * time.Second, outputLimit: oracleOutputLimit}
+	sources := []string{"", "Write-Output literal", "Write-Output 'it''s data'", "Write-Output '𐐀'", "# comment\r\nWrite-Output other", "Write-Output literal"}
+	comparisons, err := compareOracleBatch(runner, sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, err := range comparisons {
+		if err != nil {
+			t.Fatalf("batch index=%d: %v", i, err)
+		}
+	}
+	runner.environment = []string{"SECRET_PS_FAULT_HELPER=mixed"}
+	comparisons, err = compareOracleBatch(runner, sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, err := range comparisons {
+		var infrastructure *oracleInfrastructureError
+		if i == 1 {
+			if !errors.As(err, &infrastructure) || !strings.Contains(err.Error(), "index=1 id=OracleSyntheticFailure line=42") {
+				t.Fatalf("missing indexed failure: %v", err)
+			}
+		} else if err != nil {
+			t.Fatalf("failure crossed index=%d: %v", i, err)
+		}
+	}
+}
+
+func TestOracleBatchPartition(t *testing.T) {
+	for _, sources := range [][]string{
+		make([]string, oracleBatchLimit+1),
+		strings.Split(strings.Repeat(strings.Repeat("\x00", MaxSource)+"|", oracleBatchLimit), "|")[:oracleBatchLimit],
+	} {
+		batches := oracleBatches(sources)
+		if len(batches) < 2 {
+			t.Fatal("batch boundary was not exercised")
+		}
+		var flattened []string
+		for _, batch := range batches {
+			encoded, err := json.Marshal(batch)
+			if err != nil || len(encoded) > oracleInputLimit || len(batch) > oracleBatchLimit || len(batch) == 0 {
+				t.Fatal("unbounded batch")
+			}
+			flattened = append(flattened, batch...)
+		}
+		if !reflect.DeepEqual(flattened, sources) {
+			t.Fatal("partition changed count, order or source")
+		}
+	}
+}
+
+func TestOracleBatchInputLimits(t *testing.T) {
+	for _, sources := range [][]string{
+		nil, make([]string, oracleBatchLimit+1), {strings.Repeat("x", MaxSource+1)}, {"\xff"},
+		strings.Split(strings.Repeat(strings.Repeat("\x00", MaxSource)+"|", oracleBatchLimit), "|")[:oracleBatchLimit],
+	} {
+		// No executable: a validation failure must happen before process startup.
+		if got, err := (oracleRunner{}).runBatch(sources); err == nil || got != nil || strings.Contains(err.Error(), "process failed") {
+			t.Fatalf("invalid input reached process: %v", err)
+		}
+	}
+}
+
+func TestOracleRunnerDiagnostics(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"nonzero-diagnostic", "nonzero-control", "nonzero-long", "nonzero-nonascii"} {
+		runner := oracleRunner{executable: executable, script: "unused", directory: t.TempDir(), environment: []string{"SECRET_PS_FAULT_HELPER=" + mode}, prefix: []string{"-test.run=^TestOracleFaultHelper$", "--"}, timeout: 2 * time.Second, outputLimit: oracleOutputLimit}
+		_, err := runner.run("Write-Output literal")
+		if err == nil || !strings.Contains(err.Error(), "process failed") {
+			t.Fatalf("missing process failure: %v", err)
+		}
+		if strings.Contains(err.Error(), "suppressed") || (mode == "nonzero-diagnostic") != strings.Contains(err.Error(), "id=PropertyNotFoundStrict line=42") {
+			t.Fatalf("incorrect diagnostic capture: %v", err)
+		}
+	}
+	for _, text := range []string{"line\nsecond", "\tline", "\x00", "line\r", strings.Repeat("x", 513)} {
+		if got := oracleDiagnostic([]byte(text)); got != "" {
+			t.Fatalf("unsafe diagnostic accepted: %q", got)
+		}
+	}
+	if got := oracleDiagnostic([]byte("fixed id=Test line=42\r\n")); got != "fixed id=Test line=42" {
+		t.Fatalf("lost WriteLine diagnostic: %q", got)
+	}
+}
+
+func TestOracleBatchIsolation(t *testing.T) {
+	runner := configuredOracle(t)
+	for _, source := range []string{"", "Write-Output 'public literal'"} {
+		if err := compareOracle(runner, source); err != nil {
+			t.Fatalf("fresh batch of one: %v", err)
+		}
+	}
+	// Alias evidence is captured before any metadata lookup or binder can load
+	// Management, including in this fresh process with an empty first source.
+	// The middle input exceeds the oracle token cap, not the source-byte cap.
+	sources := []string{"", strings.Repeat("Out-Null;", MaxTokens), "Write-Output 'public literal'"}
+	results, err := runner.runBatch(sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, i := range []int{0, 2} {
+		native, err := results[i].value()
+		if err != nil {
+			t.Fatalf("unrelated index=%d failed: %v", i, err)
+		}
+		if err := compareOracleProjection(sources[i], native); err != nil {
+			t.Fatalf("index=%d: %v", i, err)
+		}
+	}
+	if native, err := results[1].value(); err == nil || native != nil || !strings.Contains(err.Error(), "index=1") {
+		t.Fatalf("source fault not isolated: %v", err)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -61,14 +60,14 @@ func configuredOracle(t *testing.T) oracleRunner {
 		t.Fatal(err)
 	}
 	directory := t.TempDir()
-	environment := []string{"HOME=" + directory, "USERPROFILE=" + directory, "TEMP=" + directory, "TMP=" + directory, "TMPDIR=" + directory, "PSModulePath=" + filepath.Join(filepath.Dir(executable), "Modules"), "POWERSHELL_TELEMETRY_OPTOUT=1", "POWERSHELL_UPDATECHECK=Off"}
+	environment := []string{"HOME=" + directory, "USERPROFILE=" + directory, "LOCALAPPDATA=" + directory, "APPDATA=" + directory, "TEMP=" + directory, "TMP=" + directory, "TMPDIR=" + directory, "PSModulePath=" + filepath.Join(filepath.Dir(executable), "Modules"), "POWERSHELL_TELEMETRY_OPTOUT=1", "POWERSHELL_UPDATECHECK=Off"}
 	// Windows process startup requires these OS-owned directories, not user state.
 	for _, key := range []string{"SystemRoot", "WINDIR"} {
 		if value := os.Getenv(key); value != "" {
 			environment = append(environment, key+"="+value)
 		}
 	}
-	return oracleRunner{executable: executable, script: script, directory: directory, environment: environment, timeout: 15 * time.Second, outputLimit: oracleOutputLimit}
+	return oracleRunner{executable: executable, script: script, directory: directory, environment: environment, timeout: 30 * time.Second, outputLimit: oracleOutputLimit}
 }
 
 type boundedCapture struct {
@@ -89,47 +88,13 @@ func (w *boundedCapture) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+// Keep all single-source comparisons and fault injection on the batch protocol.
 func (r oracleRunner) run(source string) (*nativeProjection, error) {
-	if len(source) > MaxSource {
-		return nil, errors.New("oracle source limit")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
-	defer cancel()
-	args := append(append([]string{}, r.prefix...), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", r.script)
-	cmd := exec.CommandContext(ctx, r.executable, args...)
-	cmd.Dir, cmd.Env, cmd.Stdin = r.directory, r.environment, strings.NewReader(source)
-	cmd.WaitDelay = time.Second
-	configureOracleProcess(cmd)
-	stdout, stderr := &boundedCapture{limit: r.outputLimit}, &boundedCapture{limit: 4096}
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	err := cmd.Run()
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("oracle timeout: %w", ctx.Err())
-	}
+	results, err := r.runBatch([]string{source})
 	if err != nil {
-		return nil, fmt.Errorf("oracle process failed: %w", err)
+		return nil, err
 	}
-	if stdout.overflow || stderr.overflow {
-		return nil, errors.New("oracle output limit")
-	}
-	if stderr.data.Len() != 0 {
-		return nil, errors.New("oracle unexpected stderr")
-	}
-	var result nativeProjection
-	decoder := json.NewDecoder(&stdout.data)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&result); err != nil {
-		return nil, fmt.Errorf("oracle invalid JSON: %w", err)
-	}
-	var tail any
-	if err := decoder.Decode(&tail); err != io.EOF {
-		return nil, errors.New("oracle trailing JSON")
-	}
-	// An empty object is broken evidence, not an empty successfully parsed script.
-	if result.Tokens == nil || result.ParseErrors == nil || result.Statements == nil || result.Bindings == nil || result.Metadata == nil || result.Unsupported == nil || result.Aliases == nil {
-		return nil, errors.New("oracle incomplete projection")
-	}
-	return &result, nil
+	return results[0].value()
 }
 
 func corpusSources(t *testing.T) []string {
@@ -166,32 +131,48 @@ func corpusSources(t *testing.T) []string {
 
 func TestOracleGoldenFixtures(t *testing.T) {
 	runner := configuredOracle(t)
-	accepted := 0
+	var sources []string
+	var indices []int
 	for i, source := range corpusSources(t) {
-		if !Classify([]byte(source), fakeContext()).Allow {
-			continue
+		if Classify([]byte(source), fakeContext()).Allow {
+			sources = append(sources, source)
+			indices = append(indices, i)
 		}
-		accepted++
-		t.Run(fmt.Sprintf("case-%04d", i), func(t *testing.T) {
-			if err := compareOracle(runner, source); err != nil {
-				t.Fatalf("synthetic source %q: %v", source, err)
-			}
-		})
 	}
-	if accepted == 0 {
+	if len(sources) == 0 {
 		t.Fatal("no Go-accepted oracle cases")
 	}
-	t.Logf("native oracle %s: %d Go-accepted corpus/replay cases", runner.executable, accepted)
+	offset := 0
+	for _, batch := range oracleBatches(sources) {
+		comparisons, err := compareOracleBatch(runner, batch)
+		if err != nil {
+			t.Fatalf("oracle corpus batch at accepted index=%d: %v", offset, err)
+		}
+		for j, err := range comparisons {
+			i := indices[offset+j]
+			t.Run(fmt.Sprintf("case-%04d", i), func(t *testing.T) {
+				if err != nil {
+					t.Fatalf("corpus index=%d: %v", i, err)
+				}
+			})
+		}
+		offset += len(batch)
+	}
+	t.Logf("native oracle %s: %d Go-accepted corpus/replay cases", runner.executable, len(sources))
 }
 
 func compareOracle(runner oracleRunner, source string) error {
-	goSide, err := Project([]byte(source), context.Background())
-	if err != nil {
-		return err
-	}
 	native, err := runner.run(source)
 	if err != nil {
 		return &oracleInfrastructureError{err}
+	}
+	return compareOracleProjection(source, native)
+}
+
+func compareOracleProjection(source string, native *nativeProjection) error {
+	goSide, err := Project([]byte(source), context.Background())
+	if err != nil {
+		return err
 	}
 	if len(native.ParseErrors) != 0 || native.ScriptRequirements != nil || len(native.Unsupported) != 0 {
 		return errors.New("native parse errors, requirements or unsupported AST node")
@@ -358,9 +339,27 @@ func TestOracleRunnerFaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"missing", "nonzero", "malformed", "empty", "oversized", "timeout"} {
-		t.Run(mode, func(t *testing.T) {
-			runner := oracleRunner{executable: executable, script: "unused", directory: t.TempDir(), environment: []string{"SECRET_PS_FAULT_HELPER=" + mode}, prefix: []string{"-test.run=^TestOracleFaultHelper$", "--"}, timeout: 2 * time.Second, outputLimit: 1024}
+	for _, tc := range []struct{ mode, want string }{
+		{"missing", "process failed"},
+		{"nonzero", "process failed"},
+		{"malformed", "invalid JSON"},
+		{"empty", "incomplete projection"},
+		{"oversized", "output limit"},
+		{"timeout", "timeout"},
+		{"count", "count mismatch"},
+		{"order", "order mismatch"},
+		{"source-error", "source failed index=0 id=OracleSyntheticFailure line=42"},
+		{"trailing", "trailing JSON"},
+		{"stderr", "unexpected stderr"},
+		{"missing-index", "incomplete projection"},
+		{"missing-error", "incomplete projection"},
+		{"missing-requirements", "incomplete projection"},
+		{"missing-binding-flag", "incomplete projection"},
+		{"null-binding-flag", "incomplete projection"},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			mode := tc.mode
+			runner := oracleRunner{executable: executable, script: "unused", directory: t.TempDir(), environment: []string{"SECRET_PS_FAULT_HELPER=" + mode}, prefix: []string{"-test.run=^TestOracleFaultHelper$", "--"}, timeout: 2 * time.Second, outputLimit: oracleOutputLimit}
 			if mode == "missing" {
 				runner.executable = filepath.Join(runner.directory, "missing-oracle.exe")
 			}
@@ -371,36 +370,94 @@ func TestOracleRunnerFaults(t *testing.T) {
 			if err == nil || got != nil {
 				t.Fatalf("broken oracle passed: %+v %v", got, err)
 			}
-			want := map[string]string{"missing": "process failed", "nonzero": "process failed", "malformed": "invalid JSON", "empty": "incomplete projection", "oversized": "output limit", "timeout": "timeout"}[mode]
-			if !strings.Contains(err.Error(), want) {
-				t.Fatalf("fault was not exercised: got %v, want %s", err, want)
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("fault was not exercised: got %v, want %s", err, tc.want)
 			}
 		})
 	}
 }
 func TestOracleFaultHelper(t *testing.T) {
-	switch os.Getenv("SECRET_PS_FAULT_HELPER") {
-	case "":
+	mode := os.Getenv("SECRET_PS_FAULT_HELPER")
+	if mode == "" {
 		return
-	case "valid":
+	}
+	input, err := io.ReadAll(io.LimitReader(os.Stdin, oracleInputLimit+1))
+	var sources []string
+	if err != nil || len(input) > oracleInputLimit || json.Unmarshal(input, &sources) != nil {
+		os.Exit(12)
+	}
+	results := make([]oracleResult, len(sources))
+	for i, source := range sources {
 		// Fabricated runner unit data, never native oracle evidence.
-		data, err := json.Marshal(syntheticNativeMetadata(t))
+		native := syntheticNativeMetadata(t)
+		projected, err := Project([]byte(source), context.Background())
 		if err != nil {
-			os.Exit(11)
+			os.Exit(13)
 		}
-		_, _ = os.Stdout.Write(data)
+		metadata := native.Metadata
+		native.Projection = *projected
+		native.Metadata = metadata
+		results[i] = oracleResult{Index: i, Projection: native}
+	}
+	switch mode {
 	case "nonzero":
+		os.Exit(9)
+	case "nonzero-diagnostic":
+		fmt.Fprintln(os.Stderr, "powershell oracle failed id=PropertyNotFoundStrict line=42")
+		os.Exit(9)
+	case "nonzero-control", "nonzero-long", "nonzero-nonascii":
+		text := map[string]string{"nonzero-control": "suppressed\x1b", "nonzero-long": strings.Repeat("suppressed", 100), "nonzero-nonascii": "suppressedé"}[mode]
+		fmt.Fprint(os.Stderr, text)
 		os.Exit(9)
 	case "malformed":
 		fmt.Print("not JSON")
+		os.Exit(0)
 	case "empty":
-		fmt.Print("{}")
+		fmt.Print("[{\"index\":0,\"projection\":{},\"error\":null}]")
+		os.Exit(0)
+	case "count":
+		fmt.Print("[]")
+		os.Exit(0)
 	case "oversized":
-		fmt.Print(strings.Repeat("x", 8192))
+		fmt.Print(strings.Repeat("x", oracleOutputLimit+1))
+		os.Exit(0)
 	case "timeout":
 		time.Sleep(time.Minute)
+		os.Exit(0)
+	case "order":
+		results[0].Index++
+	case "source-error", "mixed":
+		index := 0
+		if mode == "mixed" {
+			index = 1
+		}
+		results[index].Projection = nil
+		results[index].Error = &oracleSourceError{ID: "OracleSyntheticFailure", Line: 42}
+	case "valid", "trailing", "stderr", "missing-index", "missing-error", "missing-requirements", "missing-binding-flag", "null-binding-flag":
 	default:
 		os.Exit(10)
+	}
+	data, err := json.Marshal(results)
+	if err != nil {
+		os.Exit(11)
+	}
+	switch mode {
+	case "missing-index":
+		data = bytes.Replace(data, []byte(`"index":0,`), nil, 1)
+	case "missing-error":
+		data = bytes.Replace(data, []byte(`,"error":null`), nil, 1)
+	case "missing-requirements":
+		data = bytes.Replace(data, []byte(`"scriptRequirements":null,`), nil, 1)
+	case "missing-binding-flag":
+		data = bytes.Replace(data, []byte(`"positional":true,`), nil, 1)
+	case "null-binding-flag":
+		data = bytes.Replace(data, []byte(`"positional":true`), []byte(`"positional":null`), 1)
+	case "stderr":
+		fmt.Fprint(os.Stderr, "unexpected synthetic stderr")
+	}
+	_, _ = os.Stdout.Write(data)
+	if mode == "trailing" {
+		fmt.Print("[]")
 	}
 	os.Exit(0)
 }
