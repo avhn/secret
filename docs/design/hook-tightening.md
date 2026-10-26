@@ -2280,20 +2280,51 @@ or README.md as that credential. Bash-policy argument probing retains its
 pre-step-7 inert-data rules, without consulting strict native path validation or
 handle identity. Strict file/patch checks keep their native validation.
 The Windows shell adapter continues to deny all requests without Bash analysis.
-Git signature discovery requires an existing regular HEAD, so an undeclared
-legacy directory with a dangling symbolic HEAD does not gain a Git role solely
-from a metadata error. Explicit gitdirs, inherited Git roots and alias denials
-remain independently protected. Existing audit expectations are unchanged.
+That correction required an existing regular HEAD for Git signature discovery,
+so an undeclared legacy directory did not gain a Git role solely from a metadata
+error. The refs/ symbolic-link tightening below adds Git's explicit legacy HEAD
+rule without restoring error-based classification. Explicit gitdirs, inherited
+Git roots and alias denials remain independently protected.
 
 ### dangling symbolic HEAD Git-signature gap
 
-Open, cross-platform tightening acknowledged during M5a review, not fixed in
-M5a. Unix `writes.go` `gitConfigTarget` and Windows `nativeGitDirectory` require
-an existing regular HEAD for signature discovery. A legacy directory with a
-dangling symbolic HEAD is therefore not treated as a Git directory by that
-check; a Git config write beneath it relies on other proofs. Explicit gitdirs,
-inherited Git roots and alias denials remain independently protected as noted
-above. This reviewed tightening is deferred, not a changed guard expectation.
+Resolved as a classified cross-platform tightening in the staged Go hook only.
+Git's [`setup.c` `is_git_directory` and `validate_headref`](https://github.com/git/git/blob/master/setup.c)
+use lstat and accept a symbolic HEAD when readlink succeeds and its literal text
+starts with `refs/`, without requiring that target to exist. Shared
+`writes.go` `gitHeadSignature` now applies that rule to both `gitConfigTarget`
+and Windows `nativeGitDirectory`. Existing regular HEAD discovery and
+objects/refs or commondir requirements are unchanged. A non-refs link, including
+one pointing to a regular file, does not establish a Git role; neither do lstat
+or readlink errors. Windows junction HEADs do not count as symbolic links.
+This preserves the run 40232530209 metadata-error over-classification repair.
+Explicit gitdirs, inherited Git roots and alias denials remain independent.
+The frozen Bash guard and installed manifests are unchanged.
+
+Exact synthetic regressions:
+
+- `TestGitHeadSignatures` covers regular and empty regular HEADs, missing and
+  directory HEADs, unborn and existing refs/ links, a refs/ prefix-only link,
+  dangling and existing non-refs links, ./refs/, refs-neighbor, case and backslash
+  prefixes, and a symlink loop. Each runs with objects/refs and commondir layouts
+  and checks config and missing hooks/new writes.
+- `TestGitHeadSignatureMetadataErrors` injects missing, permission and invalid
+  errors at lstat/readlink, including partial refs/ text returned with an error.
+- `TestWindowsGitHeadSignatures` repeats the table through native Git-directory
+  discovery, ancestor-role checks and file-tool classification.
+  `TestWindowsGitHeadJunctionControl` keeps a junction HEAD public. Windows
+  fixtures use CreateSymbolicLink directly to preserve literal refs/ link text;
+  Go's os.Symlink otherwise rewrites it to backslashes. These Windows tests need
+  native hosted execution; cross-compilation is not runtime evidence.
+- `TestAudit29InheritedGitWriteRoots` now requires denial for the undeclared
+  unborn refs/ layout through both shared write checks and patch dispatch. Its
+  undeclared non-refs dangling layout and alias remain public; inherited-root
+  subtests use that layout so their denials still prove inherited-root handling.
+
+Fresh default-binary inventory verification retains all 5738 guard and 2669 Codex
+assertions with 51 and 35 reviewed differences respectively. Regeneration leaves
+all 165 exact divergence rows unchanged; this synthetic layout adds no retained
+shell-suite divergence row.
 
 ### M5a review: separate Bash policy from native file semantics
 

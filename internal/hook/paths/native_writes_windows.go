@@ -111,15 +111,10 @@ func nativeRepositoryGitDir(start string) (string, error) {
 }
 
 func nativeGitDirectory(dir string) bool {
-	// A signature requires an existing regular HEAD, like gitConfigTarget.
-	// nativeStat intentionally turns a dangling reparse point into uncertainty
-	// for protected-target lookup, but that is not evidence of a Git role.
+	// Share HEAD semantics with gitConfigTarget, including unborn refs/ links.
+	// nativeStat's reparse uncertainty is not evidence of a Git HEAD signature.
 	// Explicit repository/inherited roots above remain protected independently.
-	head, err := os.Stat(filepath.Join(dir, "HEAD"))
-	if err != nil {
-		return !os.IsNotExist(err)
-	}
-	if !head.Mode().IsRegular() {
+	if !gitHeadSignature(filepath.Join(dir, "HEAD")) {
 		return false
 	}
 	objects, objErr := nativeStat(filepath.Join(dir, "objects"))
@@ -130,6 +125,6 @@ func nativeGitDirectory(dir string) bool {
 	if objErr == nil && refsErr == nil && objects.IsDir() && refs.IsDir() {
 		return true
 	}
-	_, err = os.Lstat(filepath.Join(dir, "commondir"))
+	_, err := os.Lstat(filepath.Join(dir, "commondir"))
 	return err == nil || !os.IsNotExist(err)
 }

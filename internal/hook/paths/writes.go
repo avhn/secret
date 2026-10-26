@@ -39,9 +39,9 @@ func ConfigWriteProtected(name, cwd, workdir, home, xdg, global string) bool {
 	return check(raw)
 }
 
-// Inherited roots are protected independently of Git metadata. In particular,
-// an unborn legacy symbolic HEAD need not resolve to an existing regular file.
-// Retain lexical intent as well as physical aliases, including missing leaves.
+// Inherited roots are protected independently of Git metadata, including roots
+// without a valid HEAD signature. Retain lexical intent as well as physical
+// aliases, including missing leaves.
 func inheritedGitRootTarget(name, cwd, workdir, home string) bool {
 	return inheritedGitRootTargetWith(name, cwd, workdir, home, Resolve, physical)
 }
@@ -77,6 +77,26 @@ func inheritedGitRootTargetWith(name, cwd, workdir, home string, anchor func(str
 		}
 	}
 	return false
+}
+
+// gitHeadSignature preserves regular HEAD discovery and Git validate_headref's
+// legacy symlink rule: the link text must start with "refs/", even when unborn.
+// Metadata errors alone cannot establish a Git role. Lstat also excludes Windows
+// junctions, which are not symbolic links for this signature.
+func gitHeadSignature(name string) bool {
+	return gitHeadSignatureWith(name, os.Lstat, os.Readlink)
+}
+
+func gitHeadSignatureWith(name string, lstat func(string) (os.FileInfo, error), readlink func(string) (string, error)) bool {
+	info, err := lstat(name)
+	if err != nil {
+		return false
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := readlink(name)
+		return err == nil && strings.HasPrefix(target, "refs/")
+	}
+	return info.Mode().IsRegular()
 }
 
 func gitConfigTarget(name, cwd, home, xdg, global string) bool {
@@ -124,7 +144,7 @@ func gitConfigTarget(name, cwd, home, xdg, global string) bool {
 	}
 	// A separate gitdir need not have a .git component in its path.
 	for dir, count := filepath.Clean(rawName), 0; dir != filepath.Dir(dir) && count < 128; dir, count = filepath.Dir(dir), count+1 {
-		if info, err := os.Stat(filepath.Join(dir, "HEAD")); err == nil && info.Mode().IsRegular() {
+		if gitHeadSignature(filepath.Join(dir, "HEAD")) {
 			objects, objErr := os.Stat(filepath.Join(dir, "objects"))
 			refs, refsErr := os.Stat(filepath.Join(dir, "refs"))
 			if objErr == nil && refsErr == nil && objects.IsDir() && refs.IsDir() {

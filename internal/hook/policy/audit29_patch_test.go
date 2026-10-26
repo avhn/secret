@@ -167,7 +167,7 @@ func TestAudit29InheritedGitWriteRoots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Symlink("refs/heads/main", filepath.Join(root, "HEAD")); err != nil {
+	if err := audit29HeadSymlink("refs/heads/main", filepath.Join(root, "HEAD")); err != nil {
 		t.Skipf("legacy symbolic HEAD unavailable: %v", err)
 	}
 	if err := os.Symlink(root, filepath.Join(work, "alias")); err != nil {
@@ -176,8 +176,22 @@ func TestAudit29InheritedGitWriteRoots(t *testing.T) {
 	body := func(name string) string {
 		return "*** Begin Patch\n*** Add File: " + filepath.ToSlash(name) + "\n+synthetic\n*** End Patch\n"
 	}
-	if paths.ConfigWriteProtected("legacy/config", work, "", home, "", "") || patch.Decision(body("legacy/config"), work, "", home) != "" {
-		t.Fatal("undeclared legacy root control denied")
+	// Classified tightening: Git validate_headref accepts an unborn refs/ link.
+	if !paths.ConfigWriteProtected("legacy/config", work, "", home, "", "") || patch.Decision(body("legacy/config"), work, "", home) == "" {
+		t.Fatal("undeclared legacy refs/ root allowed")
+	}
+	// A non-refs dangling link does not establish a Git signature. Use it for
+	// inherited-root tests so their denials cannot borrow signature discovery.
+	if err := os.Remove(filepath.Join(root, "HEAD")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("public/missing", filepath.Join(root, "HEAD")); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"legacy/config", "alias/config"} {
+		if paths.ConfigWriteProtected(target, work, "", home, "", "") || patch.Decision(body(target), work, "", home) != "" {
+			t.Fatalf("undeclared non-refs root control denied: %s", target)
+		}
 	}
 	// An inherited relative root is anchored at the effective tool workdir.
 	t.Run("workdir", func(t *testing.T) {
