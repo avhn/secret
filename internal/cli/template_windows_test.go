@@ -4,6 +4,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +14,60 @@ import (
 
 	"github.com/avhn/secret/internal/secure"
 	"github.com/avhn/secret/internal/testutil"
+	"github.com/avhn/secret/internal/transport"
 	"golang.org/x/sys/windows"
 )
+
+func TestWindowsTemplateCloseFailureCleanup(t *testing.T) {
+	home := syntheticTemplateHome(t)
+	t.Setenv("HOME", home)
+	t.Setenv("SECRETS_DIR", home)
+	storePath := filepath.Join(home, "synthetic.store")
+	templatePath := filepath.Join(home, "synthetic.tmpl")
+	if testutil.WriteFile(storePath, []byte("TOKEN=synthetic-template-value\n"), 0600) != nil || testutil.WriteFile(templatePath, []byte("{{TOKEN}}"), 0600) != nil {
+		t.Fatal("cannot write synthetic fixtures")
+	}
+
+	originalClose := closeWindowsProcess
+	t.Cleanup(func() { closeWindowsProcess = originalClose })
+	var closeErr error
+	var payloadPath string
+	var payloadPresentAtClose bool
+	closeCalls := 0
+	closeWindowsProcess = func(process *transport.WindowsProcess) error {
+		closeCalls++
+		// Release the real native resources even though the reported result fails.
+		closeErr = originalClose(process)
+		paths, err := filepath.Glob(filepath.Join(home, ".secrets", ".rendered", "*", "payload"))
+		if err == nil && len(paths) == 1 {
+			payloadPath = paths[0]
+			info, err := os.Lstat(payloadPath)
+			payloadPresentAtClose = err == nil && info.Mode().IsRegular()
+		}
+		return errors.New("synthetic close failure")
+	}
+
+	var out, diagnostic bytes.Buffer
+	args := []string{"run", "-f", "file:" + storePath, "--template-file", templatePath, "--"}
+	status := Main(append(args, windowsCLIArgs("mark", home)...), os.Stdin, &out, &diagnostic)
+	if status == 0 || diagnostic.String() != "secret: child supervision failed\n" || out.Len() != 0 {
+		t.Fatal("Close failure did not produce only the fixed supervision diagnostic")
+	}
+	if closeCalls != 1 || closeErr != nil {
+		t.Fatal("injected Close did not release native resources exactly once")
+	}
+	if _, err := os.Stat(filepath.Join(home, "started")); err != nil {
+		t.Fatal("synthetic child did not run")
+	}
+	if !payloadPresentAtClose {
+		t.Fatal("payload removal preceded injected Close")
+	}
+	for _, path := range []string{payloadPath, filepath.Dir(payloadPath)} {
+		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("private template survived Close failure")
+		}
+	}
+}
 
 func TestWindowsTemplateJobCleanup(t *testing.T) {
 	for _, failOutput := range []bool{false, true} {

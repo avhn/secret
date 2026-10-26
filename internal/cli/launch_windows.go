@@ -12,6 +12,9 @@ import (
 	"github.com/avhn/secret/internal/transport"
 )
 
+// closeWindowsProcess permits synthetic Close failures without changing native cleanup.
+var closeWindowsProcess = (*transport.WindowsProcess).Close
+
 // Private rendering uses the native ACL primitives before child creation.
 func launchTemplateUnsupported() bool { return false }
 
@@ -71,7 +74,7 @@ func (c command) windowsChildSignals(args, env []string, values [][]byte, filter
 	outWrite.Close()
 	errWrite.Close()
 	defer func() {
-		if process.Close() != nil {
+		if closeWindowsProcess(process) != nil {
 			status = c.runFailure("child supervision failed")
 		}
 	}()
