@@ -1,7 +1,7 @@
 # M5e plan: bounded PowerShell classification and Windows host evidence
 
-Status: draft for owner approval (2026-10-26), revised after gpt-plan-reviewer review. No code lands until the owner approves
-this plan and the parser revision below.
+Status: approved 2026-10-26 for steps 1 to 4 (owner decisions below), revised after
+gpt-plan-reviewer review. Steps 5 and 6 stay gated on sponsorship and host evidence.
 
 M5e adds conservative PowerShell classification to the staged Go hook, replacing Windows
 shell refusal only for a verified host/dialect contract. Completion requires actual
@@ -289,7 +289,11 @@ its tests. Re-estimate rather than weaken the grammar, failure gate or native te
   dynamic expressions, cross-session state, profile or module inspection, new secret
   transports, Windows releases or installers, manifest or default promotion, M4.1
   output changes and Unix PowerShell.
-- Owner decisions required:
+- Owner decisions recorded 2026-10-26: (1) the Go subset parser replaces the runtime
+  helper (go-rewrite.md revision 16); (2) steps 1 to 4 are approved; (5) Codex Windows
+  shell calls stay denied now, with sponsored host-evidence work to enable Codex later.
+  Decisions 3, 4 and 6 remain open.
+- Owner decisions (original list):
   1. Approve replacing the rewrite plan's runtime helper with the Go subset.
   2. Approve starting conditional M5e (steps 1 to 4 can finish without host evidence).
   3. Sponsorship, spend approval and protected Windows host sessions for step 5.

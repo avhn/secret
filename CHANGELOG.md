@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Approve the M5e PowerShell plan: a bounded Go safe-subset parser with test-only
+  ParseInput and static-binding oracles replaces the runtime parser helper
+  (go-rewrite.md revision 16). No hook behavior changes yet.
+
 - Recognize legacy unborn symlink HEADs whose text starts with `refs/` as Git
   directory signatures in the staged Go hook, matching Git `validate_headref`, so
   config writes beneath them deny. The earlier "HEAD stats to a regular file"

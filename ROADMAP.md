@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e stays conditional. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) is in progress. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -648,7 +648,7 @@ release authorization, Windows filesystem support or host fail-closed claim.
 
 ## M5e: PowerShell AST
 
-Status: conditional. Estimate: 8-14 days. Goal: host-tested Windows PowerShell shell classification.
+Status: in progress (owner-approved steps 1 to 4 on 2026-10-26; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need sponsorship and Windows host evidence; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
 
 - [ ] feat(hook): classify powershell ast with safe-source and failure assertions
 - [ ] test(hook): expand real windows host dialect matrix
