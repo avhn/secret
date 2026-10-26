@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Add the unwired `internal/hook/ps` PowerShell classifier: a bounded literal
+  subset parser, exact command and parameter roles, non-expanding operand
+  anchoring, `#requires` and signature denial, a synthetic corpus, fuzz targets
+  and a test-only non-executing AST and static-binding oracle script. Windows
+  PowerShell routing still denies pending native parser and host evidence.
 - The staged Go hook now recognizes `PowerShell` tool events and denies them on
   every OS with a fixed reason, instead of returning no decision. On Windows,
   unknown command-bearing tools and named shell dialects also deny. PowerShell

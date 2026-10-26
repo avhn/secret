@@ -42,6 +42,43 @@ establish a verified host contract or fail-closed host protection. The frozen
 Bash guard, matchers, manifests and Bash divergence inventory remain unchanged;
 PowerShell cases are adjacent Go tests, not new Bash inventory rows.
 
+## M5e PowerShell classifier core
+
+The unwired `internal/hook/ps` classifier denies everything outside its literal
+subset. These named rules apply when a test adapter consults it; production
+routing still denies every PowerShell request.
+
+Named tightening: `powershell-literal-grammar` (deliberate-tightening). Backticks,
+adjacent quoting, numeric-looking bare words, expansions, subexpressions,
+here-strings, splatting, call and dot-source operators, `--` and `--%`, `&&`
+and `||`, active `#requires` directives, signature blocks, Unicode quote and
+dash substitutes, non-ASCII bare-token bytes and control characters deny.
+
+Named tightening: `powershell-exact-binding` (deliberate-tightening). Unknown
+commands, module-qualified names, abbreviations, common or unmodeled parameters
+(for example `-Stream`, `-Encoding`, `-Filter`, `-Include`, `-Exclude`,
+`-Recurse`), duplicates, conflicting sets, `ForEach-Object` member names,
+`-Begin`, `-End` and `-Parallel`, and implicit property binding deny. Only the
+fixed alias table is recognized.
+
+Named tightening: `powershell-literal-anchoring` (deliberate-tightening). File
+operands join the validated native cwd without shell expansion and without
+cleaning away dot-component witnesses. Operands starting with `~` or `$`, or
+containing `${`, wildcard characters `* ? [ ]`, colons outside a drive-absolute
+prefix (provider, drive-relative and alternate data stream forms), device names,
+or trailing dots and spaces deny. Write destinations require both read and
+configuration-write protection checks.
+
+Named tightening: `powershell-certified-streams` (deliberate-tightening). Only
+literal or certified public content feeds modeled consumers; redirects cannot
+erase an upstream denial, duplicate or overlapping streams deny, and `Copy-Item`
+and names-only enumeration also require a metadata certification callback.
+
+Named tightening: `powershell-analysis-failure` (deliberate-tightening). The
+40 KiB source, 4,096-token, 2,048-node, 256-word and four-level caps, deadline
+checks across scan, parse and walk, and fixed panic denials keep incomplete
+analysis from allowing. Denial reasons never contain source text.
+
 ## Arithmetic expansion operands
 
 The Go arithmetic walker denies any expansion-bearing operand, including command

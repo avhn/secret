@@ -1,0 +1,75 @@
+{"source":"Write-Output 'public literal'","decision":"allow","reason":"safe"}
+{"source":"Get-Content -LiteralPath public.txt","decision":"allow","reason":"safe"}
+{"source":"Get-Content -LiteralPath protected.txt","decision":"deny","reason":"protected-read"}
+{"source":"GC -LiteralPath public.txt | Out-Null","decision":"allow","reason":"safe"}
+{"source":"CAT protected.txt | Out-Null","decision":"deny","reason":"protected-read"}
+{"source":"type public.txt","decision":"allow","reason":"safe"}
+{"source":"sls -Pattern protected -LiteralPath public.txt","decision":"allow","reason":"safe"}
+{"source":"Get-ChildItem -Name -LiteralPath public","decision":"allow","reason":"safe"}
+{"source":"dir -Name protected","decision":"deny","reason":"protected-read"}
+{"source":"Copy-Item -LiteralPath public.txt -Destination result.txt","decision":"allow","reason":"safe"}
+{"source":"copy protected result.txt","decision":"deny","reason":"protected-read"}
+{"source":"cpi public config","decision":"deny","reason":"protected-write"}
+{"source":"Set-Content -LiteralPath result.txt -Value 'protected is data'","decision":"allow","reason":"safe"}
+{"source":"Set-Content -LiteralPath config -Value public","decision":"deny","reason":"protected-write"}
+{"source":"Write-Output x | Add-Content public.txt","decision":"allow","reason":"safe"}
+{"source":"Write-Output x | Out-File public.txt","decision":"allow","reason":"safe"}
+{"source":"Get-Content public | Out-File protected","decision":"deny","reason":"protected-write"}
+{"source":"Write-Output x | % { Get-Content public } | Out-Null","decision":"allow","reason":"safe"}
+{"source":"Write-Output x | foreach { Get-Content protected }","decision":"deny","reason":"protected-read"}
+{"source":"# ordinary comment\r\nWrite-Output 'it''s data'","decision":"allow","reason":"safe"}
+{"source":"Write-Output x\n#requires -Version 5.1","decision":"deny","reason":"directive"}
+{"source":"# SIG # Begin signature block","decision":"deny","reason":"directive"}
+{"source":"Write-Output x 2>&1 > public.txt","decision":"allow","reason":"safe"}
+{"source":"Write-Output x 6>> protected","decision":"deny","reason":"protected-write"}
+{"source":"Write-Output x < public","decision":"deny","reason":"unsupported"}
+{"source":"Get-Content '$HOME/public'","decision":"deny","reason":"path"}
+{"source":"Get-Content '.\\$HOME\\public'","decision":"allow","reason":"safe"}
+{"source":"Get-Content '.\\$HOME\\protected'","decision":"deny","reason":"protected-read"}
+{"source":"Set-Content '.\\$HOME\\public' x","decision":"allow","reason":"safe"}
+{"source":"Set-Content '.\\$HOME\\protected' x","decision":"deny","reason":"protected-write"}
+{"source":"Write-Output public | Get-Content","decision":"deny","reason":"binding"}
+{"source":"Get-Content -LiteralPath public -ErrorAction Stop","decision":"deny","reason":"binding"}
+{"source":"Get-Content -Path public -LiteralPath other","decision":"deny","reason":"binding"}
+{"source":"Get-Content -LiteralPath:public","decision":"allow","reason":"safe"}
+{"source":"Write-Output '-dash data'","decision":"allow","reason":"safe"}
+{"source":"Write-Output x | Set-Content public -Value y","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content 'Env:HOME'","decision":"deny","reason":"path"}
+{"source":"Get-Content 'C:relative'","decision":"deny","reason":"path"}
+{"source":"Write-Output x |","decision":"deny","reason":"syntax"}
+{"source":"Write-Output 'unterminated","decision":"deny","reason":"syntax"}
+{"source":"iex public","decision":"deny","reason":"command"}
+{"source":"& Get-Content public","decision":"deny","reason":"unsupported"}
+{"source":"pwsh -e AA==","decision":"deny","reason":"unsupported"}
+{"source":"Get-ChildItem -Name uncertain","decision":"deny","reason":"metadata"}
+{"source":"Write-Output <# ordinary <# nested #> comment #> x","decision":"allow","reason":"safe"}
+{"source":"Get-Content 01","decision":"deny","reason":"unsupported"}
+{"source":"Get-Content '01'","decision":"allow","reason":"safe"}
+{"source":"Write-Output x | Out-Null | Get-Content public","decision":"deny","reason":"pipeline"}
+{"source": "Get-Content -Path 'public*'", "decision": "deny", "reason": "path"}
+{"source": "Get-Content 'public?'", "decision": "deny", "reason": "path"}
+{"source": "Select-String -Pattern x -Path 'public?'", "decision": "deny", "reason": "path"}
+{"source": "Select-String x 'public]'", "decision": "deny", "reason": "path"}
+{"source": "Get-ChildItem -Name -LiteralPath 'public['", "decision": "deny", "reason": "path"}
+{"source": "Get-ChildItem -Name 'public*'", "decision": "deny", "reason": "path"}
+{"source": "Copy-Item -LiteralPath 'public]' -Destination result.txt", "decision": "deny", "reason": "path"}
+{"source": "Copy-Item public.txt -Destination 'result*'", "decision": "deny", "reason": "path"}
+{"source": "Copy-Item 'public?' result.txt", "decision": "deny", "reason": "path"}
+{"source": "Set-Content -Path 'result?' -Value x", "decision": "deny", "reason": "path"}
+{"source": "Set-Content 'result*' x", "decision": "deny", "reason": "path"}
+{"source": "Add-Content -LiteralPath 'result[' -Value x", "decision": "deny", "reason": "path"}
+{"source": "Write-Output x | Out-File -FilePath 'result]'", "decision": "deny", "reason": "path"}
+{"source": "Write-Output x | Out-File 'result?'", "decision": "deny", "reason": "path"}
+{"source": "Get-Content 'HKLM:\\Synthetic'", "decision": "deny", "reason": "path"}
+{"source": "Get-Content 'Microsoft.PowerShell.Core\\FileSystem::C:\\public.txt'", "decision": "deny", "reason": "path"}
+{"source": "Get-Content \u2013Path public.txt", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-Content \u2014Path public.txt", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-Content \u2015Path public.txt", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-Content \u2018public.txt\u2019", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-Content\u00a0public.txt", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-Content\u2028public.txt", "decision": "deny", "reason": "unsupported"}
+{"source": "Get-ChildItem -Name -Path public -Filter x", "decision": "deny", "reason": "binding"}
+{"source": "Get-ChildItem -Name -Path public -Include x", "decision": "deny", "reason": "binding"}
+{"source": "Get-ChildItem -Name -Path public -Exclude x", "decision": "deny", "reason": "binding"}
+{"source": "Write-Output x | ForEach-Object -End { Write-Output y }", "decision": "deny", "reason": "binding"}
+{"source": "Write-Output x | ForEach-Object Length", "decision": "deny", "reason": "binding"}
