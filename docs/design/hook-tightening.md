@@ -2316,7 +2316,10 @@ Exact synthetic regressions:
   errors at lstat/readlink, including partial refs/ text returned with an error.
 - `TestWindowsGitHeadSignatures` repeats the table through native Git-directory
   discovery, ancestor-role checks and file-tool classification.
-  `TestWindowsGitHeadJunctionControl` keeps a junction HEAD public. Windows
+  `TestWindowsGitHeadJunctionControl` keeps a junction HEAD public, and
+  `TestWindowsGitHeadUnresolvableLink` requires native fail-closed discovery for
+  an existing HEAD link Windows cannot resolve (relative forward-slash text). The
+  shared table uses native separators for non-refs link text on Windows. Windows
   fixtures use CreateSymbolicLink directly to preserve literal refs/ link text;
   Go's os.Symlink otherwise rewrites it to backslashes. These Windows tests need
   native hosted execution; cross-compilation is not runtime evidence.

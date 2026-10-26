@@ -66,3 +66,25 @@ func TestWindowsGitHeadJunctionControl(t *testing.T) {
 		t.Fatal("junction HEAD denied a public config write")
 	}
 }
+
+// A HEAD link that exists but cannot be resolved (relative forward-slash text)
+// keeps native discovery fail-closed, unlike a missing or dangling native link.
+func TestWindowsGitHeadUnresolvableLink(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "metadata")
+	for _, name := range []string{"", "objects", "refs"} {
+		if err := os.Mkdir(filepath.Join(dir, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	head := filepath.Join(dir, "HEAD")
+	if err := gitHeadSymlink("public/missing", head); err != nil {
+		t.Skipf("symbolic HEAD unavailable: %v", err)
+	}
+	if _, err := os.Stat(head); err == nil || os.IsNotExist(err) {
+		t.Fatalf("unresolvable link fixture premise failed: %v", err)
+	}
+	if !nativeGitDirectory(dir) || !FileConfigWriteProtected(filepath.Join(dir, "config"), root, "", root, "", "") {
+		t.Fatal("unresolvable HEAD link did not fail closed")
+	}
+}

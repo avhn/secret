@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -78,6 +80,13 @@ func testGitHeadSignatures(t *testing.T, native bool, check func(*testing.T, str
 						t.Fatal(err)
 					}
 				case "link", "existing_link":
+					target := tc.target
+					if runtime.GOOS == "windows" && !strings.HasPrefix(target, "refs/") {
+						// Windows cannot resolve relative forward-slash link text; use
+						// native separators so these cases test the text rule, not
+						// unresolvable links (TestWindowsGitHeadUnresolvableLink).
+						target = filepath.FromSlash(target)
+					}
 					if tc.kind == "existing_link" {
 						target := filepath.Join(dir, filepath.FromSlash(tc.target))
 						if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
@@ -87,11 +96,11 @@ func testGitHeadSignatures(t *testing.T, native bool, check func(*testing.T, str
 							t.Fatal(err)
 						}
 					}
-					if err := gitHeadSymlink(tc.target, head); err != nil {
+					if err := gitHeadSymlink(target, head); err != nil {
 						t.Skipf("symbolic HEAD unavailable: %v", err)
 					}
-					if text, err := os.Readlink(head); err != nil || text != tc.target {
-						t.Fatalf("HEAD link text = %q, %v; want %q", text, err, tc.target)
+					if text, err := os.Readlink(head); err != nil || text != target {
+						t.Fatalf("HEAD link text = %q, %v; want %q", text, err, target)
 					}
 				}
 				want := tc.want
