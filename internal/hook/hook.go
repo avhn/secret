@@ -134,6 +134,10 @@ func decide(host string, in io.Reader, out io.Writer) (err error) {
 		}
 	case "Bash":
 		reason = bashDecision(e, cwd, protected)
+	case "PowerShell":
+		reason = powershellDecision(host, e, cwd, home)
+	default:
+		reason = unknownShellDecision(e)
 	}
 	if reason != "" {
 		_, err = out.Write(input.Deny(reason, reason != "command too complex to analyse for secret access; split it or use secret run"))

@@ -650,7 +650,10 @@ release authorization, Windows filesystem support or host fail-closed claim.
 
 Status: in progress (owner-approved steps 1 to 4 on 2026-10-26; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need sponsorship and Windows host evidence; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
 
+- [x] docs(hook): define powershell host and parser contract (bffb75a)
+- [ ] fix(hook): recognize windows powershell calls and deny unknown contracts
 - [ ] feat(hook): classify powershell ast with safe-source and failure assertions
+- [ ] test(hook): gate powershell parsing against native editions
 - [ ] test(hook): expand real windows host dialect matrix
 
 Gate: host/version/workdir contract, static literals/pipelines/redirects/nested blocks checked against PowerShell, dynamic syntax denied, and missing/crash/timeout blocks. Only then claim Windows shell protection; CMD remains denied.

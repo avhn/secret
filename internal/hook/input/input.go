@@ -46,6 +46,9 @@ func Decode(r io.Reader) (Envelope, error) {
 	if !ok || strings.TrimSpace(tool) == "" {
 		return Envelope{}, ErrInvalid
 	}
+	if tool == "PowerShell" && len(data) > MaxPowerShellEnvelopeBytes {
+		return Envelope{}, ErrInvalid
+	}
 	cwd, ok := text(root, "cwd")
 	if !ok || tool == "Bash" && !filepath.IsAbs(cwd) {
 		return Envelope{}, ErrInvalid
@@ -72,14 +75,17 @@ func Decode(r io.Reader) (Envelope, error) {
 		}
 	}
 	raw, exists := fields["command"]
-	if (tool == "Bash" || tool == "apply_patch") && !exists {
+	if (tool == "Bash" || tool == "apply_patch" || tool == "PowerShell") && !exists {
+		return Envelope{}, ErrInvalid
+	}
+	if tool == "PowerShell" && (len(raw) == 0 || raw[0] != '"') {
 		return Envelope{}, ErrInvalid
 	}
 	if exists {
 		switch {
 		case len(raw) > 0 && raw[0] == '"':
 			var cmd string
-			if json.Unmarshal(raw, &cmd) != nil || strings.ContainsRune(cmd, 0) {
+			if json.Unmarshal(raw, &cmd) != nil || strings.ContainsRune(cmd, 0) || tool == "PowerShell" && len(cmd) > MaxPowerShellSourceBytes {
 				return Envelope{}, ErrInvalid
 			}
 		case len(raw) > 0 && raw[0] == '[':

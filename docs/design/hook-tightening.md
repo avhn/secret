@@ -12,6 +12,36 @@ execute Git, a shell interpreter, child commands, or provider value APIs while
 making a decision. It reads only the bounded metadata described below. Real-host
 failure tests, dialect evidence, and supported-platform CI remain separate gates.
 
+## M5e PowerShell and unknown Windows shell contracts
+
+Named tightening: `m5e-powershell-contract-denial` (deliberate-tightening).
+The Go hook now recognizes the exact `PowerShell` tool name instead of returning
+no decision. Claude PowerShell, Codex PowerShell and unknown-host PowerShell
+requests deny on every OS with the fixed reason `PowerShell host contract is not
+enabled`. The retained guidance suffix is unchanged. A command must be a JSON
+string; missing commands, argv, wrong types, duplicate keys, invalid UTF-8 and
+unpaired surrogate escapes retain the fixed malformed-envelope denial. Only
+PowerShell envelopes receive the separate 64 KiB raw and 40 KiB decoded-source
+ceilings; shared Bash, file and patch budgets are unchanged.
+
+Named tightening: `m5e-unknown-windows-shell-contract` (deliberate-tightening).
+On Windows, otherwise unknown tools carrying a `command` field are unknown shell
+contracts and deny with the existing `shell requests are unsupported on Windows`
+reason. The explicit names `Shell`, `shell`, `CMD`, `Cmd`, `cmd`, `cmd.exe`,
+`powershell`, `powershell.exe`, `pwsh`, `pwsh.exe`, `exec_command` and
+`shell_command` also deny without a command. Other unknown tools retain no
+decision, and Unix unknown-tool behavior is unchanged. No agent-supplied shell
+field or source syntax selects a dialect. Native Windows Bash strings and argv,
+including Codex Bash, retain their existing denial.
+
+Production PowerShell routing remains disabled. An unexported function seam can
+be populated only by tests; only validated Windows Claude `PowerShell` events
+can reach it. Unix and Codex cannot reach that adapter. No environment or
+request field enables it. Synthetic routing tests and cross-compilation do not
+establish a verified host contract or fail-closed host protection. The frozen
+Bash guard, matchers, manifests and Bash divergence inventory remain unchanged;
+PowerShell cases are adjacent Go tests, not new Bash inventory rows.
+
 ## Arithmetic expansion operands
 
 The Go arithmetic walker denies any expansion-bearing operand, including command

@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- The staged Go hook now recognizes `PowerShell` tool events and denies them on
+  every OS with a fixed reason, instead of returning no decision. On Windows,
+  unknown command-bearing tools and named shell dialects also deny. PowerShell
+  envelopes get separate 64 KiB raw and 40 KiB source limits; Bash, file and
+  patch behavior, the Bash guard, manifests and inventories are unchanged.
 - Approve the M5e PowerShell plan: a bounded Go safe-subset parser with test-only
   ParseInput and static-binding oracles replaces the runtime parser helper
   (go-rewrite.md revision 16). No hook behavior changes yet.
