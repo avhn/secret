@@ -181,6 +181,8 @@ func (p *projector) script(script Script) []ProjectedPipeline {
 				}
 				cmd.Redirects = append(cmd.Redirects, redir)
 			}
+			// ParseInput stores redirections by source stream, with * first.
+			sort.SliceStable(cmd.Redirects, func(a, b int) bool { return cmd.Redirects[a].Stream < cmd.Redirects[b].Stream })
 			projected.Commands = append(projected.Commands, cmd)
 			if i > 0 {
 				projected.Edges = append(projected.Edges, Edge{i - 1, i})

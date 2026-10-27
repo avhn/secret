@@ -47,3 +47,5 @@
 {"source":"Write-Output public | Get-Content -PSPath public.txt","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
 {"source":"Write-Output public | Set-Content","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
 {"source":"Write-Output public | Out-File","decision":"deny","origin":"explicit filename/property-binding and parameter-alias rejection control"}
+{"source": "# >\nWrite-Output <#<# ne#> co #> x", "origin": "native differential index 136 (run 40407877597): block comments do not nest", "decision": "deny"}
+{"source": "Write-Output x 2>&1 > public.txt", "origin": "native corpus index 22 (run 40407877597): redirections ordered by source stream", "decision": "allow"}

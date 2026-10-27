@@ -66,7 +66,7 @@ func TestPairedPathRoles(t *testing.T) {
 func TestBindingsAndLiterals(t *testing.T) {
 	allow := []string{
 		"", "# ordinary comment\r\n", "Write-Output x; Out-Null\nWrite-Output y",
-		"<# ordinary block comment #> Write-Output x", "Write-Output <# outer <# nested #> comment #> x",
+		"<# ordinary block comment #> Write-Output x", "<# outer #> Write-Output x <# trailing #>",
 		"Write-Output x | % { <# block\r\n comment #> Write-Output y }",
 		`Write-Output 'it''s literal'`, `Write-Output "non expanding"`, `Write-Output '-Path'`,
 		"Write-Output 'first\nsecond'", "Write-Output \"first\r\nsecond\"",
@@ -174,7 +174,8 @@ func TestProhibitedConstructs(t *testing.T) {
 		"Write-Output x`n", "Write-Output `\n x", "Write-Output 'literal`tick'",
 		`Write-Output 'a'"b"`, `Write-Output "a"'b'`, `Write-Output foo'bar'`,
 		"Write-Output \u201cx\u201d", "Get\u2013Content public", "Write-Output x\x00", "Write-Output x\x1b", "Write-Output x\u200b",
-		"<# unterminated block comment", "<# outer <# nested #>", "#requires -Version 5.1\nWrite-Output x",
+		"<# unterminated block comment", "<# outer <# nested #>", "Write-Output <# outer <# nested #> comment #> x",
+		"Write-Output <# <# #> ; Get-Content protected #>", "#requires -Version 5.1\nWrite-Output x",
 		"Write-Output x\n#Requires -Modules Synthetic", "Write-Output x | % {\n#requires -Version 5.1\n Write-Output y }",
 		"# SIG # Begin signature block\n# synthetic\n# SIG # End signature block",
 		"Write-Output x | % { # SIG # Begin signature block\n Write-Output y }",

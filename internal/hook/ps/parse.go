@@ -209,21 +209,22 @@ func scan(src []byte, b *budget) []Token {
 			continue
 		}
 		if c == '<' && i+1 < len(src) && src[i+1] == '#' {
+			// PowerShell block comments do not nest: the first #> ends the
+			// comment. A nested-looking opener is ambiguous to readers, so deny it.
 			i += 2
-			level := 1
-			for i < len(src) && level != 0 {
+			closed := false
+			for i < len(src) && !closed {
 				b.check()
 				if i+1 < len(src) && src[i] == '<' && src[i+1] == '#' {
-					level++
-					i += 2
+					deny(ReasonUnsupported)
 				} else if i+1 < len(src) && src[i] == '#' && src[i+1] == '>' {
-					level--
+					closed = true
 					i += 2
 				} else {
 					i++
 				}
 			}
-			if level != 0 {
+			if !closed {
 				deny(ReasonSyntax)
 			}
 			text := strings.ToLower(string(src[start:i]))

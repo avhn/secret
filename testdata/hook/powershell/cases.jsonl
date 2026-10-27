@@ -42,7 +42,7 @@
 {"source":"& Get-Content public","decision":"deny","reason":"unsupported"}
 {"source":"pwsh -e AA==","decision":"deny","reason":"unsupported"}
 {"source":"Get-ChildItem -Name uncertain","decision":"deny","reason":"metadata"}
-{"source":"Write-Output <# ordinary <# nested #> comment #> x","decision":"allow","reason":"safe"}
+{"source": "Write-Output <# ordinary <# nested #> comment #> x", "decision": "deny", "reason": "unsupported"}
 {"source":"Get-Content 01","decision":"deny","reason":"unsupported"}
 {"source":"Get-Content '01'","decision":"allow","reason":"safe"}
 {"source":"Write-Output x | Out-Null | Get-Content public","decision":"deny","reason":"pipeline"}
@@ -73,3 +73,5 @@
 {"source": "Get-ChildItem -Name -Path public -Exclude x", "decision": "deny", "reason": "binding"}
 {"source": "Write-Output x | ForEach-Object -End { Write-Output y }", "decision": "deny", "reason": "binding"}
 {"source": "Write-Output x | ForEach-Object Length", "decision": "deny", "reason": "binding"}
+{"source": "Write-Output <# <# #> ; Get-Content protected.txt #>", "decision": "deny", "reason": "unsupported"}
+{"source": "Write-Output <# ordinary #> x <# second #>", "decision": "allow", "reason": "safe"}
