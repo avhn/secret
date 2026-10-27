@@ -1,8 +1,8 @@
 # Roadmap
 
-Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
+Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has its parser gate green on 5.1 and 7.6.7; host steps 5 and 6 await sponsorship. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** none in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -404,7 +404,7 @@ never reuse, move or delete it. The owner-approved new release identity is
 
 ## M4.1: Host evidence and Claude cutover
 
-Status: planned, blocked on sponsorship for model usage. Goal: prove real host failure behavior before changing what main installs.
+Status: waiting sponsorship (paid model usage for the real-host harness, plus owner-provisioned protected environment and keys). Goal: prove real host failure behavior before changing what main installs.
 
 - [ ] test(host): enable sponsored protected host sessions and record Linux/macOS Claude failure evidence
 - [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
@@ -614,7 +614,7 @@ Gate: pinned provider version, manifest/readback/no-argv/missing-item tests and 
 
 ## M5c: 1Password backend
 
-Status: scaffolded, dispatch disabled pending provider evidence and licensing review. Owner-approved scope 2026-10-25; plan docs/design/m5c-plan.md. Estimate: 3-5 days. Goal: registered item reads without value exposure.
+Status: waiting sponsorship (a 1Password account for the isolated synthetic vault and CLI evidence, plus the licensing review); scaffolded, dispatch disabled. Owner-approved scope 2026-10-25; plan docs/design/m5c-plan.md. Estimate: 3-5 days. Goal: registered item reads without value exposure.
 
 - [ ] feat(backend): add registered item reads with isolated cli and failure assertions
 - [ ] test(onepassword): extend unsupported-write and redaction matrix
@@ -648,7 +648,7 @@ release authorization, Windows filesystem support or host fail-closed claim.
 
 ## M5e: PowerShell AST
 
-Status: in progress (owner-approved steps 1 to 4 done on 2026-10-27; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need sponsorship and Windows host evidence; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
+Status: waiting sponsorship (steps 1 to 4 done on 2026-10-27; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need paid real-host Windows sessions and separate owner go-ahead; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
 
 - [x] docs(hook): define powershell host and parser contract (bffb75a)
 - [x] fix(hook): recognize windows powershell calls and deny unknown contracts (16ee6b4)
@@ -668,7 +668,7 @@ Gate: host/version/workdir contract, static literals/pipelines/redirects/nested 
 
 ## M6: Bash compatibility
 
-Status: planned (after M4.1 cutover and two green shipped releases). Estimate: 2-3 days. Goal: maintain explicit rollback until supported hosts can safely retire it.
+Status: waiting sponsorship (starts after the M4.1 cutover, which needs sponsorship, and two green shipped releases). Estimate: 2-3 days. Goal: maintain explicit rollback until supported hosts can safely retire it.
 
 - [ ] docs(compat): mark bash implementation maintenance-only
 - [ ] test(compat): retain differential corpus and explicit rollback CI

@@ -4,6 +4,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Mark M4.1, M5c, M5e steps 5 and 6, and M6 as `waiting sponsorship` in the roadmap.
 - Tighten the unwired PowerShell classifier after a gpt-sol audit: deny signature-like
   comments under PowerShell's whitespace-insensitive near-match rule, any decoded `--%`
   value, and stream merges whose non-success objects could reach a consumer. The oracle
