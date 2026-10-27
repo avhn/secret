@@ -20,7 +20,7 @@
 {"source":"# ordinary comment\r\nWrite-Output 'it''s data'","decision":"allow","reason":"safe"}
 {"source":"Write-Output x\n#requires -Version 5.1","decision":"deny","reason":"directive"}
 {"source":"# SIG # Begin signature block","decision":"deny","reason":"directive"}
-{"source":"Write-Output x 2>&1 > public.txt","decision":"allow","reason":"safe"}
+{"source":"Write-Output x 2>&1 > public.txt","decision":"deny","reason":"pipeline"}
 {"source":"Write-Output x 6>> protected","decision":"deny","reason":"protected-write"}
 {"source":"Write-Output x < public","decision":"deny","reason":"unsupported"}
 {"source":"Get-Content '$HOME/public'","decision":"deny","reason":"path"}
@@ -75,3 +75,67 @@
 {"source": "Write-Output x | ForEach-Object Length", "decision": "deny", "reason": "binding"}
 {"source": "Write-Output <# <# #> ; Get-Content protected.txt #>", "decision": "deny", "reason": "unsupported"}
 {"source": "Write-Output <# ordinary #> x <# second #>", "decision": "allow", "reason": "safe"}
+{"source":"# SIG #  BEGIN SIGNATURE BLOCK\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# SIG #  BEGIN SIGNATURE BLOCK #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# SIG#BEGINSIGNATUREBLOCK\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# SIG#BEGINSIGNATUREBLOCK #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# SIG # BEGIN SIGNATURE BLOC\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# SIG # BEGIN SIGNATURE BLOC #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# sIg\t#\tEnD\tSiGnAtUrE\tBlOcK\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# sIg\t#\tEnD\tSiGnAtUrE\tBlOcK #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# S1G # BEGIN SIGNATUR3 BLOC\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# S1G # BEGIN SIGNATUR3 BLOC #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# S1G # END SIGNATUR3 BLOC\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# S1G # END SIGNATUR3 BLOC #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# SIG\u00a0# BEGIN SIGNATURE BLOCK\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# SIG\u00a0# BEGIN SIGNATURE BLOCK #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"# synthetic prefix SIGNATUREBLOCK trailing text\nWrite-Output x","decision":"deny","reason":"directive"}
+{"source":"<# synthetic prefix SIGNATUREBLOCK trailing text #> Write-Output x","decision":"deny","reason":"directive"}
+{"source":"Get-Content '--%' -Raw","decision":"deny","reason":"unsupported"}
+{"source":"Get-Content \"--%\" -Raw","decision":"deny","reason":"unsupported"}
+{"source":"Get-ChildItem '--%' -Name","decision":"deny","reason":"unsupported"}
+{"source":"Write-Output -InputObject:'--%'","decision":"deny","reason":"unsupported"}
+{"source":"Get-Content -LiteralPath:\"--%\" -Raw","decision":"deny","reason":"unsupported"}
+{"source":"Write-Output x > '--%'","decision":"deny","reason":"unsupported"}
+{"source":"Write-Output x | % { Write-Output '--%' }","decision":"deny","reason":"unsupported"}
+{"source":"Get-Content missing-public.txt 2>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory 2>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 2>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 3>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory 3>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 3>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 4>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory 4>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 4>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 5>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory 5>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 5>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 6>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory 6>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 6>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt *>&1 | Set-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-ChildItem -Name public-directory *>&1 | Add-Content out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } *>&1 | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 2>&1 > out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt > out.txt 2>&1","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content missing-public.txt 3>&1 1>> out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } 2>&1","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Write-Output y } 2>&1","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt 2>&1 } | Out-File out.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt 2>&1 } > other.txt","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt 2>&1; Write-Output y }","decision":"deny","reason":"pipeline"}
+{"source":"Write-Output 'literal' 2>&1 | Out-Null","decision":"deny","reason":"pipeline"}
+{"source":"Get-Content protected.txt 2>&1 > out.txt | Out-Null","decision":"deny","reason":"protected-read"}
+{"source":"Get-Content protected.txt > out.txt 2>&1","decision":"deny","reason":"protected-read"}
+{"source":"Write-Output x | ForEach-Object { Get-Content protected.txt > out.txt } 2>&1","decision":"deny","reason":"protected-read"}
+{"source":"# ordinary comment\nWrite-Output x","decision":"allow","reason":"safe"}
+{"source":"<# ordinary block comment #> Write-Output x","decision":"allow","reason":"safe"}
+{"source":"Get-Content '-dash' -Raw","decision":"allow","reason":"safe"}
+{"source":"Get-Content \"-dash\" -Raw","decision":"allow","reason":"safe"}
+{"source":"Get-ChildItem '-dash' -Name","decision":"allow","reason":"safe"}
+{"source":"Write-Output '--%data'","decision":"allow","reason":"safe"}
+{"source":"Get-Content missing-public.txt | Set-Content out.txt","decision":"allow","reason":"safe"}
+{"source":"Get-ChildItem -Name public-directory | Add-Content out.txt","decision":"allow","reason":"safe"}
+{"source":"Write-Output x | ForEach-Object { Get-Content missing-public.txt } | Out-File out.txt","decision":"allow","reason":"safe"}
+{"source":"Get-Content missing-public.txt 2>&1","decision":"allow","reason":"safe"}
+{"source":"Get-Content missing-public.txt > out.txt","decision":"allow","reason":"safe"}

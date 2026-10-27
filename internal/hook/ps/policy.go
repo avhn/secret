@@ -92,14 +92,14 @@ func (a *analyzer) script(script Script) Source {
 		input := None
 		for i, command := range pipeline.Commands {
 			a.b.check()
-			input = a.command(command, input, i > 0)
+			input = a.command(command, input, i > 0, i+1 < len(pipeline.Commands))
 		}
 		out = combine(out, input)
 	}
 	a.b.check()
 	return out
 }
-func (a *analyzer) command(c Command, input Source, piped bool) Source {
+func (a *analyzer) command(c Command, input Source, piped, downstream bool) Source {
 	a.b.check()
 	bound := bind(c, a.b)
 	switch bound.role.input {
@@ -164,6 +164,7 @@ func (a *analyzer) command(c Command, input Source, piped bool) Source {
 		deny(ReasonPipeline)
 	}
 	seenStreams := map[int]bool{}
+	merged, successRedirect := false, false
 	for _, redirect := range c.Redirects {
 		a.b.check()
 		if seenStreams[redirect.Stream] || seenStreams[-1] || redirect.Stream == -1 && len(seenStreams) != 0 {
@@ -173,9 +174,23 @@ func (a *analyzer) command(c Command, input Source, piped bool) Source {
 		if redirect.Target != nil {
 			a.path(redirect.Target.Value, true)
 		}
-		if redirect.Merge == 0 && (redirect.Stream == 1 || redirect.Stream == -1) {
+		if redirect.Merge != 0 {
+			merged = true
+		} else if redirect.Stream == 1 || redirect.Stream == -1 {
+			successRedirect = true
 			output = None
 		}
+	}
+	if merged {
+		// Roles certify success objects only, not ErrorRecord or other streams.
+		// No consumer exception (including Out-Null) or block-level emptiness
+		// proof is modeled. Redirect order cannot erase an unproved merge.
+		if downstream || successRedirect || bound.role.name == "ForEach-Object" {
+			deny(ReasonPipeline)
+		}
+		// A terminal merge may display objects but cannot certify data escaping
+		// a nested block into its enclosing ForEach-Object's success stream.
+		output = Unknown
 	}
 	a.b.check()
 	return output

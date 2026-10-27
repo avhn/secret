@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Tighten the unwired PowerShell classifier after a gpt-sol audit: deny signature-like
+  comments under PowerShell's whitespace-insensitive near-match rule, any decoded `--%`
+  value, and stream merges whose non-success objects could reach a consumer. The oracle
+  harness now rejects duplicate keys, invalid UTF-8 and unpaired surrogates in native
+  output and checks mandatory parameters of each compatible parameter set.
 - Match PowerShell comment semantics in the unwired classifier: block comments end at the
   first `#>` and any nested-looking `<#` opener denies, so live text cannot hide inside what
   the Go scanner reads as a comment. Found by the native 5.1 and 7.6.7 oracle gate, which now

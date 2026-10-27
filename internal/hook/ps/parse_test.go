@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -73,7 +74,8 @@ func TestLosslessTokensAndDecodedLiterals(t *testing.T) {
 	if c.Arguments[1].Word.Value != "it's literal" || !c.Arguments[0].Word.Colon {
 		t.Fatalf("decoded words: %+v", c.Arguments)
 	}
-	assertDecision(t, string(src), true, "")
+	// Syntax remains lossless, but a block-level merge has no stream proof.
+	assertDecision(t, string(src), false, ReasonPipeline)
 }
 func TestProjectionShapeAndUTF16(t *testing.T) {
 	src := []byte("Write-Output '\U00010400' | % { Get-Content -LiteralPath:public } 2> errors")
@@ -119,6 +121,116 @@ func TestParseRecovery(t *testing.T) {
 		t.Fatalf("projection panic was not contained: %v %v", result, err)
 	}
 }
+func TestSignatureLikeComments(t *testing.T) {
+	cases := []struct {
+		name, comment string
+		deny          bool
+	}{
+		{"extra whitespace", " SIG #  BEGIN SIGNATURE BLOCK", true},
+		{"compact", " SIG#BEGINSIGNATUREBLOCK", true},
+		{"truncated", " SIG # BEGIN SIGNATURE BLOC", true},
+		{"case and tabs", " sIg\t#\tEnD\tSiGnAtUrE\tBlOcK", true},
+		{"unicode whitespace", " SIG # BEGIN SIGNATURE BLOCK", true},
+		{"marker within prose", " synthetic prefix sig# trailing text", true},
+		{"signature within prose", " synthetic prefix SIGNATUREBLOCK trailing text", true},
+		{"near begin", " S1G # BEGIN SIGNATUR3 BLOC", true},
+		{"near end", " S1G # END SIGNATUR3 BLOC", true},
+		{"bounded near prefix", " S1G # BEGIN SIGNATUR3 BLOC " + strings.Repeat("synthetic ", 100), true},
+		{"ten deletions", " sinsignature", true},
+		{"ordinary", " ordinary comment", false},
+		{"empty", "", false},
+		{"public prose", " explanatory public prose about harmless input", false},
+		{"bounded ordinary", " ordinary comment " + strings.Repeat("synthetic ", 100), false},
+	}
+	for _, tc := range cases {
+		for _, block := range []bool{false, true} {
+			name := fmt.Sprintf("%s/block=%v", tc.name, block)
+			t.Run(name, func(t *testing.T) {
+				comment := "#" + tc.comment + "\n"
+				if block {
+					comment = "<#" + tc.comment + " #> "
+				}
+				source := []byte(comment + "Write-Output x")
+				tree, err := Parse(source, context.Background())
+				if tc.deny {
+					var d *Denial
+					if tree != nil || !errors.As(err, &d) || d.Reason != ReasonDirective {
+						t.Fatalf("signature-like comment: tree=%v err=%v", tree, err)
+					}
+					assertDecision(t, string(source), false, ReasonDirective)
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					assertDecision(t, string(source), true, "")
+				}
+			})
+		}
+	}
+}
+
+func TestSignatureCommentDeadline(t *testing.T) {
+	// Walk every deadline checkpoint in normalization and bounded edit distance.
+	text := " ordinary comment " + strings.Repeat("synthetic ", 100)
+	checks := 0
+	b := &budget{deadline: time.Unix(100, 0), now: func() time.Time { checks++; return time.Unix(0, 0) }}
+	if signatureComment(text, b) {
+		t.Fatal("ordinary comment rejected")
+	}
+	total := checks
+	for cutoff := 1; cutoff <= total; cutoff++ {
+		checks = 0
+		b.now = func() time.Time {
+			checks++
+			if checks >= cutoff {
+				return time.Unix(100, 0)
+			}
+			return time.Unix(0, 0)
+		}
+		func() {
+			var err error
+			defer func() {
+				var d *Denial
+				if !errors.As(err, &d) || d.Reason != ReasonDeadline {
+					t.Fatalf("deadline %d/%d: %v", cutoff, total, err)
+				}
+			}()
+			defer recoverDenial(&err)
+			signatureComment(text, b)
+		}()
+	}
+}
+
+func TestDecodedStopParsing(t *testing.T) {
+	for _, literal := range []string{"--%", "'--%'", `"--%"`} {
+		for _, format := range []string{
+			"Get-Content %s -Raw", "Get-ChildItem %s -Name", "Write-Output %s",
+			"Write-Output -InputObject:%s", "Get-Content -LiteralPath:%s -Raw",
+			"Write-Output x > %s", "%s x", "Write-Output x | %% { Write-Output %s }",
+		} {
+			source := fmt.Sprintf(format, literal)
+			t.Run(source, func(t *testing.T) {
+				tree, err := Parse([]byte(source), context.Background())
+				var d *Denial
+				if tree != nil || !errors.As(err, &d) || d.Reason != ReasonUnsupported {
+					t.Fatalf("stop-parsing value: tree=%v err=%v", tree, err)
+				}
+				assertDecision(t, source, false, ReasonUnsupported)
+			})
+		}
+	}
+	for _, source := range []string{
+		`Get-Content '-dash' -Raw`, `Get-Content "-dash" -Raw`, `Get-ChildItem '-dash' -Name`,
+		`Write-Output '--%data'`, `Write-Output "--%data"`, `Write-Output '--'`,
+		`Write-Output -InputObject:'-dash'`, `Write-Output x > '-dash'`,
+	} {
+		if _, err := Parse([]byte(source), context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		assertDecision(t, source, true, "")
+	}
+}
+
 func FuzzPowerShellParse(f *testing.F) {
 	for _, src := range []string{"", `Get-Content public`, `Write-Output 'it''s' | % { Out-Null }`, "#requires -Version 5.1", `Write-Output x 2>&1`, "\xff", "Write-Output -InputObject:'x'"} {
 		f.Add([]byte(src))

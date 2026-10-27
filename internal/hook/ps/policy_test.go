@@ -207,6 +207,56 @@ func TestRedirects(t *testing.T) {
 	assertDecision(t, `Write-Output x 2> public > other`, true, "")
 	assertDecision(t, `Write-Output x > public | Out-File other`, false, ReasonPipeline)
 }
+func TestMergedStreamProofs(t *testing.T) {
+	for _, stream := range []string{"2", "3", "4", "5", "6", "*"} {
+		merge := stream + ">&1"
+		for _, pair := range []struct{ denied, control string }{
+			{`Get-Content missing-public.txt %s | Set-Content out.txt`, `Get-Content missing-public.txt | Set-Content out.txt`},
+			{`Get-ChildItem -Name public-directory %s | Add-Content out.txt`, `Get-ChildItem -Name public-directory | Add-Content out.txt`},
+			{`Write-Output x | ForEach-Object { Get-Content missing-public.txt } %s | Out-File out.txt`, `Write-Output x | ForEach-Object { Get-Content missing-public.txt } | Out-File out.txt`},
+			{`Get-Content missing-public.txt %s > out.txt`, `Get-Content missing-public.txt > out.txt`},
+			{`Get-Content missing-public.txt > out.txt %s`, `Get-Content missing-public.txt > out.txt`},
+			{`Get-Content missing-public.txt %s 1>> out.txt`, `Get-Content missing-public.txt 1>> out.txt`},
+			{`Write-Output x %s | Out-Null`, `Write-Output x | Out-Null`},
+			{`Write-Output x | ForEach-Object { Get-Content missing-public.txt } %s`, `Write-Output x | ForEach-Object { Get-Content missing-public.txt }`},
+			{`Write-Output x | ForEach-Object { Write-Output y } %s`, `Write-Output x | ForEach-Object { Write-Output y }`},
+			{`Write-Output x | ForEach-Object { Get-Content missing-public.txt %s } | Out-File out.txt`, `Write-Output x | ForEach-Object { Get-Content missing-public.txt } | Out-File out.txt`},
+			{`Write-Output x | ForEach-Object { Get-Content missing-public.txt %s; Write-Output y }`, `Write-Output x | ForEach-Object { Get-Content missing-public.txt; Write-Output y }`},
+			{`Write-Output x | ForEach-Object { Write-Output y | %% { Get-Content missing-public.txt %s } }`, `Write-Output x | ForEach-Object { Write-Output y | % { Get-Content missing-public.txt } }`},
+		} {
+			source := fmt.Sprintf(pair.denied, merge)
+			t.Run(source, func(t *testing.T) {
+				reason := ReasonPipeline
+				if stream == "*" && (strings.Contains(source, "> out.txt") || strings.Contains(source, "1>> out.txt")) {
+					// Retain the existing overlapping-stream rejection category.
+					reason = ReasonUnsupported
+				}
+				assertDecision(t, source, false, reason)
+				assertDecision(t, pair.control, true, "")
+			})
+		}
+		// Display-only merges do not transfer objects into a certified consumer.
+		assertDecision(t, "Get-Content missing-public.txt "+merge, true, "")
+		assertDecision(t, "Write-Output x "+merge+" 3> errors.txt", stream != "3" && stream != "*", "")
+		// A redirect or discard must never erase a protected upstream rejection.
+		for _, source := range []string{
+			"Get-Content protected.txt " + merge + " > out.txt | Out-Null",
+			"Get-Content protected.txt > out.txt " + merge,
+			"Write-Output x | ForEach-Object { Get-Content protected.txt > out.txt } " + merge,
+		} {
+			assertDecision(t, source, false, ReasonRead)
+		}
+	}
+	for _, source := range []string{
+		`Write-Output x | ForEach-Object { Get-Content missing-public.txt 2>&1 > out.txt } > other.txt`,
+		`Write-Output x | ForEach-Object { Get-Content missing-public.txt 2>&1 } > other.txt`,
+		`Get-Content missing-public.txt 2>&1 > out.txt | Out-Null`,
+		`Write-Output 'literal' 2>&1 | Out-Null`,
+	} {
+		assertDecision(t, source, false, ReasonPipeline)
+	}
+}
+
 func TestNativeAnchoring(t *testing.T) {
 	// Different synthetic environment homes must not affect literal anchoring.
 	t.Setenv("HOME", `D:\different-home`)

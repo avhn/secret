@@ -4,6 +4,7 @@ import "strings"
 
 // Source is an object-pipeline proof, not an inferred filename. None represents
 // no success-stream objects; Unknown must never satisfy a consumer contract.
+// These roles do not certify non-success streams, including those merged into 1.
 type Source string
 
 const (

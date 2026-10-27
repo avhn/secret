@@ -81,6 +81,36 @@ Named tightening: `powershell-analysis-failure` (deliberate-tightening). The
 checks across scan, parse and walk, and fixed panic denials keep incomplete
 analysis from allowing. Denial reasons never contain source text.
 
+Named tightening: `powershell-signature-like-comments` (deliberate-tightening,
+2026-10-27 audit). Line and block comments are normalized by removing whitespace
+and folding case. Comments containing `sig#` or `signatureblock`, or a bounded
+prefix within ten edits of `sig#beginsignatureblock` or
+`sig#endsignatureblock`, deny as directives. The edit-distance dimensions are
+bounded by marker length plus ten, with deadline checks during normalization
+and every distance row. This conservatively includes extra whitespace, compact
+markers, truncated markers and near matches; prior exact denials remain. Ordinary
+comments remain controls. Native replay is required in both pinned editions.
+
+Named tightening: `powershell-decoded-stop-parsing` (deliberate-tightening,
+2026-10-27 audit). Every decoded literal equal to `--%` denies, including single
+and double quotes, colon-bound arguments, redirects and nested blocks. Native
+argument parsing recognizes the decoded value, not only bare spelling. Other
+quoted dash-prefixed data and values merely containing `--%` remain controls.
+
+Named tightening: `powershell-merged-stream-provenance` (deliberate-tightening,
+2026-10-27 audit). Success-stream roles do not certify merged error, warning,
+verbose, debug or information objects. Any merge on a non-final pipeline stage,
+any merge combined with a success-stream file redirect (in either order), and
+any merge on `ForEach-Object` deny. No block-level empty-stream proof or
+`Out-Null` consumer exception is modeled, so even literal-block merges and
+`Write-Output 'literal' 2>&1 | Out-Null` conservatively deny. Terminal display-only
+merges remain allowed but return an unknown proof, preventing a merge inside a
+nested block from certifying the enclosing command's output. Redirection and
+discard never erase an upstream rejection. Existing all-stream/overlapping-stream
+denials remain unchanged. The former `Write-Output x 2>&1 > public.txt` allow
+also becomes a pipeline denial. Synthetic corpus and replay rows record these
+expectation changes and all audit reproducers; production routing stays all-deny.
+
 ## Arithmetic expansion operands
 
 The Go arithmetic walker denies any expansion-bearing operand, including command

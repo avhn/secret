@@ -178,6 +178,11 @@ func scan(src []byte, b *budget) []Token {
 	out := make([]Token, 0)
 	add := func(kind string, start, end int, value, quote string) {
 		b.check()
+		// Native argument parsing recognizes the decoded value even when quoted.
+		// Keep this at the shared token boundary for every literal-word path.
+		if kind == "word" && value == "--%" {
+			deny(ReasonUnsupported)
+		}
 		if len(out) == MaxTokens {
 			deny(ReasonLimit)
 		}
@@ -202,7 +207,7 @@ func scan(src []byte, b *budget) []Token {
 				i++
 			}
 			text := strings.ToLower(string(src[start:i]))
-			if strings.HasPrefix(text, "#requires") || strings.Contains(text, "sig # begin signature block") || strings.Contains(text, "sig # end signature block") {
+			if strings.HasPrefix(text, "#requires") || strings.Contains(text, "sig # begin signature block") || strings.Contains(text, "sig # end signature block") || signatureComment(text[1:], b) {
 				deny(ReasonDirective)
 			}
 			add("comment", start, i, "", "")
@@ -228,7 +233,7 @@ func scan(src []byte, b *budget) []Token {
 				deny(ReasonSyntax)
 			}
 			text := strings.ToLower(string(src[start:i]))
-			if strings.Contains(text, "#requires") || strings.Contains(text, "sig # begin signature block") || strings.Contains(text, "sig # end signature block") {
+			if strings.Contains(text, "#requires") || strings.Contains(text, "sig # begin signature block") || strings.Contains(text, "sig # end signature block") || signatureComment(text[2:len(text)-2], b) {
 				deny(ReasonDirective)
 			}
 			add("comment", start, i, "", "")
@@ -353,6 +358,58 @@ func scan(src []byte, b *budget) []Token {
 	}
 	return out
 }
+
+// signatureComment deliberately over-denies native signature-like comments.
+// PowerShell ignores whitespace and case and tolerates near-miss markers. Scan
+// the whole bounded comment for markers, but cap edit-distance work to prefixes
+// that could be within ten edits of a begin/end marker, even with trailing text.
+func signatureComment(text string, b *budget) bool {
+	var normalized strings.Builder
+	for _, r := range text {
+		b.check()
+		if !unicode.IsSpace(r) {
+			normalized.WriteRune(unicode.ToLower(r))
+		}
+	}
+	value := normalized.String()
+	if strings.Contains(value, "sig#") || strings.Contains(value, "signatureblock") {
+		return true
+	}
+	const distance = 10
+	for _, marker := range []string{"sig#beginsignatureblock", "sig#endsignatureblock"} {
+		b.check()
+		// Both dimensions are fixed by the marker length and distance, never
+		// the source length. Each row is the distance for one bounded prefix.
+		previous := make([]int, len(marker)+1)
+		current := make([]int, len(marker)+1)
+		for j := range previous {
+			previous[j] = j
+		}
+		i := 0
+		for _, r := range value {
+			b.check()
+			i++
+			if i > len(marker)+distance {
+				break
+			}
+			current[0] = i
+			for j := 1; j <= len(marker); j++ {
+				cost := 1
+				if r == rune(marker[j-1]) {
+					cost = 0
+				}
+				current[j] = min(previous[j]+1, current[j-1]+1, previous[j-1]+cost)
+			}
+			if current[len(marker)] <= distance {
+				return true
+			}
+			previous, current = current, previous
+		}
+	}
+	b.check()
+	return false
+}
+
 func asciiLetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 func wordBoundary(src []byte, i int) bool {
 	return i == len(src) || strings.ContainsRune(" \t\r\n;|{}", rune(src[i]))
