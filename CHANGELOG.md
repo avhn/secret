@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Match PowerShell comment semantics in the unwired classifier: block comments end at the
+  first `#>` and any nested-looking `<#` opener denies, so live text cannot hide inside what
+  the Go scanner reads as a comment. Found by the native 5.1 and 7.6.7 oracle gate, which now
+  passes on both editions.
 - Batch the test-only PowerShell oracle's synthetic sources to amortize native
   startup, with bounded indexed projections, isolated per-source failures and
   value-free failure identifiers. Capture default aliases without resolving

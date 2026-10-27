@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate.
 
-**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) is in progress. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** M4.1, host evidence and Claude cutover (blocked pending sponsorship of the inactive real-host harness). M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has its parser gate green on 5.1 and 7.6.7; host steps 5 and 6 await sponsorship. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Owner decisions (2026-10-13)
 
@@ -648,13 +648,19 @@ release authorization, Windows filesystem support or host fail-closed claim.
 
 ## M5e: PowerShell AST
 
-Status: in progress (owner-approved steps 1 to 4 on 2026-10-26; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need sponsorship and Windows host evidence; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
+Status: in progress (owner-approved steps 1 to 4 done on 2026-10-27; [binding plan](docs/design/m5e-plan.md)). Steps 5 and 6 need sponsorship and Windows host evidence; production PowerShell allows stay disabled until then, and Codex Windows shell calls stay denied. Estimate: 12.5 days (8-14). Goal: host-tested Windows PowerShell shell classification.
 
 - [x] docs(hook): define powershell host and parser contract (bffb75a)
-- [ ] fix(hook): recognize windows powershell calls and deny unknown contracts
-- [ ] feat(hook): classify powershell ast with safe-source and failure assertions
-- [ ] test(hook): gate powershell parsing against native editions
+- [x] fix(hook): recognize windows powershell calls and deny unknown contracts (16ee6b4)
+- [x] feat(hook): classify powershell ast with safe-source and failure assertions (5d9c8f4, 1395b87)
+- [x] test(hook): gate powershell parsing against native editions (5a053d6, 9ba21e5)
 - [ ] test(hook): expand real windows host dialect matrix
+
+Parser gate passed in [run 40424299294](https://github.com/avhn/secret/actions/runs/40424299294): inbox
+Windows PowerShell 5.1.26100 and pinned PowerShell 7.6.7 agree with the Go projection on 61
+corpus and replay cases and 442 accepted fixed-seed generated inputs each. The first native runs
+found non-nesting block comments and stream-ordered redirections, both fixed and replayed. This
+is syntax and binding evidence only; host routing stays denied pending steps 5 and 6.
 
 Gate: host/version/workdir contract, static literals/pipelines/redirects/nested blocks checked against PowerShell, dynamic syntax denied, and missing/crash/timeout blocks. Only then claim Windows shell protection; CMD remains denied.
 

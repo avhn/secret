@@ -52,7 +52,9 @@ Named tightening: `powershell-literal-grammar` (deliberate-tightening). Backtick
 adjacent quoting, numeric-looking bare words, expansions, subexpressions,
 here-strings, splatting, call and dot-source operators, `--` and `--%`, `&&`
 and `||`, active `#requires` directives, signature blocks, Unicode quote and
-dash substitutes, non-ASCII bare-token bytes and control characters deny.
+dash substitutes, non-ASCII bare-token bytes and control characters deny. Block comments
+end at the first `#>`, as in PowerShell, and any `<#` inside a block comment denies
+(native oracle finding, run 40407877597).
 
 Named tightening: `powershell-exact-binding` (deliberate-tightening). Unknown
 commands, module-qualified names, abbreviations, common or unmodeled parameters
