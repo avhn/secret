@@ -73,10 +73,39 @@ func syntheticNativeMetadata(t *testing.T) *nativeProjection {
 		for j := range command.Sets[0].Parameters {
 			parameter := &command.Sets[0].Parameters[j]
 			parameter.FromPipeline, parameter.FromProperty = nativeParameterInput(command.Name, psParameter(*parameter))
+			// Fixed 5.1/7.x contracts, not the Go projection's optional flags.
+			// Get-ChildItem's Path set has no mandatory parameters; its
+			// LiteralPath set does require LiteralPath. Copy-Item requires
+			// Path/LiteralPath, but Destination is optional natively.
+			switch parameter.Name {
+			case "Path":
+				parameter.Mandatory = command.Name != "Get-ChildItem"
+			case "LiteralPath", "Pattern", "Value", "FilePath", "Process", "InputObject":
+				parameter.Mandatory = true
+			}
 		}
 		switch command.Name {
 		case "Out-Null", "Out-File", "ForEach-Object":
 			command.Sets[0].Parameters = append(command.Sets[0].Parameters, ParameterMetadata{Name: "InputObject", Position: -1, Kind: "word", FromPipeline: true})
+		}
+		// Path and LiteralPath never belong to the same native set. Keep
+		// this fabricated fixture small, but preserve that mandatory choice.
+		hasPath := false
+		for _, parameter := range command.Sets[0].Parameters {
+			hasPath = hasPath || parameter.Name == "Path"
+		}
+		if hasPath {
+			pathSet := ParameterSetMetadata{Name: "synthetic-path", Parameters: []ParameterMetadata{}}
+			literalSet := ParameterSetMetadata{Name: "synthetic-literal-path", Parameters: []ParameterMetadata{}}
+			for _, parameter := range command.Sets[0].Parameters {
+				if parameter.Name != "LiteralPath" {
+					pathSet.Parameters = append(pathSet.Parameters, parameter)
+				}
+				if parameter.Name != "Path" {
+					literalSet.Parameters = append(literalSet.Parameters, parameter)
+				}
+			}
+			command.Sets = []ParameterSetMetadata{pathSet, literalSet}
 		}
 	}
 	return native
@@ -131,7 +160,7 @@ func TestOracleRunnerBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := oracleRunner{executable: executable, script: "unused", directory: t.TempDir(), environment: []string{"SECRET_PS_FAULT_HELPER=valid"}, prefix: []string{"-test.run=^TestOracleFaultHelper$", "--"}, timeout: 15 * time.Second, outputLimit: oracleOutputLimit}
-	sources := []string{"", "Write-Output literal", "Write-Output 'it''s data'", "Write-Output '𐐀'", "# comment\r\nWrite-Output other", "Write-Output literal"}
+	sources := []string{"", "Write-Output literal", "Write-Output 'it''s data'", "Write-Output '𐐀'", "Write-Output '�'", "# comment\r\nWrite-Output other", "Write-Output literal"}
 	comparisons, err := compareOracleBatch(runner, sources)
 	if err != nil {
 		t.Fatal(err)

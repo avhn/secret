@@ -200,6 +200,8 @@ func compareOracleProjection(source string, native *nativeProjection) error {
 // consume only their certified Value/InputObject channel, never a filename.
 func compareNativeRoles(native *nativeProjection) error {
 	metadata := map[string]CommandMetadata{}
+	models := map[string]commandRole{}
+	receivers := map[string]string{}
 	for _, command := range native.Metadata {
 		metadata[strings.ToLower(command.Name)] = command
 	}
@@ -241,6 +243,8 @@ func compareNativeRoles(native *nativeProjection) error {
 		default:
 			return fmt.Errorf("unmodeled input role %s", role.name)
 		}
+		models[strings.ToLower(role.name)] = role
+		receivers[strings.ToLower(role.name)] = receiver
 		if receiver != "" {
 			found := false
 			for _, set := range command.Sets {
@@ -259,18 +263,23 @@ func compareNativeRoles(native *nativeProjection) error {
 		}
 	}
 	// Check each actual combination against a single native parameter set, not a
-	// union that accidentally accepts mutually exclusive parameters.
-	var visit func([]ProjectedPipeline) error
-	visit = func(pipelines []ProjectedPipeline) error {
+	// union that accidentally accepts mutually exclusive parameters. Mandatory
+	// inputs need an explicit binding or certified success-stream input through
+	// this command's modeled receiver, never arbitrary native property binding.
+	var visit func([]ProjectedPipeline) (Source, error)
+	visit = func(pipelines []ProjectedPipeline) (Source, error) {
+		output := None
 		for _, pipeline := range pipelines {
-			for _, command := range pipeline.Commands {
+			input := None
+			for index, command := range pipeline.Commands {
 				name := strings.ToLower(command.Name)
 				if canonical, ok := aliases[name]; ok {
 					name = canonical
 				}
 				info, ok := metadata[name]
-				if !ok {
-					return fmt.Errorf("unresolved command %s", name)
+				model, modeled := models[name]
+				if !ok || !modeled {
+					return Unknown, fmt.Errorf("unresolved command %s", name)
 				}
 				var binding *ProjectedBinding
 				for i := range native.Bindings {
@@ -280,17 +289,31 @@ func compareNativeRoles(native *nativeProjection) error {
 					}
 				}
 				if binding == nil {
-					return errors.New("missing native binding")
+					return Unknown, errors.New("missing native binding")
 				}
+				boundNames := map[string]bool{}
+				for _, bound := range binding.Parameters {
+					boundNames[bound.Name] = true
+				}
+				piped := false
+				for _, edge := range pipeline.Edges {
+					if index > 0 && edge == (Edge{index - 1, index}) {
+						piped = true
+					}
+				}
+				pipelineInput := piped && certified(input)
 				compatible := false
 				for _, set := range info.Sets {
 					parameters := map[string]ParameterMetadata{}
+					fits := true
 					for _, p := range set.Parameters {
 						parameters[p.Name] = p
+						if p.Mandatory && !boundNames[p.Name] && !(pipelineInput && p.Name == receivers[name] && p.FromPipeline) {
+							fits = false
+						}
 					}
-					fits := true
-					for _, bound := range binding.Parameters {
-						if _, ok := parameters[bound.Name]; !ok {
+					for name := range boundNames {
+						if _, ok := parameters[name]; !ok {
 							fits = false
 						}
 					}
@@ -299,18 +322,35 @@ func compareNativeRoles(native *nativeProjection) error {
 					}
 				}
 				if !compatible {
-					return fmt.Errorf("no native parameter set for %s", name)
+					return Unknown, fmt.Errorf("no native parameter set for %s", name)
 				}
+				blockOutput := None
 				for _, element := range command.Elements {
-					if err := visit(element.Statements); err != nil {
-						return err
+					nested, err := visit(element.Statements)
+					if err != nil {
+						return Unknown, err
+					}
+					blockOutput = combine(blockOutput, nested)
+				}
+				input = model.output
+				if model.name == "ForEach-Object" {
+					input = Unknown
+					if pipelineInput {
+						input = blockOutput
+					}
+				}
+				for _, redirect := range command.Redirects {
+					if redirect.Merge == 0 && (redirect.Stream == 1 || redirect.Stream == -1) {
+						input = None
 					}
 				}
 			}
+			output = combine(output, input)
 		}
-		return nil
+		return output, nil
 	}
-	return visit(native.Statements)
+	_, err := visit(native.Statements)
+	return err
 }
 
 // Expected native metadata is independently checked, not copied out of the
@@ -343,6 +383,9 @@ func TestOracleRunnerFaults(t *testing.T) {
 		{"missing", "process failed"},
 		{"nonzero", "process failed"},
 		{"malformed", "invalid JSON"},
+		{"duplicate-key", "invalid JSON"},
+		{"invalid-utf8", "invalid JSON"},
+		{"unpaired-surrogate", "invalid JSON"},
 		{"empty", "incomplete projection"},
 		{"oversized", "output limit"},
 		{"timeout", "timeout"},
@@ -366,9 +409,14 @@ func TestOracleRunnerFaults(t *testing.T) {
 			if mode == "timeout" {
 				runner.timeout = 100 * time.Millisecond
 			}
-			got, err := runner.run("Write-Output synthetic")
-			if err == nil || got != nil {
-				t.Fatalf("broken oracle passed: %+v %v", got, err)
+			source := "Write-Output synthetic"
+			if mode == "invalid-utf8" || mode == "unpaired-surrogate" {
+				source = "Write-Output '�'"
+			}
+			err := compareOracle(runner, source)
+			var infrastructure *oracleInfrastructureError
+			if !errors.As(err, &infrastructure) {
+				t.Fatalf("broken oracle did not fail as infrastructure: %v", err)
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("fault was not exercised: got %v, want %s", err, tc.want)
@@ -433,7 +481,7 @@ func TestOracleFaultHelper(t *testing.T) {
 		}
 		results[index].Projection = nil
 		results[index].Error = &oracleSourceError{ID: "OracleSyntheticFailure", Line: 42}
-	case "valid", "trailing", "stderr", "missing-index", "missing-error", "missing-requirements", "missing-binding-flag", "null-binding-flag":
+	case "valid", "trailing", "stderr", "missing-index", "missing-error", "missing-requirements", "missing-binding-flag", "null-binding-flag", "duplicate-key", "invalid-utf8", "unpaired-surrogate":
 	default:
 		os.Exit(10)
 	}
@@ -442,6 +490,12 @@ func TestOracleFaultHelper(t *testing.T) {
 		os.Exit(11)
 	}
 	switch mode {
+	case "duplicate-key":
+		data = bytes.Replace(data, []byte(`"unsupported":[]`), []byte(`"unsupported":["UnexpectedNode"],"unsupported":[]`), 1)
+	case "invalid-utf8":
+		data = bytes.Replace(data, []byte("�"), []byte{0xff}, 1)
+	case "unpaired-surrogate":
+		data = bytes.Replace(data, []byte("�"), []byte(`\ud800`), 1)
 	case "missing-index":
 		data = bytes.Replace(data, []byte(`"index":0,`), nil, 1)
 	case "missing-error":

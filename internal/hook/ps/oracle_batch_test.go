@@ -19,6 +19,8 @@ const (
 	oracleInputLimit       = 8 << 20
 	oracleBatchOutputLimit = 64 << 20
 	oracleBatchTimeout     = 2 * time.Minute
+	oracleJSONDepthLimit   = 128
+	oracleJSONTokenLimit   = 8 << 20
 )
 
 type oracleSourceError struct {
@@ -107,6 +109,9 @@ func (r oracleRunner) runBatch(sources []string) ([]oracleResult, error) {
 	}
 	var results []oracleResult
 	data := stdout.data.Bytes()
+	if err := validateOracleJSON(data, oracleJSONDepthLimit, oracleJSONTokenLimit); err != nil {
+		return nil, err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&results); err != nil {
