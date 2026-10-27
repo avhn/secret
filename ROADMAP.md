@@ -656,11 +656,13 @@ Status: in progress (owner-approved steps 1 to 4 done on 2026-10-27; [binding pl
 - [x] test(hook): gate powershell parsing against native editions (5a053d6, 9ba21e5)
 - [ ] test(hook): expand real windows host dialect matrix
 
-Parser gate passed in [run 40424299294](https://github.com/avhn/secret/actions/runs/40424299294): inbox
-Windows PowerShell 5.1.26100 and pinned PowerShell 7.6.7 agree with the Go projection on 61
-corpus and replay cases and 442 accepted fixed-seed generated inputs each. The first native runs
-found non-nesting block comments and stream-ordered redirections, both fixed and replayed. This
-is syntax and binding evidence only; host routing stays denied pending steps 5 and 6.
+Parser gate passed in [run 40440119444](https://github.com/avhn/secret/actions/runs/40440119444) at
+`d2ea6d8`: inbox Windows PowerShell 5.1.26100 and pinned PowerShell 7.6.7 agree with the Go
+projection on 80 corpus and replay cases and 277 accepted fixed-seed generated inputs each. The
+first native runs found non-nesting block comments and stream-ordered redirections; a gpt-sol
+audit then tightened signature-like comments, quoted `--%` and stream merges (`685a9e5`) and
+the oracle JSON and mandatory-parameter checks (`d2ea6d8`). This is syntax and binding
+evidence only; host routing stays denied pending steps 5 and 6.
 
 Gate: host/version/workdir contract, static literals/pipelines/redirects/nested blocks checked against PowerShell, dynamic syntax denied, and missing/crash/timeout blocks. Only then claim Windows shell protection; CMD remains denied.
 
