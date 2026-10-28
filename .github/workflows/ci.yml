@@ -12,6 +12,111 @@ permissions:
   contents: read
 
 jobs:
+  standalone-install-unix:
+    name: standalone installer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.26.10'
+          cache: false
+      - name: Standalone installer synthetic transport and trust regressions
+        run: bash tests/test-install.sh
+      - name: Retained stock Bash 3.2 standalone installer regressions
+        if: runner.os == 'macOS'
+        run: /bin/bash tests/test-install.sh
+
+  standalone-install-windows:
+    name: standalone installer (Windows, ${{ matrix.shell }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [pwsh, powershell]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.26.10'
+          cache: false
+      - name: Parse new installer and release integration scripts
+        shell: pwsh
+        env:
+          POWERSHELL_EDITION: ${{ matrix.shell }}
+        run: |
+          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application).Source
+          & $edition -NoProfile -NonInteractive -Command {
+            foreach ($path in @('install.ps1', 'tests/test-install.ps1', 'tests/test-release-windows.ps1')) {
+              $tokens = $null
+              $errors = $null
+              $null = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path), [ref]$tokens, [ref]$errors)
+              if ($errors.Count -ne 0) { throw 'PowerShell release script has parser errors' }
+            }
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native standalone installer synthetic regressions
+        shell: pwsh
+        env:
+          POWERSHELL_EDITION: ${{ matrix.shell }}
+        run: |
+          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application).Source
+          & $edition -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-install.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  packaging-and-setup:
+    name: MCPB, registry and setup regressions
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.26.10'
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26.10.0'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.14.8'
+      - name: Install locked MCPB tooling in disposable roots without lifecycle scripts
+        run: |
+          root="$(mktemp -d "$RUNNER_TEMP/packaging.XXXXXX")"
+          mkdir -m 700 "$root/home" "$root/tmp"
+          export HOME="$root/home" TMPDIR="$root/tmp"
+          npm install --global --prefix "$root/tools" --ignore-scripts --no-audit --no-fund npm@11.19.1
+          export PATH="$root/tools/bin:$PATH"
+          test "$(npm --version)" = 11.19.1
+          npm ci --ignore-scripts --prefix packaging/mcpb
+          printf 'HOME=%s\nTMPDIR=%s\n' "$HOME" "$TMPDIR" >> "$GITHUB_ENV"
+          printf '%s\n' "$root/tools/bin" >> "$GITHUB_PATH"
+      - name: MCPB allowlist, determinism and metadata-only smoke
+        run: python3 -I tests/test-mcpb.py
+      - name: Fresh npm audit through the reviewed MCPB advisory policy
+        run: |
+          report="$TMPDIR/npm-audit.json"
+          status=0
+          npm audit --prefix packaging/mcpb --ignore-scripts --json > "$report" || status=$?
+          case "$status" in 0|1) ;; *) echo "npm audit failed with status $status" >&2; exit 1 ;; esac
+          python3 -I scripts/package_mcpb.py --version 0.3.0 --audit-report "$report"
+      - name: Registry generation and publication contract without external publication
+        run: python3 -I tests/test-registry.py
+      - name: Setup examples and exact synthetic argv
+        run: python3 -I tests/test-setup.py
+
   lint:
     runs-on: ubuntu-latest
     steps:

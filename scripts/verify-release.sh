@@ -11,14 +11,21 @@ import subprocess
 import sys
 
 ROOT = Path(sys.argv[1])
-VERSION = "0.2.3"
+VERSION = "0.3.0"
 TAG = "v" + VERSION
 REPO = "avhn/secret"
 WORKFLOW = REPO + "/.github/workflows/release.yml"
 MANIFEST = "checksums-" + TAG + ".txt"
 MANIFEST_PATH = "dist/" + MANIFEST
+# Historical four-binary releases remain verifiable in the disposable rehearsal.
+# This is a compiled-in identity, not an untrusted version/tag override.
+EXTENDED = tuple(map(int, VERSION.split("."))) >= (0, 3, 0)
 NAMES = sorted("secret-" + TAG + "-" + osname + "-" + arch
-               for osname in ("linux", "darwin") for arch in ("amd64", "arm64"))
+               + (".exe" if osname == "windows" else "")
+               for osname in (("linux", "darwin", "windows") if EXTENDED else ("linux", "darwin"))
+               for arch in ("amd64", "arm64"))
+if EXTENDED:
+    NAMES = sorted(NAMES + ["secret-" + TAG + "-desktop.mcpb", "server.json"])
 
 
 def require(condition, message):
@@ -39,8 +46,11 @@ def commit(value):
 
 
 def fixture_absent(sha):
-    require(not git("ls-tree", "--name-only", sha, "--", ".secret-release-test-fixture"),
+    marker = ".secret-release-test-fixture"
+    require(not any(marker.encode() in path.split(b"/") for path in
+                    git("ls-tree", "-r", "-t", "--name-only", "-z", sha).split(b"\0")),
             "test fixture marker must not ship")
+    require(not any(ROOT.rglob(marker)), "test fixture marker must not be on disk")
 
 
 def check_source(source, final):
@@ -74,7 +84,7 @@ def read_file(path, limit):
 def checksum_records(path):
     data = read_file(path, 4096)
     lines = data.splitlines(keepends=True)
-    require(len(lines) == 4, "invalid checksum manifest")
+    require(len(lines) == len(NAMES), "invalid checksum manifest")
     records = {}
     for name, line in zip(NAMES, lines):
         match = re.fullmatch(rb"([0-9a-f]{64})  " + re.escape(name.encode()) + rb"\n", line)
@@ -93,6 +103,13 @@ def checksums(directory, manifest):
     data, records = checksum_records(manifest)
     for name, expected in records.items():
         require(digest(directory / name) == expected, "release digest mismatch")
+    # Full build/draft directories contain only payloads, checksums and optional
+    # digest-named bundles. Unknown files must not become attested/uploaded inputs.
+    allowed = set(NAMES + [MANIFEST])
+    for expected in [*records.values(), digest(manifest)]:
+        allowed.update("sha256" + separator + expected + ".jsonl" for separator in (":", "-"))
+    require(all(path.name in allowed and path.is_file() and not path.is_symlink()
+                for path in directory.iterdir()), "unexpected release file")
     return data, records
 
 
@@ -118,7 +135,12 @@ def verify(directory, final, bundle_dir):
                    "--cert-identity", "https://github.com/" + WORKFLOW + "@refs/tags/" + TAG,
                    "--deny-self-hosted-runners", "--format", "json"]
         if bundle_dir is not None:
-            bundle = bundle_dir / ("sha256:" + expected + ".jsonl")
+            portable = bundle_dir / ("sha256-" + expected + ".jsonl")
+            legacy = bundle_dir / ("sha256:" + expected + ".jsonl")
+            # Prefer portable public names, including on Windows. Reject
+            # ambiguous copies rather than silently choosing a different bundle.
+            require(not (portable.exists() and legacy.exists()), "ambiguous provenance bundles")
+            bundle = portable if portable.exists() else legacy
             read_file(bundle, 16 * 1024 * 1024)
             command.extend(["--bundle", str(bundle)])
         # A local bundle does not make gh offline: it still uses its normal
@@ -146,11 +168,13 @@ def verify(directory, final, bundle_dir):
             matches = [subject for subject in subjects if subject.get("name") == name]
             require(len(matches) == 1 and matches[0].get("digest") == {"sha256": expected},
                     "provenance subject mismatch")
-    print("secret: verified all four assets and checksum provenance at final tag C")
+    print("secret: verified all " + str(len(NAMES)) + " payloads and checksum provenance at final tag C")
 
 
 def main(args):
-    if args == ["--source"]:
+    if args == ["--version"]:
+        print(VERSION)
+    elif args == ["--source"]:
         print(source_commit())
     elif len(args) == 3 and args[0] == "--check-source":
         check_source(args[1], args[2])

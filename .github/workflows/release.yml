@@ -11,7 +11,7 @@ permissions:
 
 # Candidates only build and compare. Final-tag provenance is never borrowed from
 # a candidate run. Repository administrators must configure release-publish with
-# required reviewers and restrict it to the v0.2.3 tag before approving draft
+# required reviewers and restrict it to the v0.3.0 tag before approving draft
 # creation. A sole maintainer approves their own deployment, so self-review is
 # permitted; the reviewer gate still makes the draft a separate human action.
 jobs:
@@ -42,8 +42,8 @@ jobs:
           python3 -I scripts/rehearse-release.py
 
   release-build-a:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    runs-on: macos-15-intel
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -54,6 +54,17 @@ jobs:
         with:
           go-version: '1.26.10'
           cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '26.10.0'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.14.8'
+      - name: Check pinned packaging tools
+        run: |
+          test "$(node --version)" = v26.10.0
+          test "$(python3 --version)" = 'Python 3.14.8'
+          xcrun --find lipo
       - name: Independent build A
         env:
           GOTOOLCHAIN: local
@@ -64,7 +75,17 @@ jobs:
           export HOME="$TMPDIR/home" XDG_CACHE_HOME="$TMPDIR/cache"
           export GOCACHE="$TMPDIR/go-cache" GOMODCACHE="$TMPDIR/go-modules"
           mkdir -p "$HOME" "$XDG_CACHE_HOME"
+          npm install --global --prefix "$TMPDIR/tools" --ignore-scripts --no-audit --no-fund npm@11.19.1
+          export PATH="$TMPDIR/tools/bin:$PATH"
+          test "$(npm --version)" = 11.19.1
           sh source-a/scripts/build-release.sh "$RUNNER_TEMP/build-a/assets"
+          # Fresh advisories against the lock build-release.sh just installed.
+          report="$TMPDIR/npm-audit.json"
+          status=0
+          npm audit --prefix source-a/packaging/mcpb --ignore-scripts --json > "$report" || status=$?
+          case "$status" in 0|1) ;; *) echo "npm audit failed with status $status" >&2; exit 1 ;; esac
+          version="$(sh source-a/scripts/verify-release.sh --version)"
+          python3 -I source-a/scripts/package_mcpb.py --version "$version" --audit-report "$report"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-build-a
@@ -72,8 +93,8 @@ jobs:
           if-no-files-found: error
 
   release-build-b:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    runs-on: macos-15-intel
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -84,6 +105,17 @@ jobs:
         with:
           go-version: '1.26.10'
           cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '26.10.0'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.14.8'
+      - name: Check pinned packaging tools
+        run: |
+          test "$(node --version)" = v26.10.0
+          test "$(python3 --version)" = 'Python 3.14.8'
+          xcrun --find lipo
       - name: Independent build B
         env:
           GOTOOLCHAIN: local
@@ -94,6 +126,9 @@ jobs:
           export HOME="$TMPDIR/home" XDG_CACHE_HOME="$TMPDIR/cache"
           export GOCACHE="$TMPDIR/go-cache" GOMODCACHE="$TMPDIR/go-modules"
           mkdir -p "$HOME" "$XDG_CACHE_HOME"
+          npm install --global --prefix "$TMPDIR/tools" --ignore-scripts --no-audit --no-fund npm@11.19.1
+          export PATH="$TMPDIR/tools/bin:$PATH"
+          test "$(npm --version)" = 11.19.1
           sh independently/nested/source-b/scripts/build-release.sh "$RUNNER_TEMP/other/build-b/assets"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -113,10 +148,10 @@ jobs:
       - name: Restore and check annotated release tag
         if: github.event_name == 'push'
         run: |
-          test "$GITHUB_REF" = refs/tags/v0.2.3
-          git fetch --no-tags --force origin "refs/tags/v0.2.3:refs/tags/v0.2.3"
-          test "$(git cat-file -t refs/tags/v0.2.3)" = tag
-          test "$(git rev-parse 'refs/tags/v0.2.3^{commit}')" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = refs/tags/v0.3.0
+          git fetch --no-tags --force origin "refs/tags/v0.3.0:refs/tags/v0.3.0"
+          test "$(git cat-file -t refs/tags/v0.3.0)" = tag
+          test "$(git rev-parse 'refs/tags/v0.3.0^{commit}')" = "$GITHUB_SHA"
       - name: Check release scripts and synthetic regressions
         run: |
           sh -n scripts/build-release.sh scripts/verify-release.sh
@@ -130,21 +165,20 @@ jobs:
         with:
           name: release-build-b
           path: artifacts-b
-      - name: Compare every executable byte and sorted checksum manifest
+      - name: Compare all eight payloads and sorted checksum manifest
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           sh scripts/verify-release.sh --source
           sh scripts/verify-release.sh --checksums "$PWD/artifacts-a"
           sh scripts/verify-release.sh --checksums "$PWD/artifacts-b"
-          for os in darwin linux; do
-            for arch in amd64 arm64; do
-              cmp "artifacts-a/secret-v0.2.3-$os-$arch" "artifacts-b/secret-v0.2.3-$os-$arch"
-            done
+          test "$(find artifacts-a -type f | wc -l)" -eq 9
+          test "$(find artifacts-b -type f | wc -l)" -eq 9
+          for asset in artifacts-a/*; do
+            cmp "$asset" "artifacts-b/$(basename "$asset")"
           done
-          cmp artifacts-a/checksums-v0.2.3.txt artifacts-b/checksums-v0.2.3.txt
           if [ "$EVENT_NAME" = push ]; then
-            cmp dist/checksums-v0.2.3.txt artifacts-a/checksums-v0.2.3.txt
+            cmp dist/checksums-v0.3.0.txt artifacts-a/checksums-v0.3.0.txt
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -153,7 +187,7 @@ jobs:
           if-no-files-found: error
 
   release-attest:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.3' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.3.0' && github.repository == 'avhn/secret'
     needs: release-repro
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -168,13 +202,13 @@ jobs:
           path: assets
       # Reviewed composite action: the fixed revision generates SLSA v1 build
       # provenance and invokes actions/attest. Subject paths contain only the
-      # four compared executables and their compared checksum asset.
+      # eight compared payloads and their compared checksum asset (nine subjects).
       - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: assets/*
 
   release-verify:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.3' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.3.0' && github.repository == 'avhn/secret'
     needs: release-attest
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -188,20 +222,20 @@ jobs:
           persist-credentials: false
       - name: Restore and check annotated release tag
         run: |
-          test "$GITHUB_REF" = refs/tags/v0.2.3
-          git fetch --no-tags --force origin "refs/tags/v0.2.3:refs/tags/v0.2.3"
-          test "$(git cat-file -t refs/tags/v0.2.3)" = tag
-          test "$(git rev-parse 'refs/tags/v0.2.3^{commit}')" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = refs/tags/v0.3.0
+          git fetch --no-tags --force origin "refs/tags/v0.3.0:refs/tags/v0.3.0"
+          test "$(git cat-file -t refs/tags/v0.3.0)" = tag
+          test "$(git rev-parse 'refs/tags/v0.3.0^{commit}')" = "$GITHUB_SHA"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-reproducible
           path: assets
-      - name: Verify final C, tag, certificate, workflow and all five subjects
+      - name: Verify final C, tag, certificate, workflow and all nine subjects
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA"
-          for asset in "$PWD"/assets/secret-v0.2.3-* "$PWD/assets/checksums-v0.2.3.txt"; do
+          for asset in "$PWD"/assets/secret-v0.3.0-* "$PWD/assets/server.json" "$PWD/assets/checksums-v0.3.0.txt"; do
             scratch="$(mktemp -d "$RUNNER_TEMP/attestation.XXXXXX")"
             (cd "$scratch" && gh attestation download "$asset" --repo avhn/secret)
             cp "$scratch"/sha256:*.jsonl assets/
@@ -216,7 +250,7 @@ jobs:
              and .deployment_branch_policy.custom_branch_policies == true' \
             | grep -qx true
           gh api repos/avhn/secret/environments/release-publish/deployment-branch-policies --jq \
-            '[.branch_policies[] | {name, type}] == [{"name": "v0.2.3", "type": "tag"}]' \
+            '[.branch_policies[] | {name, type}] == [{"name": "v0.3.0", "type": "tag"}]' \
             | grep -qx true
       # upload-artifact rejects colons in paths. Preserve gh's bundle contents
       # under portable transport names, then restore them in the approved job.
@@ -232,7 +266,7 @@ jobs:
           if-no-files-found: error
 
   release-publish:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.3' && github.repository == 'avhn/secret'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.3.0' && github.repository == 'avhn/secret'
     needs: release-verify
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -246,10 +280,10 @@ jobs:
           persist-credentials: false
       - name: Restore and check annotated release tag
         run: |
-          test "$GITHUB_REF" = refs/tags/v0.2.3
-          git fetch --no-tags --force origin "refs/tags/v0.2.3:refs/tags/v0.2.3"
-          test "$(git cat-file -t refs/tags/v0.2.3)" = tag
-          test "$(git rev-parse 'refs/tags/v0.2.3^{commit}')" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = refs/tags/v0.3.0
+          git fetch --no-tags --force origin "refs/tags/v0.3.0:refs/tags/v0.3.0"
+          test "$(git cat-file -t refs/tags/v0.3.0)" = tag
+          test "$(git rev-parse 'refs/tags/v0.3.0^{commit}')" = "$GITHUB_SHA"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-verified
@@ -269,13 +303,14 @@ jobs:
           for bundle in assets/sha256:*.jsonl; do
             mv "$bundle" "assets/sha256-${bundle#assets/sha256:}"
           done
-          gh release create v0.2.3 --repo avhn/secret --verify-tag --target "$GITHUB_SHA" \
-            --draft --title 'secret v0.2.3' \
-            --notes 'Reproducible Linux/macOS binaries verified against final-tag C provenance. Publication requires separate owner approval.' \
-            assets/secret-v0.2.3-* assets/checksums-v0.2.3.txt assets/sha256-*.jsonl
+          gh release create v0.3.0 --repo avhn/secret --verify-tag --target "$GITHUB_SHA" \
+            --draft --title 'secret v0.3.0' \
+            --notes 'Reproducible Linux/macOS/Windows binaries, MCPB and registry metadata verified against final-tag C provenance. Publication requires separate owner approval.' \
+            assets/secret-v0.3.0-* assets/server.json assets/checksums-v0.3.0.txt assets/sha256-*.jsonl
           scratch="$(mktemp -d "$RUNNER_TEMP/draft-assets.XXXXXX")"
-          gh release download v0.2.3 --repo avhn/secret --dir "$scratch"
-          for asset in assets/secret-v0.2.3-* assets/checksums-v0.2.3.txt assets/sha256-*.jsonl; do
+          gh release download v0.3.0 --repo avhn/secret --dir "$scratch"
+          test "$(find "$scratch" -type f | wc -l)" -eq 18
+          for asset in assets/secret-v0.3.0-* assets/server.json assets/checksums-v0.3.0.txt assets/sha256-*.jsonl; do
             cmp "$asset" "$scratch/$(basename "$asset")"
           done
           for bundle in "$scratch"/sha256-*.jsonl; do

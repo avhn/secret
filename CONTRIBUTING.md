@@ -157,14 +157,16 @@ full-stream authentication, injected publication failures and killed writers
 whose tokened locks are never stolen. Windows runs codec tests and asserts age
 filesystem rejection before access; native Linux/macOS PTYs remain required.
 Keep all previous Go, race, shell, provider, Bash 3.2 and exact inventory gates.
-M5d is pending hosted CI; do not call it complete from local tests alone.
+M5d passed its hosted gate in PR #28; changed inputs still require the applicable
+hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4 prepares opt-in release tooling; the installed Bash CLI, Claude/Codex hooks
-and four manifest versions remain unchanged. M4.1 owns all version bumps,
+M4's v0.2.3 release is complete. The v0.3.0 extension changes packaging and
+independently bumps all four manifests to 0.3.0 without changing installed Bash
+CLI/Claude/Codex hooks. M4.1 remains waiting sponsorship and owns
 `onFailure: "block"`, `guard-go` activation, the `bin/secret`/`compat/secret`
-switch and Go hook output-contract changes. See [the M4 plan](docs/design/m4-plan.md),
+switch and Go hook output-contract changes. See [the release plan](docs/design/v0.3.0-plan.md),
 [installation](docs/install.md) and [release approvals](docs/release.md).
 
 New production files are `scripts/build-release.sh`, `scripts/verify-release.sh`,
@@ -174,27 +176,57 @@ live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.
 is test-only under `-tags hosthookfixture`, never a shipped binary.
 
 Use exactly Go 1.26.10, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
-builds. Run tests from the trusted checkout, keeping downloads in fresh empty
+builds. Complete assembly also requires native macOS lipo, Node 26.10.0,
+npm 11.19.1, Python 3.14.8 and the locked MCPB 2.1.2 validator. Install it with
+`npm ci --prefix packaging/mcpb --ignore-scripts`. Review the narrowly bounded
+Zod advisory exception in `scripts/package_mcpb.py` and the
+[fresh-audit policy](docs/release.md#packaging-tools-and-advisory-review);
+never suppress unrelated findings or lifecycle-script safeguards.
+Run tests from the trusted checkout, keeping downloads in fresh empty
 directories and readers/scripts outside them. Never install into your real HOME.
 
 ```bash
 export GOTOOLCHAIN=local
 python3 -I tests/test-release.py
 bash tests/test-launchers.sh
+bash tests/test-install.sh
+python3 -I tests/test-mcpb.py
+python3 -I tests/test-registry.py
+python3 -I tests/test-setup.py
+# Full assembly requires macOS/lipo and the pinned packaging tools above:
 assets="$(mktemp -d)"
 sh scripts/build-release.sh "$assets"
-python3 -I tests/test-plugin.py "$PWD" "$assets" --manifest-only
-python3 -I tests/test-plugin.py "$PWD" "$assets"
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.0 --manifest-only
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.0
 python3 -I tests/test-host-hooks.py # offline classification, no model calls
-shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go scripts/*.sh tests/*.sh
-# On macOS, also run the launcher suite with stock Bash 3.2:
+shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go install.sh scripts/*.sh tests/*.sh
+# On macOS, also run retained shell suites with stock Bash 3.2:
 /bin/bash tests/test-launchers.sh
+/bin/bash tests/test-install.sh
 ```
 
-CI runs independent release builds and native Linux/macOS amd64/arm64 install
-jobs. `plugin-manifest-check` uses the default M4 shipped-state contract.
-`--stage m4.1` preserves the stronger activation assertions for that milestone;
-do not enable it on the M4 workflow or weaken other assertions. Tests assert
+On disposable native Windows hosts, run the installer suite in each available
+PowerShell edition (5.1 and 7), never against the real user install or PATH:
+
+```powershell
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tests/test-install.ps1
+pwsh -NoProfile -NonInteractive -File tests/test-install.ps1
+```
+
+The installer suites use synthetic transport/verifier fixtures; setup tests parse
+all fenced JSON/TOML/CLI examples, verify argv against the Go CLI source and
+exercise synthetic shell launchers with disposable HOME/TMPDIR, no network or
+real stores. Windows escaping is checked as data in the Python
+suite, not native client evidence. MCPB tests require the locked validator and
+Go cache; Registry tests are offline and never publish. None starts a model or
+proves Desktop install/interpolation/restart behavior.
+
+CI runs independent macOS full assembly plus native Linux/macOS/Windows
+amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
+`--stage v0.3.0`, a version-only bump plus unchanged Bash nonactivation contract.
+The test default remains historical `m4`; `--stage m4.1` preserves the stronger
+activation assertions for that milestone. Do not use it as a v0.3.0 gate or
+weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.
 `.secret-release-test-fixture` is forbidden in the shipped tree, S and C,
 including dangling symlinks. Only disposable synthetic checkout copies may use

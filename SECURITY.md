@@ -24,27 +24,70 @@ and core dumps prevent a secure-erasure guarantee. Names-only outer metadata
 is unauthenticated and never authorizes a value read. Names, labels, recipients
 and approximate size remain visible; encryption does not prove sender identity
 or prevent replay. Rekey and migration do not erase older ciphertext or sources.
-Age templates and age-to-plaintext export are prohibited. Windows filesystem
-operations await M5a. See [age workflows and recovery](docs/age.md).
+Age templates and age-to-plaintext export are prohibited. Windows age filesystem
+operations remain unsupported after the separate M5a CLI gate.
+See [age workflows and recovery](docs/age.md).
 This is not a sandbox, hook activation or proof of host fail-closed behavior.
 
-## Windows development status
+## Windows staged CLI and release evidence
 
-M5a is incomplete. Windows store reads and writes now use handle-checked,
-protected owner-only DACLs for parents, locks, tokens, scratch, replacements,
-manifests and recovery. Existing broad/inherited/NULL DACLs and final reparse
-points are rejected, not silently repaired. Native CI must still certify this
-storage contract; cross-compilation cannot do so. Do not use Windows development
-builds with real stores. Higher-level operator, provider transaction and child
-launch guards remain pending later lifecycle and console work.
+M5a's native Windows amd64 gate passed in PR #29, including storage, console,
+Job containment and exact Credential Manager lifecycle/independent cleanup.
+See [Windows evidence and limits](docs/windows.md). Windows reads/writes use
+handle-checked, protected owner-only DACLs for parents, locks, tokens, scratch,
+replacements, manifests and recovery. Broad/inherited/NULL DACLs and final reparse
+points are rejected, not silently repaired. Child creation enrolls descendants
+in a non-inheritable kill-on-close Job without breakaway fallback; redirected
+operator consent/value input is rejected. Literal output redaction covers UTF-8
+and UTF-16LE/BE, not transformed values or other code pages.
+
+The v0.3.0 release targets Windows amd64 and arm64; its native candidate/public
+asset installation gates are new and not established by the older amd64 gate.
+Cross-builds and test compilation do not certify native installations. The native
+8.3 fixture volume lacked short names, so short-alias coverage remains synthetic.
 
 Successful replacement flushes file data and uses handle-relative native rename
 without deleting the destination first or falling back to a copy. Real flush and
 publication failures remain failures. Windows directory flushing is unavailable
 under this contract, so a successful transaction does not imply power-loss
 durability. Owner-only DACLs do not isolate the same user or administrators and
-do not guarantee secure erasure. No Windows release, child containment, CredMan
-integration or shell/file-hook protection is claimed.
+do not guarantee secure erasure. Provider mutation and manifest publication are
+not jointly atomic. Windows age, pass and 1Password remain unsupported. The
+PowerShell parser is unwired: production Windows shell calls remain denied, and
+no installed-hook or fail-closed PowerShell/CMD host protection is claimed.
+
+## v0.3.0 installer and MCP boundaries
+
+Pinned HTTPS one-liners execute a script before payload verification and trust
+GitHub HTTPS, repository ownership/tag governance and the reviewed installer.
+Download/review/run or a trusted checkout gives stronger bootstrap review, not
+isolation from a compromised same-user process. gh is mandatory. Installers
+verify checksum and binary attestations against the exact repository/workflow/
+tag and hosted Actions identity, require their C to agree, and optionally enforce
+an independently authenticated `SECRET_RELEASE_COMMIT`. No checksum-only fallback,
+source build, automatic registration or store/value discovery is permitted.
+Standalone binaries have install-time verification, not checkout-launcher
+per-execution rehash. Windows adds only its own install directory to user PATH;
+Unix does not edit PATH. Native public-install evidence remains a release gate.
+
+MCP is opt-in local stdio with explicit exact `--store` references, not a network
+service or credential transport. Its four tools list/show/diff/health never
+return values, value hashes or lengths and expose no mutation, resource or prompt
+capability. Names-only metadata can still disclose key names, labels, presence,
+backend, references/paths and provider account IDs to clients, models and logs.
+File metadata parsing may open local file bytes internally; provider metadata
+never calls value Get. Age outer metadata is unauthenticated. Health proves only
+configured readiness/store count, not provider availability, value validity or
+hook protection. MCP registration grants no guard exception.
+
+The Desktop MCPB contains macOS universal and Windows amd64 executables and
+requires one approved store reference, with no default. Locked-CLI validation and
+native payload smoke are not actual Desktop install/interpolation/restart evidence;
+that host integration is not host-tested. Registry identity `io.github.avhn/secret`
+and versioned bundle metadata do not imply publication or host protection.
+All four plugin manifests become 0.3.0 without changing installed Bash hooks.
+M4.1 Go activation remains waiting sponsorship. No new fail-closed host claim
+follows from installers, MCP, the Registry or synthetic tests.
 
 ## What it protects
 

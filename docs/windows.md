@@ -1,10 +1,67 @@
 # Windows support (staged Go CLI)
 
-The staged Go CLI implements native Windows amd64 development support, verified
-on hosted windows-latest runners; this is not a Windows release or installation
-claim. The installed defaults remain the Bash CLI and guard, and installed
-manifests are unchanged. See [installation and rollback](install.md) and the
+M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
+run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
+v0.3.0 packaging work adds raw `secret-v0.3.0-windows-amd64.exe` and
+`secret-v0.3.0-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+public-release installs on both architectures remain separate required evidence.
+This document does not claim those new installs have passed or publication exists.
+The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.0
+without Go hook activation, which stays M4.1, waiting sponsorship.
+See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
+
+## Release installation and MCP
+
+The version-pinned PowerShell bootstrap snippet is in [setup.md](setup.md#install).
+It needs gh and curl.exe from trusted channels. gh must already be authenticated:
+run `gh auth login` yourself in a private terminal, or supply `GH_TOKEN` through
+your trusted credential environment without displaying it. Never paste a token
+into chat or client configuration. Verification checks checksum/binary
+attestations, exact workflow/tag identity, their common C, digest and PE machine.
+`SECRET_RELEASE_COMMIT` optionally pins a separately authenticated full C;
+missing gh never falls back to checksums. Executing the bootstrap script still
+trusts GitHub HTTPS, tag governance and the reviewed script before verification.
+
+The download completes with `-ErrorAction Stop` before the snippet starts a
+child process of the current PowerShell host using `-NoProfile -ExecutionPolicy
+Bypass -File`. This bypass applies only to that one child process, not persistent
+policy, so Windows PowerShell 5.1's default Restricted policy does not block the
+downloaded file. Centrally enforced Group Policy can still take precedence.
+`finally` cleans up and the saved child exit code is propagated afterward.
+
+If the installer reports
+`secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry`,
+authenticate gh privately or correct its trusted environment, then retry. Do not
+paste or print a token to troubleshoot it.
+
+The default destination is `%LOCALAPPDATA%\Programs\secret\secret-go.exe`.
+`INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
+0.3.0, never latest; `--commit` supplies the optional full C and `--help` explains
+inputs. It adds only its own directory to user PATH. It does not modify client
+files, register MCP, install hooks or overwrite a Bash installation. Use the
+printed absolute path, not an assumed PATH lookup. The raw executable does not
+perform the Unix checkout launcher's per-exec rehash. Cold offline Windows
+installation is unsupported; do not bypass attestation for an air-gapped machine.
+
+Stop clients before replacement. Open-image failures preserve the old executable;
+there is no delete-first/copy fallback. Private destination and tokened locking
+checks reject unsafe ACLs/reparse points and never steal stale locks.
+
+Local MCP uses exactly `mcp --store STORE_REFERENCE`; Windows file references
+are absolute, for example `file:C:\ABSOLUTE\STORE DIR\STORE.secret`.
+Names-only provider metadata resolves registered manifests, never value Get.
+The Desktop MCPB includes Windows amd64 only; Windows arm64 CLI availability is
+not a Desktop-on-Arm compatibility claim. Locked MCPB CLI and native subprocess
+smoke validation do not prove actual Desktop installation/configuration/restart.
+MCP metadata may expose names, labels, paths and provider account IDs to clients
+and models, never values, hashes or lengths. It grants no hook exception.
+
+Full bundle assembly runs on macOS with lipo, Go 1.26.10, Node 26.10.0,
+npm 11.19.1 and Python 3.14.8, not on an end user's Windows installation.
+The narrowly reviewed build-only Zod exception and fresh audit gate are described
+in [release tooling security](release.md#packaging-tools-and-advisory-review) and
+`scripts/package_mcpb.py`; it is not a runtime dependency in the bundle.
 
 ## Supported behavior
 
@@ -58,8 +115,10 @@ changes the human-consent or agent-denial boundaries.
 - Age filesystem operations, pass and 1Password provider operations remain
   unsupported on Windows. Clipboard parity is outside M5a.
 - The Windows hook denies every shell call with a fixed denial, including public
-  commands. It does not parse PowerShell or CMD as Bash. A Windows PowerShell
-  adapter belongs to conditional M5e; CMD remains denied.
+  commands. It does not parse PowerShell or CMD as Bash. M5e steps 1 to 4 have
+  native PowerShell 5.1/7.6.7 parser evidence, but the adapter remains unwired;
+  steps 5 and 6 are waiting sponsorship. Production PowerShell/CMD allows are
+  not enabled by the parser tests or this release.
 - Native file/patch checks are bounded decision-time metadata proofs, not a
   filesystem-race sandbox. 8.3 coverage depends on short-name availability.
 - `hooks/guard-go.cmd` is development-only, invokes its fixed sibling

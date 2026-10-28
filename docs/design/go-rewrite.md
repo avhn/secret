@@ -225,3 +225,20 @@ CLI fixture and owner-provisioned isolated provider integration remain mandatory
 before activation or completion. Session auth and all provider writes/export are
 deferred. The installed Bash CLI, guard and manifests remain unchanged. See
 [the M5c plan](m5c-plan.md) and [1Password contract](../onepassword.md).
+
+## v0.3.0 release packaging status (2026-10-28)
+
+The historical design/revisions above remain the implementation record. The
+owner-approved [v0.3.0 plan](v0.3.0-plan.md), section 11, adds a narrow packaging
+extension: six native CLI assets, pinned standalone installers, a Desktop MCPB,
+Registry metadata/publication tooling and equal 0.3.0 manifests without Go
+activation. It does not rewrite hook policy/output, activate PowerShell allows,
+introduce a network MCP transport or complete M4.1. Canonical
+[MCP setup](../setup.md) requires explicit human-approved exact store references
+and documents metadata privacy and the absence of Desktop host-install evidence.
+
+Source implementation is staged; new integrated/public native release evidence
+and all owner publication checkpoints remain open. M4.1, M5c, M5e steps 5 and 6,
+and M6 remain waiting sponsorship. M5a and M5d's prior completed staged CLI gates
+do not certify Windows arm64/public release assets, Desktop installation or
+fail-closed host protection. See [the tracker](../../ROADMAP.md) for separate gates.

@@ -5,8 +5,8 @@ set -f
 umask 077
 LC_ALL=C
 export LC_ALL
-version=0.2.3
-tag=v0.2.3
+version=0.3.0
+tag=v0.3.0
 scratch=
 locked=no
 
@@ -108,18 +108,33 @@ digest() {
 
 safe_chain "$entry" && safe_chain "$root" || fail 1
 manifest=$root/dist/checksums-v$version.txt
-safe_chain "$manifest" && bounded_file "$manifest" 1024 || fail 1
+safe_chain "$manifest" && bounded_file "$manifest" 4096 || fail 1
+# Historical genuine-provenance rehearsals substitute the compiled-in identity.
+# There is no runtime override and a 0.3.0 manifest always requires all eight names.
+case $version in
+    0.2.0|0.2.1|0.2.2|0.2.3) records=4 ;;
+    0.3.0) records=8 ;;
+    *) fail 1 ;;
+esac
 # Check bytes as well as records: wc rejects a missing final LF.
-[ "$(wc -l <"$manifest")" -eq 4 ] || fail 1
-awk '
+[ "$(wc -l <"$manifest")" -eq "$records" ] || fail 1
+awk -v version="$version" -v records="$records" '
 BEGIN {
-    name[1]="secret-v0.2.3-darwin-amd64"; name[2]="secret-v0.2.3-darwin-arm64"
-    name[3]="secret-v0.2.3-linux-amd64"; name[4]="secret-v0.2.3-linux-arm64"
+    prefix="secret-v" version "-"
+    name[1]=prefix "darwin-amd64"; name[2]=prefix "darwin-arm64"
+    if (records == 4) {
+        name[3]=prefix "linux-amd64"; name[4]=prefix "linux-arm64"
+    } else {
+        name[3]=prefix "desktop.mcpb"
+        name[4]=prefix "linux-amd64"; name[5]=prefix "linux-arm64"
+        name[6]=prefix "windows-amd64.exe"; name[7]=prefix "windows-arm64.exe"
+        name[8]="server.json"
+    }
 }
-NR > 4 { exit 1 }
+NR > records { exit 1 }
 { if (length(substr($0,1,64)) != 64 || substr($0,1,64) ~ /[^0-9a-f]/ ||
       substr($0,65,2) != "  " || substr($0,67) != name[NR]) exit 1 }
-END { if (NR != 4) exit 1 }
+END { if (NR != records) exit 1 }
 ' "$manifest" || fail 1
 case $(uname -s 2>/dev/null) in Linux) os=linux ;; Darwin) os=darwin ;; *) fail 4 ;; esac
 case $(uname -m 2>/dev/null) in x86_64|amd64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) fail 4 ;; esac

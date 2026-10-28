@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Original abstract metadata card, copyright Mert Dede, GPL-3.0-or-later. -->
+  <rect width="256" height="256" rx="48" fill="#173042"/>
+  <rect x="52" y="48" width="152" height="160" rx="16" fill="#eff5f5"/>
+  <g fill="#177d83">
+    <circle cx="80" cy="88" r="8"/><rect x="104" y="80" width="72" height="16" rx="4"/>
+    <circle cx="80" cy="128" r="8"/><rect x="104" y="120" width="56" height="16" rx="4"/>
+    <circle cx="80" cy="168" r="8"/><rect x="104" y="160" width="64" height="16" rx="4"/>
+  </g>
+</svg>

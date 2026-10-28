@@ -1,8 +1,38 @@
 # Changelog
 
-All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The first published release is v0.2.3; installed plugin manifests still carry version 0.1.0 and are not release tags.
+All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The first published release is v0.2.3; plugin manifest versions are packaging metadata, not release publication evidence.
 
 ## [Unreleased]
+
+### 0.3.0 packaging (not yet published)
+
+- Add pinned POSIX and PowerShell standalone installers with mandatory gh
+  attestation verification, optional authenticated checksum-commit pin, exact
+  versions and atomic secret-go publication. Unix keeps PATH unchanged;
+  Windows adds only its own install directory to user PATH. No automatic MCP
+  registration, store discovery, hook installation or source-build fallback.
+- Extend deterministic assembly to six raw Linux/macOS/Windows amd64/arm64
+  executables, a macOS-universal/Windows-amd64 Desktop MCPB and generated official
+  Registry server.json: eight payloads, nine attested subjects, eighteen assets.
+  Native macOS lipo assembly pins Node 26.10.0, npm 11.19.1, Python 3.14.8 and
+  locked MCPB 2.1.2 alongside Go 1.26.10. Fresh audit checks preserve the narrowly
+  reviewed build-only Zod exception documented in scripts/package_mcpb.py.
+- Add canonical local stdio MCP client setup and offline parsed-example,
+  Go-source argv and synthetic-launcher tests. The surface remains names-only list/show/diff/health on explicitly
+  approved store references, never values. Desktop installation/interpolation/
+  restart is not host-tested; native subprocess smoke is not host evidence.
+- Add exact io.github.avhn/secret Registry metadata and protected OIDC publication
+  after public native-install gates. Protected release-publish/registry-publish
+  environments, tag, draft, publication, public installs and Registry publication
+  remain owner-gated and incomplete until their recorded evidence exists.
+- Bump all four plugin/marketplace versions equally to 0.3.0 without changing
+  installed Bash CLI/hooks, activation configuration or Go hook policy/output.
+  M4.1 Go activation remains waiting sponsorship. No fail-closed host claim.
+- Reconcile prior completed v0.2.3, M5a and M5d gates with the separate new
+  release-asset evidence. Windows age/pass/1Password and production PowerShell
+  allows remain unsupported; M5e steps 5/6, M5c and M6 keep sponsorship blockers.
+
+### Other unreleased changes
 
 - Pin only bounded CI fuzzing to Go 1.27.3, whose fuzz coordinator fixes a race
   that could report a bare `context deadline exceeded` at budget expiry without

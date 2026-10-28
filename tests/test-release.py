@@ -9,16 +9,19 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.2.3"
+VERSION = "0.3.0"
 TAG = "v" + VERSION
 MANIFEST = "checksums-" + TAG + ".txt"
-NAMES = sorted("secret-" + TAG + "-" + system + "-" + arch
-               for system in ("linux", "darwin") for arch in ("amd64", "arm64"))
+BINARY_NAMES = sorted("secret-" + TAG + "-" + system + "-" + arch
+                      + (".exe" if system == "windows" else "")
+                      for system in ("linux", "darwin", "windows") for arch in ("amd64", "arm64"))
+NAMES = sorted(BINARY_NAMES + ["secret-" + TAG + "-desktop.mcpb", "server.json"])
 
 # This is a verifier boundary double, not cryptographic or hosted evidence.
 GH = r'''#!/usr/bin/env python3
@@ -34,12 +37,12 @@ if args[:2] == ["attestation", "download"]:
     sys.exit(0)
 if args[:2] == ["release", "create"]:
     import shutil
-    assert args[2] == "v0.2.3"
+    assert args[2] == "v0.3.0"
     assert "--draft" in args and "--verify-tag" in args
     assert args[args.index("--target") + 1] == os.environ["EXPECTED_COMMIT"]
     assert args[args.index("--repo") + 1] == "avhn/secret"
     assets = [pathlib.Path(arg) for arg in args if arg.startswith("assets/")]
-    assert len(assets) == 10
+    assert len(assets) == 18
     destination = pathlib.Path(os.environ["GH_RELEASE_ASSETS"])
     destination.mkdir()
     for asset in assets:
@@ -48,13 +51,18 @@ if args[:2] == ["release", "create"]:
     sys.exit(0)
 if args[:2] == ["release", "download"]:
     import shutil
-    assert args[2:5] == ["v0.2.3", "--repo", "avhn/secret"]
+    assert args[2:5] == ["v0.3.0", "--repo", "avhn/secret"]
     destination = pathlib.Path(args[args.index("--dir") + 1])
     assert not any(destination.iterdir())
     for asset in pathlib.Path(os.environ["GH_RELEASE_ASSETS"]).iterdir():
         shutil.copyfile(asset, destination / asset.name)
-    if os.environ.get("GH_MODE") == "corrupt-draft":
-        (destination / "secret-v0.2.3-linux-amd64").write_bytes(b"corrupt uploaded binary")
+    mode = os.environ.get("GH_MODE")
+    if mode == "corrupt-draft":
+        (destination / "secret-v0.3.0-linux-amd64").write_bytes(b"corrupt uploaded binary")
+    if mode == "extra-draft":
+        (destination / "unexpected.exe").write_bytes(b"unexpected")
+    if mode == "missing-draft":
+        (destination / "server.json").unlink()
     sys.exit(0)
 assert args[:2] == ["attestation", "verify"]
 for group in (("--owner", "--repo"),
@@ -64,8 +72,8 @@ expected = {
     "--repo": "avhn/secret",
     "--source-digest": os.environ["EXPECTED_COMMIT"],
     "--signer-digest": os.environ["EXPECTED_COMMIT"],
-    "--source-ref": "refs/tags/v0.2.3",
-    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.3",
+    "--source-ref": "refs/tags/v0.3.0",
+    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.0",
     "--cert-oidc-issuer": "https://token.actions.githubusercontent.com",
     "--format": "json",
 }
@@ -82,7 +90,7 @@ import hashlib
 digest = hashlib.sha256(pathlib.Path(args[2]).read_bytes()).hexdigest()
 if "--bundle" in args:
     bundle = pathlib.Path(args[args.index("--bundle") + 1])
-    assert bundle.name == "sha256:" + digest + ".jsonl"
+    assert bundle.name in ["sha256" + sep + digest + ".jsonl" for sep in (":", "-")]
     assert bundle.read_text() == "synthetic bundle " + digest + "\n"
 subject = {"name": name, "digest": {"sha256": digest}}
 if mode == "subject": subject["name"] = "wrong-subject"
@@ -105,7 +113,7 @@ if args == ["env", "GOVERSION"]:
 if args in (["mod", "download"], ["mod", "verify"]):
     sys.exit(0)
 assert args[:3] == ["build", "-trimpath", "-buildvcs=false"]
-assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.2.3"
+assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.3.0"
 assert args[4] == "-o" and args[6:] == ["./cmd/secret"]
 if os.environ.get("GO_FAIL_BUILD") == "1": sys.exit(1)
 expected = {"CGO_ENABLED": "0", "GOAMD64": "v1", "GOARM64": "v8.0",
@@ -116,6 +124,55 @@ with open(os.environ["GO_CALLS"], "a") as log:
     log.write(json.dumps({key: os.environ[key] for key in
                          ["GOOS", "GOARCH", "SOURCE_DATE_EPOCH"]}) + "\n")
 pathlib.Path(args[5]).write_bytes((os.environ["GOOS"] + "/" + os.environ["GOARCH"]).encode())
+'''
+
+
+# These doubles exercise the frozen assembly interfaces without claiming MCPB
+# validation, native lipo slices, Registry schema validation or reproducibility.
+PACKAGE = r'''import argparse, os
+from pathlib import Path
+p = argparse.ArgumentParser()
+for flag in ("version", "darwin-amd64", "darwin-arm64", "windows-amd64", "out"):
+    p.add_argument("--" + flag, required=True)
+a = p.parse_args()
+assert a.version == "0.3.0"
+if os.environ.get("PACKAGE_FAIL"): raise SystemExit(1)
+parts = []
+for system, arch in (("darwin", "amd64"), ("darwin", "arm64"), ("windows", "amd64")):
+    path = Path(getattr(a, system + "_" + arch))
+    suffix = ".exe" if system == "windows" else ""
+    assert path.name == "secret-v" + a.version + "-" + system + "-" + arch + suffix
+    parts.append(path.read_bytes())
+Path(a.out, "secret-v" + a.version + "-desktop.mcpb").write_bytes(b"synthetic mcpb:" + b";".join(parts))
+'''
+
+REGISTRY = r'''import argparse, hashlib, json, os
+from pathlib import Path
+p = argparse.ArgumentParser()
+p.add_argument("command", choices=["generate"])
+p.add_argument("--version", required=True)
+p.add_argument("--assets", required=True)
+a = p.parse_args()
+if os.environ.get("MANIFEST_FAIL"): raise SystemExit(1)
+root = Path(a.assets)
+bundle = root / ("secret-v" + a.version + "-desktop.mcpb")
+metadata = {"version": a.version, "fileSha256": hashlib.sha256(bundle.read_bytes()).hexdigest()}
+(root / "server.json").write_text(json.dumps(metadata, sort_keys=True) + "\n")
+assert len(list(root.iterdir())) == 8
+manifest = b"".join(hashlib.sha256(path.read_bytes()).hexdigest().encode() + b"  " + path.name.encode() + b"\n"
+                    for path in sorted(root.iterdir()))
+if os.environ.get("MANIFEST_TRUNCATE"): manifest = b"".join(manifest.splitlines(keepends=True)[:6])
+(root / ("checksums-v" + a.version + ".txt")).write_bytes(manifest)
+if os.environ.get("MANIFEST_EXTRA"): (root / "unexpected.exe").write_bytes(b"not a release input")
+'''
+
+NPM = r'''#!/usr/bin/env python3
+import os, sys
+if sys.argv[1:] == ["--version"]:
+    print(os.environ.get("FAKE_NPM_VERSION", "11.19.1"))
+    sys.exit(0)
+assert sys.argv[1:3] == ["ci", "--ignore-scripts"]
+assert sys.argv[3] == "--prefix" and sys.argv[4].endswith("/packaging/mcpb")
 '''
 
 
@@ -144,9 +201,16 @@ class ReleaseTest(unittest.TestCase):
         (self.repo / "scripts").mkdir()
         for name in ("build-release.sh", "verify-release.sh"):
             shutil.copyfile(ROOT / "scripts" / name, self.repo / "scripts" / name)
+        for name, content in (("package_mcpb.py", PACKAGE), ("release_manifest.py", REGISTRY)):
+            (self.repo / "scripts" / name).write_text(content)
         self.tools = self.base / "tools"
         self.tools.mkdir()
-        for name, content in (("gh", GH), ("go", GO)):
+        python = ('#!/bin/sh\nif [ "$#" -eq 1 ] && [ "$1" = --version ]; then\n'
+                  '  printf "%s\\n" "${FAKE_PYTHON_VERSION:-Python 3.14.8}"\nelse\n'
+                  '  exec ' + shlex.quote(sys.executable) + ' "$@"\nfi\n')
+        node = '#!/bin/sh\nprintf "%s\\n" "${FAKE_NODE_VERSION:-v26.10.0}"\n'
+        for name, content in (("gh", GH), ("go", GO), ("npm", NPM), ("python3", python),
+                              ("lipo", "#!/bin/sh\nexit 0\n"), ("node", node)):
             path = self.tools / name
             path.write_text(content)
             path.chmod(0o700)
@@ -206,7 +270,7 @@ class ReleaseTest(unittest.TestCase):
     def assert_denied(self, result):
         self.assertNotEqual(result.returncode, 0)
 
-    def test_valid_final_and_all_five_pinned_verifications(self):
+    def test_valid_final_and_all_nine_pinned_verifications(self):
         self.assert_ok(self.verify())
         calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
         self.assertEqual(sorted(Path(call[2]).name for call in calls), sorted(NAMES + [MANIFEST]))
@@ -220,10 +284,15 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn("secret: release verification failed", result.stderr)
         self.assertEqual(result.stdout, "")
 
-    def test_changed_binary_denies_before_provenance(self):
-        (self.assets / NAMES[0]).write_bytes(b"changed binary")
-        self.assert_denied(self.verify())
-        self.assertFalse(Path(self.env["GH_CALLS"]).exists())
+    def test_changed_payload_denies_before_provenance(self):
+        for name in NAMES:
+            with self.subTest(name=name):
+                path = self.assets / name
+                original = path.read_bytes()
+                path.write_bytes(b"changed payload")
+                self.assert_denied(self.verify())
+                self.assertFalse(Path(self.env["GH_CALLS"]).exists())
+                path.write_bytes(original)
 
     def test_symlink_asset_denies(self):
         target = self.assets / NAMES[0]
@@ -242,8 +311,11 @@ class ReleaseTest(unittest.TestCase):
             "one space": self.manifest.replace(b"  ", b" "),
             "path": self.manifest.replace(b"  secret", b"  ./secret"),
             "uppercase": self.manifest.upper(),
-            "other version": self.manifest.replace(b"v0.2.3", b"v0.2.4"),
-            "windows": self.manifest.replace(b"darwin", b"windows"),
+            "other version": self.manifest.replace(b"v0.3.0", b"v0.3.1"),
+            "windows without exe": self.manifest.replace(b".exe", b""),
+            "unix with exe": self.manifest.replace(b"linux-amd64\n", b"linux-amd64.exe\n"),
+            "six binaries only": b"".join(line for line in lines if b"desktop.mcpb" not in line and b"server.json" not in line),
+            "checksum hashes itself": self.manifest + b"0" * 64 + b"  " + MANIFEST.encode() + b"\n",
         }
         for name, content in invalid.items():
             with self.subTest(name=name):
@@ -287,7 +359,8 @@ class ReleaseTest(unittest.TestCase):
         subprocess.run(["git", "clone", "--quiet", "--bare", str(self.repo), str(origin)],
                        env=self.env, check=True, capture_output=True)
         self.git("remote", "add", "origin", str(origin))
-        self.env.update(GITHUB_SHA=self.final, GITHUB_REF="refs/tags/" + TAG)
+        self.env.update(GITHUB_SHA=self.final, GITHUB_REF="refs/tags/" + TAG,
+                        RELEASE_TAG=TAG, RELEASE_COMMIT=self.final)
         self.git("checkout", "-q", "--detach", self.final)
         return origin
 
@@ -401,9 +474,9 @@ class ReleaseTest(unittest.TestCase):
         self.env.update(GITHUB_SHA=self.final, RUNNER_TEMP=str(self.base))
         assets = self.repo / "assets"
         shutil.copytree(self.assets, assets)
-        run_step("Verify final C, tag, certificate, workflow and all five subjects", self.repo)
+        run_step("Verify final C, tag, certificate, workflow and all nine subjects", self.repo)
         bundles = {path.name: path.read_bytes() for path in assets.glob("sha256:*.jsonl")}
-        self.assertEqual(len(bundles), 5)
+        self.assertEqual(len(bundles), 9)
         for name in bundles:
             self.assertRegex(name, r"^sha256:[0-9a-f]{64}\.jsonl$")
 
@@ -432,7 +505,7 @@ class ReleaseTest(unittest.TestCase):
         self.assert_ok(self.script("verify-release.sh", downloaded, self.final,
                                    "--bundle-dir", downloaded))
         calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
-        self.assertEqual(len(calls), 5)
+        self.assertEqual(len(calls), 9)
         for call in calls:
             bundle = Path(call[call.index("--bundle") + 1])
             # The verifier resolves paths physically, e.g. macOS /var -> /private/var.
@@ -458,18 +531,46 @@ class ReleaseTest(unittest.TestCase):
     def test_workflow_draft_portable_names_and_final_reverification(self):
         self.assert_ok(self.draft_step("valid"))
         uploaded = Path(self.env["GH_RELEASE_ASSETS"])
-        self.assertEqual(len(list(uploaded.glob("sha256-*.jsonl"))), 5)
+        self.assertEqual(len(list(uploaded.glob("sha256-*.jsonl"))), 9)
         self.assertFalse(list(uploaded.glob("sha256:*.jsonl")))
         calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
         self.assertEqual([call[:2] for call in calls],
-                         [["attestation", "verify"]] * 5
+                         [["attestation", "verify"]] * 9
                          + [["release", "create"], ["release", "download"]]
-                         + [["attestation", "verify"]] * 5)
+                         + [["attestation", "verify"]] * 9)
+
+    def test_workflow_repro_rejects_self_consistent_but_different_payloads(self):
+        first, second = self.repo / "artifacts-a", self.repo / "artifacts-b"
+        shutil.copytree(self.assets, first)
+        shutil.copytree(self.assets, second)
+        self.env["EVENT_NAME"] = "push"
+        step = workflow_step(workflow_jobs("release.yml")["release-repro"],
+                             "Compare all eight payloads and sorted checksum manifest")
+        self.assert_ok(self.run_tag_step(step))
+        for name in NAMES:
+            with self.subTest(name=name):
+                path = second / name
+                original = path.read_bytes()
+                path.write_bytes(b"self-consistent but independently different " + original)
+                data = b"".join(hashlib.sha256((second / payload).read_bytes()).hexdigest().encode()
+                                + b"  " + payload.encode() + b"\n" for payload in NAMES)
+                (second / MANIFEST).write_bytes(data)
+                self.assert_ok(self.script("verify-release.sh", "--checksums", second))
+                self.assert_denied(self.run_tag_step(step))
+                path.write_bytes(original)
+                (second / MANIFEST).write_bytes(self.manifest)
 
     def test_workflow_draft_changed_uploaded_bytes_denies(self):
         self.assert_denied(self.draft_step("corrupt-draft"))
 
+    def test_workflow_draft_extra_download_denies(self):
+        self.assert_denied(self.draft_step("extra-draft"))
+
+    def test_workflow_draft_missing_download_denies(self):
+        self.assert_denied(self.draft_step("missing-draft"))
+
     def test_build_frozen_environment_names_flags_and_source_epoch(self):
+        self.git("checkout", "-q", "--detach", self.source)
         self.env.update(GOFLAGS="-tags=secretstub", GOAMD64="v4", GOARM64="v9.0",
                         CGO_ENABLED="1", SOURCE_DATE_EPOCH="0", GOTOOLCHAIN="auto")
         output = self.base / "build output"
@@ -477,7 +578,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(sorted(path.name for path in output.iterdir()), sorted(NAMES + [MANIFEST]))
         self.assert_ok(self.script("verify-release.sh", "--checksums", output))
         calls = [json.loads(line) for line in Path(self.env["GO_CALLS"]).read_text().splitlines()]
-        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(calls), 6)
         self.assertEqual({call["SOURCE_DATE_EPOCH"] for call in calls},
                          {self.git("show", "-s", "--format=%ct", self.source)})
 
@@ -486,11 +587,142 @@ class ReleaseTest(unittest.TestCase):
         self.env["FAKE_GO_VERSION"] = "go1.27.1"
         self.assert_denied(self.script("build-release.sh", self.base / "bad-toolchain"))
 
+    def test_build_rejects_unpinned_packaging_tools_before_compilation(self):
+        for name, value in (("FAKE_NODE_VERSION", "v22.16.0"), ("FAKE_NPM_VERSION", "10.9.2"),
+                            ("FAKE_PYTHON_VERSION", "Python 3.13.3")):
+            with self.subTest(tool=name):
+                self.env[name] = value
+                result = self.script("build-release.sh", self.base / name)
+                self.assert_denied(result)
+                self.assertIn("release packaging requires", result.stderr)
+                self.assertFalse(Path(self.env["GO_CALLS"]).exists())
+                del self.env[name]
+
     def test_compiler_failure_does_not_produce_an_accepted_manifest(self):
         self.env["GO_FAIL_BUILD"] = "1"
         output = self.base / "failed-build"
         self.assert_denied(self.script("build-release.sh", output))
         self.assertFalse((output / MANIFEST).exists())
+
+    def test_complete_artifact_contract_and_missing_new_payloads(self):
+        self.assertEqual(len(BINARY_NAMES), 6)
+        self.assertEqual(len(NAMES), 8)
+        self.assertEqual([name for name in BINARY_NAMES if "windows" in name],
+                         ["secret-" + TAG + "-windows-" + arch + ".exe" for arch in ("amd64", "arm64")])
+        for name in NAMES:
+            with self.subTest(name=name):
+                path = self.assets / name
+                content = path.read_bytes()
+                path.unlink()
+                self.assert_denied(self.verify())
+                path.write_bytes(content)
+        self.assertFalse(Path(self.env["GH_CALLS"]).exists())
+
+    def test_unexpected_release_inputs_deny(self):
+        for name in ("unexpected.exe", "server.json.old", "sha256-" + "0" * 64 + ".jsonl"):
+            with self.subTest(name=name):
+                path = self.assets / name
+                path.write_bytes(b"unexpected")
+                self.assert_denied(self.script("verify-release.sh", "--checksums", self.assets))
+                path.unlink()
+
+    def test_portable_bundles_verify_without_colon_paths(self):
+        bundles = self.bundles()
+        for path in bundles.iterdir():
+            path.rename(path.with_name(path.name.replace("sha256:", "sha256-", 1)))
+        self.assert_ok(self.verify("--bundle-dir", bundles))
+        calls = [json.loads(line) for line in Path(self.env["GH_CALLS"]).read_text().splitlines()]
+        self.assertEqual(len(calls), 9)
+        self.assertTrue(all(Path(call[call.index("--bundle") + 1]).name.startswith("sha256-")
+                            for call in calls))
+        digest = hashlib.sha256((self.assets / NAMES[0]).read_bytes()).hexdigest()
+        (bundles / ("sha256:" + digest + ".jsonl")).write_bytes(b"ambiguous")
+        self.assert_denied(self.verify("--bundle-dir", bundles))
+
+    def test_untracked_nested_and_symlink_fixture_markers_deny(self):
+        parent = self.repo / "nested"
+        parent.mkdir()
+        marker = parent / ".secret-release-test-fixture"
+        marker.symlink_to(self.base / "missing")
+        self.assert_denied(self.script("verify-release.sh", "--source"))
+        self.save("nested marker must not ship")
+        marker.unlink()
+        self.assert_denied(self.script("verify-release.sh", "--source"))
+
+    def test_assembly_failures_and_partial_manifests_never_succeed(self):
+        self.git("checkout", "-q", "--detach", self.source)
+        for mode in ("PACKAGE_FAIL", "MANIFEST_FAIL", "MANIFEST_TRUNCATE", "MANIFEST_EXTRA"):
+            with self.subTest(mode=mode):
+                self.env[mode] = "1"
+                output = self.base / mode
+                self.assert_denied(self.script("build-release.sh", output))
+                if mode in ("PACKAGE_FAIL", "MANIFEST_FAIL"):
+                    self.assertFalse((output / MANIFEST).exists())
+                else:
+                    self.assert_denied(self.script("verify-release.sh", "--checksums", output))
+                del self.env[mode]
+
+    def test_missing_lipo_fails_before_compilation(self):
+        (self.tools / "lipo").unlink()
+        # Ensure this is independent of whether the test host has native lipo.
+        restricted = self.base / "missing-lipo-tools"
+        restricted.mkdir()
+        for name in ("go", "node", "npm", "dirname", "mkdir", "git", "python3", "sh"):
+            (restricted / name).symlink_to(shutil.which(name, path=self.env["PATH"]))
+        self.env["PATH"] = str(restricted)
+        result = self.script("build-release.sh", self.base / "missing-lipo")
+        self.assert_denied(result)
+        self.assertIn("missing lipo", result.stderr)
+        self.assertFalse(Path(self.env["GO_CALLS"]).exists())
+
+    def test_build_at_C_matches_S_bytes_and_epoch(self):
+        self.git("checkout", "-q", "--detach", self.source)
+        first = self.base / "source-build"
+        self.assert_ok(self.script("build-release.sh", first))
+        (self.repo / "dist").mkdir(exist_ok=True)
+        (self.repo / "dist" / MANIFEST).write_bytes((first / MANIFEST).read_bytes())
+        final = self.save("reproduced checksum C")
+        self.assert_ok(self.script("verify-release.sh", "--check-source", self.source, final))
+        second = self.base / "checksum-build"
+        self.assert_ok(self.script("build-release.sh", second))
+        self.assertEqual({path.name: path.read_bytes() for path in first.iterdir()},
+                         {path.name: path.read_bytes() for path in second.iterdir()})
+        calls = [json.loads(line) for line in Path(self.env["GO_CALLS"]).read_text().splitlines()]
+        self.assertEqual(len(calls), 12)
+        self.assertEqual({call["SOURCE_DATE_EPOCH"] for call in calls},
+                         {self.git("show", "-s", "--format=%ct", self.source)})
+
+    def test_build_at_C_rejects_manifest_not_reproduced(self):
+        result = self.script("build-release.sh", self.base / "different-build")
+        self.assert_denied(result)
+
+    def test_historical_rehearsal_keeps_exact_four_binary_contract(self):
+        self.git("checkout", "-q", "--detach", self.source)
+        legacy_tag = "v0.2.2"
+        legacy_manifest = "checksums-" + legacy_tag + ".txt"
+        names = sorted("secret-" + legacy_tag + "-" + system + "-" + arch
+                       for system in ("linux", "darwin") for arch in ("amd64", "arm64"))
+        assets = self.base / "historical-assets"
+        assets.mkdir()
+        for name in names:
+            (assets / name).write_bytes(name.encode())
+        data = b"".join(hashlib.sha256((assets / name).read_bytes()).hexdigest().encode()
+                        + b"  " + name.encode() + b"\n" for name in names)
+        (assets / legacy_manifest).write_bytes(data)
+        (self.repo / "dist").mkdir(exist_ok=True)
+        (self.repo / "dist" / legacy_manifest).write_bytes(data)
+        final = self.save("historical checksum C")
+        self.git("tag", "-a", legacy_tag, "-m", "historical identity")
+        self.env["EXPECTED_COMMIT"] = final
+        # Same mechanical substitution as the rehearsal, only in disposable code.
+        verify = self.repo / "scripts/verify-release.sh"
+        verify.write_text(verify.read_text().replace("0.3.0", "0.2.2"))
+        (self.tools / "gh").write_text(GH.replace("0.3.0", "0.2.2"))
+        self.assert_ok(self.script("verify-release.sh", assets, final))
+        calls = Path(self.env["GH_CALLS"]).read_text().splitlines()
+        self.assertEqual(len(calls), 5, "old subjects are not Windows/MCPB evidence")
+        (assets / "secret-v0.2.2-windows-amd64.exe").write_bytes(b"not historical")
+        self.assert_denied(self.script("verify-release.sh", "--checksums", assets))
 
     def test_candidate_source_selection(self):
         self.git("checkout", "-q", "--detach", self.source)
@@ -528,12 +760,19 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(job.count(target), 1, target)
 
     def test_every_tag_check_follows_explicit_annotated_tag_restoration(self):
-        fetch = 'git fetch --no-tags --force origin "refs/tags/v0.2.3:refs/tags/v0.2.3"'
-        tag_type = 'git cat-file -t refs/tags/v0.2.3'
-        peel = "git rev-parse 'refs/tags/v0.2.3^{commit}'"
         for filename, names in (
                 ("release.yml", ("release-repro", "release-verify", "release-publish")),
                 ("plugin.yml", ("plugin-install-linux", "plugin-install-macos"))):
+            if filename == "release.yml":
+                fetch = 'git fetch --no-tags --force origin "refs/tags/v0.3.0:refs/tags/v0.3.0"'
+                tag_type = 'git cat-file -t refs/tags/v0.3.0'
+                peel = "git rev-parse 'refs/tags/v0.3.0^{commit}'"
+                final = "$GITHUB_SHA"
+            else:
+                fetch = 'git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"'
+                tag_type = 'git cat-file -t "refs/tags/$RELEASE_TAG"'
+                peel = 'git rev-parse "refs/tags/$RELEASE_TAG^{commit}"'
+                final = "$RELEASE_COMMIT"
             jobs = workflow_jobs(filename)
             for name in names:
                 with self.subTest(workflow=filename, job=name):
@@ -543,11 +782,14 @@ class WorkflowTest(unittest.TestCase):
                     self.assertLess(job.index("uses: actions/checkout@"), job.index(fetch))
                     self.assertLess(job.index(fetch), job.index(tag_type))
                     self.assertLess(job.index(tag_type), job.index(peel))
-                    self.assertIn('test "$(' + peel + ')" = "$GITHUB_SHA"', job)
+                    self.assertIn('test "$(' + peel + ')" = "' + final + '"', job)
                     # Script entry points can inspect tags too, so restore before them.
-                    self.assertLess(job.index(fetch), job.index("sh scripts/verify-release.sh"))
+                    entry = re.search(r"^          sh scripts/verify-release\.sh\b", job, re.MULTILINE)
+                    self.assertIsNotNone(entry)
+                    self.assertLess(job.index(fetch), entry.start())
                     if filename == "plugin.yml":
-                        self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.published", job)
+                        self.assertIn("if: inputs.published || inputs.commit != ''", job)
+                        self.assertIn('test "$RELEASE_TAG" = v0.3.0', job)
                         self.assertLess(job.index(fetch), job.index("--published"))
 
     def test_real_provenance_rehearsal_is_read_only_and_runs_on_pr_head(self):
@@ -570,7 +812,7 @@ class WorkflowTest(unittest.TestCase):
         rehearsal = (ROOT / "scripts/rehearse-release.py").read_text()
         self.assertIn('TAG = "v0.2.2"', rehearsal)
         self.assertIn('FINAL = "68b2cf8c5e9196f4d79afc032ea95b535751971d"', rehearsal)
-        self.assertIn('source.replace("0.2.3", "0.2.2")', rehearsal)
+        self.assertIn('source.replace("0.3.0", "0.2.2")', rehearsal)
         self.assertIn('"cat-file", "-t", "refs/tags/" + TAG', rehearsal)
         self.assertIn('run("sh", verify, assets, FINAL, env=env)', rehearsal)
         self.assertIn('"--bundle-dir", bundles', rehearsal)
@@ -579,11 +821,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('run("sh", install, "--from-dir", corrupt, env=bad_env, deny=True)', rehearsal)
         self.assertIn('run("sh", verify, assets, source, env=env, deny=True)', rehearsal)
         self.assertIn('("--source-digest", source)', rehearsal)
-        self.assertIn('("--source-ref", "refs/tags/v0.2.3")', rehearsal)
+        self.assertIn('("--source-ref", "refs/tags/v0.3.0")', rehearsal)
         self.assertIn('"--offline", "--from-dir", inputs', rehearsal)
         self.assertIn('"worktree", "remove", "--force", worktree', rehearsal)
         self.assertLess(rehearsal.index('worktree / "scripts/build-release.sh"'),
-                        rehearsal.index('source.replace("0.2.3", "0.2.2")'))
+                        rehearsal.index('source.replace("0.3.0", "0.2.2")'))
 
     def test_gh_attestation_argvs_respect_mutually_exclusive_flag_groups(self):
         # gh 2.102.0 verify/verify.go and download/download.go declare these
@@ -625,6 +867,36 @@ class WorkflowTest(unittest.TestCase):
                 for group in groups[:2 if operation == "verify" else 1]:
                     self.assertLessEqual(len(flags & group), 1, "mutually exclusive gh attestation flags")
 
+    def test_independent_full_builds_require_native_macos_and_locked_tools(self):
+        jobs = workflow_jobs("release.yml")
+        for name in ("release-build-a", "release-build-b"):
+            job = jobs[name]
+            self.assertIn("runs-on: macos-15-intel", job)
+            self.assertIn("node-version: '26.10.0'", job)
+            self.assertIn("python-version: '3.14.8'", job)
+            self.assertIn('xcrun --find lipo', job)
+            self.assertIn('export HOME="$TMPDIR/home"', job)
+            self.assertIn('export GOCACHE="$TMPDIR/go-cache" GOMODCACHE="$TMPDIR/go-modules"', job)
+            self.assertIn('--ignore-scripts --no-audit --no-fund npm@11.19.1', job)
+            self.assertLess(job.index('export HOME='), job.index('npm install '))
+            self.assertIn('sh ', job)
+            self.assertIn('/scripts/build-release.sh', job)
+        self.assertIn('path: source-a', jobs["release-build-a"])
+        self.assertIn('path: independently/nested/source-b', jobs["release-build-b"])
+        repro = workflow_step(jobs["release-repro"], "Compare all eight payloads and sorted checksum manifest")
+        self.assertIn('for asset in artifacts-a/*', repro)
+        self.assertIn('find artifacts-a -type f | wc -l)" -eq 9', repro)
+        self.assertIn('find artifacts-b -type f | wc -l)" -eq 9', repro)
+        self.assertIn('cmp dist/checksums-v0.3.0.txt', repro)
+        # The complete build, not the tests, invokes the two frozen lane APIs.
+        build = (ROOT / "scripts/build-release.sh").read_text()
+        self.assertIn('npm ci --ignore-scripts', build)
+        self.assertIn('for os in darwin linux windows', build)
+        self.assertIn('suffix=.exe', build)
+        self.assertLess(build.index('scripts/package_mcpb.py'), build.index('scripts/release_manifest.py'))
+        self.assertIn('generate --version "$version" --assets "$out"', build)
+        self.assertIn('git show "HEAD:dist/checksums-v$version.txt" | cmp', build)
+
     def test_candidate_and_final_job_boundaries(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertIn("  pull_request:\n", workflow)
@@ -636,7 +908,7 @@ class WorkflowTest(unittest.TestCase):
                                      "release-rehearsal"})
         for name in ("release-attest", "release-verify", "release-publish"):
             self.assertIn("github.event_name == 'push'", jobs[name])
-            self.assertIn("github.ref == 'refs/tags/v0.2.3'", jobs[name])
+            self.assertIn("github.ref == 'refs/tags/v0.3.0'", jobs[name])
             self.assertIn("github.repository == 'avhn/secret'", jobs[name])
         for name in ("release-build-a", "release-build-b"):
             self.assertIn("cache: false", jobs[name])
@@ -647,7 +919,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("--draft --title", jobs["release-publish"])
         self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
         self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
-        self.assertIn('[{"name": "v0.2.3", "type": "tag"}]', jobs["release-verify"])
+        self.assertIn('[{"name": "v0.3.0", "type": "tag"}]', jobs["release-verify"])
         self.assertNotIn("prevent_self_review", jobs["release-verify"])
         self.assertIn("attestations: read", jobs["release-verify"])
         for job, dependency in (("release-attest", "release-repro"),

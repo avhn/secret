@@ -1,5 +1,7 @@
 #!/bin/sh
-# Build the four raw release executables with the frozen M4 inputs.
+# Assemble the full release: six raw binaries, MCPB, registry metadata, checksums.
+# Full builds require macOS/native lipo and the locked Node/npm MCPB toolchain
+# (packaging/mcpb). CI pins Python/Node/npm and runs two isolated macOS jobs.
 set -eu
 umask 077
 if [ "$#" -ne 1 ]; then
@@ -29,28 +31,43 @@ if [ "$(go env GOVERSION)" != go1.26.10 ]; then
     echo 'secret: release builds require Go 1.26.10' >&2
     exit 1
 fi
+version=$(sh "$root/scripts/verify-release.sh" --version)
 source=$(sh "$root/scripts/verify-release.sh" --source)
 SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$source")
 export SOURCE_DATE_EPOCH
-go mod download
-go mod verify
-for os in darwin linux; do
-    for arch in amd64 arm64; do
-        GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false \
-            -ldflags='-buildid= -s -w -X main.version=0.2.3' \
-            -o "$out/secret-v0.2.3-$os-$arch" ./cmd/secret
-    done
+for tool in lipo node npm python3; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "secret: complete release builds require macOS lipo and locked packaging tools (missing $tool)" >&2
+        exit 1
+    fi
 done
-git diff --exit-code -- go.mod go.sum
-cd "$out"
-if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum secret-v0.2.3-darwin-amd64 secret-v0.2.3-darwin-arm64 \
-        secret-v0.2.3-linux-amd64 secret-v0.2.3-linux-arm64 >checksums-v0.2.3.txt
-elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 secret-v0.2.3-darwin-amd64 secret-v0.2.3-darwin-arm64 \
-        secret-v0.2.3-linux-amd64 secret-v0.2.3-linux-arm64 >checksums-v0.2.3.txt
-else
-    echo 'secret: missing SHA-256 utility' >&2
+if [ "$(node --version)" != v26.10.0 ] || [ "$(npm --version)" != 11.19.1 ] ||
+   [ "$(python3 --version)" != 'Python 3.14.8' ]; then
+    echo 'secret: release packaging requires Node 26.10.0, npm 11.19.1 and Python 3.14.8' >&2
     exit 1
 fi
+# Installation is from the reviewed lock, never a floating npx download or script.
+npm ci --ignore-scripts --prefix "$root/packaging/mcpb"
+go mod download
+go mod verify
+for os in darwin linux windows; do
+    for arch in amd64 arm64; do
+        suffix=
+        if [ "$os" = windows ]; then suffix=.exe; fi
+        GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false \
+            -ldflags="-buildid= -s -w -X main.version=$version" \
+            -o "$out/secret-v$version-$os-$arch$suffix" ./cmd/secret
+    done
+done
+# Frozen lane interfaces: metadata must describe the exact inspected MCPB bytes.
+python3 -I "$root/scripts/package_mcpb.py" --version "$version" \
+    --darwin-amd64 "$out/secret-v$version-darwin-amd64" \
+    --darwin-arm64 "$out/secret-v$version-darwin-arm64" \
+    --windows-amd64 "$out/secret-v$version-windows-amd64.exe" --out "$out"
+python3 -I "$root/scripts/release_manifest.py" generate --version "$version" --assets "$out"
+git diff --exit-code -- go.mod go.sum packaging/mcpb/package.json packaging/mcpb/package-lock.json
 sh "$root/scripts/verify-release.sh" --checksums "$out"
+# At C, reproduction must match the committed manifest, not merely itself.
+if git cat-file -e "HEAD:dist/checksums-v$version.txt" 2>/dev/null; then
+    git show "HEAD:dist/checksums-v$version.txt" | cmp - "$out/checksums-v$version.txt"
+fi

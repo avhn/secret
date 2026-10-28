@@ -28,14 +28,73 @@ Treat it as one layer, not the boundary.
 
 ## Install
 
-The installed CLI and Claude/Codex hooks remain Bash until M4.1. M4 adds opt-in
-verified Go launchers without activating them. See [installation and rollback](docs/install.md)
-for checkout/release pins, platform evidence, dependencies, offline preinstallation
-and failure recovery, and [the release procedure](docs/release.md) for approval gates.
-The v0.2.3 release is in progress, not yet published.
+### Opt-in Go CLI and names-only MCP
+
+[Canonical setup](docs/setup.md) covers installation, approved store references,
+per-client registration, verification, updates and removal. The v0.3.0 release
+is being prepared; these pinned commands require its published assets and never
+select latest or fall back to another version.
+
+Prerequisites: authenticated GitHub CLI gh, plus curl and Python 3 on Unix or
+curl.exe on Windows. Install tools through trusted channels. Run `gh auth login`
+yourself in a private terminal, or supply `GH_TOKEN` through your trusted
+credential environment without displaying it. Never paste a token into chat
+or client configuration.
+
+```sh
+sh -c 'umask 077; d=$(mktemp -d) || exit
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.3.0/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
+status=$?; rm -rf "$d"; exit "$status"' sh
+```
+
+Windows PowerShell:
+
+```powershell
+& { $ErrorActionPreference = 'Stop'; $d = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $d | Out-Null
+try { irm https://raw.githubusercontent.com/avhn/secret/v0.3.0/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
+finally { Remove-Item -LiteralPath $d -Recurse -Force }; exit $status }
+```
+
+These download-first snippets run only after the download succeeds and preserve
+failure through cleanup. Append installer flags after the final `sh` or closing
+PowerShell brace; see [setup](docs/setup.md#install) for details. PowerShell runs
+the file in a child of the same host with `-NoProfile -ExecutionPolicy Bypass`
+and propagates its exit code after cleanup. The bypass applies only to that one
+child process, not any persistent policy; centrally enforced Group Policy can
+still take precedence.
+
+If an installer reports
+`secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry`,
+authenticate gh privately or correct its trusted environment, then retry without
+pasting or printing a token.
+
+The bootstrap trusts GitHub HTTPS, repository/tag governance and the reviewed
+installer before verification. Both require gh and verify release attestations,
+not checksums alone; `SECRET_RELEASE_COMMIT` optionally pins an independently
+authenticated full C. Unix also needs curl and Python 3; Windows needs curl.exe.
+Download/review/run or a trusted checkout offers stronger bootstrap review.
+Installers publish only `secret-go` / `secret-go.exe` and print the absolute path.
+Unix does not edit PATH; Windows adds only its directory to user PATH. Neither
+registers MCP, reads stores or activates hooks. Raw executables do not have the
+checkout launcher's per-execution rehash.
+
+Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.3.0/docs/setup.md to install and register secret MCP; ask me for exact store references, never discover/read stores, handle values or bypass a guard.
+
+| Surface | Support and evidence |
+| --- | --- |
+| Go CLI | v0.3.0 targets Linux, macOS and Windows amd64/arm64; new native candidate/public-install gates remain required. v0.2.3 Linux/macOS publication is complete. |
+| Local stdio MCP | Opt-in `mcp --store STORE_REFERENCE`; list/show/diff/health only, never values. Metadata can still reveal names, labels, paths and account IDs. |
+| Desktop bundle | `secret-v0.3.0-desktop.mcpb`: macOS universal and Windows amd64; locked-CLI/native smoke validation is not host-tested Desktop installation. |
+| Registry | Name `io.github.avhn/secret`; publication is separately owner-gated, not claimed here. |
+| Plugins and hooks | All four manifests are 0.3.0; installed hooks remain the Bash guard. M4.1 Go activation is waiting sponsorship, with no fail-closed host claim. |
+
+See [installation and rollback](docs/install.md) for pins, dependencies, offline
+options and failure recovery, and [release approvals](docs/release.md).
+
+### Bash CLI, guard and skill (installed defaults)
 
 Requirements: bash 3.2 or newer (stock macOS bash works), perl, and jq for the
-guard.
+guard. These remain separate from the opt-in Go executable and MCP registration.
 
 The CLI:
 
@@ -109,9 +168,10 @@ before publication; both require real terminals and exact target confirmation.
 Key files must be private under `HOME/.secrets/.age-keys/`, and value-consuming
 commands require explicit `--age-identity FILE`. Names-only interfaces need no
 identity, but their outer metadata is unauthenticated. Use `list --backend age`;
-default discovery and the Bash CLI are unchanged. Windows filesystem support
-waits for M5a. See [age setup, migration, recovery and limits](docs/age.md).
-Hosted CI is pending; this does not activate hooks or authorize a release.
+default discovery and the Bash CLI are unchanged. Windows age filesystem
+operations remain unsupported even though M5a's separate Windows CLI gate passed.
+See [age setup, migration, recovery and limits](docs/age.md). M5d passed its hosted
+gate in PR #28; this does not activate hooks or authorize publication.
 
 ## Usage
 
@@ -254,9 +314,11 @@ requests cannot expand that exact allowlist. Configuring it permits the path and
 account metadata above to reach its clients. No network listener or ambient store
 discovery is enabled. The unchanged installed hooks conservatively deny new
 subcommands, including names-only ones; this feature does not grant an agent a
-hook exception. Windows operator/persistence support and installed-host protection
-are not claimed. See [CONTRIBUTING.md](CONTRIBUTING.md) for the synthetic and hosted
-gates and [the M3 plan](docs/design/m3-plan.md) for the implementation contract.
+hook exception. M5a's native Windows CLI, console, storage, Job and Credential
+Manager gate passed; [Windows support](docs/windows.md) states its limits and the
+separate pending release-asset evidence. No installed-host protection is claimed.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for gates and [the M3 plan](docs/design/m3-plan.md)
+for the implementation contract.
 
 ## Tests
 

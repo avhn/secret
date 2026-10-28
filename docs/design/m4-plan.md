@@ -178,3 +178,21 @@ Acceptance: documented install and Bash-default commands run on hosted runners. 
 - Keep rollback and differential CI after M4.1 cutover and for two successful shipped releases, not merely two candidates. M6 maintenance-only status and retirement need their own gates; never remove Codex's installed Bash guard while hook failures remain open.
 
 Sources: <https://code.claude.com/docs/en/hooks>, <https://code.claude.com/docs/en/headless>, <https://cli.github.com/manual/gh_attestation_verify>. They establish supported harness mechanisms, not that this repository's host tests pass.
+
+## v0.3.0 packaging status (2026-10-28)
+
+Historical M4 scope and gate evidence above remain unchanged. The owner-approved
+[v0.3.0 plan](v0.3.0-plan.md), especially section 11, narrowly supersedes the
+0.2.3/four-asset/unchanged-manifest-version packaging assumptions: six raw native
+CLI targets including Windows, a macOS-universal/Windows-amd64 MCPB, generated
+Registry metadata, eight checksums, nine attested subjects and equal 0.3.0 plugin
+versions. Standalone installers require gh and accept an optional authenticated C
+pin. Build tooling pins native macOS lipo, Node 26.10.0, npm 11.19.1 and Python
+3.14.8 alongside Go 1.26.10. See [release procedure](../release.md) for the reviewed
+build-only Zod exception and fresh audit policy.
+
+Implementation exists on rel/v0.3.0; integrated native candidates, protected
+release-publish/registry-publish configuration, tag, draft, publication, public
+installs and Registry publication remain incomplete/owner-gated. Actual Desktop
+installation is not host-tested. Installed Bash hooks/configuration stay unchanged;
+M4.1 Go activation remains waiting sponsorship, not completed by the version bump.

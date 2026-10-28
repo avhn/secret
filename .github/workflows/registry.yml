@@ -1,0 +1,100 @@
+name: registry
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact published release tag (v0.3.0)
+        required: true
+        type: string
+      commit:
+        description: Full authenticated checksum commit C for that tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  attestations: read
+
+# Repository owners must configure required reviewers and trusted refs for the
+# registry-publish environment. Its review authorizes metadata publication only.
+concurrency:
+  group: registry-io.github.avhn-secret-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: >-
+      github.repository == 'avhn/secret' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'release' && github.event.release.draft == false &&
+        github.event.release.prerelease == false && github.event.release.tag_name == 'v0.3.0'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve exact annotated published identity
+        id: identity
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          EXPECTED_COMMIT: ${{ inputs.commit }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          test "$TAG" = v0.3.0
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            printf '%s\n' "$EXPECTED_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
+          fi
+          git fetch --no-tags --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          test "$(git cat-file -t "refs/tags/$TAG")" = tag
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          test "$(git rev-parse HEAD)" = "$commit"
+          if [ -n "$EXPECTED_COMMIT" ]; then test "$commit" = "$EXPECTED_COMMIT"; fi
+          gh release view "$TAG" --repo avhn/secret --json tagName,isDraft,isPrerelease \
+            --jq '.tagName == "v0.3.0" and .isDraft == false and .isPrerelease == false' | grep -qx true
+          printf 'tag=%s\ncommit=%s\n' "$TAG" "$commit" >> "$GITHUB_OUTPUT"
+
+  public-native-installs:
+    needs: resolve
+    uses: ./.github/workflows/plugin.yml
+    with:
+      tag: ${{ needs.resolve.outputs.tag }}
+      commit: ${{ needs.resolve.outputs.commit }}
+    permissions:
+      contents: read
+      attestations: read
+
+  publish:
+    needs: [resolve, public-native-installs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: registry-publish
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify public bytes, provenance and pinned publisher, then publish
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          COMMIT: ${{ needs.resolve.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TMPDIR="$(mktemp -d "$RUNNER_TEMP/registry.XXXXXX")"
+          export TMPDIR
+          python3 -I "$GITHUB_WORKSPACE/scripts/release_manifest.py" registry-publish --tag "$TAG" --commit "$COMMIT"

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Rebuild a dead release and exercise new logic against its public provenance.
 
-Only disposable copies receive the 0.2.3 -> 0.2.2 identity substitution. Production
+Only disposable copies receive the 0.3.0 -> 0.2.2 identity substitution. Production
 entry points have no tag override and the dead tag is never created or moved.
+This is historical five-subject evidence, not Windows/MCPB issuance evidence.
 Run with Python -I and TMPDIR set to a private scratch directory.
 """
 import hashlib
@@ -37,22 +38,22 @@ def rehearse(scratch):
     worktree = scratch / "tag-checkout"
     assets = scratch / "assets"
     env = dict(os.environ)
-    # Preserve gh's existing authentication location without reading credentials.
-    # Hosted runs use only the read-only GITHUB_TOKEN supplied as GH_TOKEN.
-    config = Path(env.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
-    env.setdefault("GH_CONFIG_DIR", str(config / "gh"))
+    # Never use the operator's real gh configuration or HOME. Hosted runs use
+    # only the read-only GITHUB_TOKEN supplied as GH_TOKEN, not stored credentials.
+    env["GH_CONFIG_DIR"] = str(scratch / "gh-config")
     env.update(HOME=str(scratch), XDG_CACHE_HOME=str(scratch / "cache"),
                GOCACHE=str(scratch / "go-cache"), GOMODCACHE=str(scratch / "go-modules"),
-               GOTOOLCHAIN="local", GH_PROMPT_DISABLED="1")
+               GOTOOLCHAIN="local", GH_PROMPT_DISABLED="1",
+               GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
     env.pop("SECRET_RELEASE_TEST_ROOT", None)
     # Fetch the existing annotated object explicitly, not checkout's commit ref.
     run("git", "-C", ROOT, "fetch", "--no-tags", "--force", "origin",
-        "refs/tags/" + TAG + ":refs/tags/" + TAG)
+        "refs/tags/" + TAG + ":refs/tags/" + TAG, env=env)
     assert run("git", "-C", ROOT, "cat-file", "-t", "refs/tags/" + TAG,
-               capture=True) == "tag"
+               capture=True, env=env) == "tag"
     assert run("git", "-C", ROOT, "rev-parse", "refs/tags/" + TAG + "^{commit}",
-               capture=True) == FINAL
-    run("git", "-C", ROOT, "worktree", "add", "--detach", worktree, FINAL)
+               capture=True, env=env) == FINAL
+    run("git", "-C", ROOT, "worktree", "add", "--detach", worktree, FINAL, env=env)
     try:
         # Build BEFORE replacing scripts, using precisely the dead tag's inputs.
         run("sh", worktree / "scripts/build-release.sh", assets, env=env)
@@ -60,8 +61,8 @@ def rehearse(scratch):
         print("PASS: rebuilt all four assets match the committed v0.2.2 manifest", flush=True)
         for name in ("verify-release.sh", "install-release.sh"):
             source = (ROOT / "scripts" / name).read_text()
-            assert "0.2.3" in source
-            (worktree / "scripts" / name).write_text(source.replace("0.2.3", "0.2.2"))
+            assert "0.3.0" in source
+            (worktree / "scripts" / name).write_text(source.replace("0.3.0", "0.2.2"))
         verify = worktree / "scripts/verify-release.sh"
         install = worktree / "scripts/install-release.sh"
         run("sh", verify, assets, FINAL, env=env)
@@ -110,7 +111,7 @@ def rehearse(scratch):
         bad_env = {**env, "XDG_CACHE_HOME": str(scratch / "negative-cache")}
         run("sh", install, "--from-dir", corrupt, env=bad_env, deny=True)
         print("PASS: byte-flipped binary rejected by verifier and production installer", flush=True)
-        source = run("git", "-C", worktree, "rev-parse", FINAL + "^", capture=True)
+        source = run("git", "-C", worktree, "rev-parse", FINAL + "^", capture=True, env=env)
         run("sh", verify, assets, source, env=env, deny=True)
         # Exercise gh's authenticated pins too, rather than only local git checks.
         command = ["gh", "attestation", "verify", str(assets / binary),
@@ -120,13 +121,13 @@ def rehearse(scratch):
                    "--cert-identity", "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/" + TAG,
                    "--deny-self-hosted-runners", "--format", "json"]
         for flag, value in (("--source-digest", source),
-                            ("--source-ref", "refs/tags/v0.2.3")):
+                            ("--source-ref", "refs/tags/v0.3.0")):
             wrong = command.copy()
             wrong[wrong.index(flag) + 1] = value
             run(*wrong, env=env, deny=True)
         print("PASS: wrong commit and tag ref rejected by genuine provenance", flush=True)
     finally:
-        run("git", "-C", ROOT, "worktree", "remove", "--force", worktree)
+        run("git", "-C", ROOT, "worktree", "remove", "--force", worktree, env=env)
 
 
 if __name__ == "__main__":

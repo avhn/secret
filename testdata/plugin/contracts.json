@@ -1,11 +1,15 @@
 {
-  "version": "0.2.3",
-  "tag": "v0.2.3",
+  "version": "0.3.0",
+  "tag": "v0.3.0",
   "assets": [
-    "secret-v0.2.3-darwin-amd64",
-    "secret-v0.2.3-darwin-arm64",
-    "secret-v0.2.3-linux-amd64",
-    "secret-v0.2.3-linux-arm64"
+    "secret-v0.3.0-darwin-amd64",
+    "secret-v0.3.0-darwin-arm64",
+    "secret-v0.3.0-desktop.mcpb",
+    "secret-v0.3.0-linux-amd64",
+    "secret-v0.3.0-linux-arm64",
+    "secret-v0.3.0-windows-amd64.exe",
+    "secret-v0.3.0-windows-arm64.exe",
+    "server.json"
   ],
   "manifests": {
     ".claude-plugin/plugin.json": ["version"],

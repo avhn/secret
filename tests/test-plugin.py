@@ -5,8 +5,10 @@ Run with Python -I and absolute checkout and candidate asset directories. Candid
 checksums and the attestation bypass marker exist only in disposable clones.
 Transport fault injection is a PATH shim in the test, not a production option.
 --published repeats the public release install without the fixture bypass.
-The default M4 manifest gate retains Bash installation; --stage m4.1 explicitly
-selects the deferred activation contract and is not enabled by plugin.yml.
+The default --stage m4 retains Bash installation and checks version equality.
+--stage v0.3.0 additionally requires the release version, without Go activation.
+--stage m4.1 explicitly selects deferred activation, never the release gate.
+Linux/macOS checkout-launcher tests are separate from test-release-windows.ps1.
 """
 
 import argparse
@@ -63,10 +65,10 @@ def transport(name, args):
             return 0
         if args[:2] == ["attestation", "verify"]:
             required = {"--repo": "avhn/secret",
-                        "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.2.3",
+                        "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v" + VERSION,
                         "--signer-digest": "1" * 40,
                         "--source-digest": "1" * 40,
-                        "--source-ref": "refs/tags/v0.2.3",
+                        "--source-ref": "refs/tags/v" + VERSION,
                         "--cert-oidc-issuer": "https://token.actions.githubusercontent.com"}
             for flag, value in required.items():
                 if flag not in args or args[args.index(flag) + 1] != value:
@@ -84,7 +86,7 @@ def transport(name, args):
     if name == "git":
         # Pin only the disposable negative-test checkout. This is deliberately
         # not evidence of final C/tag authentication.
-        if args[-3:] == ["cat-file", "-t", "refs/tags/v0.2.3"]:
+        if args[-3:] == ["cat-file", "-t", "refs/tags/v" + VERSION]:
             if config["mode"] == "missing-tag":
                 return 1
             print("commit" if config["mode"] == "lightweight-tag" else "tag")
@@ -92,10 +94,10 @@ def transport(name, args):
         if args[-3:] == ["rev-parse", "--verify", "HEAD"]:
             print("1" * 40)
             return 0
-        if args[-3:] == ["rev-parse", "--verify", "refs/tags/v0.2.3^{commit}"]:
+        if args[-3:] == ["rev-parse", "--verify", "refs/tags/v" + VERSION + "^{commit}"]:
             print(("2" if config["mode"] == "wrong-tag-target" else "1") * 40)
             return 0
-        if args[-2:] == ["show", "HEAD:dist/checksums-v0.2.3.txt"]:
+        if args[-2:] == ["show", "HEAD:dist/checksums-v" + VERSION + ".txt"]:
             sys.stdout.write(Path(config["manifest"]).read_text())
             return 0
         return subprocess.call([config["git"], *args])
@@ -114,7 +116,7 @@ def transport(name, args):
             if "--proto-redir" not in args or "--max-redirs" not in args:
                 return 96
         url = next((arg for arg in args if arg.startswith("https://")), "")
-        prefix = "https://github.com/avhn/secret/releases/download/v0.2.3/"
+        prefix = "https://github.com/avhn/secret/releases/download/v" + VERSION + "/"
         if not url.startswith(prefix) or url[len(prefix):] not in ASSETS:
             return 96
         output = None
@@ -229,6 +231,8 @@ class ManifestTests(unittest.TestCase):
                 for hook in hooks:
                     self.assertEqual(hook["command"], command)
                     self.assertEqual(hook["timeout"], 5)
+                    self.assertEqual(hook["type"], "command")
+                    self.assertNotIn("onFailure", hook)
 
     def test_no_shipped_bypass_marker(self):
         marker = CHECKOUT / ".secret-release-test-fixture"
@@ -266,6 +270,19 @@ class M4ShippedManifestTests(unittest.TestCase):
                 contents = (CHECKOUT / name).read_text()
                 self.assertNotIn("guard-go", contents)
                 self.assertNotIn("secret-go", contents)
+
+
+class V030ManifestTests(M4ShippedManifestTests):
+    """Version-only release: inherit the unchanged Bash/nonactivation contract."""
+
+    def test_four_versions_match_release(self):
+        self.assertEqual(VERSION, "0.3.0")
+        for name, keys in CONTRACT["manifests"].items():
+            with self.subTest(manifest=name):
+                value = json.loads((CHECKOUT / name).read_text())
+                for key in keys:
+                    value = value[key]
+                self.assertEqual(value, VERSION)
 
 
 class M41ActivationManifestTests(unittest.TestCase):
@@ -306,7 +323,7 @@ class InstallTests(unittest.TestCase):
                 raise RuntimeError("missing release asset: " + name)
         cls.expected_manifest = "".join(digest(ASSET_DIR / name) + "  " + name + "\n" for name in ASSETS)
         if (ASSET_DIR / ("checksums-v" + VERSION + ".txt")).read_bytes() != cls.expected_manifest.encode():
-            raise RuntimeError("candidate checksum manifest does not match all four assets")
+            raise RuntimeError("candidate checksum manifest does not match all eight payloads")
         cls.required = ["scripts/install-release.sh", "hooks/guard-go", "bin/secret-go"]
         for name in cls.required:
             if not (CHECKOUT / name).is_file():
@@ -449,7 +466,7 @@ class InstallTests(unittest.TestCase):
         for launcher in (absolute, relative):
             with self.subTest(launcher=launcher.name):
                 version = self.command([launcher, "version"])
-                self.assertEqual(version.stdout, b"secret 0.2.3 (go)\n")
+                self.assertEqual(version.stdout, ("secret " + VERSION + " (go)\n").encode())
                 shown = self.command([launcher, "show", self.store])
                 self.assertIn(b"PLUGIN_TOKEN=<", shown.stdout)
                 witness = self.root / "child.witness"
@@ -505,7 +522,7 @@ class InstallTests(unittest.TestCase):
             "single-space": self.expected_manifest.replace("  ", " ", 1),
             "crlf": self.expected_manifest.replace("\n", "\r\n"),
             "no-final-lf": self.expected_manifest.rstrip("\n"),
-            "wrong-version": self.expected_manifest.replace("v0.2.3", "v0.2.4"),
+            "wrong-version": self.expected_manifest.replace("v" + VERSION, "v0.0.0"),
         }
         for name, contents in variants.items():
             with self.subTest(malformed=name):
@@ -545,7 +562,7 @@ class InstallTests(unittest.TestCase):
         other_asset = next(name for name in ASSETS if name != self.asset)
         native = self.assets / self.asset
         original = native.read_bytes()
-        wrong_version = original.replace(b"0.2.3", b"0.2.4")
+        wrong_version = original.replace(VERSION.encode(), b"0.0.0")
         self.assertNotEqual(original, wrong_version, "release version not found in native asset")
         for label, contents in (("architecture", (self.assets / other_asset).read_bytes()),
                                 ("version", wrong_version)):
@@ -723,16 +740,16 @@ class PublishedTests(unittest.TestCase):
                 env["GH_TOKEN"] = os.environ["GH_TOKEN"]
             # The checkout must already be the authenticated final C, not S.
             self.assertFalse((CHECKOUT / ".secret-release-test-fixture").exists())
-            self.assertTrue((CHECKOUT / "dist/checksums-v0.2.3.txt").is_file())
+            self.assertTrue((CHECKOUT / ("dist/checksums-v" + VERSION + ".txt")).is_file())
 
             def git(*args):
                 return subprocess.check_output(["git", "-C", str(CHECKOUT), *args],
                                                cwd=other, env=env, stderr=subprocess.DEVNULL).strip()
 
             self.assertEqual(git("rev-parse", "--is-shallow-repository"), b"false")
-            self.assertEqual(git("cat-file", "-t", "refs/tags/v0.2.3"), b"tag")
+            self.assertEqual(git("cat-file", "-t", "refs/tags/v" + VERSION), b"tag")
             commit = git("rev-parse", "HEAD")
-            self.assertEqual(commit, git("rev-parse", "refs/tags/v0.2.3^{commit}"))
+            self.assertEqual(commit, git("rev-parse", "refs/tags/v" + VERSION + "^{commit}"))
             installer = CHECKOUT / "scripts/install-release.sh"
 
             def command(arguments, expected=0, environment=None, input=None):
@@ -745,8 +762,28 @@ class PublishedTests(unittest.TestCase):
                 return result
 
             command([CHECKOUT / "scripts/verify-release.sh", "--source"])
+            # Public standalone installation is distinct from the checkout
+            # cache. Neither path may overwrite an existing Bash CLI name.
+            standalone_dir = home / "standalone binary with spaces"
+            standalone_dir.mkdir(mode=0o700)
+            bash_cli = standalone_dir / "secret"
+            bash_cli.write_bytes(b"synthetic-existing-bash-cli\n")
+            bash_cli.chmod(0o500)
+            standalone = standalone_dir / "secret-go"
+            bootstrap = CHECKOUT / "install.sh"
+            command(["sh", bootstrap, "--version", VERSION, "--commit", commit.decode(),
+                     "--dir", standalone_dir])
+            self.assertEqual(bash_cli.read_bytes(), b"synthetic-existing-bash-cli\n")
+            self.assertEqual(command([standalone, "version"]).stdout,
+                             ("secret " + VERSION + " (go)\n").encode())
+            standalone_digest = digest(standalone)
+            # Omitted C must come from agreeing verified attestations, never
+            # latest or a checksum-only path. Replacement keeps exact bytes.
+            command(["sh", bootstrap, "--version", VERSION, "--dir", standalone_dir])
+            self.assertEqual(digest(standalone), standalone_digest)
+            self.assertEqual(bash_cli.read_bytes(), b"synthetic-existing-bash-cli\n")
             command([installer])
-            cache = home / ".cache/secret/v0.2.3"
+            cache = home / (".cache/secret/v" + VERSION)
             binary = cache / "secret"
             metadata = cache / "verified"
             fields = dict(line.split("=", 1) for line in metadata.read_text().splitlines())
@@ -819,7 +856,7 @@ class PublishedTests(unittest.TestCase):
                     self.assertEqual(path.stat().st_uid, os.getuid())
                 self.assertFalse(Path(str(cache) + ".lock").exists())
                 result = command([CHECKOUT / "bin/secret-go", "version"], environment=offline)
-                self.assertEqual(result.stdout, b"secret 0.2.3 (go)\n")
+                self.assertEqual(result.stdout, ("secret " + VERSION + " (go)\n").encode())
                 binary.chmod(0o700)
                 binary.write_bytes(b"#!/bin/sh\nexit 0\n")
                 binary.chmod(0o500)
@@ -839,8 +876,8 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--manifest-only", action="store_true")
     mode.add_argument("--published", action="store_true")
-    parser.add_argument("--stage", choices=("m4", "m4.1"), default="m4",
-                        help="manifest contract; M4.1 activation is not an M4 CI gate")
+    parser.add_argument("--stage", choices=("m4", "m4.1", "v0.3.0"), default="m4",
+                        help="default: m4 equality/Bash; v0.3.0 pins versions only; m4.1 is deferred activation")
     args = parser.parse_args()
     if not args.checkout.is_absolute() or not args.asset_dir.is_absolute():
         parser.error("checkout and asset directory must be absolute paths")
@@ -850,11 +887,14 @@ def main():
                       "image": os.environ.get("ImageOS", "local"),
                       "image_version": os.environ.get("ImageVersion", "unknown"),
                       "runner_arch": os.environ.get("RUNNER_ARCH", "local"),
-                      "evidence": "native published install" if PUBLISHED else "native synthetic candidate"}), flush=True)
+                      "evidence": ("manifest contract only" if manifest_only else
+                                   "native published install" if PUBLISHED else
+                                   "native synthetic candidate")}), flush=True)
     suite = unittest.TestSuite()
     loader = unittest.defaultTestLoader
     suite.addTests(loader.loadTestsFromTestCase(ManifestTests))
-    stage_checks = M4ShippedManifestTests if args.stage == "m4" else M41ActivationManifestTests
+    stage_checks = {"m4": M4ShippedManifestTests, "m4.1": M41ActivationManifestTests,
+                    "v0.3.0": V030ManifestTests}[args.stage]
     suite.addTests(loader.loadTestsFromTestCase(stage_checks))
     if manifest_only:
         pass
