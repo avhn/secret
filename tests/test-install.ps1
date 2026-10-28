@@ -43,6 +43,12 @@ function Send-SecretEnvironmentChange {
     Assert-True ($script:environmentChanges -eq ($script:pathWrites - 1)) 'broadcast without a new user PATH write'
     $script:environmentChanges++
 }
+function Report-SecretInstallFailure([string]$category, [string]$types, [string]$hresults) {
+    Assert-True ($category -cmatch '\A[a-z-]+\z') 'unsafe installer diagnostic category'
+    Assert-True ($types -cmatch '\A[A-Za-z0-9_.+,]+\z') 'unsafe installer diagnostic type'
+    Assert-True ($hresults -cmatch '\A[0-9A-F,]+\z') 'unsafe installer diagnostic HRESULT'
+    $script:lastInstallFailure = "stage=$category; types=$types; hresults=$hresults"
+}
 function New-TestPrivateDirectory([string]$path) {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
     $acl = New-Object Security.AccessControl.DirectorySecurity
@@ -56,7 +62,29 @@ function New-TestPrivateDirectory([string]$path) {
         [IO.FileSystemAclExtensions]::Create([IO.DirectoryInfo]::new($path), $acl)
     } else { [IO.Directory]::CreateDirectory($path, $acl) | Out-Null }
 }
-function Invoke-TestInstaller([string[]]$Arguments = @()) { & ([scriptblock]::Create($installer)) @Arguments | Out-String }
+function Restore-TestDacl([string]$path, [Security.AccessControl.DirectorySecurity]$baseline) {
+    # Persist only Access from a fresh descriptor, not a stale whole-ACL object.
+    # Owner/group and protection must survive every fault-injection round trip.
+    $sddl = $baseline.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
+    $restored = Get-Acl -LiteralPath $path
+    $restored.SetSecurityDescriptorSddlForm($sddl, [Security.AccessControl.AccessControlSections]::Access)
+    Set-Acl -LiteralPath $path -AclObject $restored
+    $actual = Get-Acl -LiteralPath $path
+    Assert-True ($actual.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access) -ceq $sddl) 'test DACL restoration changed access rules'
+    Assert-True ($actual.GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $baseline.GetOwner([Security.Principal.SecurityIdentifier]).Value) 'test DACL restoration changed owner'
+    Assert-True ($actual.GetGroup([Security.Principal.SecurityIdentifier]).Value -ceq $baseline.GetGroup([Security.Principal.SecurityIdentifier]).Value) 'test DACL restoration changed group'
+    Assert-True ($actual.AreAccessRulesProtected -eq $baseline.AreAccessRulesProtected) 'test DACL restoration changed protection'
+}
+function Invoke-TestInstaller([string[]]$Arguments = @(), [switch]$ExpectedSuccess) {
+    $script:lastInstallFailure = $null
+    try { & ([scriptblock]::Create($installer)) @Arguments | Out-String } catch {
+        if ($ExpectedSuccess) {
+            if ($script:lastInstallFailure) { Write-Host "secret installer diagnostic: $script:lastInstallFailure" }
+            else { Write-Host 'secret installer diagnostic: stage=bootstrap' }
+        }
+        throw
+    }
+}
 function Expect-Failure([string]$label, [string[]]$Arguments = @(), [string]$ExpectedMessage = '') {
     $before = $script:pathWrites; $beforeBroadcasts = $script:environmentChanges; $failed = $false
     try { Invoke-TestInstaller $Arguments | Out-Null } catch {
@@ -304,12 +332,14 @@ func main() {
     if (-not (Test-Path -LiteralPath $env:INSTALL_DIR)) { New-TestPrivateDirectory $env:INSTALL_DIR }
     foreach ($sid in @('S-1-1-0', 'S-1-5-32-545', 'S-1-5-11')) {
         foreach ($rights in @('Modify', 'AppendData', 'DeleteSubdirectoriesAndFiles')) {
+            $originalAcl = Get-Acl -LiteralPath $env:INSTALL_DIR
             $unsafeAcl = Get-Acl -LiteralPath $env:INSTALL_DIR
             $principal = New-Object Security.Principal.SecurityIdentifier($sid)
             $unsafeRule = New-Object Security.AccessControl.FileSystemAccessRule($principal, $rights, 'Allow')
-            $unsafeAcl.AddAccessRule($unsafeRule); Set-Acl -LiteralPath $env:INSTALL_DIR -AclObject $unsafeAcl
-            Expect-Failure "unsafe destination DACL $sid $rights"
-            $unsafeAcl.RemoveAccessRuleSpecific($unsafeRule); Set-Acl -LiteralPath $env:INSTALL_DIR -AclObject $unsafeAcl
+            try {
+                $unsafeAcl.AddAccessRule($unsafeRule); Set-Acl -LiteralPath $env:INSTALL_DIR -AclObject $unsafeAcl
+                Expect-Failure "unsafe destination DACL $sid $rights"
+            } finally { Restore-TestDacl $env:INSTALL_DIR $originalAcl }
         }
     }
     $lock = Join-Path $env:INSTALL_DIR '.secret-go.install-lock'
@@ -334,7 +364,7 @@ func main() {
     Assert-True (-not $inheritedAcl.AreAccessRulesProtected) 'test destination unexpectedly protected'
     $originalDacl = $inheritedAcl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access)
     $env:SECRET_RELEASE_COMMIT = 'a' * 40
-    $output = Invoke-TestInstaller -Arguments @('--version', '0.3.0', '--commit', ('a' * 40))
+    $output = Invoke-TestInstaller -Arguments @('--version', '0.3.0', '--commit', ('a' * 40)) -ExpectedSuccess
     $target = Join-Path $env:INSTALL_DIR 'secret-go.exe'
     Assert-True (Test-Path -LiteralPath $target) 'valid install absent'
     Assert-True (-not $output.Contains('synthetic authenticated status')) 'installer printed authentication status output'
@@ -354,7 +384,16 @@ func main() {
     $env:SECRET_INSTALL_MODE = 'corrupt'
     $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
     Assert-True ($failed -and (Get-FileHash -LiteralPath $target).Hash -ceq $before) 'failure damaged existing destination'
+    Assert-True ($script:lastInstallFailure -clike 'stage=download-verification; types=*; hresults=*') 'missing path-free failure diagnostic'
     $env:SECRET_INSTALL_MODE = $null
+    # Exercise File.Replace before any later ACL fault injection. Passing $null
+    # instead of NullString.Value used to pass an empty backup path to .NET.
+    Invoke-TestInstaller -ExpectedSuccess | Out-Null
+    Assert-True ((Get-FileHash -LiteralPath $target).Hash -ceq $before) 'atomic replacement changed verified bytes'
+    Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'atomic replacement changed PATH or broadcast again'
+    Assert-True ((Get-Acl -LiteralPath $env:INSTALL_DIR).GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access) -ceq $originalDacl) 'atomic replacement changed destination DACL'
+    Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'atomic replacement left backup, lock or scratch'
+    Write-Output 'PASS atomic replacement before DACL fault injection'
     # FILE_DELETE_CHILD (0x40) must deny for the destination and every ancestor,
     # even when that is the broad principal's only granted write-like right.
     foreach ($directory in @($env:INSTALL_DIR, $work)) {
@@ -374,10 +413,11 @@ func main() {
                 Assert-True ($afterDacl -ceq $unsafeDacl) 'DACL rejection rewrote existing permissions'
                 Assert-True ($script:pathWrites -eq 1) 'DACL rejection changed user PATH'
                 Write-Output "PASS DeleteSubdirectoriesAndFiles rejection preserves DACL and binary ($sid)"
-            } finally { Set-Acl -LiteralPath $directory -AclObject $originalAcl }
+            } finally { Restore-TestDacl $directory $originalAcl }
         }
     }
-    Invoke-TestInstaller | Out-Null
+    Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'DACL fault injection left install scratch or lock'
+    Invoke-TestInstaller -ExpectedSuccess | Out-Null
     Assert-True ($script:pathWrites -eq 1) 'replacement duplicated PATH'
     Assert-True ($script:environmentChanges -eq 1) 'unchanged user PATH broadcast an environment change'
     Assert-True ($env:PATH -ceq (Join-Path $work 'tools')) 'installer edited process PATH'

@@ -184,6 +184,9 @@ namespace SecretInstallerV030 {
     if (-not (Get-Command Send-SecretEnvironmentChange -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
         function Send-SecretEnvironmentChange { [SecretInstallerV030.Native]::BroadcastEnvironment() }
     }
+    if (-not (Get-Command Report-SecretInstallFailure -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
+        function Report-SecretInstallFailure([string]$category, [string]$types, [string]$hresults) { }
+    }
     try { $nativeMachine = Get-SecretNativeMachine } catch { throw 'secret: unsupported platform' }
     if ($nativeMachine -eq 0xaa64) { $arch = 'arm64' }
     elseif ($nativeMachine -eq 0x8664) { $arch = 'amd64' }
@@ -253,6 +256,7 @@ namespace SecretInstallerV030 {
     function Invoke-Bounded([string]$exe, [string[]]$arguments, [int]$limit = 1048576, [int]$seconds = 90, [string]$watched = $null, [long]$maximum = 0, [string]$headers = $null) {
         [SecretInstallerV030.Native]::Run($exe, $arguments, $limit, $seconds, $watched, $maximum, $headers)
     }
+    $failureCategory = 'destination-safety'
     try {
         if (-not $directory) {
             if (-not $env:LOCALAPPDATA) { throw 'missing LOCALAPPDATA' }
@@ -286,6 +290,7 @@ namespace SecretInstallerV030 {
                 Start-Sleep -Seconds 1
             }
         }
+        $failureCategory = 'download-verification'
         $tag = "v$version"; $asset = "secret-$tag-windows-$arch.exe"; $manifestName = "checksums-$tag.txt"
         function Save-ReleaseFile([string]$name, [long]$limit) {
             $url = "https://github.com/avhn/secret/releases/download/$tag/$name"
@@ -435,12 +440,20 @@ namespace SecretInstallerV030 {
         } finally { $stream.Dispose() }
         $line = Invoke-Bounded $binary @('version') 256 10
         if ($line -cne "secret $version (go)`n" -or (Get-Digest $binary) -cne $sha) { throw 'wrong version or modified binary' }
+        $failureCategory = 'publication-safety'
         Assert-Chain $directory; Assert-SafePath $directory $false $true
         if (Test-Path -LiteralPath $target) {
             Assert-SafePath $target
+            $failureCategory = 'atomic-replacement'
+            # PowerShell converts $null to an empty string for .NET string
+            # parameters. File.Replace needs a real CLR null to omit the backup.
             # Open-image failures preserve the old file. Never delete-first/copy.
-            [IO.File]::Replace($binary, $target, $null)
-        } else { [IO.File]::Move($binary, $target) }
+            [IO.File]::Replace($binary, $target, [System.Management.Automation.Language.NullString]::Value)
+        } else {
+            $failureCategory = 'atomic-create'
+            [IO.File]::Move($binary, $target)
+        }
+        $failureCategory = 'user-path'
         # Read/update only the user registry PATH, not the merged process PATH.
         $key = Get-Item -LiteralPath 'HKCU:\Environment'
         $userPath = [string]$key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
@@ -456,6 +469,15 @@ namespace SecretInstallerV030 {
         Write-Output "claude mcp add --scope user --transport stdio secret -- $quoted mcp --store 'file:C:\ABSOLUTE\STORE'"
         Write-Output 'Raw executable only: no per-exec checkout rehash, MCP registration or hook activation. Open a new terminal for user PATH.'
     } catch {
+        # Tests may record fixed stages, CLR type names and numeric HRESULTs.
+        # Never forward exception messages, stack traces, paths or tool output.
+        $types = @(); $hresults = @(); $cause = $_.Exception
+        for ($depth = 0; $depth -lt 8 -and $null -ne $cause; $depth++) {
+            $types += $cause.GetType().FullName
+            $hresults += $cause.HResult.ToString('X8')
+            $cause = $cause.InnerException
+        }
+        Report-SecretInstallFailure $failureCategory ($types -join ',') ($hresults -join ',')
         if ($_.Exception.Message -in @(
             'secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry',
             'secret: install directory must not contain %')) { throw $_.Exception.Message }
