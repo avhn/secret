@@ -316,7 +316,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $editions = @((Get-Command pwsh -CommandType Application).Source,
+          $editions = @((Get-Command pwsh -CommandType Application -TotalCount 1).Source,
             (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))
           foreach ($edition in $editions) {
             if (-not (Test-Path -LiteralPath $edition)) { throw 'Required PowerShell edition unavailable' }
@@ -328,7 +328,7 @@ jobs:
         env:
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: |
-          $editions = @((Get-Command pwsh -CommandType Application).Source,
+          $editions = @((Get-Command pwsh -CommandType Application -TotalCount 1).Source,
             (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))
           foreach ($edition in $editions) {
             & $edition -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-release-windows.ps1 -Assets (Join-Path $env:PLUGIN_TEST_ROOT 'assets') -ExpectedArchitecture $env:EXPECTED_ARCH
@@ -343,7 +343,7 @@ jobs:
           RELEASE_COMMIT: ${{ inputs.commit }}
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: |
-          $editions = @((Get-Command pwsh -CommandType Application).Source,
+          $editions = @((Get-Command pwsh -CommandType Application -TotalCount 1).Source,
             (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))
           foreach ($edition in $editions) {
             & $edition -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-release-windows.ps1 -Assets (Join-Path $env:PLUGIN_TEST_ROOT 'assets') -ExpectedArchitecture $env:EXPECTED_ARCH -Published -Tag $env:RELEASE_TAG -Commit $env:RELEASE_COMMIT

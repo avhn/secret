@@ -55,7 +55,7 @@ jobs:
         env:
           POWERSHELL_EDITION: ${{ matrix.shell }}
         run: |
-          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application).Source
+          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application -TotalCount 1).Source
           & $edition -NoProfile -NonInteractive -Command {
             foreach ($path in @('install.ps1', 'tests/test-install.ps1', 'tests/test-release-windows.ps1')) {
               $tokens = $null
@@ -70,7 +70,7 @@ jobs:
         env:
           POWERSHELL_EDITION: ${{ matrix.shell }}
         run: |
-          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application).Source
+          $edition = (Get-Command $env:POWERSHELL_EDITION -CommandType Application -TotalCount 1).Source
           & $edition -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./tests/test-install.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

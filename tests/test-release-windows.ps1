@@ -249,7 +249,7 @@ try {
         '--version', $version, '--commit', $Commit, '--dir', $destination)
     if ($Published) {
         Assert-True ($Commit -cmatch '^[0-9a-f]{40}$') 'authenticated full checksum commit'
-        $git = (Get-Command git -CommandType Application).Source
+        $git = (Get-Command git -CommandType Application -TotalCount 1).Source
         $got = Invoke-Captured $git @('-C', $checkout, 'fetch', '--no-tags', '--force', 'origin', "refs/tags/${Tag}:refs/tags/${Tag}")
         Assert-True ($got.Code -eq 0) 'restore annotated public tag'
         foreach ($arguments in @(

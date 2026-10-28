@@ -4,7 +4,8 @@ if ($env:OS -ne 'Windows_NT') { throw 'test-install.ps1 requires native Windows'
 $root = Split-Path -Parent $PSScriptRoot
 $installer = [IO.File]::ReadAllText((Join-Path $root 'install.ps1'))
 $work = Join-Path ([IO.Path]::GetTempPath()) ('secret-installer-tests-' + [Guid]::NewGuid().ToString('N'))
-$go = (Get-Command go -CommandType Application).Source
+# setup-go can leave several go.exe on PATH; use the first, as the shell would.
+$go = (Get-Command go -CommandType Application -TotalCount 1).Source
 $names = @('HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'PATH', 'TEMP', 'TMP', 'SECRET_VERSION',
     'SECRET_RELEASE_COMMIT', 'INSTALL_DIR', 'SECRET_INSTALL_MODE', 'SECRET_INSTALL_FIXTURES', 'SECRET_INSTALL_LOG',
     'SECRET_INSTALL_ASSET', 'SECRET_INSTALL_READY', 'GOCACHE', 'GOMODCACHE', 'GOTOOLCHAIN', 'GOENV', 'GOWORK', 'CGO_ENABLED')
@@ -12,6 +13,8 @@ $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $script:fakeUserPath = '%USERPROFILE%\synthetic-existing'
 $script:pathWrites = 0
+$script:environmentChanges = 0
+$script:nativeMachine = [uint16]0 # Exercise the existing environment fallback by default.
 $originalProcessPath = $env:PATH
 # Registry access is shadowed only in this test process. File access stays native.
 function Get-Item {
@@ -34,6 +37,12 @@ function New-ItemProperty {
     $script:fakeUserPath = $Value; $script:pathWrites++
 }
 function Assert-True($condition, $message) { if (-not $condition) { throw "FAIL: $message" } }
+# Shadow native detection and broadcasting, just as registry access is shadowed.
+function Get-SecretNativeMachine { return $script:nativeMachine }
+function Send-SecretEnvironmentChange {
+    Assert-True ($script:environmentChanges -eq ($script:pathWrites - 1)) 'broadcast without a new user PATH write'
+    $script:environmentChanges++
+}
 function New-TestPrivateDirectory([string]$path) {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
     $acl = New-Object Security.AccessControl.DirectorySecurity
@@ -49,13 +58,14 @@ function New-TestPrivateDirectory([string]$path) {
 }
 function Invoke-TestInstaller([string[]]$Arguments = @()) { & ([scriptblock]::Create($installer)) @Arguments | Out-String }
 function Expect-Failure([string]$label, [string[]]$Arguments = @(), [string]$ExpectedMessage = '') {
-    $before = $script:pathWrites; $failed = $false
+    $before = $script:pathWrites; $beforeBroadcasts = $script:environmentChanges; $failed = $false
     try { Invoke-TestInstaller $Arguments | Out-Null } catch {
         $failed = $true
         if ($ExpectedMessage) { Assert-True ($_.Exception.Message -ceq $ExpectedMessage) "$label had the wrong diagnostic" }
     }
     Assert-True $failed "$label accepted"
     Assert-True ($script:pathWrites -eq $before) "$label changed user PATH"
+    Assert-True ($script:environmentChanges -eq $beforeBroadcasts) "$label broadcast an environment change"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret-go.exe'))) "$label published binary"
     if (Test-Path -LiteralPath $env:INSTALL_DIR) {
         Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 0) "$label left scratch/lock"
@@ -239,6 +249,29 @@ func main() {
     Rename-Item -LiteralPath $transport -NewName 'missing-gh.exe'
     Expect-Failure 'missing gh'
     Rename-Item -LiteralPath (Join-Path $work 'tools\missing-gh.exe') -NewName 'gh.exe'
+    $emulatedProcess = @{
+        Architecture = $env:PROCESSOR_ARCHITECTURE; Wow = $env:PROCESSOR_ARCHITEW6432
+        Asset = $env:SECRET_INSTALL_ASSET; Mode = $env:SECRET_INSTALL_MODE; Machine = $script:nativeMachine
+    }
+    try {
+        $env:PROCESSOR_ARCHITECTURE = 'AMD64'; $env:PROCESSOR_ARCHITEW6432 = 'AMD64'
+        $script:nativeMachine = [uint16]0xaa64
+        $env:SECRET_INSTALL_ASSET = 'secret-v0.3.0-windows-arm64.exe'
+        # Stop at checksum validation: an x64 runner cannot execute Arm64 code,
+        # but the transport log must prove native, not process, asset selection.
+        $env:SECRET_INSTALL_MODE = 'corrupt'
+        [IO.File]::Delete($env:SECRET_INSTALL_LOG)
+        Expect-Failure 'native Arm64 with an AMD64 PowerShell process'
+        $selectionLog = [IO.File]::ReadAllText($env:SECRET_INSTALL_LOG)
+        Assert-True ($selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.3.0/secret-v0.3.0-windows-arm64.exe')) 'emulated AMD64 process did not select Arm64 asset'
+        Assert-True (-not $selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.3.0/secret-v0.3.0-windows-amd64.exe')) 'emulated AMD64 process selected process architecture'
+        Write-Output 'PASS native Arm64 overrides AMD64 process architecture'
+    } finally {
+        $env:PROCESSOR_ARCHITECTURE = $emulatedProcess.Architecture
+        $env:PROCESSOR_ARCHITEW6432 = $emulatedProcess.Wow
+        $env:SECRET_INSTALL_ASSET = $emulatedProcess.Asset; $env:SECRET_INSTALL_MODE = $emulatedProcess.Mode
+        $script:nativeMachine = $emulatedProcess.Machine
+    }
     foreach ($mode in @('attestation', 'subject', 'subject-duplicate', 'subject-digest', 'binary-subject-duplicate', 'binary-subject-digest',
         'workflow', 'duplicate', 'inconsistent', 'corrupt', 'network', 'interrupted', 'oversize', 'redirect', 'redirect-loop', 'version',
         'lightweight-tag', 'wrong-tag-commit', 'two-parents', 'extra-file', 'modified-checksums', 'committed-mismatch',
@@ -316,6 +349,7 @@ func main() {
     $command = $ast.EndBlock.Statements[0].PipelineElements[0]
     Assert-True ($command.CommandElements[9].Value -ceq $target) 'quoted registration changed binary argv'
     Assert-True ($script:pathWrites -eq 1 -and $script:fakeUserPath -ceq ('%USERPROFILE%\synthetic-existing;' + $env:INSTALL_DIR)) 'user PATH changed beyond destination'
+    Assert-True ($script:environmentChanges -eq 1) 'changed user PATH did not broadcast exactly once'
     $before = (Get-FileHash -LiteralPath $target).Hash
     $env:SECRET_INSTALL_MODE = 'corrupt'
     $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
@@ -345,6 +379,7 @@ func main() {
     }
     Invoke-TestInstaller | Out-Null
     Assert-True ($script:pathWrites -eq 1) 'replacement duplicated PATH'
+    Assert-True ($script:environmentChanges -eq 1) 'unchanged user PATH broadcast an environment change'
     Assert-True ($env:PATH -ceq (Join-Path $work 'tools')) 'installer edited process PATH'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe'))) 'installer touched Bash name'
     Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'successful install left scratch/lock'

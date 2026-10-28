@@ -39,15 +39,8 @@
     if ($version -cnotmatch '\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z' -or
         ($commit -and $commit -cnotmatch '\A[0-9a-f]{40}\z')) { throw 'secret: invalid release pin' }
     if ($env:OS -ne 'Windows_NT') { throw 'secret: unsupported platform' }
-    $architecture = $env:PROCESSOR_ARCHITECTURE
-    if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
-    switch ($architecture) {
-        'AMD64' { $arch = 'amd64' }
-        'ARM64' { $arch = 'arm64' }
-        default { throw 'secret: unsupported platform' }
-    }
-    $gh = Get-Command gh -CommandType Application -ErrorAction SilentlyContinue
-    $curl = Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue
+    $gh = Get-Command gh -CommandType Application -TotalCount 1 -ErrorAction SilentlyContinue
+    $curl = Get-Command curl.exe -CommandType Application -TotalCount 1 -ErrorAction SilentlyContinue
     if (-not $gh -or -not $curl) { throw 'secret: gh and curl.exe are required from a trusted package channel' }
     # Bounded native process output, detached stdin and strict duplicate-key JSON.
     if (-not ('SecretInstallerV030.Native' -as [type])) {
@@ -62,6 +55,30 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 namespace SecretInstallerV030 {
  public static class Native {
+  [DllImport("kernel32.dll", ExactSpelling=true)]
+  static extern IntPtr GetCurrentProcess();
+  [DllImport("kernel32.dll", ExactSpelling=true, SetLastError=true)]
+  [return: MarshalAs(UnmanagedType.Bool)]
+  static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
+  public static ushort NativeMachine() {
+   try {
+    ushort processMachine, nativeMachine;
+    if (!IsWow64Process2(GetCurrentProcess(), out processMachine, out nativeMachine)) {
+     if (Marshal.GetLastWin32Error() == 120) return 0; // ERROR_CALL_NOT_IMPLEMENTED
+     throw new Exception();
+    }
+    if (nativeMachine == 0) throw new Exception();
+    return nativeMachine;
+   } catch (EntryPointNotFoundException) { return 0; }
+  }
+  [DllImport("user32.dll", EntryPoint="SendMessageTimeoutW", ExactSpelling=true, CharSet=CharSet.Unicode)]
+  static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr parameter, string data,
+                                        uint flags, uint milliseconds, out UIntPtr result);
+  public static void BroadcastEnvironment() {
+   UIntPtr result;
+   // HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG. A timeout is not failure.
+   SendMessageTimeout(new IntPtr(0xffff), 0x001a, UIntPtr.Zero, "Environment", 0x0002, 5000, out result);
+  }
   [StructLayout(LayoutKind.Sequential)] struct HandleInfo {
    public uint Attributes; public System.Runtime.InteropServices.ComTypes.FILETIME Creation, Access, Write;
    public uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
@@ -160,6 +177,27 @@ namespace SecretInstallerV030 {
 }
 '@
     }
+    # Resolve wrappers from the caller when shadowed by the native test harness.
+    if (-not (Get-Command Get-SecretNativeMachine -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
+        function Get-SecretNativeMachine { [SecretInstallerV030.Native]::NativeMachine() }
+    }
+    if (-not (Get-Command Send-SecretEnvironmentChange -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
+        function Send-SecretEnvironmentChange { [SecretInstallerV030.Native]::BroadcastEnvironment() }
+    }
+    try { $nativeMachine = Get-SecretNativeMachine } catch { throw 'secret: unsupported platform' }
+    if ($nativeMachine -eq 0xaa64) { $arch = 'arm64' }
+    elseif ($nativeMachine -eq 0x8664) { $arch = 'amd64' }
+    elseif ($nativeMachine -eq 0) {
+        # Older kernels lack IsWow64Process2. Preserve the previous fallback only
+        # for that unavailable API, never instead of a supported native result.
+        $architecture = $env:PROCESSOR_ARCHITECTURE
+        if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
+        switch ($architecture) {
+            'AMD64' { $arch = 'amd64' }
+            'ARM64' { $arch = 'arm64' }
+            default { throw 'secret: unsupported platform' }
+        }
+    } else { throw 'secret: unsupported platform' }
     $scratch = $null; $owned = $false; $lock = $null
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
     function Assert-SafePath([string]$path, [bool]$private = $false, [bool]$installDirectory = $false) {
@@ -411,6 +449,7 @@ namespace SecretInstallerV030 {
             $newPath = $directory
             if ($userPath) { $newPath = $userPath.TrimEnd(';') + ';' + $directory }
             New-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -Value $newPath -PropertyType ExpandString -Force | Out-Null
+            Send-SecretEnvironmentChange
         }
         $quoted = "'" + ($target -replace "['\u2018\u2019\u201A\u201B]", '$0$0') + "'"
         Write-Output "Installed $target"
