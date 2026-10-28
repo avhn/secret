@@ -500,6 +500,33 @@ class ReleaseTest(unittest.TestCase):
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_only_bounded_fuzz_steps_override_the_pinned_toolchain(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertIn("\nenv:\n  GOTOOLCHAIN: local\n", workflow)
+        job = workflow_jobs("ci.yml")["go"]
+        self.assertIn('go-version: "1.26.10"', job)
+        steps = re.split(r"^      - ", job, flags=re.MULTILINE)[1:]
+        fuzz_names = {"Bounded feature fuzzing", "Bounded age fuzzing"}
+        found = set()
+        for step in steps:
+            name = step.splitlines()[0].removeprefix("name: ")
+            with self.subTest(step=name):
+                if name in fuzz_names:
+                    found.add(name)
+                    self.assertIn("        if: runner.os == 'Linux'\n", step)
+                    self.assertIn("        env:\n          GOTOOLCHAIN: go1.27.3\n", step)
+                    self.assertNotIn("continue-on-error", step)
+                    commands = [line.strip() for line in step.splitlines() if "go test " in line]
+                    for command in commands:
+                        self.assertTrue(command.endswith(" -fuzztime=15s -parallel=2"))
+                else:
+                    self.assertNotIn("go1.27.3", step)
+        self.assertEqual(found, fuzz_names)
+        self.assertEqual(workflow.count("GOTOOLCHAIN: go1.27.3"), 2)
+        for target in ("FuzzMetadataSelection", "FuzzPrivateImporterJSON", "FuzzMCPProtocol",
+                       "FuzzAgeEnvelope", "FuzzAgeDecrypt", "FuzzAgeKeyFiles"):
+            self.assertEqual(job.count(target), 1, target)
+
     def test_every_tag_check_follows_explicit_annotated_tag_restoration(self):
         fetch = 'git fetch --no-tags --force origin "refs/tags/v0.2.3:refs/tags/v0.2.3"'
         tag_type = 'git cat-file -t refs/tags/v0.2.3'

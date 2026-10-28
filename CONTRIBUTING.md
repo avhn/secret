@@ -2,7 +2,7 @@
 
 ## Set up
 
-Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.26.10 or newer; CI pins Go 1.26.10. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
+Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.26.10 or newer; CI pins Go 1.26.10 with `GOTOOLCHAIN=local` except for bounded fuzzing, which pins Go 1.27.3 as described below. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
 
 ## Test locally
 
@@ -58,10 +58,28 @@ Operator tests exercise import/export, collision-before-fetch, fresh-account
 rotation/rename/delete, exact cleanup and provider-boundary argv sampling with
 synthetic sentinels. Do not enable these gates locally.
 
-Ubuntu CI runs each feature fuzz target with a bounded budget, for example
-`go test ./internal/feature -run '^$' -fuzz '^FuzzMetadataSelection$' -fuzztime=15s -parallel=2`.
-The other targets are `FuzzPrivateImporterJSON` and `FuzzMCPProtocol`. Keep JSON
-metadata names-only, audit opt-in and MCP explicitly allowlisted. The M2 guard
+Ubuntu CI runs each feature fuzz target with Go 1.27.3 and a bounded budget:
+
+```bash
+for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
+  GOTOOLCHAIN=go1.27.3 go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
+done
+```
+
+Only bounded fuzz invocations override `GOTOOLCHAIN=local`. Go 1.26.10 has an
+`internal/fuzz` coordinator race that can report `context deadline exceeded`
+when the fuzz budget expires, without a crashing input. Go 1.27.3 contains the
+[upstream fix](https://github.com/golang/go/commit/5a957dc766aed011cdfe7c953987a2ff86c0829c):
+`src/internal/fuzz/fuzz.go:129` also checks `err == ctx.Err()` before suppressing
+coordinator cancellation. The [release history](https://go.dev/doc/devel/release)
+lists no newer 1.26 patch as of 2026-10-28; the
+[1.26 backport](https://github.com/golang/go/issues/82362) remains open.
+The exact override may download the official toolchain into the module cache;
+it does not change the module's Go directive, the default toolchain or release
+reproducibility pins. Keep builds, vet, ordinary tests, race tests and releases
+on Go 1.26.10 with `GOTOOLCHAIN=local`. Do not retry or filter fuzz failures.
+
+Keep JSON metadata names-only, audit opt-in and MCP explicitly allowlisted. The M2 guard
 still conservatively denies new secret subcommands; do not relax it for tests.
 Hosted PTY/provider results, native OS tests and all prior shell, Bash 3.2,
 inventory, exact hook and race gates are required before calling M3 complete.
@@ -111,8 +129,10 @@ and [M5e plan](docs/design/m5e-plan.md); passing parser CI does not finish M5e.
 
 ## M5d encrypted-store tests
 
-Use Go 1.26.10 with `GOTOOLCHAIN=local`. Review the exact age pin, complete module
-graph, every new license, checksums and reachable vulnerability scan before any
+Use Go 1.26.10 with `GOTOOLCHAIN=local` except for the bounded fuzz commands
+below, which use the same Go 1.27.3 coordinator fix as feature fuzzing. Review
+the exact age pin, complete module graph, every new license, checksums and
+reachable vulnerability scan before any
 dependency change. See [the binding M5d plan](docs/design/m5d-plan.md) and
 [age guarantees and recovery](docs/age.md). Core age imports only, never a crypto
 subprocess. Keep plaintext and identity material in owned byte buffers; never
@@ -122,9 +142,9 @@ print it or put it in argv, diagnostics, audit or JSON.
 go mod verify
 go mod tidy -diff
 go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
-go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
-go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
-go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
+GOTOOLCHAIN=go1.27.3 go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
+GOTOOLCHAIN=go1.27.3 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
+GOTOOLCHAIN=go1.27.3 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
 python3 -I tests/test-age.py /absolute/fresh/secret-go
 ```
 

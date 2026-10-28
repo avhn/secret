@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+- Pin only bounded CI fuzzing to Go 1.27.3, whose fuzz coordinator fixes a race
+  that could report a bare `context deadline exceeded` at budget expiry without
+  a crashing input. All six targets retain 15-second budgets and two workers;
+  non-fuzz checks, the module directive and release pins stay on Go 1.26.10.
 - Mark M4.1, M5c, M5e steps 5 and 6, and M6 as `waiting sponsorship` in the roadmap.
 - Tighten the unwired PowerShell classifier after a gpt-sol audit: deny signature-like
   comments under PowerShell's whitespace-insensitive near-match rule, any decoded `--%`

@@ -21,6 +21,14 @@ guard cases and the Codex suite passed. Audit empty array expansions without
 changing decisions, messages, budgets or deadlines; preserve exact inventories
 and require native CI after local Bash 3.2 and current-Bash checks.
 
+## CI fuzz toolchain maintenance (2026-10-28)
+
+Bounded feature and age fuzzing use Go 1.27.3 to avoid the Go 1.26.10 fuzz
+coordinator deadline race (go.dev/issue/75804). Keep all six targets, 15-second
+budgets and two workers unchanged. Non-fuzz checks and release reproducibility
+remain pinned to Go 1.26.10 with `GOTOOLCHAIN=local`; no milestone status changes.
+Hosted CI must confirm the workflow change before calling the runner issue fixed.
+
 ## Done: Bash-era phases
 
 - Hardened guard: protected input roles and aliases (`b430d30`), parser and search fixes (`3aba0f2`, `fc59cd1`, `ab4fa37`) and fail-safe redaction (`020c540`).

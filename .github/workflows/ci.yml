@@ -417,9 +417,13 @@ jobs:
           else
             go test -race -timeout 30m ./...
           fi
+      # Go 1.26.10 can report a spurious fuzz deadline error (go.dev/issue/75804).
+      # Override only fuzz steps; all other checks and release pins stay unchanged.
       - name: Bounded feature fuzzing
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          GOTOOLCHAIN: go1.27.3
         run: |
           for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
             go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
@@ -427,6 +431,8 @@ jobs:
       - name: Bounded age fuzzing
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          GOTOOLCHAIN: go1.27.3
         run: |
           go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
           for target in FuzzAgeDecrypt FuzzAgeKeyFiles; do
