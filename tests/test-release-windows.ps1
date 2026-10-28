@@ -290,21 +290,31 @@ try {
     $store = Join-Path $root 'synthetic store.secret'
     Write-PrivateFile $store ("PLUGIN_TOKEN=" + $script:Value + "`n")
     Assert-Private $store
+    # Literal frames keep the request bytes identical across PowerShell editions.
     $frames = @(
-        @{ jsonrpc = '2.0'; id = 1; method = 'initialize'; params = @{ protocolVersion = '2025-06-18'; capabilities = @{}; clientInfo = @{ name = 'synthetic-release'; version = '1' } } },
-        @{ jsonrpc = '2.0'; method = 'notifications/initialized' },
-        @{ jsonrpc = '2.0'; id = 2; method = 'tools/list' },
-        @{ jsonrpc = '2.0'; id = 3; method = 'tools/call'; params = @{ name = 'list'; arguments = @{} } },
-        @{ jsonrpc = '2.0'; id = 4; method = 'tools/call'; params = @{ name = 'health'; arguments = @{} } }
+        '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"synthetic-release","version":"1"}}}',
+        '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+        '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
+        '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list","arguments":{}}}',
+        '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"health","arguments":{}}}'
     )
-    $inputText = (($frames | ForEach-Object { ConvertTo-Json -InputObject $_ -Depth 10 -Compress }) -join "`n") + "`n"
+    $inputText = ($frames -join "`n") + "`n"
     $got = Invoke-Captured $binary @('mcp', '--store', ('file:' + $store)) $inputText
     Assert-True ($got.Code -eq 0 -and $got.Err.Length -eq 0) 'names-only MCP transport'
-    $replies = @($utf8.GetString($got.Out).Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
+    # JSON-RPC permits replies in any order; match them by id. Output was already
+    # checked for the synthetic value, so ids and error codes are safe to print.
+    $replies = @($utf8.GetString($got.Out).Trim().Split("`n") | ForEach-Object { $_.Trim() | ConvertFrom-Json } |
+        Sort-Object -Property { [int64]$_.id })
+    $summary = ($replies | ForEach-Object {
+        $code = if ($_.PSObject.Properties['error']) { [string]$_.error.code } else { 'ok' }
+        "id=$($_.id) $code" }) -join ', '
+    if ($replies.Count -ne 4) { Write-Host "MCP replies: $summary" }
     Assert-True ($replies.Count -eq 4) 'all MCP replies present'
     for ($index = 0; $index -lt 4; $index++) {
-        Assert-True ($replies[$index].id -eq ($index + 1) -and
-            $null -eq $replies[$index].PSObject.Properties['error']) 'ordered successful JSON-RPC replies'
+        if (-not ([int64]$replies[$index].id -eq ($index + 1) -and
+            $null -eq $replies[$index].PSObject.Properties['error'])) { Write-Host "MCP replies: $summary" }
+        Assert-True ([int64]$replies[$index].id -eq ($index + 1) -and
+            $null -eq $replies[$index].PSObject.Properties['error']) 'successful JSON-RPC reply for each request id'
     }
     Assert-True ($replies[0].result.serverInfo.version -ceq '1') 'metadata protocol version is not release version'
     $names = @($replies[1].result.tools | ForEach-Object { $_.name } | Sort-Object)
