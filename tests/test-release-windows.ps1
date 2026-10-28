@@ -179,6 +179,13 @@ function Invoke-Captured([string] $Image, [string[]] $Arguments, [string] $Input
     $stdout = New-Object IO.MemoryStream
     $stderr = New-Object IO.MemoryStream
     $started = $false
+    # .NET Framework builds the redirected stdin writer from Console.InputEncoding;
+    # under code page 65001 that writer emits a UTF-8 BOM before our bytes.
+    $savedInput = $null
+    if ($PSVersionTable.PSVersion.Major -lt 6) {
+        $savedInput = [Console]::InputEncoding
+        [Console]::InputEncoding = $utf8
+    }
     try {
         $started = $process.Start()
         Assert-True $started 'native process starts'
@@ -195,6 +202,7 @@ function Invoke-Captured([string] $Image, [string[]] $Arguments, [string] $Input
         Assert-NoValue $got.Err
         return $got
     } finally {
+        if ($null -ne $savedInput) { [Console]::InputEncoding = $savedInput }
         if ($started -and -not $process.HasExited) { $process.Kill(); $process.WaitForExit() }
         $stdout.Dispose()
         $stderr.Dispose()
