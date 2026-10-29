@@ -1,14 +1,14 @@
 {
-  "version": "0.3.1",
-  "tag": "v0.3.1",
+  "version": "0.3.2",
+  "tag": "v0.3.2",
   "assets": [
-    "secret-v0.3.1-darwin-amd64",
-    "secret-v0.3.1-darwin-arm64",
-    "secret-v0.3.1-desktop.mcpb",
-    "secret-v0.3.1-linux-amd64",
-    "secret-v0.3.1-linux-arm64",
-    "secret-v0.3.1-windows-amd64.exe",
-    "secret-v0.3.1-windows-arm64.exe",
+    "secret-v0.3.2-darwin-amd64",
+    "secret-v0.3.2-darwin-arm64",
+    "secret-v0.3.2-desktop.mcpb",
+    "secret-v0.3.2-linux-amd64",
+    "secret-v0.3.2-linux-arm64",
+    "secret-v0.3.2-windows-amd64.exe",
+    "secret-v0.3.2-windows-arm64.exe",
     "server.json"
   ],
   "manifests": {

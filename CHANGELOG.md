@@ -4,7 +4,22 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.3.1 patch preparation
+### 0.3.2 patch preparation
+
+- Set the installed Windows `secret-go.exe` owner to the current user after
+  atomic creation or replacement. Elevated tokens otherwise default new files
+  to `BUILTIN\Administrators`, and `File.Replace` retains the old owner.
+  Classify owner-publication failures as `publication-owner` and add native
+  first-install and replacement owner assertions, including an Administrators-
+  owned replacement fixture where the test token permits it. Skip the owner
+  write when the current user already owns the binary, since ownership grants
+  no `WRITE_OWNER`, and test a protected Modify-only replacement.
+- Advance release, installer, packaging, manifest, workflow and setup identities
+  to 0.3.2. Keep the published v0.3.0 and v0.3.1 tags and checksum manifests
+  immutable. v0.3.1 Registry publication was blocked by the installed-owner
+  assertion; v0.3.2 carries the fix without Go hook activation.
+
+### 0.3.1 patch (published 2026-10-30)
 
 - Fix published Windows release tests to install beneath a fresh private user
   temp directory instead of hosted RUNNER_TEMP ancestors that correctly fail

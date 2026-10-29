@@ -2,7 +2,7 @@
 # Keep state local for irm URL | iex. No source build or host activation occurs.
 & {
     $ErrorActionPreference = 'Stop'
-    $version = '0.3.1'
+    $version = '0.3.2'
     if (Test-Path Env:SECRET_VERSION) { $version = $env:SECRET_VERSION }
     $commit = $env:SECRET_RELEASE_COMMIT
     $directory = $env:INSTALL_DIR
@@ -30,7 +30,7 @@
     }
     if ($showHelp) {
         Write-Output 'Usage: install.ps1 [--version V] [--commit C] [--dir DIR] [--help]'
-        Write-Output 'SECRET_VERSION defaults to 0.3.1; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
+        Write-Output 'SECRET_VERSION defaults to 0.3.2; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
         Write-Output 'INSTALL_DIR defaults to %LOCALAPPDATA%\Programs\secret. gh and curl.exe are required.'
         Write-Output 'Adds only its directory to user PATH. No source build, stores, profiles or client edits.'
         return
@@ -43,7 +43,7 @@
     $curl = Get-Command curl.exe -CommandType Application -TotalCount 1 -ErrorAction SilentlyContinue
     if (-not $gh -or -not $curl) { throw 'secret: gh and curl.exe are required from a trusted package channel' }
     # Bounded native process output, detached stdin and strict duplicate-key JSON.
-    if (-not ('SecretInstallerV031.Native' -as [type])) {
+    if (-not ('SecretInstallerV032.Native' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -53,7 +53,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
-namespace SecretInstallerV031 {
+namespace SecretInstallerV032 {
  public static class Native {
   [DllImport("kernel32.dll", ExactSpelling=true)]
   static extern IntPtr GetCurrentProcess();
@@ -179,10 +179,10 @@ namespace SecretInstallerV031 {
     }
     # Resolve wrappers from the caller when shadowed by the native test harness.
     if (-not (Get-Command Get-SecretNativeMachine -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
-        function Get-SecretNativeMachine { [SecretInstallerV031.Native]::NativeMachine() }
+        function Get-SecretNativeMachine { [SecretInstallerV032.Native]::NativeMachine() }
     }
     if (-not (Get-Command Send-SecretEnvironmentChange -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
-        function Send-SecretEnvironmentChange { [SecretInstallerV031.Native]::BroadcastEnvironment() }
+        function Send-SecretEnvironmentChange { [SecretInstallerV032.Native]::BroadcastEnvironment() }
     }
     if (-not (Get-Command Report-SecretInstallFailure -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
         function Report-SecretInstallFailure([string]$category, [string]$types, [string]$hresults) { }
@@ -225,7 +225,7 @@ namespace SecretInstallerV031 {
                 $sid -notin @($identity.Value, 'S-1-5-18', 'S-1-5-32-544', $trustedInstaller)) { throw 'unsafe DACL' }
         }
         if (-not $item.PSIsContainer) {
-            [SecretInstallerV031.Native]::SingleLink($path)
+            [SecretInstallerV032.Native]::SingleLink($path)
             if ($item.Length -gt 67108864) { throw 'oversized destination' }
         }
     }
@@ -254,7 +254,7 @@ namespace SecretInstallerV031 {
         Assert-SafePath $path $true
     }
     function Invoke-Bounded([string]$exe, [string[]]$arguments, [int]$limit = 1048576, [int]$seconds = 90, [string]$watched = $null, [long]$maximum = 0, [string]$headers = $null) {
-        [SecretInstallerV031.Native]::Run($exe, $arguments, $limit, $seconds, $watched, $maximum, $headers)
+        [SecretInstallerV032.Native]::Run($exe, $arguments, $limit, $seconds, $watched, $maximum, $headers)
     }
     $failureCategory = 'destination-safety'
     try {
@@ -324,7 +324,7 @@ namespace SecretInstallerV031 {
                 '--bundle', $bundle, '--format', 'json')
             if ($expected) { $arguments += @('--source-digest', $expected, '--signer-digest', $expected) }
             $json = Invoke-Bounded $gh.Source $arguments
-            [SecretInstallerV031.Native]::Json($json)
+            [SecretInstallerV032.Native]::Json($json)
             if (-not $json.TrimStart().StartsWith('[')) { throw 'invalid verification results' }
             $results = @($json | ConvertFrom-Json)
             if ($results.Count -eq 0) { throw 'empty verification results' }
@@ -357,7 +357,7 @@ namespace SecretInstallerV031 {
         }
         function Invoke-ReleaseAPI([string]$endpoint, [int]$limit = 16384) {
             $json = Invoke-Bounded $gh.Source @('api', '--hostname', 'github.com', '--method', 'GET', "repos/avhn/secret/$endpoint") $limit
-            [SecretInstallerV031.Native]::Json($json)
+            [SecretInstallerV032.Native]::Json($json)
             if (-not $json.TrimStart().StartsWith('{')) { throw 'invalid API object' }
             $json | ConvertFrom-Json
         }
@@ -455,6 +455,19 @@ namespace SecretInstallerV031 {
             $failureCategory = 'atomic-create'
             [IO.File]::Move($binary, $target)
         }
+        # An elevated token defaults new owners to Administrators, and Replace keeps
+        # the old file's owner. Write only the owner section, naming this user.
+        # Skip the write when this user already owns it: ownership alone grants
+        # no WRITE_OWNER, so a Modify-only DACL would refuse a no-op owner write.
+        $failureCategory = 'publication-owner'
+        if ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.Value) {
+            $ownerOnly = New-Object Security.AccessControl.FileSecurity
+            $ownerOnly.SetOwner($identity)
+            if ($PSVersionTable.PSEdition -eq 'Core') {
+                [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]::new($target), $ownerOnly)
+            } else { (New-Object IO.FileInfo($target)).SetAccessControl($ownerOnly) }
+        }
+        if ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.Value) { throw 'unsafe owner' }
         $failureCategory = 'user-path'
         # Read/update only the user registry PATH, not the merged process PATH.
         $key = Get-Item -LiteralPath 'HKCU:\Environment'

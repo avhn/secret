@@ -6,7 +6,7 @@
       "name": "secret",
       "source": "./",
       "description": "Use credentials from coding agents without reading their values into context.",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "category": "security"
     }
   ]

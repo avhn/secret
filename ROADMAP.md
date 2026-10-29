@@ -2,21 +2,38 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.0 was published on 2026-10-29; v0.3.1 patch preparation is in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.3.1 was published on 2026-10-30; v0.3.2 patch preparation is in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
-## v0.3.1: Installer and public Windows release-test patch
+## v0.3.2: Installed Windows binary owner patch
 
-Status: in progress, not published. Based on the immutable v0.3.0 checksum
-commit C `b911c92`; the existing tag and `dist/checksums-v0.3.0.txt` stay unchanged.
-The patch keeps the [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md),
-installed Bash CLI/hooks and all waiting-sponsorship boundaries.
+Status: in progress, not published. Based on the immutable v0.3.1 checksum
+commit C `a2180875`; the existing tag and both `dist/checksums-v0.3.0.txt` and
+`dist/checksums-v0.3.1.txt` stay unchanged. The patch keeps the
+[v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash CLI/hooks
+and all waiting-sponsorship boundaries.
 
-- [x] Use a fresh private directory under `[IO.Path]::GetTempPath()` for public Windows installs, not writable hosted `RUNNER_TEMP` ancestors; keep installer ancestor checks strict
-- [x] Raise the standalone installers' gh auth status bound from 10 to 60 seconds; classify PowerShell auth failures as `github-auth` and keep the fixed recovery message
-- [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.1 without Go hook activation
+- [x] Set the installed binary owner to the current user after Move/Replace, with failure category `publication-owner`; retain the reviewed fix's logic
+- [x] Add native first-install and replacement owner assertions, correcting a pre-existing `S-1-5-32-544` owner where the test token permits that fixture
+- [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.2 without Go hook activation
 - [ ] Review local checks and rerun applicable hosted candidate/public-install gates for the changed inputs
 - [ ] Owner separately authorizes source/checksum commits, protected environment tag policies, signed tag, draft, publication and Registry publication
 - [ ] Complete public native installs and confirm the exact active Registry identity/version/packages record
+
+## v0.3.1: Installer and public Windows release-test patch
+
+Published on GitHub Releases on 2026-10-30, with immutable tag `v0.3.1` at
+checksum commit C `a2180875`. This release moved public Windows test installs
+under private user temp roots, raised gh auth status to 60 seconds and fixed
+its PowerShell failure category, without Go hook activation.
+
+Registry workflow [run 40967543855](https://github.com/avhn/secret/actions/runs/40967543855)
+was blocked by the `current-user install owner` assertion in
+`tests/test-release-windows.ps1`. Elevated tokens default new file owners to
+`BUILTIN\Administrators`, and `File.Replace` keeps the old owner. A hosted
+diagnostic with the exact owner-publication patch passed the full v0.3.1-tag
+published-mode suite against the live v0.3.1 release on windows-latest and
+windows-11-arm under PowerShell 7 and 5.1. v0.3.2 carries this fix; v0.3.1 is not
+retagged or republished. The changed release inputs still need their own gates.
 
 ## v0.3.0: Native installers and names-only MCP packaging
 

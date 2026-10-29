@@ -3,8 +3,8 @@
 ## What is installed today
 
 The installed default `bin/secret` and Claude/Codex plugin hooks remain Bash.
-The v0.3.1 packaging update independently bumps all four marketplace/plugin
-versions to 0.3.1; this is not Go activation. Opt-in standalone installers publish
+The v0.3.2 packaging update independently bumps all four marketplace/plugin
+versions to 0.3.2; this is not Go activation. Opt-in standalone installers publish
 `secret-go` or `secret-go.exe`, while trusted checkouts retain `bin/secret-go`
 and `hooks/guard-go`. No installed manifest references those launchers.
 Claude cutover, `onFailure: "block"`, `compat/secret` and Go hook output-contract
@@ -17,7 +17,7 @@ was published on 2026-10-24, at checksum commit C
 The [recorded release evidence](../ROADMAP.md#m4-releasable-linuxmacos-core)
 includes native published-asset installs on all four Linux/macOS targets.
 That historical evidence does not certify the new Windows assets or Desktop
-bundle. The procedure below targets the planned v0.3.1 final tag after its
+bundle. The procedure below targets the planned v0.3.2 final tag after its
 separate owner-approved publication; do not use a candidate branch as C.
 See [release.md](release.md) for owner approval boundaries and
 [canonical MCP setup](setup.md) for per-client registration.
@@ -51,7 +51,7 @@ cleans up in `finally`. The bypass applies only to that one child process, not
 persistent policy. It permits execution under Windows PowerShell 5.1's default
 Restricted policy; centrally enforced Group Policy can still take precedence.
 
-Inputs: `SECRET_VERSION` defaults to `0.3.1`, never latest;
+Inputs: `SECRET_VERSION` defaults to `0.3.2`, never latest;
 `SECRET_RELEASE_COMMIT` optionally supplies an independently authenticated full
 lowercase 40-hex C; `INSTALL_DIR` selects the destination. Equivalent file-mode
 flags are `--version`, `--commit`, `--dir` and `--help`. Conflicting pins fail.
@@ -59,7 +59,7 @@ Without an explicit C, both scripts derive it only from verified attestation
 identity and require checksum and binary provenance to agree. gh is mandatory;
 missing gh never enables a checksum-only fallback. The auth status check is bounded
 to 60 seconds; its fixed recovery message never includes gh diagnostics. Digest, architecture and
-`secret 0.3.1 (go)` are checked before atomic publication.
+`secret 0.3.2 (go)` are checked before atomic publication.
 
 Unix defaults to `~/.local/bin/secret-go` without PATH/profile edits. Windows
 defaults to `%LOCALAPPDATA%\Programs\secret\secret-go.exe` and adds only its own
@@ -67,7 +67,10 @@ directory to user PATH; open a new terminal afterward. Neither edits client
 configuration, registers MCP, reads stores, installs hooks or overwrites Bash
 `secret`. Unsafe ownership/modes, reparse points, DACLs and aliases are rejected;
 arbitrary existing parents are not repaired. Stop clients before replacement,
-especially Windows open-image replacement. Locks are tokened and never stolen.
+especially Windows open-image replacement. After atomic Windows publication,
+the installed binary owner is explicitly set to the current user, including
+when replacing an Administrators-owned binary. Owner-setting failures use the
+`publication-owner` category. Locks are tokened and never stolen.
 
 The raw standalone executable has install-time verification, not the checkout
 launcher's per-execution rehash. The standalone installers are online-only and
@@ -77,7 +80,7 @@ offline interfaces below.
 
 ## Release and platform pins
 
-Release identity is fixed at V=0.3.1, annotated tag `v0.3.1`, source commit S and
+Release identity is fixed at V=0.3.2, annotated tag `v0.3.2`, source commit S and
 checksum-only child commit C. The trusted checkout must be exactly the full C
 which the annotated tag peels to. Obtain C from separately authenticated owner
 release records, not a field inside the downloaded binary or its checksum file.
@@ -85,13 +88,13 @@ Never use a `latest` URL, candidate S attestation or an arbitrary PATH `secret`.
 
 | Platform | Asset suffixes | Native hosted targets | Evidence status |
 | --- | --- | --- | --- |
-| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | Prior v0.2.3 installs passed; new v0.3.1 candidate/public installs required |
-| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | Prior v0.2.3 installs and Bash 3.2 passed; new v0.3.1 gates required |
-| Windows | windows-amd64.exe, windows-arm64.exe | windows-latest, windows-11-arm | M5a amd64 runtime gate passed; v0.3.1 native candidate/public installs on both architectures remain required |
+| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | Prior v0.2.3 installs passed; new v0.3.2 candidate/public installs required |
+| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | Prior v0.2.3 installs and Bash 3.2 passed; new v0.3.2 gates required |
+| Windows | windows-amd64.exe, windows-arm64.exe | windows-latest, windows-11-arm | M5a amd64 runtime gate passed; v0.3.2 native candidate/public installs on both architectures remain required |
 
-All six are raw executables named `secret-v0.3.1-SUFFIX`, not archives. The other
-payloads are `secret-v0.3.1-desktop.mcpb` and generated `server.json`. The sorted
-`checksums-v0.3.1.txt` has exactly eight payload records; nine attestation bundles
+All six are raw executables named `secret-v0.3.2-SUFFIX`, not archives. The other
+payloads are `secret-v0.3.2-desktop.mcpb` and generated `server.json`. The sorted
+`checksums-v0.3.2.txt` has exactly eight payload records; nine attestation bundles
 cover those payloads plus the checksum asset. There are eighteen public assets.
 The Desktop bundle contains macOS universal and Windows amd64 payloads only;
 actual Desktop installation is not host-tested. Registry name:
@@ -128,7 +131,7 @@ gh with `gh auth login` in your private terminal or an already configured
 release assets. Do not paste or print the token. Local synthetic checks use
 gh 2.102.0. The earlier read-only rehearsal used genuine v0.2.2
 provenance with identity-substituted scripts. The published v0.2.3 workflow passed
-its historical four-target checks; it is not evidence for the v0.3.1 integrated
+its historical four-target checks; it is not evidence for the v0.3.2 integrated
 artifacts or Windows installs. Online downloading additionally needs curl with
 HTTPS, redirect, connect and total-time limits. Install these tools through your
 trusted OS/package channel. This checkout path does not execute a downloaded
@@ -137,9 +140,9 @@ bootstrap script.
 ```sh
 # In the trusted checkout, after independently authenticating C and the tag:
 git checkout --detach FULL_AUTHENTICATED_C
-git fetch --no-tags --force origin "refs/tags/v0.3.1:refs/tags/v0.3.1"
-test "$(git cat-file -t refs/tags/v0.3.1)" = tag
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.3.1^{commit}')"
+git fetch --no-tags --force origin "refs/tags/v0.3.2:refs/tags/v0.3.2"
+test "$(git cat-file -t refs/tags/v0.3.2)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.3.2^{commit}')"
 sh scripts/verify-release.sh --source
 sh scripts/install-release.sh
 ./bin/secret-go version
@@ -150,22 +153,22 @@ installer itself never fetches tags, including on warm or offline paths, and
 rejects lightweight tags rather than weakening the pin.
 
 The installer fetches only the exact platform asset under
-`https://github.com/avhn/secret/releases/download/v0.3.1/`. It checks the committed
+`https://github.com/avhn/secret/releases/download/v0.3.2/`. It checks the committed
 eight-line checksum manifest, provenance repository `avhn/secret`, signer workflow
 `.github/workflows/release.yml`, source C, tag ref, certificate issuer and subject
 name/digest before execution. The checkout is the bootstrap trust root; a matching
 checksum alone is not independent provenance.
 
 The verifier keeps `--repo avhn/secret`, `--source-digest C`,
-`--signer-digest C`, `--source-ref refs/tags/v0.3.1`,
+`--signer-digest C`, `--source-ref refs/tags/v0.3.2`,
 `--cert-oidc-issuer https://token.actions.githubusercontent.com`, the exact SAN
-`--cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.1`
+`--cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.2`
 and `--deny-self-hosted-runners`. Do not add `--signer-workflow`: gh 2.102.0
 rejects it together with `--cert-identity`. The exact SAN already pins the
 same-repository signer workflow and tag. Likewise, use `--repo`, not both
 `--repo` and `--owner`, for verification or attestation download.
 
-Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.3.1/`. Keep it on a
+Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.3.2/`. Keep it on a
 user-owned direct path with private directories (0700); `secret` is 0500 and
 names-only `verified` metadata is 0600. Do not symlink cache or checksum paths.
 The launchers resolve bounded entrypoint symlink chains and rehash before every
@@ -174,7 +177,7 @@ exec. They do not trust PATH binaries or silently fall back to Bash.
 ## Verify the complete release, including Desktop MCPB
 
 From the independently authenticated checkout at C, acquire all eight payloads
-and `checksums-v0.3.1.txt`, each initially into its own new empty directory, then
+and `checksums-v0.3.2.txt`, each initially into its own new empty directory, then
 assemble only those reviewed inputs into a private asset directory. Download
 all nine portable `sha256-DIGEST.jsonl` bundles into separate fresh directories
 and assemble them in a private bundle directory. Keep scripts outside all
@@ -225,7 +228,7 @@ inputs, `sh scripts/install-release.sh --from-dir /absolute/private/release-inpu
 --offline` re-verifies using gh's custom trusted root. A bundle alone is not
 sufficient. Missing trust fails rather than bootstrapping over the network.
 The published-assets workflow removes the cached executable/metadata before
-checking this path with the real verifier and a network witness. The v0.3.1 path
+checking this path with the real verifier and a network witness. The v0.3.2 path
 still requires its own public-asset run; candidate fixture installs do not prove
 offline provenance.
 
