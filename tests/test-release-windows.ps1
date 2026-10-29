@@ -11,13 +11,13 @@ param(
     [Parameter(Mandatory)][string] $Assets,
     [Parameter(Mandatory)][ValidateSet('amd64', 'arm64')][string] $ExpectedArchitecture,
     [switch] $Published,
-    [string] $Tag = 'v0.3.0',
+    [string] $Tag = 'v0.3.1',
     [string] $Commit = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$version = '0.3.0'
+$version = '0.3.1'
 $checkout = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object Text.UTF8Encoding($false)
 
@@ -28,7 +28,7 @@ function Assert-True([bool] $Condition, [string] $Name) {
 Assert-True ($env:OS -eq 'Windows_NT' -and $env:GITHUB_ACTIONS -eq 'true' -and
     $env:RUNNER_OS -eq 'Windows') 'native disposable hosted Windows required'
 Assert-True ([IO.Path]::IsPathRooted($Assets) -and (Test-Path -LiteralPath $Assets -PathType Container)) 'absolute candidate input'
-Assert-True ($Tag -ceq 'v0.3.0') 'exact release tag'
+Assert-True ($Tag -ceq 'v0.3.1') 'exact release tag'
 Assert-True (-not (Get-Item -LiteralPath (Join-Path $checkout '.secret-release-test-fixture') -Force -ErrorAction SilentlyContinue)) 'no shipped fixture marker'
 
 # OS architecture and process architecture must both be native. In particular,
@@ -71,7 +71,10 @@ Write-Output ('OS=' + [Environment]::OSVersion.VersionString + ' arch=' + $Expec
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $sid = $identity.User
 $identity.Dispose()
-$root = Join-Path $env:RUNNER_TEMP ('secret release ' + [Guid]::NewGuid().ToString('N'))
+# RUNNER_TEMP ancestors permit other users to create/write entries. Real installs
+# must use the user temp hierarchy without weakening installer ancestor checks.
+$base = if ($Published) { [IO.Path]::GetTempPath() } else { $env:RUNNER_TEMP }
+$root = Join-Path $base ('secret release ' + [Guid]::NewGuid().ToString('N'))
 $script:Value = 'synthetic-release-' + [Guid]::NewGuid().ToString('N')
 $script:Work = $root
 
@@ -349,7 +352,7 @@ try {
         $got = Invoke-Captured $shell $replacementArgs
         Assert-True ($got.Code -eq 0 -and (Hash $binary) -ceq $before) 'verified public replacement with attestation-derived C'
         $badArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,
-            '--version', '0.3.0/invalid', '--commit', $Commit, '--dir', $destination)
+            '--version', '0.3.1/invalid', '--commit', $Commit, '--dir', $destination)
         $got = Invoke-Captured $shell $badArgs
         Assert-True ($got.Code -ne 0 -and (Hash $binary) -ceq $before) 'failed install preserves existing binary'
         Assert-InstallAcl $binary $false

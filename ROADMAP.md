@@ -2,38 +2,43 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.0 packaging is in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.3.0 was published on 2026-10-29; v0.3.1 patch preparation is in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+
+## v0.3.1: Installer and public Windows release-test patch
+
+Status: in progress, not published. Based on the immutable v0.3.0 checksum
+commit C `b911c92`; the existing tag and `dist/checksums-v0.3.0.txt` stay unchanged.
+The patch keeps the [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md),
+installed Bash CLI/hooks and all waiting-sponsorship boundaries.
+
+- [x] Use a fresh private directory under `[IO.Path]::GetTempPath()` for public Windows installs, not writable hosted `RUNNER_TEMP` ancestors; keep installer ancestor checks strict
+- [x] Raise the standalone installers' gh auth status bound from 10 to 60 seconds; classify PowerShell auth failures as `github-auth` and keep the fixed recovery message
+- [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.1 without Go hook activation
+- [ ] Review local checks and rerun applicable hosted candidate/public-install gates for the changed inputs
+- [ ] Owner separately authorizes source/checksum commits, protected environment tag policies, signed tag, draft, publication and Registry publication
+- [ ] Complete public native installs and confirm the exact active Registry identity/version/packages record
 
 ## v0.3.0: Native installers and names-only MCP packaging
 
-Status: in progress (owner-approved scope 2026-10-28, not published). This extends
-M4 packaging without completing M4.1. The binding interfaces and owner checkpoints
-are in [the release plan](docs/design/v0.3.0-plan.md), with canonical
-[MCP setup](docs/setup.md) and [release procedure](docs/release.md).
-Checked lane items below mean implementation exists, not that integrated hosted
-acceptance, publication or real-host protection has passed.
+Published on GitHub Releases on 2026-10-29, with immutable annotated tag
+`v0.3.0` at checksum commit C `b911c92`. This extended M4 packaging without
+completing M4.1: six raw native executables, the Desktop MCPB and Registry
+metadata, eight payload checksums and nine attested subjects. All four manifests
+are 0.3.0 in that historical release, without installed Bash hook activation.
 
-- [x] Installer lane: pinned POSIX/PowerShell entrypoints, mandatory gh provenance, optional full C pin, standalone secret-go only, retained Unix checkout cache interfaces
-- [x] Build lane: six raw Linux/macOS/Windows amd64/arm64 assets, complete eight-payload manifest and nine-subject portable attestation graph
-- [x] MCPB lane: deterministic macOS universal/Windows amd64 bundle, required exact store reference, locked CLI validation/native smoke gates (Desktop install not host-tested)
-- [x] Registry lane: io.github.avhn/secret metadata generation, exact bundle hash, pinned publisher validation and protected OIDC publication workflow
-- [x] Setup lane: user/client documentation, parsed JSON/TOML/CLI examples, Go-source CLI contract and synthetic quoting checks
-- [x] Manifest lane: all four versions bumped equally to 0.3.0, with unchanged Bash hook paths/nonactivation assertions and explicit --stage v0.3.0
-- [ ] Run/review two complete integrated hosted candidate rounds, including all six actual native architectures and existing CI/provider/inventory gates
-- [ ] Owner configures protected release-publish environment, required reviewers and trusted release refs
-- [ ] Owner configures protected registry-publish environment, required reviewers and trusted release refs
-- [ ] Freeze S after green gates; owner separately authorizes signed checksum-only C and exact full-set reproduction
-- [ ] Owner separately authorizes signed annotated v0.3.0 tag creation/push at C
-- [ ] Owner separately approves draft creation, eighteen-asset upload/download and all final-tag provenance checks
-- [ ] Owner separately approves release publication
-- [ ] Complete six real public native installs and applicable offline/bundle checks without fixtures; record actual OS/image/CPU evidence
-- [ ] Owner separately approves Registry publish; confirm the exact active identity/version/packages record
-- [ ] Owner separately approves installed-manifest/default promotion and any default-branch setting change
+Registry workflow [run 40816751048](https://github.com/avhn/secret/actions/runs/40816751048)
+was blocked by its public Windows install tests: their `RUNNER_TEMP` ancestors
+allow untrusted writes, so the installer correctly rejected the destinations.
+Hosted diagnostics succeeded under the user temp hierarchy on windows-latest
+and windows-11-arm, with PowerShell 5.1 and 7, `--commit` and paths with spaces.
+They also identified a cold gh auth invocation exceeding the old 10-second
+bound on Windows Arm. v0.3.1 carries the test-root, auth-bound and failure-category
+fixes; v0.3.0 is not retagged or republished.
 
-M4.1, M5c, M5e steps 5 and 6, and M6 remain waiting sponsorship. No tag, draft,
-release, Registry record, Desktop host integration or fail-closed protection is
-claimed by this implementation checklist. Prior v0.2.3/M5a evidence does not
-certify new Windows arm64/public assets or Desktop user_config interpolation.
+M4.1, M5c, M5e steps 5 and 6, and M6 remain waiting sponsorship. No Registry
+publication, Desktop host integration or fail-closed protection is claimed.
+Changed release inputs still need their own native hosted evidence and owner
+approval under the [release procedure](docs/release.md).
 
 ## Owner decisions (2026-10-13)
 

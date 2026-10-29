@@ -2,7 +2,7 @@
 # Keep state local for irm URL | iex. No source build or host activation occurs.
 & {
     $ErrorActionPreference = 'Stop'
-    $version = '0.3.0'
+    $version = '0.3.1'
     if (Test-Path Env:SECRET_VERSION) { $version = $env:SECRET_VERSION }
     $commit = $env:SECRET_RELEASE_COMMIT
     $directory = $env:INSTALL_DIR
@@ -30,7 +30,7 @@
     }
     if ($showHelp) {
         Write-Output 'Usage: install.ps1 [--version V] [--commit C] [--dir DIR] [--help]'
-        Write-Output 'SECRET_VERSION defaults to 0.3.0; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
+        Write-Output 'SECRET_VERSION defaults to 0.3.1; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
         Write-Output 'INSTALL_DIR defaults to %LOCALAPPDATA%\Programs\secret. gh and curl.exe are required.'
         Write-Output 'Adds only its directory to user PATH. No source build, stores, profiles or client edits.'
         return
@@ -43,7 +43,7 @@
     $curl = Get-Command curl.exe -CommandType Application -TotalCount 1 -ErrorAction SilentlyContinue
     if (-not $gh -or -not $curl) { throw 'secret: gh and curl.exe are required from a trusted package channel' }
     # Bounded native process output, detached stdin and strict duplicate-key JSON.
-    if (-not ('SecretInstallerV030.Native' -as [type])) {
+    if (-not ('SecretInstallerV031.Native' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -53,7 +53,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
-namespace SecretInstallerV030 {
+namespace SecretInstallerV031 {
  public static class Native {
   [DllImport("kernel32.dll", ExactSpelling=true)]
   static extern IntPtr GetCurrentProcess();
@@ -179,10 +179,10 @@ namespace SecretInstallerV030 {
     }
     # Resolve wrappers from the caller when shadowed by the native test harness.
     if (-not (Get-Command Get-SecretNativeMachine -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
-        function Get-SecretNativeMachine { [SecretInstallerV030.Native]::NativeMachine() }
+        function Get-SecretNativeMachine { [SecretInstallerV031.Native]::NativeMachine() }
     }
     if (-not (Get-Command Send-SecretEnvironmentChange -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
-        function Send-SecretEnvironmentChange { [SecretInstallerV030.Native]::BroadcastEnvironment() }
+        function Send-SecretEnvironmentChange { [SecretInstallerV031.Native]::BroadcastEnvironment() }
     }
     if (-not (Get-Command Report-SecretInstallFailure -CommandType Function -TotalCount 1 -ErrorAction SilentlyContinue)) {
         function Report-SecretInstallFailure([string]$category, [string]$types, [string]$hresults) { }
@@ -225,7 +225,7 @@ namespace SecretInstallerV030 {
                 $sid -notin @($identity.Value, 'S-1-5-18', 'S-1-5-32-544', $trustedInstaller)) { throw 'unsafe DACL' }
         }
         if (-not $item.PSIsContainer) {
-            [SecretInstallerV030.Native]::SingleLink($path)
+            [SecretInstallerV031.Native]::SingleLink($path)
             if ($item.Length -gt 67108864) { throw 'oversized destination' }
         }
     }
@@ -254,7 +254,7 @@ namespace SecretInstallerV030 {
         Assert-SafePath $path $true
     }
     function Invoke-Bounded([string]$exe, [string[]]$arguments, [int]$limit = 1048576, [int]$seconds = 90, [string]$watched = $null, [long]$maximum = 0, [string]$headers = $null) {
-        [SecretInstallerV030.Native]::Run($exe, $arguments, $limit, $seconds, $watched, $maximum, $headers)
+        [SecretInstallerV031.Native]::Run($exe, $arguments, $limit, $seconds, $watched, $maximum, $headers)
     }
     $failureCategory = 'destination-safety'
     try {
@@ -269,8 +269,10 @@ namespace SecretInstallerV030 {
         if ($directory.Contains('%')) { throw 'secret: install directory must not contain %' }
         # Verify authentication before creating directories or downloading inputs.
         # Status output is discarded; credentials are never inspected or in argv.
-        try { $null = Invoke-Bounded $gh.Source @('auth', 'status', '--hostname', 'github.com') 1048576 10 }
+        $failureCategory = 'github-auth'
+        try { $null = Invoke-Bounded $gh.Source @('auth', 'status', '--hostname', 'github.com') 1048576 60 }
         catch { throw 'secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry' }
+        $failureCategory = 'destination-safety'
         New-PrivateDirectory $directory; Assert-SafePath $directory $false $true
         $target = Join-Path $directory 'secret-go.exe'
         if (Test-Path -LiteralPath $target) { Assert-SafePath $target }
@@ -322,7 +324,7 @@ namespace SecretInstallerV030 {
                 '--bundle', $bundle, '--format', 'json')
             if ($expected) { $arguments += @('--source-digest', $expected, '--signer-digest', $expected) }
             $json = Invoke-Bounded $gh.Source $arguments
-            [SecretInstallerV030.Native]::Json($json)
+            [SecretInstallerV031.Native]::Json($json)
             if (-not $json.TrimStart().StartsWith('[')) { throw 'invalid verification results' }
             $results = @($json | ConvertFrom-Json)
             if ($results.Count -eq 0) { throw 'empty verification results' }
@@ -355,7 +357,7 @@ namespace SecretInstallerV030 {
         }
         function Invoke-ReleaseAPI([string]$endpoint, [int]$limit = 16384) {
             $json = Invoke-Bounded $gh.Source @('api', '--hostname', 'github.com', '--method', 'GET', "repos/avhn/secret/$endpoint") $limit
-            [SecretInstallerV030.Native]::Json($json)
+            [SecretInstallerV031.Native]::Json($json)
             if (-not $json.TrimStart().StartsWith('{')) { throw 'invalid API object' }
             $json | ConvertFrom-Json
         }

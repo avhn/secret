@@ -1,8 +1,8 @@
 # Release procedure
 
-v0.3.0 extends the completed v0.2.3 M4 Linux/macOS release with six native CLI
+v0.3.1 extends the completed v0.2.3 M4 Linux/macOS release with six native CLI
 assets, pinned standalone installers, a Desktop MCPB and official MCP Registry
-metadata. All four plugin/marketplace versions become 0.3.0 independently of
+metadata. All four plugin/marketplace versions become 0.3.1 independently of
 activation; installed Bash CLI/hooks and their configuration remain unchanged.
 This release is not published yet. M4.1 Go activation remains waiting sponsorship.
 The binding contract is [the v0.3.0 plan, section 11](design/v0.3.0-plan.md#11-coordinator-decisions-and-frozen-interfaces-2026-10-28),
@@ -34,7 +34,15 @@ publish it. No draft or release exists. The tag ruleset keeps this dead tag;
 never reuse, move or delete it. The subsequent v0.2.3 release completed that
 replacement candidate/source/checksum cycle and was published on 2026-10-24;
 its [M4 evidence](../ROADMAP.md#m4-releasable-linuxmacos-core) remains historical,
-not evidence for the new v0.3.0 Windows/MCPB/Registry graph.
+not evidence for the new v0.3.1 Windows/MCPB/Registry graph.
+
+v0.3.0 was published on 2026-10-29 at checksum commit C `b911c92`; its tag
+and `dist/checksums-v0.3.0.txt` are immutable. Registry run
+[40816751048](https://github.com/avhn/secret/actions/runs/40816751048) was blocked
+by the public Windows test install root under writable `RUNNER_TEMP` ancestors.
+v0.3.1 changes those public test roots to fresh private user temp directories,
+raises gh auth status to 60 seconds and fixes its PowerShell diagnostic category.
+All changed inputs require new gates; never reuse the v0.3.0 tag or assets.
 
 ## Approval boundaries
 
@@ -49,7 +57,7 @@ conventional commits, no co-author trailers, `git-safe-push` for an approved pus
 and `git-merge-safe` for an approved fast-forward.
 
 The owner must configure the `release-publish` environment with at least one
-required reviewer and a deployment policy allowing only the `v0.3.0` tag before
+required reviewer and a deployment policy allowing only the `v0.3.1` tag before
 a tag can create a draft. The workflow checks both settings; YAML cannot create
 or independently prove every repository protection. Self-review is permitted
 because a sole maintainer must approve their own tag run; the reviewer gate
@@ -87,7 +95,7 @@ and lock for the full license/dependency rationale.
 
 CI obtains fresh advisory data using `npm audit --prefix packaging/mcpb
 --ignore-scripts --json` and preserves its exit status. Only status 0 or 1 may
-reach `python3 -I scripts/package_mcpb.py --version 0.3.0 --audit-report
+reach `python3 -I scripts/package_mcpb.py --version 0.3.1 --audit-report
 ABSOLUTE_AUDIT_JSON`; all other statuses fail. That check permits only the exact
 reviewed advisory and its MCPB/zod-to-json-schema ancestors and reruns reachability.
 Never suppress findings with `--omit=dev`, `--audit-level` or an unconditional
@@ -103,7 +111,7 @@ and Python readers use `-I`.
 Finish every release lane before freezing S, including setup documentation. Keep
 `bin/secret`, `hooks/hooks.json`, `hooks/guard-secrets`, both Codex hook configs
 and `internal/hook` unchanged. The only installed-manifest change is the separately
-approved equal version bump to 0.3.0, never Go activation or onFailure. Keep the test-only
+approved equal version bump to 0.3.1, never Go activation or onFailure. Keep the test-only
 `.secret-release-test-fixture` marker out of the entire shipped tree; CI rejects
 its tracked or on-disk presence, including symlinks.
 
@@ -112,7 +120,7 @@ coverage is retained CI (including native OS, provider, race, corpus and Bash 3.
 independent reproducible release builds and native plugin installation/failure
 matrices. PRs retain release/launcher/plugin and offline host classification suites, and
 add `tests/test-install.sh`, native `tests/test-install.ps1`, `tests/test-mcpb.py`,
-`tests/test-registry.py` and `tests/test-setup.py`. Select plugin `--stage v0.3.0`
+`tests/test-registry.py` and `tests/test-setup.py`. Select plugin `--stage v0.3.1`
 explicitly: it checks version equality and unchanged Bash activation, not M4.1. Native install
 jobs record actual runner OS/image/architecture, not just cross-build success.
 Candidate tests use disposable HOME/checkouts and candidate checksum metadata;
@@ -127,7 +135,7 @@ explicitly fetches the dead annotated `v0.2.2` tag, requires its peel to be
 worktree. That worktree's own build scripts rebuild all four assets with Go
 1.26.10 and compare against its committed `dist/checksums-v0.2.2.txt`.
 Only after rebuilding, it copies the new verifier and installer into that scratch
-worktree, mechanically substituting **only** `0.3.0` with `0.2.2`. This exercises
+worktree, mechanically substituting **only** `0.3.1` with `0.2.2`. This exercises
 the same code with only the identity substituted; production scripts gain no
 tag-override option and the protected tag is never moved or reused.
 
@@ -139,7 +147,7 @@ install with that retained root. A byte-flipped binary must fail both scripts;
 a wrong C must fail the verifier, and wrong source-digest and tag-ref pins must
 fail gh's genuine verification. The worktree and scratch are removed on exit.
 This proves verifier/installer compatibility with existing public provenance,
-not the new v0.3.0 tag workflow, new attestation issuance, publication, draft
+not the new v0.3.1 tag workflow, new attestation issuance, publication, draft
 round trip or native macOS installation. Those remain separate gates.
 
 The model-using `host-hooks.yml` is manual only and inactive until sponsorship.
@@ -159,7 +167,7 @@ absolute checkout/output directories, isolated HOME/module/build caches, Go
 1.26.10 and `GOTOOLCHAIN=local`. Build exactly with `CGO_ENABLED=0`, `GOAMD64=v1`,
 `GOARM64=v8.0`, empty GOFLAGS, `SOURCE_DATE_EPOCH` equal to S's commit timestamp,
 `-trimpath -buildvcs=false` and
-`-ldflags='-buildid= -s -w -X main.version=0.3.0'`. The build script disables
+`-ldflags='-buildid= -s -w -X main.version=0.3.1'`. The build script disables
 persistent Go settings, workspaces and experiments. There is no `secretstub` tag.
 
 ```sh
@@ -169,19 +177,21 @@ sh scripts/verify-release.sh --checksums /absolute/private/build-output
 ```
 
 `release-repro` byte-compares six raw Linux/macOS/Windows amd64/arm64
-executables (Windows names end in .exe), `secret-v0.3.0-desktop.mcpb`, generated
-`server.json` and the sorted eight-line `checksums-v0.3.0.txt`. No CLI archives.
+executables (Windows names end in .exe), `secret-v0.3.1-desktop.mcpb`, generated
+`server.json` and the sorted eight-line `checksums-v0.3.1.txt`. No CLI archives.
 Build the bundle first, then registry metadata from its final inspected bytes,
 then checksums. No hashed payload embeds C, which would create a circular identity.
 After owner authorization for the commit, commit only the generated
-`dist/checksums-v0.3.0.txt` as signed checksum commit C, the direct child of S.
-`scripts/verify-release.sh --source` rejects every other S..C tree change and
-markers in S or C. Rebuild at C using S's epoch; require equality with the
-committed manifest. Never put a candidate manifest into a production checkout.
+`dist/checksums-v0.3.1.txt` as signed checksum commit C', the direct child of S'.
+The patch source S' already retains `dist/checksums-v0.3.0.txt`; that historical
+file is not a current-version boundary and must not change in S'..C'.
+`scripts/verify-release.sh --source` rejects every other S'..C' tree change and
+markers in S' or C'. Rebuild at C' using the source commit's epoch; require equality
+with the committed manifest. Never put a candidate manifest into a production checkout.
 
 ## 3. Immutable annotated tag at C
 
-Creating and pushing `v0.3.0` requires explicit owner go-ahead. Verify its peeled
+Creating and pushing `v0.3.1` requires explicit owner go-ahead. Verify its peeled
 full SHA equals C, not S. Do not move or reuse the tag after failure. A changed
 release input needs a new approved release identity and another candidate cycle.
 The tag workflow repeats both builds, compares every byte/digest to C's committed
@@ -189,7 +199,7 @@ manifest and attests the eight payloads plus checksum asset. Candidate workflow
 attestations, if any, cannot substitute for final-tag provenance.
 
 Each tag-inspecting job explicitly fetches
-`refs/tags/v0.3.0:refs/tags/v0.3.0` with `--no-tags --force` after checkout,
+`refs/tags/v0.3.1:refs/tags/v0.3.1` with `--no-tags --force` after checkout,
 then requires an annotated object whose peeled commit equals `GITHUB_SHA`.
 This restores only the runner's local ref, never the protected remote tag.
 Checkout can otherwise replace the annotated tag with a lightweight ref even
@@ -203,9 +213,9 @@ repository, workflow, source C, tag ref and certificate issuer:
 
 ```sh
 gh attestation verify /absolute/path/to/ASSET --repo avhn/secret \
-  --source-digest FULL_C --signer-digest FULL_C --source-ref refs/tags/v0.3.0 \
+  --source-digest FULL_C --signer-digest FULL_C --source-ref refs/tags/v0.3.1 \
   --cert-oidc-issuer https://token.actions.githubusercontent.com \
-  --cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.0 \
+  --cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.1 \
   --deny-self-hosted-runners --format json
 ```
 
@@ -214,7 +224,7 @@ The exact SAN selects the signer workflow without `--signer-workflow`: gh
 `--signer-workflow` mutually exclusive. `--owner` and `--repo` are also mutually
 exclusive for both verify and download. The verifier pins `--signer-digest FULL_C`
 and the exact certificate SAN
-`https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.0`.
+`https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.1`.
 This is a same-repository workflow, not a reusable workflow; the composite
 attestation action does not become the signer. On a tag push both source and
 signer digests are C, and the source ref is the tag, not the default branch.
@@ -240,7 +250,7 @@ Publishing the verified draft requires another explicit owner go-ahead. The
 workflow deliberately never runs `gh release edit --draft=false`. After approved
 publication, `registry.yml` invokes reusable `plugin.yml` with exact `tag` and
 `commit` inputs. A separately approved recovery can dispatch `plugin.yml` with
-`published=true` at the exact v0.3.0 tag/C and complete tag history. Its native
+`published=true` at the exact v0.3.1 tag/C and complete tag history. Its native
 matrix repeats installation from real public assets without a fixture bypass.
 Unix checkout jobs validate cold/warm cache paths and actual offline provenance
 with the cached executable removed and network attempts witnessed. Standalone
@@ -273,12 +283,12 @@ subprocess smoke as Desktop compatibility evidence. No Windows-on-Arm Desktop
 or Linux Desktop bundle claim follows from CLI asset availability.
 
 `registry.yml` starts only on the repository's published, non-draft,
-non-prerelease v0.3.0 release (or exact tag/C manual recovery). It runs reusable
+non-prerelease v0.3.1 release (or exact tag/C manual recovery). It runs reusable
 public native-install gates before protected `registry-publish` review. That
 separate owner approval authorizes only Registry metadata publication.
 
 The verified publication path is `python3 -I scripts/release_manifest.py
-registry-publish --tag v0.3.0 --commit FULL_AUTHENTICATED_C`. It rechecks the
+registry-publish --tag v0.3.1 --commit FULL_AUTHENTICATED_C`. It rechecks the
 annotated tag and checksum-only S..C boundary; downloads the eighteen public
 assets into fresh directories; verifies all nine attested subjects and committed
 checksums; inspects the bundle; regenerates metadata/checksums and byte-compares
@@ -287,7 +297,7 @@ It then uses `mcp-publisher login github-oidc`, never a stored registry token,
 and publishes that exact downloaded metadata. This is workflow procedure, not
 permission to invoke publication from a development shell.
 
-The name is `io.github.avhn/secret`, package version 0.3.0, stdio only. The MCPB
+The name is `io.github.avhn/secret`, package version 0.3.1, stdio only. The MCPB
 URL is version-pinned and `fileSha256` derives from its final bytes. An identical
 already-active identity/version/packages record is accepted on rerun; conflicts
 fail. A bounded official API check must confirm the exact active record. Failure
@@ -295,7 +305,7 @@ leaves the GitHub release intact and Registry status incomplete. Never replace
 assets, retag, regenerate replacement public bytes or promote defaults to recover.
 Record final evidence outside S/C, then in a later tracking PR.
 
-## M4.1 follow-up, not v0.3.0 publication work
+## M4.1 follow-up, not v0.3.1 publication work
 
 Before any Claude/default CLI activation, sponsors must fund model use and the
 owner must provision the protected `host-hook-tests` environment and applicable
@@ -308,7 +318,7 @@ upgrades need new evidence. Codex stays on Bash regardless of Claude results.
 M4.1 stages and tests its separately reviewed release manifests, both Claude `onFailure: "block"`
 entries pointing to `guard-go`, the verified `bin/secret` launcher with
 byte-identical executable `compat/secret`, and neutral-output/error behavior in
-`internal/hook`. Enable `tests/test-plugin.py --stage m4.1` there, not in the v0.3.0
+`internal/hook`. Enable `tests/test-plugin.py --stage m4.1` there, not in the v0.3.1
 workflow. The harness requires that staged configuration on a disposable hosted
 branch. Changed inputs require new source/candidate/release identity and renewed
-owner approvals, never mutation of the M4 S, C or immutable v0.3.0 tag.
+owner approvals, never mutation of the M4 S, C or immutable v0.3.0/v0.3.1 tags.

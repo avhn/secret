@@ -2,11 +2,11 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-v0.3.0 packaging work adds raw `secret-v0.3.0-windows-amd64.exe` and
-`secret-v0.3.0-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+v0.3.1 packaging work adds raw `secret-v0.3.1-windows-amd64.exe` and
+`secret-v0.3.1-windows-arm64.exe` assets plus `install.ps1`; native candidate and
 public-release installs on both architectures remain separate required evidence.
 This document does not claim those new installs have passed or publication exists.
-The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.0
+The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.1
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -37,7 +37,7 @@ paste or print a token to troubleshoot it.
 
 The default destination is `%LOCALAPPDATA%\Programs\secret\secret-go.exe`.
 `INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
-0.3.0, never latest; `--commit` supplies the optional full C and `--help` explains
+0.3.1, never latest; `--commit` supplies the optional full C and `--help` explains
 inputs. It adds only its own directory to user PATH. It does not modify client
 files, register MCP, install hooks or overwrite a Bash installation. Use the
 printed absolute path, not an assumed PATH lookup. The raw executable does not

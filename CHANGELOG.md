@@ -4,7 +4,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.3.0 packaging (not yet published)
+### 0.3.1 patch preparation
+
+- Fix published Windows release tests to install beneath a fresh private user
+  temp directory instead of hosted RUNNER_TEMP ancestors that correctly fail
+  the installer's unchanged ancestor safety checks. Candidate inputs stay put.
+- Raise the POSIX and PowerShell gh auth status bound from 10 to 60 seconds for
+  cold Windows Arm starts. Classify PowerShell auth failures as `github-auth`,
+  not `destination-safety`, while retaining the fixed authentication message.
+- Advance release, installer, packaging, manifest, workflow and setup identities
+  to 0.3.1. Keep the published v0.3.0 tag and checksum manifest immutable; its
+  Registry workflow was blocked by the Windows test-root issue.
+
+### 0.3.0 packaging (published 2026-10-29)
 
 - Add pinned POSIX and PowerShell standalone installers with mandatory gh
   attestation verification, optional authenticated checksum-commit pin, exact

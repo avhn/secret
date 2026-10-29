@@ -14,12 +14,13 @@ package main
 import ("fmt"; "os")
 func main() {
     if len(os.Args) != 2 || os.Args[1] != "version" { os.Exit(9) }
-    fmt.Println("secret 0.3.0 (go)")
+    fmt.Println("secret 0.3.1 (go)")
 }
 GO
 HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -o "$TMP/build/native" "$TMP/source/main.go"
 python3 -I - "$ROOT" "$TMP" <<'PY'
+import ast
 import hashlib
 import json
 import os
@@ -40,7 +41,7 @@ SH = shutil.which('sh')
 NATIVE = (WORK / 'build/native').read_bytes()
 OS = {'Linux': 'linux', 'Darwin': 'darwin'}[os.uname().sysname]
 ARCH = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[os.uname().machine]
-ASSET = f'secret-v0.3.0-{OS}-{ARCH}'
+ASSET = f'secret-v0.3.1-{OS}-{ARCH}'
 COMMIT = 'a' * 40
 
 CURL = r'''
@@ -90,6 +91,9 @@ if args[:2] == ['auth', 'status']:
     if mode == 'unauthenticated':
         print('provider diagnostic must not escape', file=sys.stderr)
         sys.exit(4)
+    if mode == 'slow-auth':
+        import time
+        time.sleep(11)
     print('synthetic authenticated status')
     sys.exit()
 fixtures = pathlib.Path(os.environ['FIXTURES'])
@@ -101,22 +105,22 @@ if args[0] == 'api':
     endpoint = endpoint[len('repos/avhn/secret/'):]
     if mode == 'api-error': sys.exit(1)
     if mode == 'api-size': print('{"padding":"' + 'x' * 16384 + '"}'); sys.exit()
-    if endpoint == 'git/ref/tags/v0.3.0':
-        result = {'ref': 'refs/tags/v0.3.0', 'object': {'type': 'tag', 'sha': tag_sha}}
+    if endpoint == 'git/ref/tags/v0.3.1':
+        result = {'ref': 'refs/tags/v0.3.1', 'object': {'type': 'tag', 'sha': tag_sha}}
         if mode == 'lightweight-tag': result['object'] = {'type': 'commit', 'sha': commit}
     elif endpoint == 'git/tags/' + tag_sha:
-        result = {'sha': tag_sha, 'tag': 'v0.3.0', 'object': {'type': 'commit', 'sha': commit}}
+        result = {'sha': tag_sha, 'tag': 'v0.3.1', 'object': {'type': 'commit', 'sha': commit}}
         if mode == 'wrong-tag-commit': result['object']['sha'] = 'b' * 40
     elif endpoint == 'commits/' + commit + '?per_page=100':
         result = {'sha': commit, 'parents': [{'sha': source}],
-                  'files': [{'filename': 'dist/checksums-v0.3.0.txt', 'status': 'added', 'sha': blob}]}
+                  'files': [{'filename': 'dist/checksums-v0.3.1.txt', 'status': 'added', 'sha': blob}]}
         if mode == 'two-parents': result['parents'].append({'sha': 'b' * 40})
         if mode == 'extra-file': result['files'].append({'filename': 'README.md', 'status': 'modified', 'sha': 'f' * 40})
         if mode == 'modified-checksums': result['files'][0]['status'] = 'modified'
-    elif endpoint == 'contents/dist/checksums-v0.3.0.txt?ref=' + commit:
-        data = (fixtures / 'checksums-v0.3.0.txt').read_bytes()
+    elif endpoint == 'contents/dist/checksums-v0.3.1.txt?ref=' + commit:
+        data = (fixtures / 'checksums-v0.3.1.txt').read_bytes()
         if mode == 'committed-mismatch': data += b'committed bytes differ\n'
-        result = {'type': 'file', 'path': 'dist/checksums-v0.3.0.txt', 'sha': blob, 'encoding': 'base64',
+        result = {'type': 'file', 'path': 'dist/checksums-v0.3.1.txt', 'sha': blob, 'encoding': 'base64',
                   'size': len(data), 'content': base64.b64encode(data).decode('ascii')}
     else: raise AssertionError(endpoint)
     if mode == 'api-nonfinite': result['unexpected'] = float('nan')
@@ -125,8 +129,8 @@ if args[0] == 'api':
     print(text); sys.exit()
 assert args[:2] == ['attestation', 'verify']
 assert value('--repo') == 'avhn/secret' and '--owner' not in args and '--signer-workflow' not in args
-assert value('--source-ref') == 'refs/tags/v0.3.0'
-assert value('--cert-identity') == 'https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.0'
+assert value('--source-ref') == 'refs/tags/v0.3.1'
+assert value('--cert-identity') == 'https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.1'
 assert value('--cert-oidc-issuer') == 'https://token.actions.githubusercontent.com'
 assert '--deny-self-hosted-runners' in args and value('--format') == 'json'
 assert pathlib.Path(value('--bundle')).read_text() == 'synthetic bundle'
@@ -148,8 +152,8 @@ if mode == 'subject-digest' or (mode == 'binary-subject-digest' and path.name ==
     matching['digest'] = {'sha256': '0' * 64}
 statement = {'predicateType': 'https://slsa.dev/provenance/v1', 'subject': subjects,
     'predicate': {'buildDefinition': {'externalParameters': {'workflow': {
-        'repository': 'https://github.com/avhn/secret', 'ref': 'refs/tags/v0.3.0', 'path': '.github/workflows/release.yml'}},
-        'resolvedDependencies': [{'uri': 'git+https://github.com/avhn/secret@refs/tags/v0.3.0', 'digest': {'gitCommit': commit}}]}}}
+        'repository': 'https://github.com/avhn/secret', 'ref': 'refs/tags/v0.3.1', 'path': '.github/workflows/release.yml'}},
+        'resolvedDependencies': [{'uri': 'git+https://github.com/avhn/secret@refs/tags/v0.3.1', 'digest': {'gitCommit': commit}}]}}}
 if mode == 'workflow': statement['predicate']['buildDefinition']['externalParameters']['workflow']['path'] = 'wrong.yml'
 if mode == 'source': statement['predicate']['buildDefinition']['resolvedDependencies'] = []
 result = json.dumps([{'verificationResult': {'statement': statement}}])
@@ -178,11 +182,11 @@ class Install(unittest.TestCase):
         self.script('gh', GH)
         for system in ('linux', 'darwin', 'windows'):
             for arch in ('amd64', 'arm64'):
-                name = f'secret-v0.3.0-{system}-{arch}' + ('.exe' if system == 'windows' else '')
+                name = f'secret-v0.3.1-{system}-{arch}' + ('.exe' if system == 'windows' else '')
                 (self.fixtures / name).write_bytes(NATIVE)
-        (self.fixtures / 'secret-v0.3.0-desktop.mcpb').write_bytes(b'synthetic bundle')
+        (self.fixtures / 'secret-v0.3.1-desktop.mcpb').write_bytes(b'synthetic bundle')
         (self.fixtures / 'server.json').write_bytes(b'{}\n')
-        self.manifest = self.fixtures / 'checksums-v0.3.0.txt'
+        self.manifest = self.fixtures / 'checksums-v0.3.1.txt'
         self.rehash()
 
     def script(self, name, body):
@@ -224,10 +228,10 @@ class Install(unittest.TestCase):
         self.assertEqual(len(attestations), 3)
         self.assertIn('--source-digest', attestations[1])
         self.assertEqual([c[-1] for c in api_calls], [
-            'repos/avhn/secret/git/ref/tags/v0.3.0',
+            'repos/avhn/secret/git/ref/tags/v0.3.1',
             'repos/avhn/secret/git/tags/' + 'd' * 40,
             'repos/avhn/secret/commits/' + COMMIT + '?per_page=100',
-            'repos/avhn/secret/contents/dist/checksums-v0.3.0.txt?ref=' + COMMIT])
+            'repos/avhn/secret/contents/dist/checksums-v0.3.1.txt?ref=' + COMMIT])
         binary_download = next(c for c in calls if c[0] == 'curl' and c[-1].endswith('/' + ASSET))
         self.assertGreater(calls.index(binary_download), calls.index(api_calls[-1]))
         self.assertFalse((self.home / '.profile').exists())
@@ -237,12 +241,12 @@ class Install(unittest.TestCase):
         for args in [('--help',), ('-h',)]:
             self.assertEqual(self.run_install(*args).returncode, 0)
         for args in [('--wat',), ('--help', '--wat'), ('--version',), ('--commit',), ('--dir',),
-                     ('--version', '0.3.0', '--version', '0.3.0')]:
+                     ('--version', '0.3.1', '--version', '0.3.1')]:
             self.failure(*args)
-        for version in ('', 'latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.3.0', 'v', 'vv0.3.0', '0.3.0\n'):
+        for version in ('', 'latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.3.1', 'v', 'vv0.3.1', '0.3.1\n'):
             self.env['SECRET_VERSION'] = version
             self.failure()
-        self.env['SECRET_VERSION'] = '0.3.0'
+        self.env['SECRET_VERSION'] = '0.3.1'
         self.failure('--version', '0.4.0')
         for commit in ('latest', 'a' * 39, 'A' * 40, 'a' * 40 + '\n'):
             self.env['SECRET_RELEASE_COMMIT'] = commit
@@ -250,9 +254,9 @@ class Install(unittest.TestCase):
         self.assertFalse(self.log.exists())
 
     def test_matching_pin_and_flags(self):
-        self.env['SECRET_VERSION'] = 'v0.3.0'
+        self.env['SECRET_VERSION'] = 'v0.3.1'
         self.env['SECRET_RELEASE_COMMIT'] = COMMIT
-        result = self.run_install('--version', '0.3.0', '--commit', COMMIT, '--dir', str(self.destination))
+        result = self.run_install('--version', '0.3.1', '--commit', COMMIT, '--dir', str(self.destination))
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_gh(self):
@@ -270,6 +274,22 @@ class Install(unittest.TestCase):
         self.assertFalse(self.destination.exists())
         self.assertEqual([json.loads(line) for line in self.log.read_text().splitlines()],
                          [['gh', 'auth', 'status', '--hostname', 'github.com']])
+
+    def test_auth_status_has_a_sixty_second_bound(self):
+        source = (ROOT / 'install.sh').read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
+        calls = [node for node in ast.walk(ast.parse(source))
+                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                 and isinstance(node.func.value, ast.Name) and node.func.value.id == 'authentication'
+                 and node.func.attr == 'wait' and node.keywords]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([(item.arg, ast.literal_eval(item.value)) for item in calls[0].keywords],
+                         [('timeout', 60)])
+
+    def test_cold_authenticated_gh_can_exceed_ten_seconds(self):
+        self.env['MODE'] = 'slow-auth'
+        result = self.run_install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(b'synthetic authenticated status', result.stdout + result.stderr)
 
     def test_attestation_checksum_and_transport_failures(self):
         for mode in ('attestation', 'empty', 'subject', 'workflow', 'source', 'duplicate', 'inconsistent', 'corrupt',
@@ -319,7 +339,7 @@ class Install(unittest.TestCase):
         if OS == 'linux': data[18:20] = (183 if ARCH == 'amd64' else 62).to_bytes(2, 'little')
         else: data[4:8] = (0x100000c if ARCH == 'amd64' else 0x1000007).to_bytes(4, 'little')
         native.write_bytes(data); self.rehash(); self.failure()
-        native.write_bytes(NATIVE.replace(b'secret 0.3.0 (go)', b'secret 9.9.9 (go)'))
+        native.write_bytes(NATIVE.replace(b'secret 0.3.1 (go)', b'secret 9.9.9 (go)'))
         self.rehash(); self.failure()
 
     def test_unsupported_platform(self):

@@ -256,15 +256,15 @@ def install_fixture_cache(root, plugin, checkout, fixture, env):
     digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
     os_name = {"Linux": "linux", "Darwin": "darwin"}[platform.system()]
     arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[platform.machine()]
-    native = "secret-v0.3.0-" + os_name + "-" + arch
+    native = "secret-v0.3.1-" + os_name + "-" + arch
     shutil.copyfile(fixture, assets / native)
     (assets / native).chmod(0o700)
-    # The compiled-in 0.3.0 grammar requires all eight sorted payload names.
-    names = sorted(["secret-v0.3.0-" + system + "-" + machine
+    # The compiled-in 0.3.1 grammar requires all eight sorted payload names.
+    names = sorted(["secret-v0.3.1-" + system + "-" + machine
                     for system in ("linux", "darwin") for machine in ("amd64", "arm64")]
-                   + ["secret-v0.3.0-windows-amd64.exe", "secret-v0.3.0-windows-arm64.exe",
-                      "secret-v0.3.0-desktop.mcpb", "server.json"])
-    manifest = manifest_dir / "checksums-v0.3.0.txt"
+                   + ["secret-v0.3.1-windows-amd64.exe", "secret-v0.3.1-windows-arm64.exe",
+                      "secret-v0.3.1-desktop.mcpb", "server.json"])
+    manifest = manifest_dir / "checksums-v0.3.1.txt"
     manifest.write_text("".join((digest if name == native else "0" * 64)
                                 + "  " + name + "\n" for name in names), encoding="utf-8")
     manifest.chmod(0o600)
@@ -736,7 +736,7 @@ class ClassificationTests(unittest.TestCase):
             self.assertNotIn("permissionDecision", output["hookSpecificOutput"])
             self.assertTrue(record.exists())
             self.assertTrue(json.loads(record.read_text(encoding="utf-8"))["cwd_matches"])
-            self.assertEqual((root / "fixture-cache/secret/v0.3.0/secret").stat().st_mode & 0o777, 0o500)
+            self.assertEqual((root / "fixture-cache/secret/v0.3.1/secret").stat().st_mode & 0o777, 0o500)
             self.assertTrue((plugin / ".secret-release-test-fixture").exists())
 
     def test_hosted_mode_refuses_local_execution(self):

@@ -111,7 +111,7 @@ jobs:
           status=0
           npm audit --prefix packaging/mcpb --ignore-scripts --json > "$report" || status=$?
           case "$status" in 0|1) ;; *) echo "npm audit failed with status $status" >&2; exit 1 ;; esac
-          python3 -I scripts/package_mcpb.py --version 0.3.0 --audit-report "$report"
+          python3 -I scripts/package_mcpb.py --version 0.3.1 --audit-report "$report"
       - name: Registry generation and publication contract without external publication
         run: python3 -I tests/test-registry.py
       - name: Setup examples and exact synthetic argv
