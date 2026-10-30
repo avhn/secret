@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.3.2 patch preparation
+### 0.3.2 patch (published 2026-10-30)
 
 - Set the Windows `secret-go.exe` scratch owner to the current user before
   atomic creation or replacement, and correct the published owner afterwards

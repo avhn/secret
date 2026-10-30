@@ -2,11 +2,13 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.1 was published on 2026-10-30; v0.3.2 patch preparation is in progress; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.3.2 was published on 2026-10-30, with the first active MCP Registry record `io.github.avhn/secret`; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## v0.3.2: Installed Windows binary owner patch
 
-Status: in progress, not published. Based on the immutable v0.3.1 checksum
+Published on GitHub Releases on 2026-10-30, with immutable tag `v0.3.2` at
+checksum commit C `1b246a5` (source S `9eec381`), and in the MCP Registry as
+`io.github.avhn/secret` 0.3.2. Based on the immutable v0.3.1 checksum
 commit C `a2180875`; the existing tag and both `dist/checksums-v0.3.0.txt` and
 `dist/checksums-v0.3.1.txt` stay unchanged. The patch keeps the
 [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash CLI/hooks
@@ -15,9 +17,9 @@ and all waiting-sponsorship boundaries.
 - [x] Own the scratch binary as the current user before Move/Replace and correct the published owner only if it still differs, with failure category `publication-owner`
 - [x] Add native first-install and replacement owner assertions, correcting a pre-existing `S-1-5-32-544` owner where the test token permits that fixture
 - [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.2 without Go hook activation
-- [ ] Review local checks and rerun applicable hosted candidate/public-install gates for the changed inputs
-- [ ] Owner separately authorizes source/checksum commits, protected environment tag policies, signed tag, draft, publication and Registry publication
-- [ ] Complete public native installs and confirm the exact active Registry identity/version/packages record
+- [x] Review local checks and rerun applicable hosted candidate/public-install gates for the changed inputs (two green candidate rounds at S)
+- [x] Owner authorizes source/checksum commits, protected environment tag policies, signed tag, draft, publication and Registry publication
+- [x] Complete public native installs on all six runners ([run 41030978365](https://github.com/avhn/secret/actions/runs/41030978365)) and confirm the active Registry record: version 0.3.2, MCPB `fileSha256` equal to the checksum manifest
 
 ## v0.3.1: Installer and public Windows release-test patch
 
