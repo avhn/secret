@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       published:
-        description: Repeat against published v0.3.2 assets from final checksum commit C
+        description: Repeat against published v0.3.3 assets from final checksum commit C
         type: boolean
         default: false
       tag:
         description: Exact published tag
         type: string
-        default: v0.3.2
+        default: v0.3.3
       commit:
         description: Authenticated full checksum commit C (required for published checks)
         type: string
@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.2
+          test "$RELEASE_TAG" = v0.3.3
           printf '%s\n' "$RELEASE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -62,8 +62,8 @@ jobs:
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
       # Version-only exception. M4.1 still needs separate sponsored host evidence.
-      - name: Check v0.3.2 versions and unchanged Bash activation
-        run: python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP" --stage v0.3.2 --manifest-only
+      - name: Check v0.3.3 versions and unchanged Bash activation
+        run: python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP" --stage v0.3.3 --manifest-only
       - name: Check portable shell syntax
         run: |
           sh -n scripts/build-release.sh
@@ -88,7 +88,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -142,7 +142,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - name: Record and require native Linux runner evidence
         env:
@@ -165,27 +165,27 @@ jobs:
       - name: Standalone installer regressions
         run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" bash tests/test-install.sh
       - name: Native synthetic checkout install and failure matrix
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.2
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.3
       - name: Require final checksum commit C for published verification
         if: inputs.published || inputs.commit != ''
         env:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.2
+          test "$RELEASE_TAG" = v0.3.3
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.3.2.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.3.2.txt
+          test -f dist/checksums-v0.3.3.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.3.3.txt
           sh scripts/verify-release.sh --source
       - name: Public standalone and checkout installs with real offline verification
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.2 --published
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.3 --published
 
   plugin-install-macos:
     needs: plugin-candidate-assets
@@ -212,7 +212,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - name: Record and require native macOS and stock Bash evidence
         env:
@@ -252,27 +252,27 @@ jobs:
           TMPDIR="$PLUGIN_TEST_ROOT/tmp" /bin/bash tests/test-launchers.sh
           TMPDIR="$PLUGIN_TEST_ROOT/tmp" /bin/bash tests/test-install.sh
       - name: Native synthetic checkout install and failure matrix
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.2
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.3
       - name: Require final checksum commit C for published verification
         if: inputs.published || inputs.commit != ''
         env:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.2
+          test "$RELEASE_TAG" = v0.3.3
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.3.2.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.3.2.txt
+          test -f dist/checksums-v0.3.3.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.3.3.txt
           sh scripts/verify-release.sh --source
       - name: Public standalone and checkout installs with real offline verification
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.2 --published
+        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.3 --published
 
   plugin-install-windows:
     needs: plugin-candidate-assets
@@ -299,7 +299,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - name: Prepare empty candidate input directory
         shell: pwsh

@@ -123,7 +123,7 @@ tests exercise the private metadata reader and supplied metadata independently.
 
 ## Limits of the evidence
 
-Run `python3 -I tests/test-onepassword.py` with Go 1.26.10 for offline schema,
+Run `python3 -I tests/test-onepassword.py` with Go 1.27.3 for offline schema,
 fake-op and composed CLI coverage, followed by a detached-provider assertion under
 a real PTY parent. Native Ubuntu and macOS CI run this explicitly. Windows retains
 parser/metadata coverage and rejects execution. Cross-vet is not native evidence.

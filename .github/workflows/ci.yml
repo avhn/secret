@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - name: Standalone installer synthetic transport and trust regressions
         run: bash tests/test-install.sh
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - name: Parse new installer and release integration scripts
         shell: pwsh
@@ -84,7 +84,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.3'
           cache: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -111,7 +111,7 @@ jobs:
           status=0
           npm audit --prefix packaging/mcpb --ignore-scripts --json > "$report" || status=$?
           case "$status" in 0|1) ;; *) echo "npm audit failed with status $status" >&2; exit 1 ;; esac
-          python3 -I scripts/package_mcpb.py --version 0.3.2 --audit-report "$report"
+          python3 -I scripts/package_mcpb.py --version 0.3.3 --audit-report "$report"
       - name: Registry generation and publication contract without external publication
         run: python3 -I tests/test-registry.py
       - name: Setup examples and exact synthetic argv
@@ -214,7 +214,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.10"
+          go-version: "1.27.3"
           cache: true
       - name: Install pass prerequisites and select native tools
         shell: bash
@@ -324,7 +324,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.10"
+          go-version: "1.27.3"
           cache: true
       - name: Parse isolated Windows harness
         shell: pwsh
@@ -389,7 +389,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.10"
+          go-version: "1.27.3"
           cache: true
           cache-dependency-path: go.mod
       - name: Record native image and toolchain
@@ -445,7 +445,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.10"
+          go-version: "1.27.3"
           cache: true
           cache-dependency-path: go.mod
       - name: Check gofmt
@@ -522,13 +522,9 @@ jobs:
           else
             go test -race -timeout 30m ./...
           fi
-      # Go 1.26.10 can report a spurious fuzz deadline error (go.dev/issue/75804).
-      # Override only fuzz steps; all other checks and release pins stay unchanged.
       - name: Bounded feature fuzzing
         if: runner.os == 'Linux'
         shell: bash
-        env:
-          GOTOOLCHAIN: go1.27.3
         run: |
           for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
             go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
@@ -536,8 +532,6 @@ jobs:
       - name: Bounded age fuzzing
         if: runner.os == 'Linux'
         shell: bash
-        env:
-          GOTOOLCHAIN: go1.27.3
         run: |
           go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
           for target in FuzzAgeDecrypt FuzzAgeKeyFiles; do
@@ -551,7 +545,7 @@ jobs:
         shell: bash
         # Fails on any known vulnerability reachable from our code, including the
         # standard library of the pinned toolchain.
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: Cross-compile Go binary
         if: runner.os == 'Linux'
         shell: bash

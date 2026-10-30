@@ -27,8 +27,8 @@ cd "$root"
 export CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 GOFLAGS="" GOTOOLCHAIN=local
 # Ignore persistent per-user build settings and workspace overlays as well.
 export GOENV=off GOWORK=off GOEXPERIMENT=""
-if [ "$(go env GOVERSION)" != go1.26.10 ]; then
-    echo 'secret: release builds require Go 1.26.10' >&2
+if [ "$(go env GOVERSION)" != go1.27.3 ]; then
+    echo 'secret: release builds require Go 1.27.3' >&2
     exit 1
 fi
 version=$(sh "$root/scripts/verify-release.sh" --version)

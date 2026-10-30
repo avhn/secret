@@ -249,7 +249,7 @@ func atomicReplace(root *os.Root, name string, data []byte) error {
 	if err := regularTarget(root, name); err != nil {
 		return err
 	}
-	// Go 1.26.10 Renameat uses NtSetInformationFile with an anchored destination,
+	// Go 1.27.3 Renameat uses NtSetInformationFile with an anchored destination,
 	// replacement semantics and a non-copying fallback. No delete-first window.
 	if err := retryPrivateBusy(func() error {
 		return root.Rename(filepath.Join(scratchName, "replacement"), name)

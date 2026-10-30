@@ -2,7 +2,7 @@
 
 ## Set up
 
-Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.26.10 or newer; CI pins Go 1.26.10 with `GOTOOLCHAIN=local` except for bounded fuzzing, which pins Go 1.27.3 as described below. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
+Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.27.3 or newer; CI pins Go 1.27.3 with `GOTOOLCHAIN=local` for all checks, including bounded fuzzing. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
 
 ## Test locally
 
@@ -62,22 +62,14 @@ Ubuntu CI runs each feature fuzz target with Go 1.27.3 and a bounded budget:
 
 ```bash
 for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
-  GOTOOLCHAIN=go1.27.3 go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
+  go test ./internal/feature -run '^$' -fuzz "^$target$" -fuzztime=15s -parallel=2
 done
 ```
 
-Only bounded fuzz invocations override `GOTOOLCHAIN=local`. Go 1.26.10 has an
-`internal/fuzz` coordinator race that can report `context deadline exceeded`
-when the fuzz budget expires, without a crashing input. Go 1.27.3 contains the
-[upstream fix](https://github.com/golang/go/commit/5a957dc766aed011cdfe7c953987a2ff86c0829c):
-`src/internal/fuzz/fuzz.go:129` also checks `err == ctx.Err()` before suppressing
-coordinator cancellation. The [release history](https://go.dev/doc/devel/release)
-lists no newer 1.26 patch as of 2026-10-28; the
-[1.26 backport](https://github.com/golang/go/issues/82362) remains open.
-The exact override may download the official toolchain into the module cache;
-it does not change the module's Go directive, the default toolchain or release
-reproducibility pins. Keep builds, vet, ordinary tests, race tests and releases
-on Go 1.26.10 with `GOTOOLCHAIN=local`. Do not retry or filter fuzz failures.
+Use the same Go 1.27.3 toolchain and `GOTOOLCHAIN=local` for fuzzing, builds,
+vet, ordinary tests, race tests and release builds. Do not retry or filter
+fuzz failures. Published releases remain reproducible with Go 1.26.10 from
+their tags; the historical release rehearsal retains that toolchain.
 
 Keep JSON metadata names-only, audit opt-in and MCP explicitly allowlisted. The M2 guard
 still conservatively denies new secret subcommands; do not relax it for tests.
@@ -91,7 +83,7 @@ source, parse and statically bind without execution, and exercise a Windows-only
 test adapter through the full Go hook. They do not install hooks, invoke models,
 access credential providers or prove real-host failure blocking.
 
-Use Go 1.26.10 with `GOTOOLCHAIN=local`. From the checkout on Windows, invoke the
+Use Go 1.27.3 with `GOTOOLCHAIN=local`. From the checkout on Windows, invoke the
 committed driver under each tested executable, not an arbitrary `pwsh` on PATH:
 
 ```powershell
@@ -129,8 +121,7 @@ and [M5e plan](docs/design/m5e-plan.md); passing parser CI does not finish M5e.
 
 ## M5d encrypted-store tests
 
-Use Go 1.26.10 with `GOTOOLCHAIN=local` except for the bounded fuzz commands
-below, which use the same Go 1.27.3 coordinator fix as feature fuzzing. Review
+Use Go 1.27.3 with `GOTOOLCHAIN=local`, including bounded fuzzing. Review
 the exact age pin, complete module graph, every new license, checksums and
 reachable vulnerability scan before any
 dependency change. See [the binding M5d plan](docs/design/m5d-plan.md) and
@@ -141,10 +132,10 @@ print it or put it in argv, diagnostics, audit or JSON.
 ```bash
 go mod verify
 go mod tidy -diff
-go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
-GOTOOLCHAIN=go1.27.3 go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
-GOTOOLCHAIN=go1.27.3 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
-GOTOOLCHAIN=go1.27.3 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
+go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
+go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
 python3 -I tests/test-age.py /absolute/fresh/secret-go
 ```
 
@@ -162,8 +153,8 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4's v0.2.3 release is complete. The v0.3.2 extension changes packaging and
-independently bumps all four manifests to 0.3.2 without changing installed Bash
+M4's v0.2.3 release is complete. The v0.3.3 extension changes packaging and
+independently bumps all four manifests to 0.3.3 without changing installed Bash
 CLI/Claude/Codex hooks. M4.1 remains waiting sponsorship and owns
 `onFailure: "block"`, `guard-go` activation, the `bin/secret`/`compat/secret`
 switch and Go hook output-contract changes. See [the release plan](docs/design/v0.3.0-plan.md),
@@ -175,7 +166,7 @@ are `release.yml`, `plugin.yml` and inactive `host-hooks.yml`. Synthetic fixture
 live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.go`
 is test-only under `-tags hosthookfixture`, never a shipped binary.
 
-Use exactly Go 1.26.10, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
+Use exactly Go 1.27.3, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
 builds. Complete assembly also requires native macOS lipo, Node 26.10.0,
 npm 11.19.1, Python 3.14.8 and the locked MCPB 2.1.2 validator. Install it with
 `npm ci --prefix packaging/mcpb --ignore-scripts`. Review the narrowly bounded
@@ -196,8 +187,8 @@ python3 -I tests/test-setup.py
 # Full assembly requires macOS/lipo and the pinned packaging tools above:
 assets="$(mktemp -d)"
 sh scripts/build-release.sh "$assets"
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.2 --manifest-only
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.2
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.3 --manifest-only
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.3
 python3 -I tests/test-host-hooks.py # offline classification, no model calls
 shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go install.sh scripts/*.sh tests/*.sh
 # On macOS, also run retained shell suites with stock Bash 3.2:
@@ -223,9 +214,9 @@ proves Desktop install/interpolation/restart behavior.
 
 CI runs independent macOS full assembly plus native Linux/macOS/Windows
 amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
-`--stage v0.3.2`, a version-only bump plus unchanged Bash nonactivation contract.
+`--stage v0.3.3`, a version-only bump plus unchanged Bash nonactivation contract.
 The test default remains historical `m4`; `--stage m4.1` preserves the stronger
-activation assertions for that milestone. Do not use it as a v0.3.2 gate or
+activation assertions for that milestone. Do not use it as a v0.3.3 gate or
 weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.
 `.secret-release-test-fixture` is forbidden in the shipped tree, S and C,

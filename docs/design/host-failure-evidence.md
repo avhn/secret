@@ -32,7 +32,7 @@ in a prompt, settings file, command argument, artifact, report or chat.
 - Models: `claude-haiku-4-5-20251001` and `gpt-5-mini`. Model access, pricing and
   availability must be checked by the owner before dispatch. No model calls
   were made during implementation.
-- Go in the workflow: 1.26.10 with `GOTOOLCHAIN=local`. Node: major 22.
+- Go in the workflow: 1.27.3 with `GOTOOLCHAIN=local`. Node: major 22.
 - Every session has a 90-second process-tree watchdog and bounded captured
   streams. Claude gets two turns and a $0.10 session budget. There are at most
   60 Claude sessions per job, with an additional $8 aggregate stop condition.

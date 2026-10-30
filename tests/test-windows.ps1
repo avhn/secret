@@ -206,7 +206,7 @@ try {
     Write-Output ('Runner image: ' + $env:ImageOS + ' ' + $env:ImageVersion + '; architecture: ' + [Runtime.InteropServices.RuntimeInformation]::OSArchitecture)
     Write-Output ('PowerShell: ' + $PSVersionTable.PSVersion.ToString())
     $version = Invoke-Captured (Get-Command go -CommandType Application | Select-Object -First 1).Source @('version')
-    Assert-True ($version.Code -eq 0 -and $script:Utf8.GetString($version.Out).Contains('go1.26.10')) 'pinned Go version'
+    Assert-True ($version.Code -eq 0 -and $script:Utf8.GetString($version.Out).Contains('go1.27.3')) 'pinned Go version'
     Write-Output ($script:Utf8.GetString($version.Out).Trim())
     New-PrivateDirectory $root
     $homeRoot = Join-Path $root 'home space'

@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### 0.3.3 patch preparation
+
+- Bump the release identity, installers, manifests, packaging, workflows, tests
+  and setup pins equally to 0.3.3 without Go hook activation. Published tags and
+  checksum manifests remain unchanged.
+- Development and release toolchain moved to Go 1.27.3; the next release builds
+  with it; published releases remain reproducible with 1.26.10 from their tags.
+  All current CI checks, including bounded fuzzing, use `GOTOOLCHAIN=local`.
+  Update the exact govulncheck pin from v1.1.4 to v1.9.0 for Go 1.27 analysis;
+  runtime dependency pins and module checksums are unchanged.
+
 ### 0.3.2 patch (published 2026-10-30)
 
 - Set the Windows `secret-go.exe` scratch owner to the current user before

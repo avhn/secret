@@ -1,12 +1,11 @@
 module github.com/avhn/secret
 
-go 1.26.10
-
-require golang.org/x/term v0.45.0
+go 1.27.3
 
 require (
 	filippo.io/age v1.3.2
 	golang.org/x/sys v0.47.0
+	golang.org/x/term v0.45.0
 	mvdan.cc/sh/v3 v3.14.1
 )
 

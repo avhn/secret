@@ -2,11 +2,11 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-v0.3.2 packaging work adds raw `secret-v0.3.2-windows-amd64.exe` and
-`secret-v0.3.2-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+v0.3.3 packaging work adds raw `secret-v0.3.3-windows-amd64.exe` and
+`secret-v0.3.3-windows-arm64.exe` assets plus `install.ps1`; native candidate and
 public-release installs on both architectures remain separate required evidence.
 This document does not claim those new installs have passed or publication exists.
-The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.2
+The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.3
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -37,7 +37,7 @@ paste or print a token to troubleshoot it.
 
 The default destination is `%LOCALAPPDATA%\Programs\secret\secret-go.exe`.
 `INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
-0.3.2, never latest; `--commit` supplies the optional full C and `--help` explains
+0.3.3, never latest; `--commit` supplies the optional full C and `--help` explains
 inputs. It adds only its own directory to user PATH. It does not modify client
 files, register MCP, install hooks or overwrite a Bash installation. Use the
 printed absolute path, not an assumed PATH lookup. The raw executable does not
@@ -57,7 +57,7 @@ smoke validation do not prove actual Desktop installation/configuration/restart.
 MCP metadata may expose names, labels, paths and provider account IDs to clients
 and models, never values, hashes or lengths. It grants no hook exception.
 
-Full bundle assembly runs on macOS with lipo, Go 1.26.10, Node 26.10.0,
+Full bundle assembly runs on macOS with lipo, Go 1.27.3, Node 26.10.0,
 npm 11.19.1 and Python 3.14.8, not on an end user's Windows installation.
 The narrowly reviewed build-only Zod exception and fresh audit gate are described
 in [release tooling security](release.md#packaging-tools-and-advisory-review) and

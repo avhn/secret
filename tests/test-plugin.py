@@ -6,7 +6,7 @@ checksums and the attestation bypass marker exist only in disposable clones.
 Transport fault injection is a PATH shim in the test, not a production option.
 --published repeats the public release install without the fixture bypass.
 The default --stage m4 retains Bash installation and checks version equality.
---stage v0.3.2 additionally requires the release version, without Go activation.
+--stage v0.3.3 additionally requires the release version, without Go activation.
 --stage m4.1 explicitly selects deferred activation, never the release gate.
 Linux/macOS checkout-launcher tests are separate from test-release-windows.ps1.
 """
@@ -272,11 +272,11 @@ class M4ShippedManifestTests(unittest.TestCase):
                 self.assertNotIn("secret-go", contents)
 
 
-class V032ManifestTests(M4ShippedManifestTests):
+class V033ManifestTests(M4ShippedManifestTests):
     """Version-only release: inherit the unchanged Bash/nonactivation contract."""
 
     def test_four_versions_match_release(self):
-        self.assertEqual(VERSION, "0.3.2")
+        self.assertEqual(VERSION, "0.3.3")
         for name, keys in CONTRACT["manifests"].items():
             with self.subTest(manifest=name):
                 value = json.loads((CHECKOUT / name).read_text())
@@ -876,8 +876,8 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--manifest-only", action="store_true")
     mode.add_argument("--published", action="store_true")
-    parser.add_argument("--stage", choices=("m4", "m4.1", "v0.3.2"), default="m4",
-                        help="default: m4 equality/Bash; v0.3.2 pins versions only; m4.1 is deferred activation")
+    parser.add_argument("--stage", choices=("m4", "m4.1", "v0.3.3"), default="m4",
+                        help="default: m4 equality/Bash; v0.3.3 pins versions only; m4.1 is deferred activation")
     args = parser.parse_args()
     if not args.checkout.is_absolute() or not args.asset_dir.is_absolute():
         parser.error("checkout and asset directory must be absolute paths")
@@ -894,7 +894,7 @@ def main():
     loader = unittest.defaultTestLoader
     suite.addTests(loader.loadTestsFromTestCase(ManifestTests))
     stage_checks = {"m4": M4ShippedManifestTests, "m4.1": M41ActivationManifestTests,
-                    "v0.3.2": V032ManifestTests}[args.stage]
+                    "v0.3.3": V033ManifestTests}[args.stage]
     suite.addTests(loader.loadTestsFromTestCase(stage_checks))
     if manifest_only:
         pass
