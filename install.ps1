@@ -203,6 +203,14 @@ namespace SecretInstallerV032 {
     } else { throw 'secret: unsupported platform' }
     $scratch = $null; $owned = $false; $lock = $null
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    # Write only the owner section, naming this user; the DACL is untouched.
+    function Set-CurrentOwner([string]$path) {
+        $ownerOnly = New-Object Security.AccessControl.FileSecurity
+        $ownerOnly.SetOwner($identity)
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]::new($path), $ownerOnly)
+        } else { (New-Object IO.FileInfo($path)).SetAccessControl($ownerOnly) }
+    }
     function Assert-SafePath([string]$path, [bool]$private = $false, [bool]$installDirectory = $false) {
         $item = Microsoft.PowerShell.Management\Get-Item -LiteralPath $path -Force
         if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'unsafe path' }
@@ -442,6 +450,11 @@ namespace SecretInstallerV032 {
         } finally { $stream.Dispose() }
         $line = Invoke-Bounded $binary @('version') 256 10
         if ($line -cne "secret $version (go)`n" -or (Get-Digest $binary) -cne $sha) { throw 'wrong version or modified binary' }
+        # An elevated token defaults new owners to Administrators, and Replace
+        # publishes the scratch file's owner. Own the private scratch first, where
+        # this user holds full control, so a Modify-only destination needs no write.
+        $failureCategory = 'publication-owner'
+        Set-CurrentOwner $binary
         $failureCategory = 'publication-safety'
         Assert-Chain $directory; Assert-SafePath $directory $false $true
         if (Test-Path -LiteralPath $target) {
@@ -455,17 +468,11 @@ namespace SecretInstallerV032 {
             $failureCategory = 'atomic-create'
             [IO.File]::Move($binary, $target)
         }
-        # An elevated token defaults new owners to Administrators, and Replace keeps
-        # the old file's owner. Write only the owner section, naming this user.
-        # Skip the write when this user already owns it: ownership alone grants
-        # no WRITE_OWNER, so a Modify-only DACL would refuse a no-op owner write.
+        # Should Replace keep the old owner instead, correct it here. Skip the write
+        # when already owned: ownership grants no WRITE_OWNER under a Modify-only DACL.
         $failureCategory = 'publication-owner'
         if ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.Value) {
-            $ownerOnly = New-Object Security.AccessControl.FileSecurity
-            $ownerOnly.SetOwner($identity)
-            if ($PSVersionTable.PSEdition -eq 'Core') {
-                [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]::new($target), $ownerOnly)
-            } else { (New-Object IO.FileInfo($target)).SetAccessControl($ownerOnly) }
+            Set-CurrentOwner $target
         }
         if ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $identity.Value) { throw 'unsafe owner' }
         $failureCategory = 'user-path'

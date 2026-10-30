@@ -417,8 +417,8 @@ func main() {
     Assert-True ($failed -and (Get-FileHash -LiteralPath $target).Hash -ceq $before) 'failure damaged existing destination'
     Assert-True ($script:lastInstallFailure -clike 'stage=download-verification; types=*; hresults=*') 'missing path-free failure diagnostic'
     $env:SECRET_INSTALL_MODE = $null
-    # File.Replace retains the destination owner. Where the token permits it,
-    # reproduce an elevated install's Administrators owner before replacement.
+    # Where the token permits it, seed an elevated install's Administrators owner;
+    # replacement must still publish the current user as owner.
     $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     $administratorsOwnerApplied = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if ($administratorsOwnerApplied) {

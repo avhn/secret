@@ -12,7 +12,7 @@ commit C `a2180875`; the existing tag and both `dist/checksums-v0.3.0.txt` and
 [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash CLI/hooks
 and all waiting-sponsorship boundaries.
 
-- [x] Set the installed binary owner to the current user after Move/Replace, with failure category `publication-owner`; retain the reviewed fix's logic
+- [x] Own the scratch binary as the current user before Move/Replace and correct the published owner only if it still differs, with failure category `publication-owner`
 - [x] Add native first-install and replacement owner assertions, correcting a pre-existing `S-1-5-32-544` owner where the test token permits that fixture
 - [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.2 without Go hook activation
 - [ ] Review local checks and rerun applicable hosted candidate/public-install gates for the changed inputs
@@ -29,11 +29,12 @@ its PowerShell failure category, without Go hook activation.
 Registry workflow [run 40967543855](https://github.com/avhn/secret/actions/runs/40967543855)
 was blocked by the `current-user install owner` assertion in
 `tests/test-release-windows.ps1`. Elevated tokens default new file owners to
-`BUILTIN\Administrators`, and `File.Replace` keeps the old owner. A hosted
-diagnostic with the exact owner-publication patch passed the full v0.3.1-tag
-published-mode suite against the live v0.3.1 release on windows-latest and
-windows-11-arm under PowerShell 7 and 5.1. v0.3.2 carries this fix; v0.3.1 is not
-retagged or republished. The changed release inputs still need their own gates.
+`BUILTIN\Administrators`, and `File.Replace` publishes the scratch file's owner.
+A hosted diagnostic with a post-publication owner write passed the full
+v0.3.1-tag published-mode suite against the live v0.3.1 release on
+windows-latest and windows-11-arm under PowerShell 7 and 5.1. A protected
+Modify-only replacement case then showed that write needs `WRITE_OWNER`, so
+v0.3.2 owns the scratch binary first; v0.3.1 is not retagged or republished. The changed release inputs still need their own gates.
 
 ## v0.3.0: Native installers and names-only MCP packaging
 
