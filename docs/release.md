@@ -4,7 +4,7 @@ v0.3.3 extends the completed v0.2.3 M4 Linux/macOS release with six native CLI
 assets, pinned standalone installers, a Desktop MCPB and official MCP Registry
 metadata. All four plugin/marketplace versions become 0.3.3 independently of
 activation; installed Bash CLI/hooks and their configuration remain unchanged.
-v0.3.2 was published on 2026-10-30 together with its MCP Registry record. M4.1 Go activation remains waiting sponsorship.
+v0.3.3 was published on 2026-10-30 together with its MCP Registry record. After publication main receives source S, never C, so later pull requests keep a source HEAD. M4.1 Go activation remains waiting sponsorship.
 The binding contract is [the v0.3.0 plan, section 11](design/v0.3.0-plan.md#11-coordinator-decisions-and-frozen-interfaces-2026-10-28),
 which supersedes the historical [M4 plan](design/m4-plan.md) only in its narrow
 packaging/version scope. Consumer setup is in [setup.md](setup.md), with trust,

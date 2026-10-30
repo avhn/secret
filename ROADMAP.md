@@ -2,12 +2,14 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.3 preparation is in progress. v0.3.2 was published on 2026-10-30, with the first active MCP Registry record `io.github.avhn/secret`; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.3.3 (Go 1.27.3 toolchain) was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## v0.3.3: Go 1.27.3 toolchain patch
 
-Status: in progress. Based on main after the published v0.3.2 checksum commit C
-`1b246a5`; the existing v0.3.0, v0.3.1 and v0.3.2 tags and checksum manifests
+Published on GitHub Releases on 2026-10-30, with immutable tag `v0.3.3` at
+checksum commit C `ea85737` (source S `0af5d29`), and in the MCP Registry as
+`io.github.avhn/secret` 0.3.3. main holds S, not C, so later PRs keep a source
+HEAD. Based on main after the published v0.3.2 checksum commit C `1b246a5`; the existing v0.3.0, v0.3.1 and v0.3.2 tags and checksum manifests
 stay unchanged. The patch keeps the
 [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash CLI/hooks
 and all waiting-sponsorship boundaries.
@@ -19,11 +21,11 @@ override below without changing the six targets, budgets or worker counts.
 
 - [x] Prepare the Go 1.27.3 development, CI and release toolchain move and govulncheck v1.9.0 pin without runtime dependency changes
 - [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.3 without Go hook activation
-- [ ] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
-- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.3.3.txt`
-- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.3.3
-- [ ] Owner authorizes the signed v0.3.3 tag, draft, publication and Registry publication
-- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.3.3, MCPB `fileSha256` equal to the checksum manifest
+- [x] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S (one macOS go job rerun after a slow-runner timing failure)
+- [x] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.3.3.txt`
+- [x] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.3.3
+- [x] Owner authorizes the signed v0.3.3 tag, draft, publication and Registry publication
+- [x] Complete public native installs on all six runners ([run 41129090401](https://github.com/avhn/secret/actions/runs/41129090401)) and confirm the active Registry record: version 0.3.3, MCPB `fileSha256` equal to the checksum manifest
 
 ## v0.3.2: Installed Windows binary owner patch
 

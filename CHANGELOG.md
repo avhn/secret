@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.3.3 patch preparation
+### 0.3.3 patch (published 2026-10-30)
 
 - Bump the release identity, installers, manifests, packaging, workflows, tests
   and setup pins equally to 0.3.3 without Go hook activation. Published tags and
