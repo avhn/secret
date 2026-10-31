@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Windows exec configured launchers
+### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted
   native stdio handles directly; mixed/non-file writers relay both supplied streams
@@ -16,7 +16,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Add synthetic long-lived protocol, detached host/wrapper lifecycle and failure
   regressions, and separately verified configured-launcher setup examples. No real
   Claude Code, Codex or OpenCode compatibility or hook protection is claimed. Run,
-  templates, importers, Unix exec, inventories and release identities are unchanged.
+  templates, importers, Unix exec and inventories are unchanged.
+- Advance release, installer, packaging, manifest, workflow and setup identities
+  to 0.3.4 without Go hook activation. Keep Go 1.27.3 and the published v0.3.0,
+  v0.3.1, v0.3.2 and v0.3.3 tags and checksum manifests unchanged.
 
 ### 0.3.3 patch (published 2026-10-30)
 

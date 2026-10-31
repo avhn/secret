@@ -2,7 +2,7 @@
 # Keep state local for irm URL | iex. No source build or host activation occurs.
 & {
     $ErrorActionPreference = 'Stop'
-    $version = '0.3.3'
+    $version = '0.3.4'
     if (Test-Path Env:SECRET_VERSION) { $version = $env:SECRET_VERSION }
     $commit = $env:SECRET_RELEASE_COMMIT
     $directory = $env:INSTALL_DIR
@@ -30,7 +30,7 @@
     }
     if ($showHelp) {
         Write-Output 'Usage: install.ps1 [--version V] [--commit C] [--dir DIR] [--help]'
-        Write-Output 'SECRET_VERSION defaults to 0.3.3; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
+        Write-Output 'SECRET_VERSION defaults to 0.3.4; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
         Write-Output 'INSTALL_DIR defaults to %LOCALAPPDATA%\Programs\secret. gh and curl.exe are required.'
         Write-Output 'Adds only its directory to user PATH. No source build, stores, profiles or client edits.'
         return

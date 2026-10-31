@@ -2,23 +2,37 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.3 (Go 1.27.3 toolchain) was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.3.4 (Windows long-lived exec launcher) is in preparation, based on main after v0.3.3 was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
-## Unreleased: Windows exec configured launchers
+## v0.3.4: Windows long-lived exec launcher patch
+
+Based on main after published v0.3.3 at checksum commit C `ea85737`; the existing
+v0.3.0, v0.3.1, v0.3.2 and v0.3.3 tags and checksum manifests stay unchanged.
+The patch keeps Go 1.27.3, the
+[v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash CLI/hooks
+and all waiting-sponsorship boundaries.
 
 In progress under the approved [Windows exec plan](docs/design/windows-exec-plan.md).
 File-backed exec inherits restricted stdio handles without a runtime deadline;
 non-file writers retain relay protection with an exec-only shutdown bound. Checked
 Job cleanup and failure precedence remain required. Run, Unix exec, templates,
-importers, hook rules, inventories and release identities are unchanged.
+importers, hook rules and inventories are unchanged.
 
 - [x] Implement direct and relay exec lifetime, checked cleanup and native status handling
 - [x] Add synthetic protocol, detached lifecycle, shutdown, writer and failure regressions plus separately classified setup examples
 - [ ] Require green applicable hosted CI, including both Windows lanes, before completion
 - [ ] Obtain separately sponsored versioned real-host startup/reconnect/shutdown evidence before claiming client compatibility
 
-This work is unreleased. No identity bump, tag, publication, installed-default
-promotion or real Claude Code/Codex/OpenCode compatibility is authorized here.
+- [x] Bump compiled release identity, packaging/manifests, workflows, tests and setup pins equally to 0.3.4 without Go hook activation
+- [ ] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
+- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.3.4.txt`
+- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.3.4
+- [ ] Owner authorizes the signed v0.3.4 tag, draft, publication and Registry publication
+- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.3.4, MCPB `fileSha256` equal to the checksum manifest
+
+This work is unreleased. Tags, publication, installed-default promotion and
+real Claude Code/Codex/OpenCode compatibility remain separate approval/evidence
+boundaries.
 
 ## v0.3.3: Go 1.27.3 toolchain patch
 

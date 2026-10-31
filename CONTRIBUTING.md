@@ -153,8 +153,8 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4's v0.2.3 release is complete. The v0.3.3 extension changes packaging and
-independently bumps all four manifests to 0.3.3 without changing installed Bash
+M4's v0.2.3 release is complete. The v0.3.4 extension changes packaging and
+independently bumps all four manifests to 0.3.4 without changing installed Bash
 CLI/Claude/Codex hooks. M4.1 remains waiting sponsorship and owns
 `onFailure: "block"`, `guard-go` activation, the `bin/secret`/`compat/secret`
 switch and Go hook output-contract changes. See [the release plan](docs/design/v0.3.0-plan.md),
@@ -187,8 +187,8 @@ python3 -I tests/test-setup.py
 # Full assembly requires macOS/lipo and the pinned packaging tools above:
 assets="$(mktemp -d)"
 sh scripts/build-release.sh "$assets"
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.3 --manifest-only
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.3
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.4 --manifest-only
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.4
 python3 -I tests/test-host-hooks.py # offline classification, no model calls
 shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go install.sh scripts/*.sh tests/*.sh
 # On macOS, also run retained shell suites with stock Bash 3.2:
@@ -214,9 +214,9 @@ proves Desktop install/interpolation/restart behavior.
 
 CI runs independent macOS full assembly plus native Linux/macOS/Windows
 amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
-`--stage v0.3.3`, a version-only bump plus unchanged Bash nonactivation contract.
+`--stage v0.3.4`, a version-only bump plus unchanged Bash nonactivation contract.
 The test default remains historical `m4`; `--stage m4.1` preserves the stronger
-activation assertions for that milestone. Do not use it as a v0.3.3 gate or
+activation assertions for that milestone. Do not use it as a v0.3.4 gate or
 weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.
 `.secret-release-test-fixture` is forbidden in the shipped tree, S and C,

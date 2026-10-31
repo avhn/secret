@@ -31,7 +31,7 @@ Treat it as one layer, not the boundary.
 ### Opt-in Go CLI and names-only MCP
 
 [Canonical setup](docs/setup.md) covers installation, approved store references,
-per-client registration, verification, updates and removal. The v0.3.3 release
+per-client registration, verification, updates and removal. The v0.3.4 release
 is being prepared; these pinned commands require its published assets and never
 select latest or fall back to another version.
 
@@ -43,7 +43,7 @@ or client configuration.
 
 ```sh
 sh -c 'umask 077; d=$(mktemp -d) || exit
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.3.3/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.3.4/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
 status=$?; rm -rf "$d"; exit "$status"' sh
 ```
 
@@ -51,7 +51,7 @@ Windows PowerShell:
 
 ```powershell
 & { $ErrorActionPreference = 'Stop'; $d = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $d | Out-Null
-try { irm https://raw.githubusercontent.com/avhn/secret/v0.3.3/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
+try { irm https://raw.githubusercontent.com/avhn/secret/v0.3.4/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
 finally { Remove-Item -LiteralPath $d -Recurse -Force }; exit $status }
 ```
 
@@ -78,15 +78,15 @@ Unix does not edit PATH; Windows adds only its directory to user PATH. Neither
 registers MCP, reads stores or activates hooks. Raw executables do not have the
 checkout launcher's per-execution rehash.
 
-Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.3.3/docs/setup.md to install and register secret MCP; ask me for exact store references, never discover/read stores, handle values or bypass a guard.
+Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.3.4/docs/setup.md to install and register secret MCP; ask me for exact store references, never discover/read stores, handle values or bypass a guard.
 
 | Surface | Support and evidence |
 | --- | --- |
-| Go CLI | v0.3.3 targets Linux, macOS and Windows amd64/arm64; new native candidate/public-install gates remain required. v0.2.3 Linux/macOS publication is complete. |
+| Go CLI | v0.3.4 targets Linux, macOS and Windows amd64/arm64; new native candidate/public-install gates remain required. v0.2.3 Linux/macOS publication is complete. |
 | Local stdio MCP | Opt-in `mcp --store STORE_REFERENCE`; list/show/diff/health only, never values. Metadata can still reveal names, labels, paths and account IDs. |
-| Desktop bundle | `secret-v0.3.3-desktop.mcpb`: macOS universal and Windows amd64; locked-CLI/native smoke validation is not host-tested Desktop installation. |
+| Desktop bundle | `secret-v0.3.4-desktop.mcpb`: macOS universal and Windows amd64; locked-CLI/native smoke validation is not host-tested Desktop installation. |
 | Registry | Name `io.github.avhn/secret`; publication is separately owner-gated, not claimed here. |
-| Plugins and hooks | All four manifests are 0.3.3; installed hooks remain the Bash guard. M4.1 Go activation is waiting sponsorship, with no fail-closed host claim. |
+| Plugins and hooks | All four manifests are 0.3.4; installed hooks remain the Bash guard. M4.1 Go activation is waiting sponsorship, with no fail-closed host claim. |
 
 See [installation and rollback](docs/install.md) for pins, dependencies, offline
 options and failure recovery, and [release approvals](docs/release.md).
