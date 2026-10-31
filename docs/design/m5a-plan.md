@@ -231,6 +231,15 @@ without an unenrolled retry, suspended fallback or assign-after-start window.
 The parent's death closes its only Job handle and contains descendants even
 before the supervisor's wait goroutine exists.
 
+The historical exec deadline/output-failure evidence below is narrowly superseded
+by the unreleased [Windows exec launcher plan](windows-exec-plan.md) and its
+[behavior contract](../windows.md#long-lived-configured-exec-launchers-unreleased).
+Direct file-backed exec inherits stdio and waits indefinitely for the direct child;
+non-file writers retain deadline-free relay with bounded shutdown and checked
+Close. Run, importers, templates, containment and agent-denial gates are unchanged.
+This cross-reference does not rewrite the recorded M5a results or establish any
+real-host compatibility.
+
 The extracted two-stream loop preserves Unix process-group behavior, including
 INT/TERM/HUP/QUIT forwarding and its existing drain/grace policy. Windows run and
 unfiltered supervised exec have a 15-second runtime deadline, 250 ms inherited-pipe

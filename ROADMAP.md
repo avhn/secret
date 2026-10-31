@@ -4,6 +4,22 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 
 **Current milestone:** v0.3.3 (Go 1.27.3 toolchain) was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
+## Unreleased: Windows exec configured launchers
+
+In progress under the approved [Windows exec plan](docs/design/windows-exec-plan.md).
+File-backed exec inherits restricted stdio handles without a runtime deadline;
+non-file writers retain relay protection with an exec-only shutdown bound. Checked
+Job cleanup and failure precedence remain required. Run, Unix exec, templates,
+importers, hook rules, inventories and release identities are unchanged.
+
+- [x] Implement direct and relay exec lifetime, checked cleanup and native status handling
+- [x] Add synthetic protocol, detached lifecycle, shutdown, writer and failure regressions plus separately classified setup examples
+- [ ] Require green applicable hosted CI, including both Windows lanes, before completion
+- [ ] Obtain separately sponsored versioned real-host startup/reconnect/shutdown evidence before claiming client compatibility
+
+This work is unreleased. No identity bump, tag, publication, installed-default
+promotion or real Claude Code/Codex/OpenCode compatibility is authorized here.
+
 ## v0.3.3: Go 1.27.3 toolchain patch
 
 Published on GitHub Releases on 2026-10-30, with immutable tag `v0.3.3` at

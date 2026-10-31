@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Windows exec configured launchers
+
+- Remove the Windows exec runtime deadline. File-backed outputs inherit restricted
+  native stdio handles directly; mixed/non-file writers relay both supplied streams
+  with existing writer/drain protection and an exec-only two-second shutdown bound.
+- Preserve checked Job cleanup, scoped signal grace and full native uint32 status;
+  launch, wait and cleanup failures override cancellation with fixed diagnostics.
+  Direct exec leaves output backpressure/errors and graceful EOF handling to the
+  server. Wrapper death triggers kill-on-close containment, not application cleanup.
+- Add synthetic long-lived protocol, detached host/wrapper lifecycle and failure
+  regressions, and separately verified configured-launcher setup examples. No real
+  Claude Code, Codex or OpenCode compatibility or hook protection is claimed. Run,
+  templates, importers, Unix exec, inventories and release identities are unchanged.
+
 ### 0.3.3 patch (published 2026-10-30)
 
 - Bump the release identity, installers, manifests, packaging, workflows, tests

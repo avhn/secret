@@ -41,12 +41,20 @@ type supervisedProcess struct {
 	wait    func() int
 	kill    func()
 	forward func(os.Signal)
+	// Windows relay exec alone bounds shutdown independently of normal lifetime.
+	shutdownWait time.Duration
+	// Windows exec shares one diagnostic reporter across relay and native cleanup.
+	failure func(string) int
 }
 
-// superviseChild shares the bounded two-stream loop, never a raw-output fallback.
-// Unix retains its existing signal grace and pipe drain policy. Windows also
-// bounds the total runtime and uses a shorter inherited-pipe wait.
+// superviseChild relays both streams, never using a raw-output fallback.
+// Callers select runtime and inherited-pipe bounds; zero maxRun is unlimited.
+// Unix and filtered Windows run retain their existing supervision policies.
 func (c command) superviseChild(process supervisedProcess, stdout, stderr *os.File, copyStream func(io.Reader, io.Writer) error, signals <-chan os.Signal, maxRun, pipeWait time.Duration) int {
+	failure := c.runFailure
+	if process.failure != nil {
+		failure = process.failure
+	}
 	defer stdout.Close()
 	defer stderr.Close()
 	// Descendants may close both pipes and outlive the direct child.
@@ -56,14 +64,20 @@ func (c command) superviseChild(process supervisedProcess, stdout, stderr *os.Fi
 	go func() { filters <- copyStream(stderr, timedWriter{c.errOut}) }()
 	waited := make(chan int, 1)
 	go func() { waited <- process.wait() }()
-	var drain, terminate, deadline <-chan time.Time
-	var timeout, signalTimeout, runtimeTimeout *time.Timer
+	var drain, terminate, deadline, shutdown <-chan time.Time
+	var timeout, signalTimeout, runtimeTimeout, shutdownTimeout *time.Timer
+	startShutdown := func() {
+		if process.shutdownWait > 0 && shutdownTimeout == nil {
+			shutdownTimeout = time.NewTimer(process.shutdownWait)
+			shutdown = shutdownTimeout.C
+		}
+	}
 	if maxRun > 0 {
 		runtimeTimeout = time.NewTimer(maxRun)
 		deadline = runtimeTimeout.C
 	}
 	defer func() {
-		for _, timer := range []*time.Timer{timeout, signalTimeout, runtimeTimeout} {
+		for _, timer := range []*time.Timer{timeout, signalTimeout, runtimeTimeout, shutdownTimeout} {
 			if timer != nil {
 				timer.Stop()
 			}
@@ -82,11 +96,13 @@ func (c command) superviseChild(process supervisedProcess, stdout, stderr *os.Fi
 			}
 		case <-terminate:
 			terminate = nil
+			startShutdown()
 			process.kill()
 		case er := <-filters:
 			received++
 			if er != nil {
 				failed = true
+				startShutdown()
 				process.kill()
 				_ = stdout.Close()
 				_ = stderr.Close()
@@ -101,16 +117,22 @@ func (c command) superviseChild(process supervisedProcess, stdout, stderr *os.Fi
 			process.kill()
 			_ = stdout.Close()
 			_ = stderr.Close()
-			return c.runFailure("redaction filter failed")
+			return failure("redaction filter failed")
+		case <-shutdown:
+			// Reach the caller's checked native Close even if wait never notifies.
+			if failed {
+				return failure("redaction filter failed")
+			}
+			return interrupted
 		case <-deadline:
 			process.kill()
 			_ = stdout.Close()
 			_ = stderr.Close()
-			return c.runFailure("child supervision timed out")
+			return failure("child supervision timed out")
 		}
 	}
 	if failed {
-		return c.runFailure("redaction filter failed")
+		return failure("redaction filter failed")
 	}
 	if interrupted != 0 {
 		return interrupted

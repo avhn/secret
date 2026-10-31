@@ -289,6 +289,34 @@ func TestWindowsProcessConsoleForwarding(t *testing.T) {
 	}
 }
 
+func TestWindowsProcessDetachedParentDeath(t *testing.T) {
+	// Reuse the creation-boundary fixture with no console. Keep the existing
+	// before/after enrollment, handle-list and incompatible-Job tests unchanged.
+	dir := t.TempDir()
+	args := windowsFixtureArgs("parent", dir, "after creation")
+	parent := exec.Command(args[0], args[1:]...)
+	parent.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW}
+	if err := parent.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { parent.Process.Kill(); parent.Wait() })
+	awaitWindowsFixture(t, filepath.Join(dir, "boundary"))
+	child := fixtureProcessHandle(t, filepath.Join(dir, "child.pid"))
+	grandchild := fixtureProcessHandle(t, filepath.Join(dir, "grandchild.pid"))
+	// Pin the still-live wrapper too, before initiating termination.
+	handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(parent.Process.Pid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(handle)
+	if err := windows.TerminateProcess(handle, 1); err != nil {
+		t.Fatal(err)
+	}
+	for _, process := range []windows.Handle{handle, child, grandchild} {
+		assertWindowsProcessStopped(t, process)
+	}
+}
+
 func TestWindowsProcessFixture(t *testing.T) {
 	marker := -1
 	for i, arg := range os.Args {
@@ -306,7 +334,15 @@ func TestWindowsProcessFixture(t *testing.T) {
 	}
 	mode, dir := args[0], args[1]
 	write := func(name, data string) {
-		if os.WriteFile(filepath.Join(dir, name), []byte(data), 0600) != nil {
+		// Readers must not pin an identity from a partially written PID.
+		file, err := os.CreateTemp(dir, ".ready-*")
+		if err != nil {
+			os.Exit(2)
+		}
+		_, err = file.WriteString(data)
+		closeErr := file.Close()
+		if err != nil || closeErr != nil || os.Rename(file.Name(), filepath.Join(dir, name)) != nil {
+			os.Remove(file.Name())
 			os.Exit(2)
 		}
 	}

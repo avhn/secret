@@ -28,7 +28,8 @@ $script:Work = $env:RUNNER_TEMP
 
 # Capture bytes, not PowerShell's native text pipeline (which transcodes output).
 # Never include an exception's process arguments or captured output in a failure.
-function Invoke-Captured([string] $Image, [string[]] $Arguments, [byte[]] $InputBytes = @()) {
+function Invoke-Captured([string] $Image, [string[]] $Arguments, [byte[]] $InputBytes = @(),
+        [int] $TimeoutMilliseconds = 60000) {
     foreach ($arg in $Arguments) {
         foreach ($value in $script:Values) {
             Assert-True (-not $arg.Contains($value)) 'synthetic value absent from argv'
@@ -53,7 +54,7 @@ function Invoke-Captured([string] $Image, [string[]] $Arguments, [byte[]] $Input
         $copyErr = $process.StandardError.BaseStream.CopyToAsync($stderr)
         $process.StandardInput.BaseStream.Write($InputBytes, 0, $InputBytes.Length)
         $process.StandardInput.Close()
-        if (-not $process.WaitForExit(60000)) {
+        if (-not $process.WaitForExit($TimeoutMilliseconds)) {
             $process.Kill($true)
             throw 'Windows integration process timeout'
         }
@@ -82,7 +83,9 @@ function Assert-NoValues([byte[]] $Bytes) {
 
 function Invoke-Fixture($Request) {
     $bytes = $script:Utf8.GetBytes(($Request | ConvertTo-Json -Depth 8 -Compress))
-    $got = Invoke-Captured $ConsoleFixture @() $bytes
+    # Launcher mode includes a required 20 s idle exchange and detached waits.
+    $timeoutMilliseconds = if ($Request.Mode -eq 'launcher') { 180000 } else { 60000 }
+    $got = Invoke-Captured $ConsoleFixture @() $bytes -TimeoutMilliseconds $timeoutMilliseconds
     if ($got.Code -ne 0 -or $got.Err.Length -ne 0) {
         # Fixture diagnostics are fixed strings; still prove no synthetic value
         # is present before printing a bounded excerpt for CI triage.
@@ -260,6 +263,14 @@ $bytes = $encoding.GetBytes('out:' + $env:TOKEN + ':done')
 $bytes = $encoding.GetBytes('err:' + $env:TOKEN + ':done')
 [Console]::OpenStandardError().Write($bytes, 0, $bytes.Length)
 '@, $script:Utf8)
+    # Production exec uses real inherited pipes/files, not cli.Main buffers.
+    # This lifecycle mode never activates or accesses a credential provider.
+    $lifecycleRoot = Join-Path $root 'launcher lifecycle'
+    New-PrivateDirectory $lifecycleRoot
+    $lifecycle = Invoke-Fixture @{ Mode = 'launcher'; Executable = $binary; Path = $lifecycleRoot }
+    Assert-True ($lifecycle.Code -eq 0 -and $null -eq $lifecycle.Output) 'long-lived detached exec and checked containment'
+    Write-Output 'PASS synthetic configured-launcher lifecycle (not real-host compatibility)'
+
     $credRef = 'wincred:m5a-cli-' + $env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT + '-' + $env:GITHUB_JOB + '-' + [Guid]::NewGuid().ToString('N')
     $null = Invoke-Fixture @{ Mode = 'seed'; Reference = $credRef; Value = [Convert]::ToBase64String($script:Utf8.GetBytes($credValue)) }
     $manifest = Join-Path $storeRoot ($credRef.Substring(8) + '.wincred-keys')

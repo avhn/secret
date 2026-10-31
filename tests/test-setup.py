@@ -40,6 +40,13 @@ def blocks(document):
     return re.findall(r"^```(\w+)\n(.*?)^```$", document, re.MULTILINE | re.DOTALL)
 
 
+def example_classes(document):
+    heading = "## Configured value-consuming launchers (unreleased)\n"
+    before, launcher = document.split(heading)
+    launcher, after = launcher.split("## Update, rollback and remove", 1)
+    return before + "## Update, rollback and remove" + after, launcher
+
+
 def registration(language, body):
     if language == "json":
         value = json.loads(body, object_pairs_hook=unique_object)
@@ -49,6 +56,18 @@ def registration(language, body):
         raise ValueError("unknown client configuration")
     value = tomllib.loads(body)
     return "mcp_servers", value["mcp_servers"]["secret"]
+
+
+def merge_json_registration(existing, body):
+    # Exercise the documented server-only merge through parsing and serialization,
+    # rather than assigning an already extracted entry in each assertion.
+    merged = json.loads(json.dumps(existing), object_pairs_hook=unique_object)
+    update = json.loads(body, object_pairs_hook=unique_object)
+    if len(update) != 1 or next(iter(update)) not in ("mcpServers", "servers", "mcp"):
+        raise ValueError("unknown client configuration")
+    for root, servers in update.items():
+        merged.setdefault(root, {}).update(servers)
+    return json.loads(json.dumps(merged), object_pairs_hook=unique_object)
 
 
 def server_argv(entry):
@@ -90,7 +109,8 @@ class SetupTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.document = DOCUMENT.read_text(encoding="utf-8")
-        cls.examples = blocks(cls.document)
+        cls.names_only_document, _ = example_classes(cls.document)
+        cls.examples = blocks(cls.names_only_document)
         cls.temporary = tempfile.TemporaryDirectory(prefix="secret-setup-test-")
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.base = Path(cls.temporary.name)
@@ -186,9 +206,14 @@ class SetupTests(unittest.TestCase):
                 _, merged_entry = registration(language, replaced)
                 self.assertEqual(server_argv(merged_entry), [command, "mcp", "--store", reference])
                 existing = {root: {"unrelated": {"enabled": False}}, "unrelatedSetting": True}
-                existing[root]["secret"] = merged_entry
-                self.assertEqual(existing[root]["unrelated"], {"enabled": False})
-                self.assertTrue(existing["unrelatedSetting"])
+                if language == "json":
+                    merged = merge_json_registration(existing, replaced)
+                else:
+                    existing[root]["secret"] = merged_entry
+                    merged = existing
+                self.assertEqual(server_argv(merged[root]["secret"]), [command, "mcp", "--store", reference])
+                self.assertEqual(merged[root]["unrelated"], {"enabled": False})
+                self.assertTrue(merged["unrelatedSetting"])
         for language, body in self.examples:
             if "mcp add" not in body:
                 continue
@@ -287,7 +312,7 @@ class SetupTests(unittest.TestCase):
                     self.assertFalse(Path(downloaded.read_text().strip()).parent.exists(), "temporary directory survived cleanup")
 
     def test_version_installer_urls_and_safe_placeholders(self):
-        self.assertEqual(set(re.findall(r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d.])", self.document)), {VERSION})
+        self.assertEqual(set(re.findall(r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d.])", self.names_only_document)), {VERSION})
         urls = re.findall(r"https://raw\.githubusercontent\.com/[^\s`]+", self.document)
         self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.3.3/install.sh",
                                 "https://raw.githubusercontent.com/avhn/secret/v0.3.3/install.ps1"])
@@ -319,6 +344,63 @@ class SetupTests(unittest.TestCase):
             powershell_words("claude 'unterminated")
         with self.assertRaises(ValueError):
             client_argv("sh", "claude mcp add --scope project secret -- /synthetic/secret-go mcp --store file:/synthetic/STORE")
+
+
+class ConfiguredLauncherTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        _, cls.document = example_classes(DOCUMENT.read_text(encoding="utf-8"))
+        cls.examples = blocks(cls.document)
+
+    def test_exact_configured_launcher_argv_and_scope(self):
+        self.assertEqual(len(self.examples), 2)
+        for (language, body), command, reference in zip(
+                self.examples, (UNIX_COMMAND, WINDOWS_COMMAND), (UNIX_STORE, WINDOWS_STORE), strict=True):
+            self.assertEqual(language, "json")
+            parsed = json.loads(body, object_pairs_hook=unique_object)
+            self.assertEqual(set(parsed), {"mcpServers"})
+            self.assertEqual(set(parsed["mcpServers"]), {"openproject-launcher"})
+            entry = parsed["mcpServers"]["openproject-launcher"]
+            self.assertEqual(set(entry), {"command", "args"})
+            self.assertEqual(server_argv(entry), [command, "exec", "-f", reference,
+                             "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X",
+                             "--", "uvx", "openproject-ce-mcp@0.4.1"])
+            self.assertIn(json.dumps(command), body)
+            self.assertIn(json.dumps(reference), body)
+            self.assertTrue(reference.startswith("file:"))
+            self.assertNotRegex(body, r"(?i)(?:token|password|api_key)\s*[=:]")
+
+    def test_launcher_escaping_and_merge_preserve_exact_arguments(self):
+        for _, body in self.examples:
+            entry = json.loads(body)["mcpServers"]["openproject-launcher"]
+            for command, reference in [
+                ('/synthetic install/with "double" and \'single\'/secret-go',
+                 'file:/synthetic stores/with "double" and \'single\'.secret'),
+                ('C:\\synthetic install\\with "double" and \'single\'\\secret-go.exe',
+                 'file:C:\\synthetic stores\\with "double" and \'single\'.secret'),
+            ]:
+                rewritten = body.replace(json.dumps(entry["command"]), json.dumps(command))
+                rewritten = rewritten.replace(json.dumps(entry["args"][2]), json.dumps(reference))
+                got = json.loads(rewritten, object_pairs_hook=unique_object)["mcpServers"]["openproject-launcher"]
+                self.assertEqual(server_argv(got), [command, "exec", "-f", reference, *entry["args"][3:]])
+                existing = {"mcpServers": {"secret": {"command": "unchanged"},
+                            "openproject-launcher": {"command": "old", "args": ["old"]}}, "unrelated": True}
+                merged = merge_json_registration(existing, rewritten)
+                self.assertEqual(server_argv(merged["mcpServers"]["openproject-launcher"]),
+                                 [command, "exec", "-f", reference, *entry["args"][3:]])
+                self.assertEqual(set(merged["mcpServers"]), {"secret", "openproject-launcher"})
+                self.assertEqual(merged["mcpServers"]["secret"], {"command": "unchanged"})
+                self.assertTrue(merged["unrelated"])
+                self.assertEqual(existing["mcpServers"]["openproject-launcher"], {"command": "old", "args": ["old"]})
+
+    def test_unreleased_and_host_evidence_boundaries(self):
+        document = DOCUMENT.read_text(encoding="utf-8")
+        self.assertIn("## Configured value-consuming launchers (unreleased)", document)
+        for marker in ("not the names-only", "printed absolute executable path", "human-approved",
+                       "unfiltered", "ignoring EOF", "terminate the wrapper", "real-host evidence",
+                       "no hook", "agent-denial"):
+            self.assertIn(marker, self.document)
+        self.assertEqual(set(re.findall(r"(?<![\d.])(\d+\.\d+\.\d+)(?![\d.])", self.document)), {"0.4.1"})
 
 
 if __name__ == "__main__":

@@ -90,13 +90,69 @@ and redacts all loaded literals from stdout and stderr.
 Children and descendants are enrolled atomically at creation in a non-inheritable
 kill-on-close Job, with no breakaway or unenrolled fallback. Setup failure aborts
 before execution. Normal completion, cancellation, timeout and output/filter
-failure terminate remaining Job members with bounded cleanup. Windows `run` and
-`exec` have a 15-second runtime deadline. No implicit shell is inserted; executable
-lookup uses the child PATH/PATHEXT, without implicit current-directory search.
+failure terminate remaining Job members with bounded cleanup. Windows `run`
+retains its 15-second runtime deadline. The unreleased `exec` change below removes
+only exec's runtime deadline. No implicit shell is inserted; executable lookup
+uses the child PATH/PATHEXT, without implicit current-directory search.
 
 Templates are private rendered files; successful containment precedes their
 removal. Audit remains private and names-only, not a value log. Neither feature
 changes the human-consent or agent-denial boundaries.
+
+## Long-lived configured exec launchers (unreleased)
+
+The [Windows exec plan](design/windows-exec-plan.md) narrowly supersedes M5a's
+historical exec deadline/output-failure contract, not its run contract. This is
+unreleased behavior, not available through the pinned installer release above.
+See the separate [configured-launcher example](setup.md#configured-value-consuming-launchers-unreleased),
+which requires the installer's concrete absolute path and an explicitly approved
+store, and is distinct from names-only `mcp --store`.
+
+When both outputs supplied to the Go CLI are non-nil files, exec inherits stdin,
+stdout and stderr through the existing restricted duplicated handle list. No
+CLI-owned output pipes, decoding, filtering or protocol text intervene. The
+wrapper waits indefinitely for its direct child, not EOF or descendant lifetime.
+Successful direct-child exit still requires checked Job cleanup, terminating and
+waiting on pinned remaining member identities; pipe-holding descendants alone
+do not turn that exit into a drain failure. Native uint32 status is preserved on
+the supported 64-bit CLI. An observed signal returns `128 + signal`; launch,
+wait or cleanup failure takes precedence with status 1. Overlapping relay, wait
+and cleanup failures share one bounded fixed diagnostic; direct and relay launch
+failures use the same fixed native messages.
+
+Direct exec cannot observe child output failures and has no two-second stalled
+writer protection or inherited-pipe drain. Broken pipes and backpressure belong
+to the server: an error-ignoring or blocked server can remain alive indefinitely.
+Non-file output writers, including mixed file/buffer callers of `cli.Main`, relay
+both supplied streams without a runtime deadline, retaining two-second writer
+protection, output-error cancellation and the 250 ms inherited-pipe drain. Their
+exec-only two-second shutdown bound starts on cancellation escalation or output
+failure and reaches checked Close without requiring another wait notification.
+Caller-owned files stay open; invalid or typed-nil handles fail before execution,
+without substituting global streams. Run, importers and templates stay bounded.
+
+The first observed interrupt starts a two-second grace period, with scoped
+CTRL_BREAK forwarding; repeated signals do not extend it. Escalation terminates
+the Job and enters checked cleanup, without an indefinite separate wait. Detached
+or consoleless hosts have no console-event delivery guarantee. Synthetic signal
+channels do not prove detached-host signal delivery.
+
+Graceful shutdown is server-owned: the host closes stdin, the server handles EOF
+and exits, then secret cleans remaining Job members. Secret does not consume stdin
+to detect host disappearance, watch parent lifetime or probe output. Killing an
+intermediary host need not terminate the wrapper. For an EOF-ignoring server, the
+host must terminate secret after its shutdown budget. Wrapper death closes its
+sole kill-on-close Job handle and triggers kernel containment, but cannot run Go
+defers, report cleanup status or promise application cleanup. An enclosing host
+Job may help but requires host-specific evidence.
+
+Value byte buffers are cleared before exec and the native UTF-16 environment
+block is cleared after creation, before waiting. Go environment string copies
+remain GC-managed and cannot be securely erased. Output is unfiltered and may
+expose values. Synthetic detached lifecycle tests establish neither Claude Code,
+Codex nor OpenCode startup/reconnect/shutdown compatibility, nor hook protection.
+Versioned real-host sessions and applicable hosted Windows CI remain separate
+evidence gates; installed defaults and every agent-denial rule are unchanged.
 
 ## Limits and hook behavior
 

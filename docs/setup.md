@@ -325,6 +325,59 @@ remain the Bash guard. Go hook activation is M4.1 and remains waiting sponsorshi
 Installing an executable, registering MCP or passing synthetic tests does not
 establish fail-closed host protection. This is accident prevention, not a sandbox.
 
+## Configured value-consuming launchers (unreleased)
+
+This separate, opt-in example is not the names-only secret MCP server above.
+The Windows long-lived exec behavior is unreleased and requires a reviewed build
+containing the [Windows exec change](design/windows-exec-plan.md); the pinned
+installer release above does not yet provide it. Unix exec remains unchanged.
+Resolve the installer's printed absolute executable path, replacing the command
+placeholder below only with that concrete path after an approved update. Replace
+STORE with an explicit human-approved absolute file reference. Configuration
+contains key names, never values; do not discover stores or add this as an agent
+retrieval route. Keep unrelated servers and settings.
+
+Illustrative Unix configuration, using the same absolute-path placeholders as
+above and a distinct server name:
+
+```json
+{
+  "mcpServers": {
+    "openproject-launcher": {
+      "command": "/ABSOLUTE/INSTALL DIR/secret-go",
+      "args": ["exec", "-f", "file:/ABSOLUTE/STORE DIR/STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
+    }
+  }
+}
+```
+
+Windows JSON preserves each argument and escapes backslashes, not a shell string:
+
+```json
+{
+  "mcpServers": {
+    "openproject-launcher": {
+      "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret-go.exe",
+      "args": ["exec", "-f", "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
+    }
+  }
+}
+```
+
+This launcher consumes selected values in the third-party server's environment.
+Its output is unfiltered and can disclose values; the server owns its protocol,
+output and EOF handling. Windows file-backed stdio is inherited directly and has
+no runtime deadline. On orderly shutdown the host closes stdin, the server exits,
+and secret performs checked Job cleanup. A server ignoring EOF or blocked on
+output can remain alive indefinitely: after its shutdown budget the host must
+terminate the wrapper. Killing only an intermediary host need not kill secret.
+Consoleless signal delivery is not guaranteed. See [Windows limits](windows.md).
+
+Synthetic argv, protocol and lifecycle tests establish no real Claude Code,
+Codex or OpenCode compatibility, startup, reconnect or shutdown behavior. That
+requires separate versioned real-host evidence. This example grants no hook
+exception and does not change agent-denial rules or installed defaults.
+
 ## Update, rollback and remove
 
 Review a new exact release and its setup guide before updating; never switch to

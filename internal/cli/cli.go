@@ -52,7 +52,9 @@ func clearRecords(records []store.Record) {
 	}
 }
 
-// Main runs one invocation with explicit streams. Only the terminal handles are inspected.
+// Main runs one invocation with explicit streams. Windows exec inherits file
+// outputs directly; if either output is a non-file writer, both are relayed.
+// Caller-owned streams remain open. Terminal checks still gate operator access.
 func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	c := command{in: in, out: out, errOut: errOut}
 	if len(args) == 0 {

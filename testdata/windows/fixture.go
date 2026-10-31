@@ -11,9 +11,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -41,6 +44,15 @@ type result struct {
 }
 
 func main() {
+	// These value-free subprocess modes are synthetic lifecycle fixtures only.
+	if len(os.Args) >= 2 && os.Args[1] == "launcher-child" {
+		launcherChild(os.Args[2:])
+		fail()
+	}
+	if len(os.Args) >= 2 && os.Args[1] == "launcher-host" {
+		launcherHost(os.Args[2:])
+		fail()
+	}
 	if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("RUNNER_OS") != "Windows" {
 		fail()
 	}
@@ -56,6 +68,8 @@ func main() {
 	switch req.Mode {
 	case "console", "get":
 		got, err = console(req)
+	case "launcher":
+		got, err = launcherLifecycle(req)
 	case "seed":
 		err = seed(req)
 	case "cleanup":
@@ -78,7 +92,7 @@ func main() {
 		err = errors.New("invalid fixture mode")
 	}
 	if err != nil {
-		if req.Mode == "console" || req.Mode == "get" {
+		if req.Mode == "console" || req.Mode == "get" || req.Mode == "launcher" {
 			// Console errors contain fixed stage names only, never captured
 			// output, native error text, request data or synthetic values.
 			_, _ = fmt.Fprintln(os.Stderr, err)
@@ -236,6 +250,308 @@ func console(req request) (result, error) {
 		return result{Code: code}, nil
 	}
 	return result{Code: code, Output: bytes.Clone(captured.Bytes())}, nil
+}
+
+// Publish readiness identities only after their complete decimal bytes are closed.
+func writeLauncherPID(path string, pid int) error {
+	file, err := os.CreateTemp(filepath.Dir(path), ".pid-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	_, err = file.WriteString(strconv.Itoa(pid))
+	closeErr := file.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return os.Rename(file.Name(), path)
+}
+
+// launcherChild never receives a value in argv and never emits its environment.
+func launcherChild(args []string) {
+	if len(args) != 2 || !filepath.IsAbs(args[1]) {
+		fail()
+	}
+	mode, dir := args[0], args[1]
+	if mode == "descendant" {
+		if writeLauncherPID(filepath.Join(dir, "descendant.pid"), os.Getpid()) != nil {
+			fail()
+		}
+		for {
+			time.Sleep(time.Second)
+		}
+	}
+	if !bytes.Equal([]byte(os.Getenv("TOKEN")), []byte("synthetic-launcher-selection")) || os.Getenv("OTHER") != "" || os.Getenv("X") != "" {
+		fail()
+	}
+	self, err := os.Executable()
+	if err != nil {
+		fail()
+	}
+	child := exec.Command(self, "launcher-child", "descendant", dir)
+	child.Stdout, child.Stderr = os.Stdout, os.Stderr
+	if child.Start() != nil || writeLauncherPID(filepath.Join(dir, "child.pid"), os.Getpid()) != nil {
+		fail()
+	}
+	if mode == "blocked" || mode == "broken" {
+		// Let the descendant initialize its shared standard handles before a
+		// synchronous pipe write blocks operations on the same file object.
+		handle, err := launcherPID(filepath.Join(dir, "descendant.pid"))
+		if err != nil {
+			fail()
+		}
+		windows.CloseHandle(handle)
+		if os.WriteFile(filepath.Join(dir, "output-started"), []byte("ready"), 0600) != nil {
+			fail()
+		}
+		chunk := bytes.Repeat([]byte{'x'}, 64<<10)
+		for {
+			if _, err := os.Stdout.Write(chunk); err != nil {
+				// A child may ignore output errors under direct inheritance.
+				_ = os.WriteFile(filepath.Join(dir, "output-error"), []byte("observed"), 0600)
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+	}
+	_, _ = os.Stderr.Write([]byte("separate-stderr"))
+	_, _ = io.Copy(os.Stdout, os.Stdin)
+	if mode == "protocol" {
+		windows.ExitProcess(0xf1234567)
+	}
+	if mode != "ignore" {
+		fail()
+	}
+	for {
+		time.Sleep(time.Second)
+	}
+}
+
+// launcherHost is deliberately not a kill-on-close Job owner. Killing it alone
+// must not be mistaken for killing the wrapper that owns the containment Job.
+func launcherHost(args []string) {
+	if len(args) < 3 || !filepath.IsAbs(args[0]) || !filepath.IsAbs(args[1]) {
+		fail()
+	}
+	child := exec.Command(args[0], args[2:]...)
+	child.Stdin, child.Stdout, child.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if child.Start() != nil || writeLauncherPID(filepath.Join(args[1], "wrapper.pid"), child.Process.Pid) != nil {
+		fail()
+	}
+	_ = child.Wait()
+	os.Exit(0)
+}
+
+func launcherPID(path string) (windows.Handle, error) {
+	failure := errors.New("synthetic launcher readiness failed")
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		data, _ := os.ReadFile(path)
+		pid, err := strconv.ParseUint(string(data), 10, 32)
+		if err == nil && pid != 0 {
+			handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+			if err != nil {
+				return 0, failure
+			}
+			return handle, nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return 0, failure
+}
+
+func launcherWait(handle windows.Handle, timeout uint32, want uint32) bool {
+	status, err := windows.WaitForSingleObject(handle, timeout)
+	return err == nil && status == want
+}
+
+func launcherLifecycle(req request) (result, error) {
+	failure := errors.New("synthetic launcher lifecycle failed")
+	if !filepath.IsAbs(req.Executable) || !filepath.IsAbs(req.Path) || len(req.Value) != 0 || req.Reference != "" || len(req.Args) != 0 {
+		return result{}, failure
+	}
+	root, err := os.OpenRoot(req.Path)
+	if err != nil {
+		return result{}, failure
+	}
+	defer root.Close()
+	self, err := os.Executable()
+	if err != nil {
+		return result{}, failure
+	}
+	for _, mode := range []string{"protocol", "ignore", "blocked", "broken", "host death"} {
+		if secure.CreatePrivateDirectory(root, mode) != nil {
+			return result{}, failure
+		}
+		dir, err := secure.OpenPrivateDirectory(root, mode)
+		if err != nil {
+			return result{}, failure
+		}
+		err = launcherScenario(req.Executable, self, filepath.Join(req.Path, mode), dir, mode)
+		dir.Close()
+		if err != nil {
+			return result{}, fmt.Errorf("synthetic launcher %s: %w", mode, err)
+		}
+	}
+	return result{Code: 0}, nil
+}
+
+func launcherScenario(image, self, path string, dir *os.Root, mode string) error {
+	failure := errors.New("synthetic launcher lifecycle failed")
+	file, err := secure.CreatePrivateFile(dir, "synthetic.store")
+	if err != nil {
+		return failure
+	}
+	data := []byte("TOKEN=synthetic-launcher-selection\nOTHER=synthetic-unselected\n")
+	_, err = file.Write(data)
+	secure.Clear(data)
+	closeErr := file.Close()
+	if err != nil || closeErr != nil {
+		return failure
+	}
+	input, inputWrite, err := os.Pipe()
+	if err != nil {
+		return failure
+	}
+	defer input.Close()
+	defer inputWrite.Close()
+	output, outputWrite, err := os.Pipe()
+	if err != nil {
+		return failure
+	}
+	defer output.Close()
+	defer outputWrite.Close()
+	diagnostic, err := secure.CreatePrivateFile(dir, "stderr")
+	if err != nil {
+		return failure
+	}
+	defer diagnostic.Close()
+	childMode := mode
+	if mode == "host death" {
+		childMode = "ignore"
+	}
+	args := []string{"exec", "-f", "file:" + filepath.Join(path, "synthetic.store"), "--key", "TOKEN", "--optional-key", "X", "--", self, "launcher-child", childMode, path}
+	cmd := exec.Command(image, args...)
+	if mode == "host death" {
+		cmd = exec.Command(self, append([]string{"launcher-host", image, path}, args...)...)
+	}
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = input, outputWrite, diagnostic
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW}
+	// Selection must remove ambient registered and absent optional keys.
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if !strings.EqualFold(key, "TOKEN") && !strings.EqualFold(key, "OTHER") && !strings.EqualFold(key, "X") &&
+			!strings.EqualFold(key, "HOME") && !strings.EqualFold(key, "USERPROFILE") && !strings.EqualFold(key, "SECRETS_DIR") && !strings.EqualFold(key, "SECRETS_ENV") {
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
+	cmd.Env = append(cmd.Env, "TOKEN=ambient", "OTHER=ambient", "X=ambient", "HOME="+path, "USERPROFILE="+path, "SECRETS_DIR="+path, "SECRETS_ENV="+filepath.Join(path, "absent.env"))
+	if cmd.Start() != nil {
+		return failure
+	}
+	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	input.Close()
+	outputWrite.Close()
+	parent, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(cmd.Process.Pid))
+	if err != nil {
+		return failure
+	}
+	defer windows.CloseHandle(parent)
+	wrapper := parent
+	if mode == "host death" {
+		wrapper, err = launcherPID(filepath.Join(path, "wrapper.pid"))
+		if err != nil {
+			return failure
+		}
+		defer windows.CloseHandle(wrapper)
+	}
+	// Pin every live identity before releasing EOF or initiating any termination.
+	defer windows.TerminateProcess(wrapper, 1)
+	child, err := launcherPID(filepath.Join(path, "child.pid"))
+	if err != nil {
+		return errors.New("child readiness failed")
+	}
+	defer windows.CloseHandle(child)
+	defer windows.TerminateProcess(child, 1)
+	descendant, err := launcherPID(filepath.Join(path, "descendant.pid"))
+	if err != nil {
+		return errors.New("descendant readiness failed")
+	}
+	defer windows.CloseHandle(descendant)
+	defer windows.TerminateProcess(descendant, 1)
+	if mode == "protocol" {
+		exchange := func(message []byte) bool {
+			done := make(chan bool, 1)
+			go func() {
+				_, err := inputWrite.Write(message)
+				got := make([]byte, len(message))
+				_, readErr := io.ReadFull(output, got)
+				done <- err == nil && readErr == nil && bytes.Equal(got, message)
+			}()
+			select {
+			case ok := <-done:
+				return ok
+			case <-time.After(5 * time.Second):
+				return false
+			}
+		}
+		if !exchange([]byte("before\x00\xff\n")) {
+			return errors.New("initial protocol exchange failed")
+		}
+		if !launcherWait(wrapper, 20000, uint32(windows.WAIT_TIMEOUT)) {
+			return errors.New("unlimited lifetime failed")
+		}
+		if !exchange([]byte("after\x00\xfe\n")) {
+			return errors.New("post-idle protocol exchange failed")
+		}
+		inputWrite.Close()
+		if !launcherWait(wrapper, 5000, windows.WAIT_OBJECT_0) {
+			return failure
+		}
+		var code uint32
+		if windows.GetExitCodeProcess(wrapper, &code) != nil || code != 0xf1234567 {
+			return errors.New("full-width status failed")
+		}
+		remaining, err := io.ReadAll(output)
+		stderr, readErr := os.ReadFile(filepath.Join(path, "stderr"))
+		if err != nil || len(remaining) != 0 || readErr != nil || string(stderr) != "separate-stderr" {
+			return fmt.Errorf("separate stream verification failed (read=%t, extra=%t, stderr-read=%t, stderr=%t)", err != nil, len(remaining) != 0, readErr != nil, string(stderr) != "separate-stderr")
+		}
+	} else {
+		inputWrite.Close()
+		if mode == "broken" {
+			output.Close()
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if _, err := os.Stat(filepath.Join(path, "output-error")); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					return failure
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+		if mode == "host death" {
+			if windows.TerminateProcess(parent, 1) != nil || !launcherWait(parent, 5000, windows.WAIT_OBJECT_0) {
+				return failure
+			}
+		}
+		if !launcherWait(wrapper, 3000, uint32(windows.WAIT_TIMEOUT)) || !launcherWait(child, 0, uint32(windows.WAIT_TIMEOUT)) || !launcherWait(descendant, 0, uint32(windows.WAIT_TIMEOUT)) {
+			return errors.New("direct child lifetime failed")
+		}
+		if windows.TerminateProcess(wrapper, 1) != nil || !launcherWait(wrapper, 5000, windows.WAIT_OBJECT_0) {
+			return errors.New("forced wrapper termination failed")
+		}
+	}
+	for _, handle := range []windows.Handle{child, descendant} {
+		if !launcherWait(handle, 5000, windows.WAIT_OBJECT_0) {
+			return errors.New("pinned descendant termination failed")
+		}
+	}
+	return nil
 }
 
 func journalPath() (string, error) {
