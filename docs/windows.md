@@ -71,6 +71,7 @@ in [release tooling security](release.md#packaging-tools-and-advisory-review) an
 | Inventory | `SECRETS_DIR/NAME.wincred-keys` is a names-only v1 manifest; recovery uses `NAME.wincred-keys.recovery`. The suffix stays outside unchanged Bash `*.keys` discovery. Metadata operations do not fetch credentials. |
 | Console | Human operator consent and hidden input use verified `CONIN$`/`CONOUT$` console handles. Redirected operator stdin/stdout and stash stdin are rejected before store/provider discovery. Console modes are restored on catchable exits. |
 | Children | `run` filters both output streams; `exec` supervises an unfiltered child rather than replacing the process. Both use native Job containment. |
+| Clipboard (unreleased) | `clip` uses native Unicode clipboard APIs and a detached, pipe-fed conditional clearer. No PowerShell or external clipboard utility is used. |
 | Private files | Templates, audit, stores, locks, scratch and recovery use handle-checked, protected owner-only DACLs. |
 | File/patch hooks | Native checks retain protected paths across UNC and administrative shares, subst drives, junctions and resolvable 8.3 aliases, with public-file controls and ambiguous-path denial. |
 
@@ -154,6 +155,79 @@ Codex nor OpenCode startup/reconnect/shutdown compatibility, nor hook protection
 Versioned real-host sessions and applicable hosted Windows CI remain separate
 evidence gates; installed defaults and every agent-denial rule are unchanged.
 
+## Native clipboard (unreleased)
+
+The staged Go CLI supports `secret clip FILE KEY [SECONDS]` on Windows, with
+existing selectors, exit statuses and the `copied KEY; clears in Ns if
+unchanged` message. The default timeout remains 45 seconds, and zero requests
+an immediate conditional clear. Unix pbcopy, wl-copy and xclip providers are
+unchanged. The staged Go CLI now rejects values larger than 16 MiB before
+copying on every platform. Its clearer reads into one bounded allocation and
+zeros the full allocation on success and input failures. If timer setup fails
+after copying, the caller immediately attempts a conditional clear before
+returning the unchanged setup error. This extension is outside the historical
+M5a gate and still needs its own hosted CI run; it is not available in the
+pinned installer release above.
+
+The writer retries a busy clipboard with bounded exponential backoff (ten open
+attempts, about 800 ms total sleep). It publishes `CF_UNICODETEXT` through
+movable Windows-owned memory. UTF-8 values are converted directly from byte
+buffers to UTF-16LE byte buffers, without Go value strings; owned intermediate
+buffers are zeroed. Invalid UTF-8 and embedded NUL are rejected with a fixed
+copy error before changing the clipboard, rather than silently replacing or
+truncating the value. Other text, including non-BMP characters and line
+endings, is preserved.
+
+The clearer receives the value through a private inherited pipe, never argv,
+environment, files, logs, audit or JSON. It detaches from the parent console
+and survives normal CLI exit without retaining stdout/stderr pipes. After the
+timeout it compares the current Unicode text with the original value and
+terminating NUL, then empties the clipboard only on an exact match. Comparison
+and emptying share one open clipboard session, so a concurrent replacement
+cannot be cleared between them. Copying a different value preserves it;
+copying the identical text again still counts as unchanged.
+
+The helper first requests `CREATE_BREAKAWAY_FROM_JOB`, allowing it to outlive
+an ancestor Job only when that Job permits breakaway. An `ERROR_ACCESS_DENIED`
+launch retries once without breakaway, using a fresh command and the same
+input pipe. Other errors do not retry. This does not change any enclosing Job
+policy. In particular, this repo's Windows `run` and `exec` children are in a
+kill-on-close Job that does not permit breakaway: a clip invocation inside
+that Job uses the fallback, and parent cleanup can terminate its clearer
+before the timeout, leaving the value on the clipboard. Host-created Jobs may
+impose the same limit. Invoke clip directly from a human terminal outside such
+Jobs when the detached timer is needed; even there it remains best effort.
+Busy/unavailable clipboards, helper termination, logout and shutdown can also
+prevent clearing. There is no persistent timer, retry service or
+secure-erasure guarantee.
+
+The writer registers the [Windows exclusion formats][formats]:
+`ExcludeClipboardContentFromMonitorProcessing`, plus
+`CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard` with DWORD
+zero, before publishing text. Failure to publish these requests aborts the
+copy. Cooperating Windows history/cloud consumers can honor them, but this
+does not prove exclusion on every Windows version or configuration, revoke
+earlier copies, or stop third-party managers, remote desktop redirection or
+another same-session reader. The value is exposed to the clipboard and its
+consumers; the timeout cannot erase copies already taken or guarantee removal
+from memory.
+
+[formats]: https://learn.microsoft.com/windows/win32/dataxchg/clipboard-formats
+
+Use clip only for an explicit human clipboard request. This change does not
+add an agent retrieval route, loosen any hook decision or certify installed
+host protection. The existing Windows hook still denies shell calls, and
+clipboard reads remain prohibited agent behavior.
+
+Synthetic interface tests never touch the clipboard. The native round-trip and
+post-exit tests require `SECRET_REQUIRE_WINDOWS_CLIPBOARD=1`, GitHub Actions
+Windows metadata and `RUNNER_ENVIRONMENT=github-hosted`. They run only on the
+disposable hosted runner, require an initially empty clipboard under the open
+clipboard lock, and leave pre-existing nonempty contents untouched by failing
+before mutation. They use only disposable synthetic text, conditionally clean
+it up and verify the clipboard is empty afterwards. Do not enable this gate
+locally.
+
 ## Limits and hook behavior
 
 - ACL checks require current-user ownership and a protected owner-only DACL,
@@ -169,7 +243,8 @@ evidence gates; installed defaults and every agent-denial rule are unchanged.
   transformed values. Values that cannot round-trip through the Windows UTF-16
   environment, NUL and case-insensitive name collisions fail before child creation.
 - Age filesystem operations, pass and 1Password provider operations remain
-  unsupported on Windows. Clipboard parity is outside M5a.
+  unsupported on Windows. Native clipboard support above is a separate unreleased
+  extension, not evidence from the historical M5a gate.
 - The Windows hook denies every shell call with a fixed denial, including public
   commands. It does not parse PowerShell or CMD as Bash. M5e steps 1 to 4 have
   native PowerShell 5.1/7.6.7 parser evidence, but the adapter remains unwired;

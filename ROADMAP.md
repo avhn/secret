@@ -4,6 +4,20 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 
 **Current milestone:** v0.3.4 (Windows long-lived exec launcher) is in preparation, based on main after v0.3.3 was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
+## Native Windows clipboard extension (unreleased)
+
+PR C adds native Unicode `clip` copying, bounded clipboard-open retries,
+cooperating Windows history/cloud exclusion requests and a detached, pipe-fed
+conditional clearer. It preserves Unix providers, command messages, timeout
+semantics and all existing hook/consent boundaries. See [Windows clipboard
+support and limits](docs/windows.md#native-clipboard-unreleased). This is outside
+the historical M5a completion gate and changes no release identity or defaults.
+
+- [x] Implement byte-only native copying and atomic compare-before-clear with synthetic interface tests
+- [x] Add a disposable hosted Windows gate with private synthetic store fixtures and no local clipboard access by default
+- [x] Cover Job-breakaway fallback, immediate conditional cleanup on timer setup failure and bounded, fully cleared helper input
+- [ ] Require green applicable hosted CI, including native clipboard round-trip and detached-clear evidence
+
 ## v0.3.4: Windows long-lived exec launcher patch
 
 Based on main after published v0.3.3 at checksum commit C `ea85737`; the existing

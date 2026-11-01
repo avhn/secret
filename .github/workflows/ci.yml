@@ -492,6 +492,8 @@ jobs:
         run: go test -v -count=1 -timeout 40m ./internal/hook/policy/
       - name: Test Go packages
         shell: bash
+        env:
+          SECRET_REQUIRE_WINDOWS_CLIPBOARD: ${{ runner.os == 'Windows' && '1' || '0' }}
         # Policy has its own Windows step; other packages retain the same deadline.
         # Caching makes cmd/go replay millions of logged fixture stats after each
         # package on Windows; -count=1 removes that replay without skipping tests.

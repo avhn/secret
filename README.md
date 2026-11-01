@@ -249,6 +249,11 @@ Human-only commands, which the guard denies to agents:
 45 seconds unless you have copied something else since. The value never reaches
 the agent's output, so the guard allows it; the skill tells the agent to use it
 only when you ask for the clipboard, and reading the clipboard back is denied.
+The staged Go CLI adds unreleased [native Windows clipboard support](docs/windows.md#native-clipboard-unreleased),
+including best-effort history/cloud exclusion requests. Unix clipboard providers
+are unchanged; no installed-default or Windows hook permission changes are implied.
+The staged Go CLI caps clipboard values at 16 MiB and attempts an immediate
+conditional clear if timer setup fails after copying.
 
 Run `secret help` for the full reference, including exit statuses.
 
