@@ -32,6 +32,9 @@ func TestStoreWindowsDescriptors(t *testing.T) {
 		{"deny", "D:P(D;;FW;;;WD)(A;;FA;;;" + sid + ")", false},
 		{"conditional", "D:P(XA;;FA;;;" + sid + ";(@User.synthetic == 1))", false},
 		{"object ACE", "D:P(OA;;FA;00112233-4455-6677-8899-aabbccddeeff;;" + sid + ")", false},
+		{"AppContainer traverse only", "D:P(A;;FA;;;" + sid + ")(A;;FA;;;SY)(A;;0x100020;;;S-1-15-3-65536-1)", true},
+		{"AppContainer read", "D:P(A;;FA;;;" + sid + ")(A;;FR;;;S-1-15-3-65536-1)", false},
+		{"outsider traverse and read attributes", "D:P(A;;FA;;;" + sid + ")(A;;0x100080;;;WD)", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			descriptor, err := windows.SecurityDescriptorFromString("O:" + sid + tc.acl)
@@ -43,7 +46,17 @@ func TestStoreWindowsDescriptors(t *testing.T) {
 			}
 		})
 	}
-	wrong, err := windows.SecurityDescriptorFromString("O:SYD:P(A;;FA;;;" + sid + ")")
+	// Profile folders are commonly owned by SYSTEM or Administrators.
+	for _, owner := range []string{"SY", "BA"} {
+		trusted, err := windows.SecurityDescriptorFromString("O:" + owner + "D:P(A;;FA;;;" + sid + ")")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if checkStoreDescriptor(trusted, user.User.Sid) != nil {
+			t.Fatalf("trusted owner %s rejected", owner)
+		}
+	}
+	wrong, err := windows.SecurityDescriptorFromString("O:BUD:P(A;;FA;;;" + sid + ")")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,5 +195,35 @@ func TestStoreWindowsDirectoryIdentity(t *testing.T) {
 	if alias, err := OpenStoreFile(root, "file-alias"); err == nil {
 		alias.Close()
 		t.Fatal("reparse file accepted")
+	}
+}
+
+func TestStoreWindowsFileDescriptor(t *testing.T) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid := user.User.Sid.String()
+	for _, tc := range []struct {
+		name, descriptor string
+		valid            bool
+	}{
+		{"explicit owner only", "O:" + sid + "D:P(A;;FA;;;" + sid + ")", true},
+		{"inherited owner only", "O:" + sid + "D:(A;ID;FA;;;" + sid + ")", true},
+		{"inherited owner plus SYSTEM", "O:" + sid + "D:(A;ID;FA;;;" + sid + ")(A;ID;FA;;;SY)", false},
+		{"owner plus everyone", "O:" + sid + "D:P(A;;FA;;;" + sid + ")(A;;FR;;;WD)", false},
+		{"SYSTEM owner", "O:SYD:P(A;;FA;;;" + sid + ")", false},
+		{"empty", "O:" + sid + "D:P", false},
+		{"deny", "O:" + sid + "D:P(D;;FW;;;WD)(A;;FA;;;" + sid + ")", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			descriptor, err := windows.SecurityDescriptorFromString(tc.descriptor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := checkStoreFileDescriptor(descriptor, user.User.Sid); (got == nil) != tc.valid {
+				t.Fatalf("acceptance = %v, want %v", got == nil, tc.valid)
+			}
+		})
 	}
 }

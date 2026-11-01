@@ -159,16 +159,22 @@ func (server *MCPServer) Serve(input io.Reader, output io.Writer) error {
 		response := mcpResponse{JSONRPC: "2.0", ID: request.ID}
 		switch request.Method {
 		case "initialize":
+			// Clients may add fields to clientInfo and params (MCP allows _meta and
+			// newer clientInfo keys); only the fields used here are validated.
 			var params struct {
-				ProtocolVersion string          `json:"protocolVersion"`
-				Capabilities    json.RawMessage `json:"capabilities"`
-				ClientInfo      struct {
-					Name    string `json:"name"`
-					Version string `json:"version"`
-					Title   string `json:"title,omitempty"`
-				} `json:"clientInfo"`
+				ProtocolVersion string                     `json:"protocolVersion"`
+				Capabilities    json.RawMessage            `json:"capabilities"`
+				ClientInfo      map[string]json.RawMessage `json:"clientInfo"`
+				Meta            json.RawMessage            `json:"_meta,omitempty"`
 			}
-			if initialized || decodeNamesJSON(request.Params, &params) != nil || params.ProtocolVersion == "" || params.ClientInfo.Name == "" {
+			var clientName string
+			validParams := decodeNamesJSON(request.Params, &params) == nil
+			if validParams {
+				if raw, ok := params.ClientInfo["name"]; !ok || json.Unmarshal(raw, &clientName) != nil {
+					clientName = ""
+				}
+			}
+			if initialized || !validParams || params.ProtocolVersion == "" || clientName == "" {
 				response = mcpFailure(request.ID, -32602, "Invalid metadata protocol parameters")
 			} else {
 				initialized = true

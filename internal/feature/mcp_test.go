@@ -399,3 +399,28 @@ func FuzzMCPProtocol(f *testing.F) {
 		}
 	})
 }
+
+func TestMCPInitializeAcceptsClientExtensions(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		params string
+		ok     bool
+	}{
+		{"current client fields", `{"protocolVersion":"2025-11-25","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.1","title":"Claude","websiteUrl":"https://example.invalid","icons":[]},"_meta":{"progressToken":1}}`, true},
+		{"missing client name", `{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"version":"1"}}`, false},
+		{"non-string client name", `{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":7}}`, false},
+		{"missing protocol version", `{"capabilities":{},"clientInfo":{"name":"c"}}`, false},
+		{"unknown top-level field", `{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"c"},"unexpected":true}`, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			input := `{"jsonrpc":"2.0","id":0,"method":"initialize","params":` + tt.params + "}\n"
+			responses, _, err := mcpTestServe(t, mcpTestServer(t), input)
+			if err != nil || len(responses) != 1 {
+				t.Fatalf("initialize: %v, %d responses", err, len(responses))
+			}
+			if (responses[0].Error == nil) != tt.ok {
+				t.Fatalf("accepted = %v, want %v", responses[0].Error == nil, tt.ok)
+			}
+		})
+	}
+}

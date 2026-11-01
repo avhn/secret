@@ -87,20 +87,28 @@ func checkStoreDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, user *windows
 		return ErrPrivateFile
 	}
 	owner, _, err := descriptor.Owner()
-	if err != nil || owner == nil || !owner.Equals(user) {
+	// Windows profile folders are commonly owned by SYSTEM or Administrators.
+	if err != nil || owner == nil || (!owner.Equals(user) && !owner.IsWellKnown(windows.WinLocalSystemSid) && !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid)) {
 		return ErrPrivateFile
 	}
 	acl, _, err := descriptor.DACL()
 	if err != nil || acl == nil || acl.AceCount == 0 {
 		return ErrPrivateFile
 	}
+	// Other principals (for example AppContainer capability SIDs on profiles)
+	// may only traverse: they can neither list, read nor change the folder.
+	const traverseOnly = windows.FILE_TRAVERSE | windows.SYNCHRONIZE
 	for i := uint32(0); i < uint32(acl.AceCount); i++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
 		if windows.GetAce(acl, i, &ace) != nil || ace == nil || ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE || ace.Header.AceFlags & ^uint8(windows.OBJECT_INHERIT_ACE|windows.CONTAINER_INHERIT_ACE|windows.NO_PROPAGATE_INHERIT_ACE|windows.INHERIT_ONLY_ACE|windows.INHERITED_ACE) != 0 {
 			return ErrPrivateFile
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
-		if !sid.IsValid() || (!sid.Equals(user) && !sid.IsWellKnown(windows.WinLocalSystemSid) && !sid.IsWellKnown(windows.WinBuiltinAdministratorsSid)) {
+		if !sid.IsValid() {
+			return ErrPrivateFile
+		}
+		trusted := sid.Equals(user) || sid.IsWellKnown(windows.WinLocalSystemSid) || sid.IsWellKnown(windows.WinBuiltinAdministratorsSid)
+		if !trusted && uint32(ace.Mask)&^uint32(traverseOnly) != 0 {
 			return ErrPrivateFile
 		}
 	}
@@ -153,7 +161,41 @@ func OpenPrivateFile(root *os.Root, name string) (*os.File, error) {
 
 // OpenStoreFile reads an owner-only file beneath a trusted store parent.
 func OpenStoreFile(root *os.Root, name string) (*os.File, error) {
-	return checkedChild(root, name, false, false, CheckStoreDirectory, CheckPrivate)
+	return checkedChild(root, name, false, false, CheckStoreDirectory, CheckStoreFile)
+}
+
+// CheckStoreFile accepts a store file owned by the current user whose DACL
+// grants access only to that user. Entries may be explicit or inherited (a
+// file created inside a private ~/.secrets folder inherits its single entry);
+// any other principal, deny, object or conditional entry fails closed.
+func CheckStoreFile(file *os.File) error {
+	return checkFileDescriptor(file, false, checkStoreFileDescriptor)
+}
+
+func checkStoreFileDescriptor(descriptor *windows.SECURITY_DESCRIPTOR, user *windows.SID) error {
+	if descriptor == nil || !descriptor.IsValid() || user == nil {
+		return ErrPrivateFile
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil || owner == nil || !owner.Equals(user) {
+		return ErrPrivateFile
+	}
+	acl, _, err := descriptor.DACL()
+	if err != nil || acl == nil || acl.AceCount == 0 {
+		return ErrPrivateFile
+	}
+	for i := uint32(0); i < uint32(acl.AceCount); i++ {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		if windows.GetAce(acl, i, &ace) != nil || ace == nil || ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE || ace.Header.AceFlags & ^uint8(windows.OBJECT_INHERIT_ACE|windows.CONTAINER_INHERIT_ACE|windows.NO_PROPAGATE_INHERIT_ACE|windows.INHERIT_ONLY_ACE|windows.INHERITED_ACE) != 0 {
+			return ErrPrivateFile
+		}
+		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+		if !sid.IsValid() || !sid.Equals(user) {
+			return ErrPrivateFile
+		}
+	}
+	runtime.KeepAlive(descriptor)
+	return nil
 }
 
 // OpenStoreDirectory retains the same no-follow identity checks as private roots.
