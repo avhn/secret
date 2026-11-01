@@ -115,8 +115,7 @@ see [client JSON, Windows paths and shutdown limits](docs/setup.md#configured-va
 ## Next steps
 
 - [Set up clients](docs/setup.md#clients), including the Claude Desktop MCPB and
-  MCP Registry name `io.github.avhn/secret`. Registry publication of v0.4.1 is
-  pending the macOS public-install jobs; the active record remains 0.3.4.
+  MCP Registry name `io.github.avhn/secret`. The Registry lists v0.4.1.
 - [Verify, update or roll back](docs/install.md), with explicit Bash rollback at `compat/secret`.
 - [Windows support and limits](docs/windows.md).
 - [Security model and reporting](SECURITY.md).

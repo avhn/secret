@@ -4,7 +4,7 @@ This is the canonical setup guide for the opt-in secret 0.4.1 local stdio MCP
 server. Install, choose exact references, register, reconnect and verify in that
 order. v0.4.1 was published on 2026-11-01 and is the GitHub Latest release.
 The commands below use its pinned assets, never a different release if those
-assets are absent. Registry publication is pending the macOS public-install jobs.
+assets are absent. The MCP Registry lists this version.
 See [installation](install.md) for checkout/offline options and
 [release approvals](release.md) for publication status and trust boundaries.
 
