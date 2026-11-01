@@ -2,10 +2,11 @@
 
 These are the approved Mute Agent logo resources for `secret`.
 
-- `logo.svg`: 512 px tile icon, used in the repository README header and copied
-  to `packaging/mcpb/icon.svg` as the packaging vector reference.
-- `logo-mark.svg`: transparent violet mark (`#5B3DF5`) for light backgrounds.
-- `logo-mark-dark.svg`: transparent cream mark (`#F4EFE6`) for dark backgrounds.
+- `logo.svg`: 512 px tile icon, copied to `packaging/mcpb/icon.svg` as the packaging vector reference.
+- `logo-mark.svg`: transparent violet mark (`#5B3DF5`) for light backgrounds; the
+  README header shows it, without the tile.
+- `logo-mark-dark.svg`: transparent cream mark (`#F4EFE6`) for dark backgrounds; the
+  README header switches to it under `prefers-color-scheme: dark`.
 - `logo-256.png`: reviewed 256 x 256 render of `logo.svg`, copied to
   `packaging/mcpb/icon.png` for the Desktop MCPB manifest and bundle.
 - `logo-512.png`: reviewed 512 x 512 render of `logo.svg` for larger raster use.
