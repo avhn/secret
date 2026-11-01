@@ -33,7 +33,7 @@ SCRIPT = ROOT / "scripts" / "package_mcpb.py"
 spec = importlib.util.spec_from_file_location("secret_package_mcpb", SCRIPT)
 mcpb = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mcpb)
-VERSION = "0.3.4"
+VERSION = "0.3.5"
 
 
 def thin(arch):
@@ -199,7 +199,7 @@ class BundleTests(unittest.TestCase):
                                  "--out", "output with spaces"], cwd=self.root,
                                 capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr.decode())
-        bundle = self.root / "output with spaces" / "secret-v0.3.4-desktop.mcpb"
+        bundle = self.root / "output with spaces" / "secret-v0.3.5-desktop.mcpb"
         mcpb.inspect_zip(bundle, self.stage)
 
     def test_wrong_locked_cli_version_fails(self):
@@ -377,7 +377,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
             copied.chmod(0o600)
             setattr(self.args, name, copied)
         second = self.build()
-        self.assertEqual(first.name, "secret-v0.3.4-desktop.mcpb")
+        self.assertEqual(first.name, "secret-v0.3.5-desktop.mcpb")
         self.assertEqual(first.read_bytes(), second.read_bytes())
         mcpb.inspect_zip(first, self.stage)
         with zipfile.ZipFile(first) as archive:
@@ -413,7 +413,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
         self.assertEqual(output.read_bytes(), content)
 
     def test_invalid_versions(self):
-        for version in ("v0.3.4", "0.03.0", "0.3", "0.3.4-rc1", "1.2.3\n", "../../bad", ""):
+        for version in ("v0.3.5", "0.03.0", "0.3", "0.3.5-rc1", "1.2.3\n", "../../bad", ""):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 mcpb.release_version(version)
 
@@ -439,7 +439,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
         with self.assertRaises(ValueError):
             mcpb.regular_bytes(link)
         self.args.out.mkdir()
-        output = self.args.out / "secret-v0.3.4-desktop.mcpb"
+        output = self.args.out / "secret-v0.3.5-desktop.mcpb"
         output.symlink_to(self.root / "absent")
         with self.assertRaisesRegex(ValueError, "replace"):
             self.build()
@@ -554,7 +554,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
             mcpb.inspect_zip(bundle)
 
     def test_cli_missing_inputs_and_conflicting_modes(self):
-        for arguments in (("--version", VERSION), ("--version", "v0.3.4"),
+        for arguments in (("--version", VERSION), ("--version", "v0.3.5"),
                           ("--version", VERSION, "--smoke-binary", "absent", "--out", str(self.root))):
             result = subprocess.run([sys.executable, "-I", str(SCRIPT), *arguments], cwd=ROOT,
                                     capture_output=True, timeout=15)
@@ -577,7 +577,7 @@ class NativeSmokeTests(unittest.TestCase):
         env.update({"HOME": str(home), "USERPROFILE": str(home), "GOCACHE": str(root / "go-cache"),
                     "GOTOOLCHAIN": "local", "CGO_ENABLED": "0", "GOENV": "off", "GOWORK": "off",
                     "GOFLAGS": "", "GOEXPERIMENT": ""})
-        result = subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -s -w -X main.version=0.3.4",
+        result = subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-buildid= -s -w -X main.version=0.3.5",
                                  "-o", str(cls.binary), "./cmd/secret"], env=env, cwd=ROOT,
                                 capture_output=True, text=True, timeout=180)
         if result.returncode:
@@ -592,7 +592,7 @@ class NativeSmokeTests(unittest.TestCase):
         self.assertNotIn(b"mcpb-synthetic-value-not-for-metadata", result.stdout + result.stderr)
 
     def test_smoke_wrong_binary_version_fails(self):
-        result = subprocess.run([sys.executable, "-I", str(SCRIPT), "--version", "0.3.5",
+        result = subprocess.run([sys.executable, "-I", str(SCRIPT), "--version", "0.3.6",
                                  "--smoke-binary", str(self.binary)], cwd=ROOT,
                                 capture_output=True, timeout=30)
         self.assertNotEqual(result.returncode, 0)

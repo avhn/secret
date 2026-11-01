@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild a dead release and exercise new logic against its public provenance.
 
-Only disposable copies receive the 0.3.4 -> 0.2.2 identity substitution. Production
+Only disposable copies receive the 0.3.5 -> 0.2.2 identity substitution. Production
 entry points have no tag override and the dead tag is never created or moved.
 This is historical five-subject evidence, not Windows/MCPB issuance evidence.
 Run with Python -I and TMPDIR set to a private scratch directory.
@@ -61,8 +61,8 @@ def rehearse(scratch):
         print("PASS: rebuilt all four assets match the committed v0.2.2 manifest", flush=True)
         for name in ("verify-release.sh", "install-release.sh"):
             source = (ROOT / "scripts" / name).read_text()
-            assert "0.3.4" in source
-            (worktree / "scripts" / name).write_text(source.replace("0.3.4", "0.2.2"))
+            assert "0.3.5" in source
+            (worktree / "scripts" / name).write_text(source.replace("0.3.5", "0.2.2"))
         verify = worktree / "scripts/verify-release.sh"
         install = worktree / "scripts/install-release.sh"
         run("sh", verify, assets, FINAL, env=env)
@@ -121,7 +121,7 @@ def rehearse(scratch):
                    "--cert-identity", "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/" + TAG,
                    "--deny-self-hosted-runners", "--format", "json"]
         for flag, value in (("--source-digest", source),
-                            ("--source-ref", "refs/tags/v0.3.4")):
+                            ("--source-ref", "refs/tags/v0.3.5")):
             wrong = command.copy()
             wrong[wrong.index(flag) + 1] = value
             run(*wrong, env=env, deny=True)

@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       published:
-        description: Repeat against published v0.3.4 assets from final checksum commit C
+        description: Repeat against published v0.3.5 assets from final checksum commit C
         type: boolean
         default: false
       tag:
         description: Exact published tag
         type: string
-        default: v0.3.4
+        default: v0.3.5
       commit:
         description: Authenticated full checksum commit C (required for published checks)
         type: string
@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.4
+          test "$RELEASE_TAG" = v0.3.5
           printf '%s\n' "$RELEASE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -180,14 +180,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.4
+          test "$RELEASE_TAG" = v0.3.5
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.3.4.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.3.4.txt
+          test -f dist/checksums-v0.3.5.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.3.5.txt
           sh scripts/verify-release.sh --source
       - name: Public standalone and checkout installs with real offline verification
         if: inputs.published || inputs.commit != ''
@@ -275,14 +275,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.3.4
+          test "$RELEASE_TAG" = v0.3.5
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.3.4.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.3.4.txt
+          test -f dist/checksums-v0.3.5.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.3.5.txt
           sh scripts/verify-release.sh --source
       - name: Public standalone and checkout installs with real offline verification
         if: inputs.published || inputs.commit != ''

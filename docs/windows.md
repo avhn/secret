@@ -2,11 +2,12 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-v0.3.4 packaging work adds raw `secret-v0.3.4-windows-amd64.exe` and
-`secret-v0.3.4-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+v0.3.5 packaging work adds raw `secret-v0.3.5-windows-amd64.exe` and
+`secret-v0.3.5-windows-arm64.exe` assets plus `install.ps1`; native candidate and
 public-release installs on both architectures remain separate required evidence.
 This document does not claim those new installs have passed or publication exists.
-The installed defaults remain Bash CLI/guard. Plugin manifests become 0.3.4
+The final CLI is `secret.exe`; installed hooks remain the Bash guard.
+Plugin manifests become 0.3.5
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -46,7 +47,7 @@ Only the CLI name changes: Claude and Codex keep the Bash guard, and native
 hook activation remains deferred. Explicit Bash rollback requires Git Bash:
 `bash /absolute/trusted/checkout/compat/secret`. No automatic fallback occurs.
 `INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
-0.3.4, never latest; `--commit` supplies the optional full C and `--help` explains
+0.3.5, never latest; `--commit` supplies the optional full C and `--help` explains
 inputs. It adds only its own directory to user PATH. It does not modify client
 files, register MCP or install hooks. From v0.3.5 onward, verified atomic
 publication intentionally replaces a safe existing final-name executable. Use the

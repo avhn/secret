@@ -4,14 +4,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Changed
+### 0.3.5 (2026-11-01)
 
+#### Changed
+
+- Advance release, installer, packaging, manifest, workflow, test and setup
+  identities equally to 0.3.5. Keep Go 1.27.3 and every published tag and
+  checksum manifest unchanged; no Go hook activation.
 - The release owner approval gate (required reviewers on `release-publish` and
   `registry-publish`) is disabled by owner decision. The tag workflow keeps the
   exact-tag environment check and requires reviewers only when
   `vars.SECRET_RELEASE_APPROVAL_GATE` is `enabled`; see docs/release.md.
 
-### Windows store parent policy
+#### Windows store parent policy
 
 - Accept current-user-owned store parents whose non-empty DACL grants access
   only to that user, SYSTEM and Administrators, including inherited ACEs. Keep
@@ -23,7 +28,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
   distinct from owner-only `private` objects. Keep public artifact checksum
   inspection independent of store-parent ACL requirements.
 
-### Native Windows clipboard
+#### Native Windows clipboard
 
 - Add native Unicode `clip` support to the staged Go CLI, with bounded busy-open
   retries, byte-only UTF-8/UTF-16 conversion and fixed errors for invalid UTF-8/NUL.
@@ -43,11 +48,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
   clipboard gate for native round trips and post-exit conditional clearing. No
   local real-clipboard testing or native hosted pass is claimed by these changes.
 
-### Final CLI naming for v0.3.5 (pending CI)
+#### Final CLI naming for v0.3.5
 
 - Migration: main now differs from published v0.3.4 and must ship as a new
-  v0.3.5 release, never replacement v0.3.4 assets. Version pins remain unchanged
-  here pending the separate coordinated identity bump.
+  v0.3.5 release, never replacement v0.3.4 assets. Version pins advance
+  together in this coordinated identity bump.
 - Main's `bin/secret` now exits 70 without release-C checksum metadata; unlike
   the old Bash CLI it cannot run directly from a plain clone. Use `compat/secret`
   explicitly or the standalone installer. The final checkout launcher is for
@@ -62,22 +67,22 @@ All notable changes to this project are documented here. Format follows [Keep a 
   checks, tokened locks and verified atomic replacement. Existing safe CLI files
   are intentionally replaced; failures preserve their bytes.
 - Name Desktop payloads `server/secret[.exe]`; retain release asset grammar,
-  Registry identity and 0.3.4 pins until the separate release bump.
+  Registry identity; advance current pins to 0.3.5 in the release bump.
 - Add the CLI-only plugin contract, forced Bash interpreter and compatibility
   identity/broken-launcher gates. Exact divergence inventories remain unchanged.
   Claude and Codex stay on Bash hooks; Go hook activation, `onFailure` and output
   contracts still require sponsored M4.1 host evidence.
 
-### Added
+#### Added
 
 - Mute Agent logo resources and centered README header with project badges.
 
-### Changed
+#### Changed
 
 - MCPB icon now uses the reviewed Mute Agent artwork, with a byte-for-byte sync
   script and offline branding checks.
 
-### 0.3.4 patch (2026-11-01)
+### 0.3.4 patch (published 2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted
   native stdio handles directly; mixed/non-file writers relay both supplied streams

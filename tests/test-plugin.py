@@ -289,10 +289,10 @@ class CLIOnlyManifestTests(unittest.TestCase):
 
 
 class ReleaseManifestTests(CLIOnlyManifestTests):
-    """CLI-only packaging, without changing the pending release identity."""
+    """CLI-only packaging with the coordinated release identity."""
 
     def test_four_versions_match_release(self):
-        self.assertEqual(VERSION, "0.3.4")
+        self.assertEqual(VERSION, "0.3.5")
         for name, keys in CONTRACT["manifests"].items():
             with self.subTest(manifest=name):
                 value = json.loads((CHECKOUT / name).read_text())
