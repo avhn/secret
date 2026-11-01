@@ -11,10 +11,10 @@ $names = @('HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'PATH', 'TEMP', 'TM
     'SECRET_INSTALL_LATEST', 'SECRET_INSTALL_ASSET', 'SECRET_INSTALL_READY', 'GOCACHE', 'GOMODCACHE', 'GOTOOLCHAIN', 'GOENV', 'GOWORK', 'CGO_ENABLED')
 $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
-$script:fakeUserPath = '%USERPROFILE%\synthetic-existing'
-$script:pathWrites = 0
-$script:environmentChanges = 0
-$script:nativeMachine = [uint16]0 # Exercise the existing environment fallback by default.
+$global:SecretTest_fakeUserPath = '%USERPROFILE%\synthetic-existing'
+$global:SecretTest_pathWrites = 0
+$global:SecretTest_environmentChanges = 0
+$global:SecretTest_nativeMachine = [uint16]0 # Exercise the existing environment fallback by default.
 $originalProcessPath = $env:PATH
 # Registry access is shadowed only in this test process. File access stays native.
 function Get-TestSha256([string]$path) {
@@ -30,7 +30,7 @@ function Get-Item {
         $key | Add-Member ScriptMethod GetValue {
             param($name, $default, $options)
             if ($name -ne 'Path' -or $options -ne [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) { throw 'unexpected registry read' }
-            return $script:fakeUserPath
+            return $global:SecretTest_fakeUserPath
         }
         return $key
     }
@@ -40,20 +40,20 @@ function Get-Item {
 function New-ItemProperty {
     [CmdletBinding()] param($LiteralPath, $Name, $Value, $PropertyType, [switch]$Force)
     if ($LiteralPath -ne 'HKCU:\Environment' -or $Name -ne 'Path' -or $PropertyType -ne 'ExpandString') { throw 'unexpected registry write' }
-    $script:fakeUserPath = $Value; $script:pathWrites++
+    $global:SecretTest_fakeUserPath = $Value; $global:SecretTest_pathWrites++
 }
 function Assert-True($condition, $message) { if (-not $condition) { throw "FAIL: $message" } }
 # Shadow native detection and broadcasting, just as registry access is shadowed.
-function Get-SecretNativeMachine { return $script:nativeMachine }
+function Get-SecretNativeMachine { return $global:SecretTest_nativeMachine }
 function Send-SecretEnvironmentChange {
-    Assert-True ($script:environmentChanges -eq ($script:pathWrites - 1)) 'broadcast without a new user PATH write'
-    $script:environmentChanges++
+    Assert-True ($global:SecretTest_environmentChanges -eq ($global:SecretTest_pathWrites - 1)) 'broadcast without a new user PATH write'
+    $global:SecretTest_environmentChanges++
 }
 function Report-SecretInstallFailure([string]$category, [string]$types, [string]$hresults) {
     Assert-True ($category -cmatch '\A[a-z-]+\z') 'unsafe installer diagnostic category'
     Assert-True ($types -cmatch '\A[A-Za-z0-9_.+,]+\z') 'unsafe installer diagnostic type'
     Assert-True ($hresults -cmatch '\A[0-9A-F,]+\z') 'unsafe installer diagnostic HRESULT'
-    $script:lastInstallFailure = "stage=$category; types=$types; hresults=$hresults"
+    $global:SecretTest_lastInstallFailure = "stage=$category; types=$types; hresults=$hresults"
 }
 function New-TestPrivateDirectory([string]$path) {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
@@ -97,24 +97,24 @@ function Assert-TestAclState([string]$path, $expected, [string]$message) {
     }
 }
 function Invoke-TestInstaller([string[]]$Arguments = @(), [switch]$ExpectedSuccess) {
-    $script:lastInstallFailure = $null
+    $global:SecretTest_lastInstallFailure = $null
     try { & ([scriptblock]::Create($installer)) @Arguments | Out-String } catch {
         if ($ExpectedSuccess) {
-            if ($script:lastInstallFailure) { Write-Host "secret installer diagnostic: $script:lastInstallFailure" }
+            if ($global:SecretTest_lastInstallFailure) { Write-Host "secret installer diagnostic: $global:SecretTest_lastInstallFailure" }
             else { Write-Host 'secret installer diagnostic: stage=bootstrap' }
         }
         throw
     }
 }
 function Expect-Failure([string]$label, [string[]]$Arguments = @(), [string]$ExpectedMessage = '') {
-    $before = $script:pathWrites; $beforeBroadcasts = $script:environmentChanges; $failed = $false
+    $before = $global:SecretTest_pathWrites; $beforeBroadcasts = $global:SecretTest_environmentChanges; $failed = $false
     try { Invoke-TestInstaller $Arguments | Out-Null } catch {
         $failed = $true
         if ($ExpectedMessage) { Assert-True ($_.Exception.Message -ceq $ExpectedMessage) "$label had the wrong diagnostic" }
     }
     Assert-True $failed "$label accepted"
-    Assert-True ($script:pathWrites -eq $before) "$label changed user PATH"
-    Assert-True ($script:environmentChanges -eq $beforeBroadcasts) "$label broadcast an environment change"
+    Assert-True ($global:SecretTest_pathWrites -eq $before) "$label changed user PATH"
+    Assert-True ($global:SecretTest_environmentChanges -eq $beforeBroadcasts) "$label broadcast an environment change"
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe'))) "$label published binary"
     if (Test-Path -LiteralPath $env:INSTALL_DIR) {
         Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 0) "$label left scratch/lock"
@@ -246,18 +246,18 @@ func main() {
         Expect-Failure 'percent in resolved directory' -ExpectedMessage 'secret: install directory must not contain %'
         Assert-True (-not (Test-Path -LiteralPath (Join-Path $work '%LOCALAPPDATA%'))) 'percent rejection created a directory'
         Assert-True (-not (Test-Path -LiteralPath $env:SECRET_INSTALL_LOG)) 'percent rejection called a transport'
-        Assert-True ($script:pathWrites -eq 0 -and $env:PATH -ceq (Join-Path $work 'tools')) 'percent rejection changed PATH'
+        Assert-True ($global:SecretTest_pathWrites -eq 0 -and $env:PATH -ceq (Join-Path $work 'tools')) 'percent rejection changed PATH'
     } finally { $env:INSTALL_DIR = $safeInstallDir }
     $env:SECRET_RELEASE_COMMIT = 'b' * 40; Expect-Failure 'wrong commit pin'
     Expect-Failure 'conflicting commit pins' -Arguments @('--commit', ('a' * 40))
     $env:SECRET_RELEASE_COMMIT = $null
     $emulatedProcess = @{
         Architecture = $env:PROCESSOR_ARCHITECTURE; Wow = $env:PROCESSOR_ARCHITEW6432
-        Asset = $env:SECRET_INSTALL_ASSET; Mode = $env:SECRET_INSTALL_MODE; Machine = $script:nativeMachine
+        Asset = $env:SECRET_INSTALL_ASSET; Mode = $env:SECRET_INSTALL_MODE; Machine = $global:SecretTest_nativeMachine
     }
     try {
         $env:PROCESSOR_ARCHITECTURE = 'AMD64'; $env:PROCESSOR_ARCHITEW6432 = 'AMD64'
-        $script:nativeMachine = [uint16]0xaa64
+        $global:SecretTest_nativeMachine = [uint16]0xaa64
         $env:SECRET_INSTALL_ASSET = 'secret-v0.5.0-windows-arm64.exe'
         # Stop at checksum validation: an x64 runner cannot execute Arm64 code,
         # but the transport log must prove native, not process, asset selection.
@@ -272,7 +272,7 @@ func main() {
         $env:PROCESSOR_ARCHITECTURE = $emulatedProcess.Architecture
         $env:PROCESSOR_ARCHITEW6432 = $emulatedProcess.Wow
         $env:SECRET_INSTALL_ASSET = $emulatedProcess.Asset; $env:SECRET_INSTALL_MODE = $emulatedProcess.Mode
-        $script:nativeMachine = $emulatedProcess.Machine
+        $global:SecretTest_nativeMachine = $emulatedProcess.Machine
     }
     foreach ($mode in @('corrupt', 'network', 'interrupted', 'oversize', 'redirect', 'redirect-loop', 'version')) {
         $env:SECRET_INSTALL_MODE = $mode; Expect-Failure $mode
@@ -386,8 +386,8 @@ func main() {
     Assert-True ($parseErrors.Count -eq 0) 'quoted registration parse failure'
     $command = $ast.EndBlock.Statements[0].PipelineElements[0]
     Assert-True ($command.CommandElements[9].Value -ceq $target) 'quoted registration changed binary argv'
-    Assert-True ($script:pathWrites -eq 1 -and $script:fakeUserPath -ceq ('%USERPROFILE%\synthetic-existing;' + $env:INSTALL_DIR)) 'user PATH changed beyond destination'
-    Assert-True ($script:environmentChanges -eq 1) 'changed user PATH did not broadcast exactly once'
+    Assert-True ($global:SecretTest_pathWrites -eq 1 -and $global:SecretTest_fakeUserPath -ceq ('%USERPROFILE%\synthetic-existing;' + $env:INSTALL_DIR)) 'user PATH changed beyond destination'
+    Assert-True ($global:SecretTest_environmentChanges -eq 1) 'changed user PATH did not broadcast exactly once'
     $held = [IO.File]::Open($target, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     $mtime = (Get-Item -LiteralPath $target).LastWriteTimeUtc
     try {
@@ -399,7 +399,7 @@ func main() {
         $fileOutput = & (Join-Path $root 'install.ps1') --version 0.5.0 --dir $env:INSTALL_DIR | Out-String
         Assert-True ($fileOutput.Contains('secret 0.5.0 is already installed at')) 'file parameters were not forwarded'
         Assert-True ((Get-Item -LiteralPath $target).LastWriteTimeUtc -eq $mtime) 'no-op changed mtime'
-        Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'no-op changed PATH'
+        Assert-True ($global:SecretTest_pathWrites -eq 1 -and $global:SecretTest_environmentChanges -eq 1) 'no-op changed PATH'
     } finally { $held.Dispose(); $env:SECRET_INSTALL_MODE = $null }
     $firstFixtures = $env:SECRET_INSTALL_FIXTURES
     $firstDigest = (Get-TestSha256 $target)
@@ -426,7 +426,7 @@ func main() {
     $env:SECRET_INSTALL_MODE = 'corrupt'
     $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
     Assert-True ($failed -and (Get-TestSha256 $target) -ceq $oldDigest) 'failure damaged existing destination'
-    Assert-True ($script:lastInstallFailure -clike 'stage=download-verification; types=*; hresults=*') 'missing path-free failure diagnostic'
+    Assert-True ($global:SecretTest_lastInstallFailure -clike 'stage=download-verification; types=*; hresults=*') 'missing path-free failure diagnostic'
     $env:SECRET_INSTALL_MODE = $null
     # Where the token permits it, seed an elevated install's Administrators owner;
     # replacement must still publish the current user as owner.
@@ -448,7 +448,7 @@ func main() {
     Assert-True ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'replacement owner is not the current user'
     if ($administratorsOwnerApplied) { Write-Output 'PASS replacement corrects Administrators owner to current user' }
     Assert-True ((Get-TestSha256 $target) -ceq $before) 'atomic replacement changed verified bytes'
-    Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'atomic replacement changed PATH or broadcast again'
+    Assert-True ($global:SecretTest_pathWrites -eq 1 -and $global:SecretTest_environmentChanges -eq 1) 'atomic replacement changed PATH or broadcast again'
     Assert-TestAclState $env:INSTALL_DIR $originalAclState 'atomic replacement changed destination DACL'
     Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'atomic replacement left backup, lock or scratch'
     Write-Output 'PASS atomic replacement before DACL fault injection'
@@ -484,7 +484,7 @@ func main() {
                 Assert-True $failed "$rights accepted for $sid"
                 Assert-True ((Get-TestSha256 $caseBinary) -ceq $before) 'DACL rejection damaged installed binary'
                 Assert-TestAclState $unsafeDirectory $unsafeState 'DACL rejection rewrote existing permissions'
-                Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'DACL rejection changed user PATH or broadcast'
+                Assert-True ($global:SecretTest_pathWrites -eq 1 -and $global:SecretTest_environmentChanges -eq 1) 'DACL rejection changed user PATH or broadcast'
                 Assert-True (@(Get-ChildItem -LiteralPath $caseDirectory -Force).Count -eq 1) 'DACL rejection left scratch or lock'
                 Write-Output "PASS $rights rejection preserves DACL and binary ($sid, $location)"
             } finally {
@@ -518,7 +518,7 @@ func main() {
         Assert-True ((Get-Acl -LiteralPath $caseBinary).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'modify-only fixture is not current-user owned'
         $modifyState = Get-TestAclState $caseBinary
         # A new destination appends to the synthetic PATH; restore the counters.
-        $savedPathState = @($script:fakeUserPath, $script:pathWrites, $script:environmentChanges)
+        $savedPathState = @($global:SecretTest_fakeUserPath, $global:SecretTest_pathWrites, $global:SecretTest_environmentChanges)
         $env:INSTALL_DIR = $caseDirectory
         Invoke-TestInstaller -ExpectedSuccess | Out-Null
         Assert-True ((Get-Acl -LiteralPath $caseBinary).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'modify-only replacement owner is not the current user'
@@ -528,14 +528,14 @@ func main() {
         Write-Output 'PASS current-user-owned Modify-only replacement skips owner write'
     } finally {
         $env:INSTALL_DIR = $primaryInstallDir
-        if ($savedPathState) { $script:fakeUserPath, $script:pathWrites, $script:environmentChanges = $savedPathState }
+        if ($savedPathState) { $global:SecretTest_fakeUserPath, $global:SecretTest_pathWrites, $global:SecretTest_environmentChanges = $savedPathState }
         Remove-Item -LiteralPath $caseRoot -Recurse -Force
     }
     Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'DACL fault injection left install scratch or lock'
     Invoke-TestInstaller -ExpectedSuccess | Out-Null
     Assert-True ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'repeated replacement owner is not the current user'
-    Assert-True ($script:pathWrites -eq 1) 'replacement duplicated PATH'
-    Assert-True ($script:environmentChanges -eq 1) 'unchanged user PATH broadcast an environment change'
+    Assert-True ($global:SecretTest_pathWrites -eq 1) 'replacement duplicated PATH'
+    Assert-True ($global:SecretTest_environmentChanges -eq 1) 'unchanged user PATH broadcast an environment change'
     Assert-True ($env:PATH -ceq (Join-Path $work 'tools')) 'installer edited process PATH'
     # The final name intentionally replaces the old standalone Bash-name contract.
     Assert-True (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe')) 'final CLI absent'
