@@ -318,7 +318,7 @@ class ReleaseTest(unittest.TestCase):
             "one space": self.manifest.replace(b"  ", b" "),
             "path": self.manifest.replace(b"  secret", b"  ./secret"),
             "uppercase": self.manifest.upper(),
-            "other version": self.manifest.replace(b"v0.4.0", b"v0.3.6"),
+            "other version": self.manifest.replace(b"v0.4.0", b"v9.9.9"),
             "windows without exe": self.manifest.replace(b".exe", b""),
             "unix with exe": self.manifest.replace(b"linux-amd64\n", b"linux-amd64.exe\n"),
             "six binaries only": b"".join(line for line in lines if b"desktop.mcpb" not in line and b"server.json" not in line),

@@ -247,7 +247,7 @@ class Install(unittest.TestCase):
             self.env['SECRET_VERSION'] = version
             self.failure()
         self.env['SECRET_VERSION'] = '0.4.0'
-        self.failure('--version', '0.4.0')
+        self.failure('--version', '9.9.9')
         for commit in ('latest', 'a' * 39, 'A' * 40, 'a' * 40 + '\n'):
             self.env['SECRET_RELEASE_COMMIT'] = commit
             self.failure()
