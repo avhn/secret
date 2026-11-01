@@ -45,3 +45,13 @@ func syncFeatureDirectory(root *os.Root) error {
 func validateFeaturePayload(*os.Root, os.FileInfo) error { return nil }
 
 func doctorPrivateStatus(string) string { return "unsupported" }
+
+func openOperatorDirectory(path string) (*os.Root, error) {
+	// Normal platform aliases such as macOS /var and /tmp are valid explicit
+	// input paths. Bind their resolved parent once; never follow a final alias.
+	parent, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return nil, err
+	}
+	return os.OpenRoot(parent)
+}

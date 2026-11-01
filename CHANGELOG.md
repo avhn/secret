@@ -4,6 +4,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Windows store parent policy
+
+- Accept current-user-owned store parents whose non-empty DACL grants access
+  only to that user, SYSTEM and Administrators, including inherited ACEs. Keep
+  store files, templates, audit, locks, scratch and recovery owner-only; never
+  repair ACLs or accept final reparse points.
+- Apply the same parent checks to operator lifecycle/import/export and names-only
+  MCP reads. Add synthetic native ACL, identity, write and operator regressions.
+- Classify eligible Windows store parents as `trusted_parent` in doctor output,
+  distinct from owner-only `private` objects. Keep public artifact checksum
+  inspection independent of store-parent ACL requirements.
+
 ### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted

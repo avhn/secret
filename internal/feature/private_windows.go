@@ -61,7 +61,7 @@ func openFeatureFile(root *os.Root, name string) (*os.File, error) {
 	return secure.OpenPrivateFile(root, name)
 }
 func openOperatorFile(root *os.Root, name string) (*os.File, error) {
-	return secure.OpenPrivateFile(root, name)
+	return secure.OpenStoreFile(root, name)
 }
 
 // File Sync and anchored Rename errors remain mandatory. Windows does not offer
@@ -89,7 +89,38 @@ func doctorPrivateStatus(path string) string {
 	}
 	defer file.Close()
 	if secure.CheckPrivate(file) != nil {
+		if secure.CheckStoreDirectory(file) == nil {
+			return "trusted_parent"
+		}
 		return "insecure"
 	}
 	return "private"
+}
+
+// Do not resolve away a final parent reparse point before checking its handle.
+func openOperatorDirectory(path string) (*os.Root, error) {
+	return openOperatorDirectoryWithRoot(path, os.OpenRoot)
+}
+
+func openOperatorDirectoryWithRoot(path string, openRoot func(string) (*os.Root, error)) (*os.Root, error) {
+	if secure.ValidateStorePath(path) != nil {
+		return nil, secure.ErrPrivateFile
+	}
+	parent, err := openRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	if filepath.Dir(path) == path {
+		file, err := parent.Open(".")
+		if err == nil {
+			defer file.Close()
+			if secure.CheckStoreDirectory(file) == nil {
+				return parent, nil
+			}
+		}
+		parent.Close()
+		return nil, secure.ErrPrivateFile
+	}
+	defer parent.Close()
+	return secure.OpenStoreDirectory(parent, filepath.Base(path))
 }

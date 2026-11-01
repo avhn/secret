@@ -4,6 +4,15 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 
 **Current milestone:** v0.3.4 (Windows long-lived exec launcher) is in preparation, based on main after v0.3.3 was published on 2026-10-30 with an active MCP Registry record `io.github.avhn/secret` 0.3.3; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
+## Windows store parent policy (in progress)
+
+Accept owned store parents with only current-user, SYSTEM and Administrators
+allow ACEs, including inheritance, while retaining strict owner-only files and
+private working directories. Native synthetic regression coverage includes
+operator lifecycle/import/export and names-only MCP reads. Applicable hosted
+Windows CI remains required; naming, hook activation and release identity are
+unchanged by this work.
+
 ## v0.3.4: Windows long-lived exec launcher patch
 
 Based on main after published v0.3.3 at checksum commit C `ea85737`; the existing

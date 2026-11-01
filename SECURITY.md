@@ -34,9 +34,14 @@ This is not a sandbox, hook activation or proof of host fail-closed behavior.
 M5a's native Windows amd64 gate passed in PR #29, including storage, console,
 Job containment and exact Credential Manager lifecycle/independent cleanup.
 See [Windows evidence and limits](docs/windows.md). Windows reads/writes use
-handle-checked, protected owner-only DACLs for parents, locks, tokens, scratch,
-replacements, manifests and recovery. Broad/inherited/NULL DACLs and final reparse
-points are rejected, not silently repaired. Child creation enrolls descendants
+handle-checked, protected owner-only DACLs for store files, locks, tokens, scratch,
+replacements, manifests and recovery. Store parents must be current-user owned,
+non-reparse directories with non-NULL, non-empty DACLs containing only ordinary
+allow ACEs for the current user, SYSTEM or Administrators. Inherited ACEs and
+unprotected store-parent DACLs are allowed; all other principals (even read-only),
+conditional and unsupported ACEs are rejected. Templates, audit and newly created
+directories retain protected owner-only DACLs. Final reparse points are rejected
+and existing ACLs are never repaired. Child creation enrolls descendants
 in a non-inheritable kill-on-close Job without breakaway fallback; redirected
 operator consent/value input is rejected. Literal output redaction covers UTF-8
 and UTF-16LE/BE, not transformed values or other code pages.

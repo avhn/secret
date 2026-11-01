@@ -11,10 +11,10 @@ import (
 )
 
 func openNoFollow(root *os.Root, name string) (*os.File, error) {
-	return secure.OpenPrivateFile(root, name)
+	return secure.OpenStoreFile(root, name)
 }
 
-// ReadFile anchors the private parent and checks the final handle before reading
+// ReadFile anchors the trusted parent and checks the final handle before reading
 // any bytes. Neither a final reparse point nor a mode-only fixture is private.
 func ReadFile(path string) ([]byte, error) {
 	if secure.ValidateStorePath(path) != nil {
@@ -43,7 +43,7 @@ func readPrivateChild(root *os.Root, name string) ([]byte, error) {
 func openReadRoot(dir string) (*os.Root, error) { return privateStoreRoot(dir, false) }
 
 // Windows offers no supported directory FlushFileBuffers contract here. Require
-// a live private anchor but do not turn a successful data-flushed publication
+// a live trusted anchor but do not turn a successful data-flushed publication
 // into permanent recovery by trying to Sync a read-only directory handle.
 // This is not a power-loss durability guarantee.
 func syncManifestDirectory(root *os.Root) error {
@@ -55,7 +55,7 @@ func syncManifestDirectory(root *os.Root) error {
 		return secure.ErrRecovery
 	}
 	defer dir.Close()
-	if secure.CheckPrivate(dir) != nil {
+	if secure.CheckStoreDirectory(dir) != nil {
 		return secure.ErrRecovery
 	}
 	return nil

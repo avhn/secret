@@ -151,13 +151,7 @@ func openOperatorParent(path string) (*os.Root, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, secure.ErrInvalidRequest
 	}
-	// Normal platform aliases such as macOS /var and /tmp are valid explicit
-	// input paths. Bind their resolved parent once; never follow a final alias.
-	parent, err := filepath.EvalSymlinks(filepath.Dir(path))
-	if err != nil {
-		return nil, err
-	}
-	return os.OpenRoot(parent)
+	return openOperatorDirectory(filepath.Dir(path))
 }
 
 func (operator Operator) metadata(reference string, missing bool) (store.Metadata, error) {
