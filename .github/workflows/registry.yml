@@ -18,8 +18,10 @@ permissions:
   contents: read
   attestations: read
 
-# Repository owners must configure required reviewers and trusted refs for the
-# registry-publish environment. Its review authorizes metadata publication only.
+# Repository owners must configure trusted refs for the registry-publish
+# environment. Its owner review gate is disabled by default; with
+# vars.SECRET_RELEASE_APPROVAL_GATE set to "enabled" and required reviewers
+# configured, that review authorizes metadata publication only.
 concurrency:
   group: registry-io.github.avhn-secret-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
