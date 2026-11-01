@@ -265,7 +265,7 @@ func doctorPath(path string, add func(string, string, string, string)) {
 		return
 	}
 	if runtime.GOOS == "windows" {
-		add("mode", path, doctorPrivateStatus(path), "opened-handle owner and protected DACL inspection; not same-user isolation or host certification")
+		add("mode", path, doctorPrivateStatus(path), "opened-handle owner and DACL inspection; trusted_parent is store-parent eligible, not owner-only; not same-user isolation or host certification")
 		return
 	}
 	status := "private"
@@ -298,7 +298,7 @@ func doctorArtifact(artifact DoctorArtifact, options DoctorOptions, add func(str
 		add("checksum", artifact.Kind, "unavailable", "no trusted pinned checksum supplied")
 		return
 	}
-	root, err := openOperatorParent(artifact.Path)
+	root, err := openDoctorArtifactParent(artifact.Path)
 	if err != nil {
 		add("checksum", artifact.Kind, "unavailable", "artifact could not be read safely")
 		return
@@ -326,4 +326,18 @@ func doctorArtifact(artifact DoctorArtifact, options DoctorOptions, add func(str
 		return
 	}
 	add("checksum", artifact.Kind, "matched", "matches supplied digest only; provenance and host trust require separate verification")
+}
+
+// Artifacts are public inputs, not stores. Preserve the resolved-parent walk
+// without imposing store ownership or DACL policy; doctorArtifact checks the
+// final regular-file identity, write permissions and bounded digest itself.
+func openDoctorArtifactParent(path string) (*os.Root, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return nil, secure.ErrInvalidRequest
+	}
+	parent, err := filepath.EvalSymlinks(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	return os.OpenRoot(parent)
 }

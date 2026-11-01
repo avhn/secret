@@ -71,7 +71,7 @@ in [release tooling security](release.md#packaging-tools-and-advisory-review) an
 | Inventory | `SECRETS_DIR/NAME.wincred-keys` is a names-only v1 manifest; recovery uses `NAME.wincred-keys.recovery`. The suffix stays outside unchanged Bash `*.keys` discovery. Metadata operations do not fetch credentials. |
 | Console | Human operator consent and hidden input use verified `CONIN$`/`CONOUT$` console handles. Redirected operator stdin/stdout and stash stdin are rejected before store/provider discovery. Console modes are restored on catchable exits. |
 | Children | `run` filters both output streams; `exec` supervises an unfiltered child rather than replacing the process. Both use native Job containment. |
-| Private files | Templates, audit, stores, locks, scratch and recovery use handle-checked, protected owner-only DACLs. |
+| Private files | Store files, templates, audit, locks, scratch and recovery use handle-checked, protected owner-only DACLs. Store parents use the trusted-principal rule below. |
 | File/patch hooks | Native checks retain protected paths across UNC and administrative shares, subst drives, junctions and resolvable 8.3 aliases, with public-file controls and ambiguous-path denial. |
 
 Use the staged executable directly in your own terminal for value entry and
@@ -156,10 +156,24 @@ evidence gates; installed defaults and every agent-denial rule are unchanged.
 
 ## Limits and hook behavior
 
-- ACL checks require current-user ownership and a protected owner-only DACL,
-  not Unix mode bits. Broad or NULL DACLs and ACL-incapable filesystems are not
-  silently accepted; arbitrary existing parents are not repaired. These ACLs do
-  not isolate administrators or another process running as the same user.
+- Store files require current-user ownership and a protected owner-only DACL,
+  not Unix mode bits. A store parent must be owned by the current user, must not
+  be a reparse point, and must have a non-NULL, non-empty DACL containing only
+  ordinary allow ACEs for that user, SYSTEM (`S-1-5-18`) or Administrators
+  (`S-1-5-32-544`). Explicit and inherited ACEs and unprotected parent DACLs are
+  accepted. Any other principal, including read-only grants, Users, Everyone,
+  Authenticated Users or custom sandbox groups, is rejected. Deny, conditional
+  and unsupported ACEs are rejected too. Existing ACLs are never repaired.
+- Templates, audit, locks, scratch, recovery files and newly created directories
+  retain protected owner-only DACLs. The store-parent exception does not apply
+  to template or audit directories. ACL-incapable filesystems are not accepted.
+  These ACLs do not isolate administrators or processes running as the same user.
+- Doctor reports `private` for protected owner-only objects, `trusted_parent`
+  for directories accepted only by the store-parent rule, and `insecure` for
+  rejected DACLs. This Windows status distinction corrects the former false
+  insecure classification; it does not certify template/audit eligibility.
+  Doctor artifact checksums remain public-file checks with resolved-parent
+  semantics, not store-parent ownership or DACL checks.
 - Data flushes and real publication errors remain required, but Windows directory
   flushing provides no power-loss durability guarantee. Killed writers leave a
   tokened `.write-lock` for manual owner verification and removal, never automatic

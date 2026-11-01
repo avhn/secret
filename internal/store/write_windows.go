@@ -15,9 +15,13 @@ import (
 )
 
 // privateStoreRoot creates only missing components, with their final DACLs. An
-// existing store parent must already be private; arbitrary parents are not fixed.
+// existing store parent must already be trusted; arbitrary parents are not fixed.
 // Win32 lexical cleaning is intentional (unlike physical Unix link/.. traversal).
 func privateStoreRoot(dir string, create bool) (*os.Root, error) {
+	return privateStoreRootWithOpener(dir, create, os.OpenRoot)
+}
+
+func privateStoreRootWithOpener(dir string, create bool, openRoot func(string) (*os.Root, error)) (*os.Root, error) {
 	if secure.ValidateStorePath(dir) != nil {
 		return nil, secure.ErrPrivateFile
 	}
@@ -26,16 +30,16 @@ func privateStoreRoot(dir string, create bool) (*os.Root, error) {
 		return nil, secure.ErrPrivateFile
 	}
 	if filepath.Dir(absolute) == absolute {
-		// A private UNC share root can contain stores directly. Volume roots
+		// A trusted UNC share root can contain stores directly. Volume roots
 		// already exist: open and inspect, never create or repair their ACLs.
-		root, err := os.OpenRoot(absolute)
+		root, err := openRoot(absolute)
 		if err != nil {
 			return nil, secure.ErrPrivateFile
 		}
 		dir, err := root.Open(".")
 		if err == nil {
 			defer dir.Close()
-			if secure.CheckPrivate(dir) == nil {
+			if secure.CheckStoreDirectory(dir) == nil {
 				return root, nil
 			}
 		}
@@ -43,9 +47,9 @@ func privateStoreRoot(dir string, create bool) (*os.Root, error) {
 		return nil, secure.ErrPrivateFile
 	}
 	parentPath, name := filepath.Dir(absolute), filepath.Base(absolute)
-	parent, err := os.OpenRoot(parentPath)
+	parent, err := openRoot(parentPath)
 	if os.IsNotExist(err) && create {
-		parent, err = privateStoreRoot(parentPath, true)
+		parent, err = privateStoreRootWithOpener(parentPath, true, openRoot)
 	}
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -59,7 +63,7 @@ func privateStoreRoot(dir string, create bool) (*os.Root, error) {
 			return nil, err
 		}
 	}
-	return secure.OpenPrivateDirectory(parent, name)
+	return secure.OpenStoreDirectory(parent, name)
 }
 
 func openWriteRoot(dir string) (*os.Root, error) { return privateStoreRoot(dir, true) }
@@ -210,7 +214,7 @@ func retryPrivateBusy(work func() error) error {
 
 func regularTarget(root *os.Root, name string) error {
 	return retryPrivateBusy(func() error {
-		file, err := secure.OpenPrivateFile(root, name)
+		file, err := secure.OpenStoreFile(root, name)
 		if os.IsNotExist(err) {
 			return nil
 		}
