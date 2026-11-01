@@ -41,7 +41,7 @@ def blocks(document):
 
 
 def example_classes(document):
-    heading = "## Configured value-consuming launchers (unreleased)\n"
+    heading = "## Configured value-consuming launchers\n"
     before, launcher = document.split(heading)
     launcher, after = launcher.split("## Update, rollback and remove", 1)
     return before + "## Update, rollback and remove" + after, launcher
@@ -251,6 +251,23 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(set(canonical), {"sh", "powershell"})
         self.assertEqual(installers((ROOT / "README.md").read_text()), canonical)
 
+    def test_readme_onboarding_order_prompt_and_launcher(self):
+        document = (ROOT / "README.md").read_text(encoding="utf-8")
+        headings = re.findall(r"^## (.+)$", document, re.MULTILINE)
+        self.assertEqual(headings, ["How it works", "Install", "Use it",
+                         "Use it to launch other MCP servers", "Next steps", "Guard hook",
+                         "More workflows", "Security limits", "Development", "License"])
+        prompt = self.document.split("## Paste to your agent\n\n", 1)[1].split("\n\n", 1)[0]
+        self.assertIn(prompt, document)
+        launcher = next(body for language, body in blocks(document)
+                        if language == "sh" and ' exec -f ' in body)
+        self.assertEqual(shlex.split(launcher), [UNIX_COMMAND, "exec", "-f",
+                         "/ABSOLUTE/STORE DIR/.secrets.env", "--key", "OPENPROJECT_API_TOKEN",
+                         "--", "uvx", "openproject-ce-mcp@0.4.1"])
+        registration_line = next(body for language, body in blocks(document)
+                                 if language == "sh" and body.startswith("claude mcp add"))
+        self.assert_argv(client_argv("sh", registration_line))
+
     def test_authentication_prerequisite_and_process_only_policy_are_documented(self):
         for path in (DOCUMENT, ROOT / "README.md", ROOT / "docs/install.md", ROOT / "docs/windows.md"):
             with self.subTest(document=path.name):
@@ -363,7 +380,8 @@ class ConfiguredLauncherTests(unittest.TestCase):
     def test_exact_configured_launcher_argv_and_scope(self):
         self.assertEqual(len(self.examples), 2)
         for (language, body), command, reference in zip(
-                self.examples, (UNIX_COMMAND, WINDOWS_COMMAND), (UNIX_STORE, WINDOWS_STORE), strict=True):
+                self.examples, (UNIX_COMMAND, WINDOWS_COMMAND),
+                (UNIX_STORE.removeprefix("file:"), WINDOWS_STORE.removeprefix("file:")), strict=True):
             self.assertEqual(language, "json")
             parsed = json.loads(body, object_pairs_hook=unique_object)
             self.assertEqual(set(parsed), {"mcpServers"})
@@ -375,7 +393,7 @@ class ConfiguredLauncherTests(unittest.TestCase):
                              "--", "uvx", "openproject-ce-mcp@0.4.1"])
             self.assertIn(json.dumps(command), body)
             self.assertIn(json.dumps(reference), body)
-            self.assertTrue(reference.startswith("file:"))
+            self.assertFalse(reference.startswith("file:"))
             self.assertNotRegex(body, r"(?i)(?:token|password|api_key)\s*[=:]")
 
     def test_launcher_escaping_and_merge_preserve_exact_arguments(self):
@@ -383,9 +401,9 @@ class ConfiguredLauncherTests(unittest.TestCase):
             entry = json.loads(body)["mcpServers"]["openproject-launcher"]
             for command, reference in [
                 ('/synthetic install/with "double" and \'single\'/secret',
-                 'file:/synthetic stores/with "double" and \'single\'.secret'),
+                 '/synthetic stores/with "double" and \'single\'.secret'),
                 ('C:\\synthetic install\\with "double" and \'single\'\\secret.exe',
-                 'file:C:\\synthetic stores\\with "double" and \'single\'.secret'),
+                 'C:\\synthetic stores\\with "double" and \'single\'.secret'),
             ]:
                 rewritten = body.replace(json.dumps(entry["command"]), json.dumps(command))
                 rewritten = rewritten.replace(json.dumps(entry["args"][2]), json.dumps(reference))
@@ -401,14 +419,15 @@ class ConfiguredLauncherTests(unittest.TestCase):
                 self.assertTrue(merged["unrelated"])
                 self.assertEqual(existing["mcpServers"]["openproject-launcher"], {"command": "old", "args": ["old"]})
 
-    def test_unreleased_and_host_evidence_boundaries(self):
+    def test_released_and_host_evidence_boundaries(self):
         document = DOCUMENT.read_text(encoding="utf-8")
-        self.assertIn("## Configured value-consuming launchers (unreleased)", document)
+        self.assertIn("## Configured value-consuming launchers\n", document)
+        self.assertIn("Windows long-lived exec shipped in v0.3.4", self.document)
         for marker in ("not the names-only", "printed absolute executable path", "human-approved",
                        "unfiltered", "ignoring EOF", "terminate the wrapper", "real-host evidence",
                        "no hook", "agent-denial"):
             self.assertIn(marker, self.document)
-        self.assertEqual(set(re.findall(r"(?<![\d.])(\d+\.\d+\.\d+)(?![\d.])", self.document)), {"0.4.1"})
+        self.assertEqual(set(re.findall(r"(?<![\d.])(\d+\.\d+\.\d+)(?![\d.])", self.document)), {"0.3.4", "0.4.1"})
 
 
 if __name__ == "__main__":

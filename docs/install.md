@@ -5,8 +5,8 @@
 From v0.4.0 onward, the final CLI name is `secret` on Unix and `secret.exe` on Windows. The
 owner-approved CLI-only extraction from M4.1 puts the verified Go launcher at
 `bin/secret` and retains byte-identical executable Bash at `compat/secret`.
-Main now differs from published v0.4.0. Current release identities are 0.4.1;
-this checkout must not be published under the existing tag or replace its assets.
+v0.4.1 was published on 2026-11-01 and is the GitHub Latest release. Published
+tags and assets are immutable; fixes require a new patch version.
 Claude and Codex plugin hooks remain Bash. `hooks/guard-go` stays inactive.
 Claude cutover, `onFailure: "block"` and Go hook output-contract changes
 remain M4.1, waiting sponsorship. Do not activate Go hooks based on
@@ -18,22 +18,92 @@ was published on 2026-10-24, at checksum commit C
 The [recorded release evidence](../ROADMAP.md#m4-releasable-linuxmacos-core)
 includes native published-asset installs on all four Linux/macOS targets.
 That historical evidence does not certify the new Windows assets or Desktop
-bundle. The procedure below targets the planned v0.4.1 final tag after its
-separate owner-approved publication; do not use a candidate branch as C.
+bundle. The procedure below targets published v0.4.1; do not use a candidate branch as C.
 See [release.md](release.md) for owner approval boundaries and
 [canonical MCP setup](setup.md) for per-client registration.
 
 ## Checkout installation and Bash compatibility
 
-Use the [README installation](../README.md#install) for the verified CLI and Bash plugins.
-Use `compat/secret` explicitly for Bash rollback, never as an automatic fallback.
-Bash needs Bash 3.2+, Perl, and jq for the guard. Install ripgrep's protective
-configuration as documented there. Create `~/.local/bin` before making the CLI
-symlink. For a reproducible checkout, fetch and review a full commit ID, then use
+
+Requirements: bash 3.2 or newer (stock macOS bash works), perl, and jq for the
+guard and explicit `compat/secret` rollback. The final CLI is Go; CLI naming
+does not activate Go hooks or change MCP registration.
+
+The checkout `bin/secret` launcher requires a release checksum commit C with
+its committed checksum manifest. It works at an authenticated release tag that
+includes this change, **v0.4.0 onward**, after verified cache installation. A
+plain main checkout has no current release checksum manifest and exits 70;
+it does not build from source or fall back to Bash.
+
+For main/clone users, use the standalone installer above (and its printed path),
+or explicitly select the retained Bash implementation:
+
+```bash
+git clone https://github.com/avhn/secret ~/.local/share/secret
+bash ~/.local/share/secret/compat/secret help
+```
+
+For a released checkout launcher, first select the authenticated release C as
+shown in [installation](install.md), then preinstall its verified cache and
+link that release checkout's `bin/secret`. Do not link main's launcher expecting
+it to work without release metadata.
+
+The guard and skill, as a Claude Code plugin:
+
+```text
+/plugin marketplace add avhn/secret
+/plugin install secret@secret
+```
+
+For Codex CLI, install the plugin from this repository's Codex marketplace.
+It bundles the guard and skill, without modifying `~/.codex/hooks.json`:
+
+```bash
+codex plugin marketplace add avhn/secret
+codex plugin add secret@secret
+```
+
+In Codex, open `/hooks` and trust the installed secret hook before relying on
+it. Untrusted hooks are listed but do not run; review and re-trust the hook
+when it changes. `/plugins` lets you inspect the installed plugin. The plugin
+does not put `bin/secret` on `PATH`. Install the CLI separately if you want to
+use it. Main/clone users should choose the standalone installer or invoke
+`bash ~/.local/share/secret/compat/secret` explicitly. A `bin/secret` symlink
+requires an authenticated v0.4.0-or-later release checkout at C, not main, plus
+its verified cache and `~/.local/bin` on `PATH`.
+
+If your Codex version has no plugin marketplace support, use the manual route
+with a checkout of the repo. Copy the hook template with an absolute command
+path and install the skill in the user skills root:
+
+```bash
+mkdir -p ~/.codex ~/.codex/skills
+jq --arg command "$HOME/.local/share/secret/hooks/guard-secrets" \
+  '.hooks.PreToolUse[].hooks[].command = $command' \
+  ~/.local/share/secret/codex/hooks.json >~/.codex/hooks.json
+ln -s ~/.local/share/secret/skills/secrets ~/.codex/skills/secrets
+```
+
+If `~/.codex/hooks.json` already exists, merge its `PreToolUse` groups rather
+than replacing the file. Codex also accepts inline `[hooks]` in `config.toml`;
+the snippet uses `hooks.json` so it can be copied without changing that file.
+Open `/hooks` to trust the manual hook as well. Codex sends shell commands
+under the `Bash` hook name and patches under `apply_patch`. The guard needs
+`jq` and `perl` on the hook's `PATH`.
+
+The guard allows plain `rg` because ripgrep can be told to skip store files.
+Install the protective config, or merge its globs into your own:
+
+```bash
+mkdir -p ~/.config/ripgrep
+cp ~/.local/share/secret/examples/ripgreprc ~/.config/ripgrep/config
+export RIPGREP_CONFIG_PATH="$HOME/.config/ripgrep/config"  # in your shell profile
+```
+
+For a reproducible checkout, fetch and review a full commit ID, then use
 `git checkout --detach FULL_REVIEWED_COMMIT` rather than following a moving branch.
-Review plugin updates before use. Codex hooks need explicit trust in `/hooks` and
-re-trust after changes; listed but untrusted hooks do not execute. Codex's hook
-failure behavior is not proven to block tools.
+Review plugin updates before use. Codex hook failure behavior is not proven to
+block tools.
 
 ## Standalone install and bootstrap trust
 

@@ -6,6 +6,19 @@ Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and 
 
 ## Test locally
 
+The shell suites use disposable directories and synthetic values only. CI runs
+them on Linux and macOS, including stock `/bin/bash` 3.2. Do not use real stores.
+For documentation-only onboarding changes, run:
+
+```bash
+python3 -I tests/test-setup.py
+python3 -I tests/test-mcpb.py
+python3 -I tests/test-release.py WorkflowTest
+python3 -I tests/test-plugin.py "$PWD" "$(mktemp -d)" --manifest-only
+```
+
+These offline checks do not prove installed-host protection or native runtime support.
+
 ```bash
 bash tests/test-secret.sh    # CLI; Perl, Python 3 and ripgrep
 bash tests/test-backends.sh  # disposable provider stub
