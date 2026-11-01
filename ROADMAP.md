@@ -27,6 +27,10 @@ the historical M5a completion gate and changes no release identity or defaults.
 - [x] Cover Job-breakaway fallback, immediate conditional cleanup on timer setup failure and bounded, fully cleared helper input
 - [ ] Require green applicable hosted CI, including native clipboard round-trip and detached-clear evidence
 
+Current branding work adds the approved Mute Agent resources, README header and
+synced MCPB icon with offline byte checks. Release identities, publication gates
+and installed defaults are unchanged.
+
 ## v0.3.4: Windows long-lived exec launcher patch
 
 Based on main after published v0.3.3 at checksum commit C `ea85737`; the existing

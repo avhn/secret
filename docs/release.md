@@ -100,6 +100,13 @@ actions remain separate owner checkpoints. No local test authorizes any of them.
 
 ## Packaging tools and advisory review
 
+Artwork provenance and update instructions live in
+[`resources/README.md`](../resources/README.md). The MCPB icon is copied from the
+approved Mute Agent resources; its PNG is reviewed, committed bytes rendered from
+the SVG, never regenerated in builds. Run
+`python3 -I scripts/sync-branding.py --check` from the checkout root before
+packaging to verify both icon copies match the approved sources.
+
 Full assembly requires native macOS lipo, Go 1.27.3 (`GOTOOLCHAIN=local`),
 Node 26.10.0, npm 11.19.1 and Python 3.14.8. Install the locked MCPB 2.1.2
 validator with `npm ci --prefix packaging/mcpb --ignore-scripts`; no lifecycle
