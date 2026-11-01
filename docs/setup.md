@@ -1,15 +1,15 @@
 # Set up secret MCP
 
-This is the canonical setup guide for the opt-in secret 0.3.5 local stdio MCP
+This is the canonical setup guide for the opt-in secret 0.4.0 local stdio MCP
 server. Install, choose exact references, register, reconnect and verify in that
-order. The v0.3.5 release is being prepared; the commands below require its
+order. The v0.4.0 release is being prepared; the commands below require its
 owner-approved published assets. They do not select a different release if those
 assets are absent. See [installation](install.md) for checkout/offline options
 and [release approvals](release.md) for publication status and trust boundaries.
 
 ## Paste to your agent
 
-Follow https://github.com/avhn/secret/blob/v0.3.5/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
+Follow https://github.com/avhn/secret/blob/v0.4.0/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
 
 ## For an AI agent
 
@@ -34,7 +34,7 @@ into chat, client configuration or these examples.
 
 ```sh
 sh -c 'umask 077; d=$(mktemp -d) || exit
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.3.5/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
 status=$?; rm -rf "$d"; exit "$status"' sh
 ```
 
@@ -43,7 +43,7 @@ through a trusted channel:
 
 ```powershell
 & { $ErrorActionPreference = 'Stop'; $d = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $d | Out-Null
-try { irm https://raw.githubusercontent.com/avhn/secret/v0.3.5/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
+try { irm https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
 finally { Remove-Item -LiteralPath $d -Recurse -Force }; exit $status }
 ```
 
@@ -79,14 +79,14 @@ If installation stops with
 authenticate gh in your own private terminal or correct its trusted environment,
 then retry. Do not paste or print a token to diagnose it.
 
-Inputs are `SECRET_VERSION` (default `0.3.5`, never latest), optional
+Inputs are `SECRET_VERSION` (default `0.4.0`, never latest), optional
 `SECRET_RELEASE_COMMIT` (a full lowercase 40-hex C from independently authenticated
 release records), and `INSTALL_DIR`. A supplied C must match verified provenance;
 without it, C is derived from verified attestation identity, not a checksum field.
 The scripts also accept `--version`, `--commit`, `--dir` and `--help` when run as
 files. Conflicting environment/flag pins fail. Do not substitute a guessed C.
 
-Final CLI names and destinations described below ship from **v0.3.5 onward**.
+Final CLI names and destinations described below ship from **v0.4.0 onward**.
 The download snippets install their pinned release, not main. The published
 v0.3.4 installer uses `secret-go` on Unix and
 `%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
@@ -94,7 +94,7 @@ Use the printed executable path for that release; do not infer the installed
 name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
 published assets or tags.
 
-From v0.3.5 onward, Unix installs only `~/.local/bin/secret` by default and does not edit PATH or
+From v0.4.0 onward, Unix installs only `~/.local/bin/secret` by default and does not edit PATH or
 profiles. Windows installs `$HOME\.local\bin\secret.exe` by
 default, falls back to the native user profile when HOME is absent, and adds only
 its own directory to the user PATH. Open a new terminal to
@@ -111,7 +111,7 @@ Python 3 is needed by the Unix installer, not the installed server.
 
 ## Migrate an earlier installation
 
-From v0.3.5 onward, re-register each MCP client with the new installer's printed
+From v0.4.0 onward, re-register each MCP client with the new installer's printed
 `secret` / `secret.exe` path, preserving the approved store references and other
 arguments. Restart clients and verify the new registration before removing the
 old `secret-go` / `secret-go.exe` file. Review each old path first; do not delete
@@ -174,8 +174,8 @@ scope is stored in `~/.claude.json`; do not replace that file manually.
 
 ### Claude Desktop: bundle
 
-The planned release asset is `secret-v0.3.5-desktop.mcpb`. Obtain it from the
-exact v0.3.5 release and verify its committed checksum and attestation using the
+The planned release asset is `secret-v0.4.0-desktop.mcpb`. Obtain it from the
+exact v0.4.0 release and verify its committed checksum and attestation using the
 trusted-checkout verifier in [install.md](install.md), not an adjacent checksum
 alone. The registry identity is `io.github.avhn/secret`; listing/publication is
 owner-gated and is not claimed here.
@@ -326,7 +326,7 @@ changes. Restart the agent session if needed. Do not accept unrelated trust gran
 ## Verify and understand the limits
 
 Run the installed binary's `version` command in a terminal, using its absolute
-path. Expected release output is `secret 0.3.5 (go)`. The MCP initialize response
+path. Expected release output is `secret 0.4.0 (go)`. The MCP initialize response
 instead identifies `secret-metadata` version `1`; health reports metadata schema
 version, configured readiness and store count, not the release version.
 
@@ -341,7 +341,7 @@ paths and provider account IDs may reach the client, its model and its logs.
 File metadata parsing can open local file bytes internally; provider metadata
 never calls value Get. Unauthenticated age outer metadata is not integrity proof.
 
-All four plugin/marketplace manifests are version 0.3.5, but the installed hooks
+All four plugin/marketplace manifests are version 0.4.0, but the installed hooks
 remain the Bash guard. Go hook activation is M4.1 and remains waiting sponsorship.
 Installing an executable, registering MCP or passing synthetic tests does not
 establish fail-closed host protection. This is accident prevention, not a sandbox.

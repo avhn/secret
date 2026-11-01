@@ -2,12 +2,12 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-v0.3.5 packaging work adds raw `secret-v0.3.5-windows-amd64.exe` and
-`secret-v0.3.5-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+v0.4.0 packaging work adds raw `secret-v0.4.0-windows-amd64.exe` and
+`secret-v0.4.0-windows-arm64.exe` assets plus `install.ps1`; native candidate and
 public-release installs on both architectures remain separate required evidence.
 This document does not claim those new installs have passed or publication exists.
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
-Plugin manifests become 0.3.5
+Plugin manifests become 0.4.0
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -40,16 +40,16 @@ The snippet installs its pinned release, not main. Published v0.3.4 installs `%L
 printed path. After upgrading, re-register MCP and manually retire reviewed
 old binaries and obsolete user PATH entries as described in [setup](setup.md#migrate-an-earlier-installation).
 
-From v0.3.5 onward, the default destination is `$HOME\.local\bin\secret.exe`, with the native user
+From v0.4.0 onward, the default destination is `$HOME\.local\bin\secret.exe`, with the native user
 profile as fallback when HOME is absent. Unsafe ancestors, including a
 CodexSandboxUsers Modify ACE, remain rejected without permission repair.
 Only the CLI name changes: Claude and Codex keep the Bash guard, and native
 hook activation remains deferred. Explicit Bash rollback requires Git Bash:
 `bash /absolute/trusted/checkout/compat/secret`. No automatic fallback occurs.
 `INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
-0.3.5, never latest; `--commit` supplies the optional full C and `--help` explains
+0.4.0, never latest; `--commit` supplies the optional full C and `--help` explains
 inputs. It adds only its own directory to user PATH. It does not modify client
-files, register MCP or install hooks. From v0.3.5 onward, verified atomic
+files, register MCP or install hooks. From v0.4.0 onward, verified atomic
 publication intentionally replaces a safe existing final-name executable. Use the
 printed absolute path, not an assumed PATH lookup. The raw executable does not
 perform the Unix checkout launcher's per-exec rehash. Cold offline Windows

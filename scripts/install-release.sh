@@ -5,8 +5,8 @@ set -f
 umask 077
 LC_ALL=C
 export LC_ALL
-version=0.3.5
-tag=v0.3.5
+version=0.4.0
+tag=v0.4.0
 scratch=
 locked=no
 
@@ -110,10 +110,10 @@ safe_chain "$entry" && safe_chain "$root" || fail 1
 manifest=$root/dist/checksums-v$version.txt
 safe_chain "$manifest" && bounded_file "$manifest" 4096 || fail 1
 # Historical genuine-provenance rehearsals substitute the compiled-in identity.
-# There is no runtime override and a 0.3.5 manifest always requires all eight names.
+# There is no runtime override and a 0.4.0 manifest always requires all eight names.
 case $version in
     0.2.0|0.2.1|0.2.2|0.2.3) records=4 ;;
-    0.3.0|0.3.1|0.3.2|0.3.3|0.3.4|0.3.5) records=8 ;;
+    0.3.0|0.3.1|0.3.2|0.3.3|0.3.4|0.4.0) records=8 ;;
     *) fail 1 ;;
 esac
 # Check bytes as well as records: wc rejects a missing final LF.

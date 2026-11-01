@@ -42,7 +42,7 @@ Treat it as one layer, not the boundary.
 ### Opt-in Go CLI and names-only MCP
 
 [Canonical setup](docs/setup.md) covers installation, approved store references,
-per-client registration, verification, updates and removal. The v0.3.5 release
+per-client registration, verification, updates and removal. The v0.4.0 release
 is being prepared; these pinned commands require its published assets and never
 select latest or fall back to another version.
 
@@ -54,7 +54,7 @@ or client configuration.
 
 ```sh
 sh -c 'umask 077; d=$(mktemp -d) || exit
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.3.5/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
 status=$?; rm -rf "$d"; exit "$status"' sh
 ```
 
@@ -62,7 +62,7 @@ Windows PowerShell:
 
 ```powershell
 & { $ErrorActionPreference = 'Stop'; $d = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $d | Out-Null
-try { irm https://raw.githubusercontent.com/avhn/secret/v0.3.5/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
+try { irm https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
 finally { Remove-Item -LiteralPath $d -Recurse -Force }; exit $status }
 ```
 
@@ -84,7 +84,7 @@ installer before verification. Both require gh and verify release attestations,
 not checksums alone; `SECRET_RELEASE_COMMIT` optionally pins an independently
 authenticated full C. Unix also needs curl and Python 3; Windows needs curl.exe.
 Download/review/run or a trusted checkout offers stronger bootstrap review.
-Final CLI names and destinations described below ship from **v0.3.5 onward**.
+Final CLI names and destinations described below ship from **v0.4.0 onward**.
 The download snippets install their pinned release, not main. The published
 v0.3.4 installer uses `secret-go` on Unix and
 `%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
@@ -92,7 +92,7 @@ Use the printed executable path for that release; do not infer the installed
 name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
 published assets or tags.
 
-From v0.3.5 onward, installers publish `secret` / `secret.exe` and print the absolute path.
+From v0.4.0 onward, installers publish `secret` / `secret.exe` and print the absolute path.
 Defaults are `~/.local/bin/secret` on Unix and `$HOME\.local\bin\secret.exe`
 on Windows (native profile fallback when HOME is absent). A verified install
 atomically replaces a safe existing CLI; `compat/secret` is explicit Bash rollback.
@@ -100,15 +100,15 @@ Unix does not edit PATH; Windows adds only its directory to user PATH. Neither
 registers MCP, reads stores or activates hooks. Raw executables do not have the
 checkout launcher's per-execution rehash.
 
-Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.3.5/docs/setup.md to install and register secret MCP; ask me for exact store references, never discover/read stores, handle values or bypass a guard.
+Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.4.0/docs/setup.md to install and register secret MCP; ask me for exact store references, never discover/read stores, handle values or bypass a guard.
 
 | Surface | Support and evidence |
 | --- | --- |
-| Go CLI | v0.3.5 targets Linux, macOS and Windows amd64/arm64; new native candidate/public-install gates remain required. v0.2.3 Linux/macOS publication is complete. |
+| Go CLI | v0.4.0 targets Linux, macOS and Windows amd64/arm64; new native candidate/public-install gates remain required. v0.2.3 Linux/macOS publication is complete. |
 | Local stdio MCP | Opt-in `mcp --store STORE_REFERENCE`; list/show/diff/health only, never values. Metadata can still reveal names, labels, paths and account IDs. |
-| Desktop bundle | `secret-v0.3.5-desktop.mcpb`: macOS universal and Windows amd64; locked-CLI/native smoke validation is not host-tested Desktop installation. |
+| Desktop bundle | `secret-v0.4.0-desktop.mcpb`: macOS universal and Windows amd64; locked-CLI/native smoke validation is not host-tested Desktop installation. |
 | Registry | Name `io.github.avhn/secret`; publication is separately owner-gated, not claimed here. |
-| Plugins and hooks | All four manifests are 0.3.5; installed hooks remain the Bash guard. M4.1 Go activation is waiting sponsorship, with no fail-closed host claim. |
+| Plugins and hooks | All four manifests are 0.4.0; installed hooks remain the Bash guard. M4.1 Go activation is waiting sponsorship, with no fail-closed host claim. |
 
 See [installation and rollback](docs/install.md) for pins, dependencies, offline
 options and failure recovery, and [release approvals](docs/release.md).
@@ -121,7 +121,7 @@ does not activate Go hooks or change MCP registration.
 
 The checkout `bin/secret` launcher requires a release checksum commit C with
 its committed checksum manifest. It works at an authenticated release tag that
-includes this change, **v0.3.5 onward**, after verified cache installation. A
+includes this change, **v0.4.0 onward**, after verified cache installation. A
 plain main checkout has no current release checksum manifest and exits 70;
 it does not build from source or fall back to Bash.
 
@@ -159,7 +159,7 @@ when it changes. `/plugins` lets you inspect the installed plugin. The plugin
 does not put `bin/secret` on `PATH`. Install the CLI separately if you want to
 use it. Main/clone users should choose the standalone installer or invoke
 `bash ~/.local/share/secret/compat/secret` explicitly. A `bin/secret` symlink
-requires an authenticated v0.3.5-or-later release checkout at C, not main, plus
+requires an authenticated v0.4.0-or-later release checkout at C, not main, plus
 its verified cache and `~/.local/bin` on `PATH`.
 
 If your Codex version has no plugin marketplace support, use the manual route

@@ -12,7 +12,7 @@ the last Bash blob, enforce executable identity and force the selected interpret
 even with explicit `SECRET_CLI`, including stock Bash 3.2. A broken final launcher
 must leave the exact Bash baseline results and inventory unchanged. See
 `tests/test-compat.sh`. Hook activation, `onFailure` and output contracts remain
-M4.1 work after sponsored host evidence. Current release identities remain 0.3.5;
+M4.1 work after sponsored host evidence. Current release identities remain 0.4.0;
 all reserved release actions still need separate approval. Original M4 historical
 boundaries below do not authorize changing immutable tags or checksum commits.
 

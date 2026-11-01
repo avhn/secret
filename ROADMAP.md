@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.3.5 (final CLI naming, Windows store parents and clip, Mute Agent branding, opt-in approval gate) is in preparation, based on main after v0.3.4 was published on 2026-11-01 with an active MCP Registry record `io.github.avhn/secret` 0.3.4; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.4.0 (final CLI naming, Windows store parents and clip, Mute Agent branding, opt-in approval gate) is in preparation, based on main after v0.3.4 was published on 2026-11-01 with an active MCP Registry record `io.github.avhn/secret` 0.3.4; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Windows store parent policy (in progress)
 
@@ -29,9 +29,9 @@ the historical M5a completion gate and changes no release identity or defaults.
 
 Current branding work adds the approved Mute Agent resources, README header and
 synced MCPB icon with offline byte checks. Branding does not activate hooks or
-authorize publication; current release identities advance together to 0.3.5.
+authorize publication; current release identities advance together to 0.4.0.
 
-## v0.3.5: Final CLI naming and Windows refinements
+## v0.4.0: Final CLI naming and Windows refinements
 
 Based on main after published v0.3.4 at checksum commit C `6ee3664`
 (source S `5309977`); all published tags and checksum manifests remain immutable.
@@ -40,13 +40,13 @@ It adopts final `secret[.exe]` CLI naming with explicit byte-identical Bash roll
 Windows trusted store parents and native clip, Mute Agent branding and the opt-in
 approval gate. Installed Bash hooks and waiting-sponsorship boundaries stay unchanged.
 
-- [ ] Review the coordinated 0.3.5 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
+- [ ] Review the coordinated 0.4.0 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
 - [ ] Require green applicable hosted CI, including native Windows parent/clipboard and compatibility gates
 - [ ] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
-- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.3.5.txt`
-- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.3.5 (reviewers only when the approval gate is enabled)
-- [ ] Owner authorizes the signed v0.3.5 tag, draft, publication and Registry publication
-- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.3.5, MCPB `fileSha256` equal to the checksum manifest
+- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.0.txt`
+- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.4.0 (reviewers only when the approval gate is enabled)
+- [ ] Owner authorizes the signed v0.4.0 tag, draft, publication and Registry publication
+- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.4.0, MCPB `fileSha256` equal to the checksum manifest
 - [ ] Owner authorizes promotion of main to source S, never checksum commit C
 
 This release is not published. Tags, publication, installed-default promotion and
@@ -573,19 +573,19 @@ publish it. No draft or release exists. The tag ruleset keeps this dead tag;
 never reuse, move or delete it. The owner-approved new release identity is
 **0.2.3**, with a new candidate/source/checksum cycle.
 
-## CLI-only extraction from M4.1 (v0.3.5, pending CI)
+## CLI-only extraction from M4.1 (v0.4.0, pending CI)
 
-Main now differs from published v0.3.4. This change must ship in a new v0.3.5
-release; current identities and installer snippets now pin 0.3.5 together.
+Main now differs from published v0.3.4. This change must ship in a new v0.4.0
+release; current identities and installer snippets now pin 0.4.0 together.
 No published tag or asset may be replaced. Published v0.3.4 installers retain
 the staging name. Main's launcher intentionally exits 70 without release-C metadata; use standalone installation or explicit
-`compat/secret`. Checkout-launcher instructions target v0.3.5-or-later release C.
+`compat/secret`. Checkout-launcher instructions target v0.4.0-or-later release C.
 
 Owner-approved narrow policy change: `bin/secret` is the verified Go launcher;
 `compat/secret` preserves the last Bash blob and executable mode. Standalone
 installers publish `secret` / `secret.exe`; MCPB uses `server/secret[.exe]`.
 Release asset grammar and Registry identity stay unchanged; current version pins
-advance together to 0.3.5 in the coordinated release bump. The `cli-only` plugin
+advance together to 0.4.0 in the coordinated release bump. The `cli-only` plugin
 contract checks Go CLI plus Bash hooks, not deferred M4.1 activation. Standalone overwrite is intentionally
 reclassified: a verified atomic install replaces a safe regular final-name CLI;
 failed verification preserves it. No automatic Bash fallback is permitted.

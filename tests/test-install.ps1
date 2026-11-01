@@ -138,7 +138,7 @@ func val(args []string, flag string) string { for i,v := range args { if v == fl
 func hash(b []byte) string { x:=sha256.Sum256(b); return hex.EncodeToString(x[:]) }
 func main() {
  args:=os.Args[1:]; mode:=os.Getenv("SECRET_INSTALL_MODE")
- if len(args)==1 && args[0]=="version" { if mode=="version" { fmt.Println("secret 9.9.9 (go)") } else { fmt.Println("secret 0.3.5 (go)") }; return }
+ if len(args)==1 && args[0]=="version" { if mode=="version" { fmt.Println("secret 9.9.9 (go)") } else { fmt.Println("secret 0.4.0 (go)") }; return }
  log,_:=os.OpenFile(os.Getenv("SECRET_INSTALL_LOG"), os.O_CREATE|os.O_APPEND|os.O_WRONLY,0600)
  if log!=nil { b,_:=json.Marshal(args); log.Write(append(b,'\n')); log.Close() }
  if len(args)>=2 && args[0]=="auth" && args[1]=="status" {
@@ -150,7 +150,7 @@ func main() {
  if strings.HasPrefix(filepath.Base(os.Args[0]),"curl") {
   if val(args,"--proto")!="=https" || val(args,"--proto-redir")!="=https" || val(args,"--max-redirs")!="0" || val(args,"--connect-timeout")!="10" || val(args,"--max-time")!="60" { die() }
   body:=val(args,"--output"); header:=val(args,"--dump-header"); url:=args[len(args)-1]
-  if !strings.Contains(url,"/v0.3.5/") && !strings.Contains(url,"release-assets.githubusercontent.com/") { die() }
+  if !strings.Contains(url,"/v0.4.0/") && !strings.Contains(url,"release-assets.githubusercontent.com/") { die() }
   os.WriteFile(body,nil,0600); os.WriteFile(header,[]byte("HTTP/1.1 200 OK\r\n\r\n"),0600)
   if mode=="network" || mode=="interrupted" { os.WriteFile(body,[]byte("partial"),0600); die() }
   if mode=="oversize" { os.WriteFile(body,make([]byte,4097),0600); fmt.Print("200"); return }
@@ -173,23 +173,23 @@ func main() {
   commit:=strings.Repeat("a",40); tagSHA:=strings.Repeat("d",40); blob:=strings.Repeat("e",40)
   result:=map[string]interface{}{}
   switch endpoint {
-  case "git/ref/tags/v0.3.5":
+  case "git/ref/tags/v0.4.0":
    kind:="tag"; sha:=tagSHA; if mode=="lightweight-tag" { kind="commit"; sha=commit }
-   result=map[string]interface{}{"ref":"refs/tags/v0.3.5","object":map[string]interface{}{"type":kind,"sha":sha}}
+   result=map[string]interface{}{"ref":"refs/tags/v0.4.0","object":map[string]interface{}{"type":kind,"sha":sha}}
   case "git/tags/"+tagSHA:
    sha:=commit; if mode=="wrong-tag-commit" { sha=strings.Repeat("b",40) }
-   result=map[string]interface{}{"sha":tagSHA,"tag":"v0.3.5","object":map[string]interface{}{"type":"commit","sha":sha}}
+   result=map[string]interface{}{"sha":tagSHA,"tag":"v0.4.0","object":map[string]interface{}{"type":"commit","sha":sha}}
   case "commits/"+commit+"?per_page=100":
    parents:=[]interface{}{map[string]interface{}{"sha":strings.Repeat("c",40)}}
    if mode=="two-parents" { parents=append(parents,map[string]interface{}{"sha":strings.Repeat("b",40)}) }
    status:="added"; if mode=="modified-checksums" { status="modified" }
-   files:=[]interface{}{map[string]interface{}{"filename":"dist/checksums-v0.3.5.txt","status":status,"sha":blob}}
+   files:=[]interface{}{map[string]interface{}{"filename":"dist/checksums-v0.4.0.txt","status":status,"sha":blob}}
    if mode=="extra-file" { files=append(files,map[string]interface{}{"filename":"README.md","status":"modified","sha":strings.Repeat("f",40)}) }
    result=map[string]interface{}{"sha":commit,"parents":parents,"files":files}
-  case "contents/dist/checksums-v0.3.5.txt?ref="+commit:
-   data,err:=os.ReadFile(filepath.Join(os.Getenv("SECRET_INSTALL_FIXTURES"),"checksums-v0.3.5.txt")); if err!=nil { die() }
+  case "contents/dist/checksums-v0.4.0.txt?ref="+commit:
+   data,err:=os.ReadFile(filepath.Join(os.Getenv("SECRET_INSTALL_FIXTURES"),"checksums-v0.4.0.txt")); if err!=nil { die() }
    if mode=="committed-mismatch" { data=append(data,[]byte("committed bytes differ\n")...) }
-   result=map[string]interface{}{"type":"file","path":"dist/checksums-v0.3.5.txt","sha":blob,"encoding":"base64",
+   result=map[string]interface{}{"type":"file","path":"dist/checksums-v0.4.0.txt","sha":blob,"encoding":"base64",
     "size":len(data),"content":base64.StdEncoding.EncodeToString(data)}
   default: die()
   }
@@ -198,9 +198,9 @@ func main() {
   fmt.Print(text); return
  }
  if len(args)<3 || args[0]!="attestation" || args[1]!="verify" { die() }
- if val(args,"--repo")!="avhn/secret" || val(args,"--source-ref")!="refs/tags/v0.3.5" ||
+ if val(args,"--repo")!="avhn/secret" || val(args,"--source-ref")!="refs/tags/v0.4.0" ||
     val(args,"--cert-oidc-issuer")!="https://token.actions.githubusercontent.com" ||
-    val(args,"--cert-identity")!="https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.3.5" ||
+    val(args,"--cert-identity")!="https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.4.0" ||
     !strings.Contains(strings.Join(args," "),"--deny-self-hosted-runners") || val(args,"--format")!="json" { die() }
  if mode=="attestation" { fmt.Fprintln(os.Stderr,"synthetic diagnostic must not escape"); die() }
  b,err:=os.ReadFile(args[2]); if err!=nil { die() }; name:=filepath.Base(args[2]); commit:=strings.Repeat("a",40)
@@ -219,12 +219,12 @@ func main() {
  if mode=="subject" { matching["name"]="wrong-name" }
  if mode=="subject-duplicate" || (mode=="binary-subject-duplicate" && name==os.Getenv("SECRET_INSTALL_ASSET")) { subjects=append(subjects,matching) }
  if mode=="subject-digest" || (mode=="binary-subject-digest" && name==os.Getenv("SECRET_INSTALL_ASSET")) { matching["digest"]=map[string]interface{}{"sha256":strings.Repeat("0",64)} }
- workflow:=map[string]interface{}{"repository":"https://github.com/avhn/secret","ref":"refs/tags/v0.3.5","path":".github/workflows/release.yml"}
+ workflow:=map[string]interface{}{"repository":"https://github.com/avhn/secret","ref":"refs/tags/v0.4.0","path":".github/workflows/release.yml"}
  if mode=="workflow" { workflow["path"]="wrong.yml" }
  statement:=map[string]interface{}{"predicateType":"https://slsa.dev/provenance/v1",
   "subject":subjects,
   "predicate":map[string]interface{}{"buildDefinition":map[string]interface{}{"externalParameters":map[string]interface{}{"workflow":workflow},
-   "resolvedDependencies":[]interface{}{map[string]interface{}{"uri":"git+https://github.com/avhn/secret@refs/tags/v0.3.5","digest":map[string]interface{}{"gitCommit":commit}}}}}}
+   "resolvedDependencies":[]interface{}{map[string]interface{}{"uri":"git+https://github.com/avhn/secret@refs/tags/v0.4.0","digest":map[string]interface{}{"gitCommit":commit}}}}}}
  result,_:=json.Marshal([]interface{}{map[string]interface{}{"verificationResult":map[string]interface{}{"statement":statement}}})
  text:=string(result); if mode=="duplicate" { text=strings.Replace(text,"\"predicateType\":","\"predicateType\":\"wrong\",\"predicateType\":",1) }; fmt.Print(text)
 }
@@ -239,35 +239,35 @@ func main() {
     if ($LASTEXITCODE -ne 0) { throw 'synthetic helper build failed' }
     Copy-Item -LiteralPath $transport -Destination (Join-Path $work 'tools\curl.exe')
     $env:PATH = Join-Path $work 'tools'
-    $env:SECRET_VERSION = '0.3.5'; $env:SECRET_RELEASE_COMMIT = $null
+    $env:SECRET_VERSION = '0.4.0'; $env:SECRET_RELEASE_COMMIT = $null
     $env:SECRET_INSTALL_FIXTURES = Join-Path $work 'fixtures'
     $env:SECRET_INSTALL_LOG = Join-Path $work 'transport.log'
     $env:SECRET_INSTALL_READY = Join-Path $work 'ready'
     $architecture = $env:PROCESSOR_ARCHITECTURE
     if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
     $cpu = 'amd64'; if ($architecture -eq 'ARM64') { $cpu = 'arm64' }
-    $env:SECRET_INSTALL_ASSET = "secret-v0.3.5-windows-$cpu.exe"
+    $env:SECRET_INSTALL_ASSET = "secret-v0.4.0-windows-$cpu.exe"
     $env:INSTALL_DIR = Join-Path $work "bin with 'quote and space"
     foreach ($system in @('darwin', 'linux', 'windows')) {
         foreach ($arch in @('amd64', 'arm64')) {
             $suffix = ''; if ($system -eq 'windows') { $suffix = '.exe' }
-            Copy-Item -LiteralPath $transport -Destination (Join-Path $env:SECRET_INSTALL_FIXTURES "secret-v0.3.5-$system-$arch$suffix")
+            Copy-Item -LiteralPath $transport -Destination (Join-Path $env:SECRET_INSTALL_FIXTURES "secret-v0.4.0-$system-$arch$suffix")
         }
     }
-    [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'secret-v0.3.5-desktop.mcpb'), 'synthetic bundle')
+    [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'secret-v0.4.0-desktop.mcpb'), 'synthetic bundle')
     [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'server.json'), '{}')
-    $manifest = Join-Path $env:SECRET_INSTALL_FIXTURES 'checksums-v0.3.5.txt'
+    $manifest = Join-Path $env:SECRET_INSTALL_FIXTURES 'checksums-v0.4.0.txt'
     $files = @(Get-ChildItem -LiteralPath $env:SECRET_INSTALL_FIXTURES | Sort-Object Name)
     $records = @($files | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name })
     [IO.File]::WriteAllText($manifest, ($records -join "`n") + "`n", [Text.Encoding]::ASCII)
     $output = Invoke-TestInstaller -Arguments @('--help')
-    Assert-True ($output.Contains('0.3.5') -and -not (Test-Path -LiteralPath $env:SECRET_INSTALL_LOG)) 'help had side effects'
+    Assert-True ($output.Contains('0.4.0') -and -not (Test-Path -LiteralPath $env:SECRET_INSTALL_LOG)) 'help had side effects'
     Expect-Failure 'unknown argument' -Arguments @('--unknown')
     Expect-Failure 'unknown argument after help' -Arguments @('--help', '--unknown')
-    foreach ($pin in @('latest', '0.03.0', '1.2.3-rc1', '../0.3.5', 'vv0.3.5')) {
+    foreach ($pin in @('latest', '0.03.0', '1.2.3-rc1', '../0.4.0', 'vv0.4.0')) {
         $env:SECRET_VERSION = $pin; Expect-Failure "version pin $pin"
     }
-    $env:SECRET_VERSION = '0.3.5'
+    $env:SECRET_VERSION = '0.4.0'
     foreach ($pin in @('bad', ('A' * 40), ('a' * 39))) {
         $env:SECRET_RELEASE_COMMIT = $pin; Expect-Failure 'invalid commit pin'
     }
@@ -302,15 +302,15 @@ func main() {
     try {
         $env:PROCESSOR_ARCHITECTURE = 'AMD64'; $env:PROCESSOR_ARCHITEW6432 = 'AMD64'
         $script:nativeMachine = [uint16]0xaa64
-        $env:SECRET_INSTALL_ASSET = 'secret-v0.3.5-windows-arm64.exe'
+        $env:SECRET_INSTALL_ASSET = 'secret-v0.4.0-windows-arm64.exe'
         # Stop at checksum validation: an x64 runner cannot execute Arm64 code,
         # but the transport log must prove native, not process, asset selection.
         $env:SECRET_INSTALL_MODE = 'corrupt'
         [IO.File]::Delete($env:SECRET_INSTALL_LOG)
         Expect-Failure 'native Arm64 with an AMD64 PowerShell process'
         $selectionLog = [IO.File]::ReadAllText($env:SECRET_INSTALL_LOG)
-        Assert-True ($selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.3.5/secret-v0.3.5-windows-arm64.exe')) 'emulated AMD64 process did not select Arm64 asset'
-        Assert-True (-not $selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.3.5/secret-v0.3.5-windows-amd64.exe')) 'emulated AMD64 process selected process architecture'
+        Assert-True ($selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.4.0/secret-v0.4.0-windows-arm64.exe')) 'emulated AMD64 process did not select Arm64 asset'
+        Assert-True (-not $selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.4.0/secret-v0.4.0-windows-amd64.exe')) 'emulated AMD64 process selected process architecture'
         Write-Output 'PASS native Arm64 overrides AMD64 process architecture'
     } finally {
         $env:PROCESSOR_ARCHITECTURE = $emulatedProcess.Architecture
@@ -394,7 +394,7 @@ func main() {
     $originalAclState = Get-TestAclState $env:INSTALL_DIR
     $env:SECRET_RELEASE_COMMIT = 'a' * 40
     $env:SECRET_INSTALL_MODE = 'slow-auth'
-    $output = Invoke-TestInstaller -Arguments @('--version', '0.3.5', '--commit', ('a' * 40)) -ExpectedSuccess
+    $output = Invoke-TestInstaller -Arguments @('--version', '0.4.0', '--commit', ('a' * 40)) -ExpectedSuccess
     $env:SECRET_INSTALL_MODE = $null
     $target = Join-Path $env:INSTALL_DIR 'secret.exe'
     Assert-True (Test-Path -LiteralPath $target) 'valid install absent'

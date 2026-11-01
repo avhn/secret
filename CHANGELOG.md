@@ -4,12 +4,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.3.5 (2026-11-01)
+### 0.4.0 (2026-11-01)
+
+- Windows stores work on real profiles: a store folder may be owned by the
+  user, SYSTEM or Administrators and grant other principals traverse only (for
+  example AppContainer capability entries), and store files may carry the
+  inherited user-only entry of a private `~/.secrets` folder.
+- The names-only MCP server accepts `_meta` and extra `clientInfo` fields sent
+  by current MCP clients during `initialize`.
 
 #### Changed
 
 - Advance release, installer, packaging, manifest, workflow, test and setup
-  identities equally to 0.3.5. Keep Go 1.27.3 and every published tag and
+  identities equally to 0.4.0. Keep Go 1.27.3 and every published tag and
   checksum manifest unchanged; no Go hook activation.
 - The release owner approval gate (required reviewers on `release-publish` and
   `registry-publish`) is disabled by owner decision. The tag workflow keeps the
@@ -48,15 +55,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
   clipboard gate for native round trips and post-exit conditional clearing. No
   local real-clipboard testing or native hosted pass is claimed by these changes.
 
-#### Final CLI naming for v0.3.5
+#### Final CLI naming for v0.4.0
 
 - Migration: main now differs from published v0.3.4 and must ship as a new
-  v0.3.5 release, never replacement v0.3.4 assets. Version pins advance
+  v0.4.0 release, never replacement v0.3.4 assets. Version pins advance
   together in this coordinated identity bump.
 - Main's `bin/secret` now exits 70 without release-C checksum metadata; unlike
   the old Bash CLI it cannot run directly from a plain clone. Use `compat/secret`
   explicitly or the standalone installer. The final checkout launcher is for
-  authenticated v0.3.5-or-later release tags. Published v0.3.4 keeps its staging
+  authenticated v0.4.0-or-later release tags. Published v0.3.4 keeps its staging
   name; after upgrading, re-register MCP and manually retire reviewed old
   `secret-go` files and the obsolete Windows installer PATH entry.
 
@@ -67,7 +74,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
   checks, tokened locks and verified atomic replacement. Existing safe CLI files
   are intentionally replaced; failures preserve their bytes.
 - Name Desktop payloads `server/secret[.exe]`; retain release asset grammar,
-  Registry identity; advance current pins to 0.3.5 in the release bump.
+  Registry identity; advance current pins to 0.4.0 in the release bump.
 - Add the CLI-only plugin contract, forced Bash interpreter and compatibility
   identity/broken-launcher gates. Exact divergence inventories remain unchanged.
   Claude and Codex stay on Bash hooks; Go hook activation, `onFailure` and output

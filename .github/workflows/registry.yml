@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Exact published release tag (v0.3.5)
+        description: Exact published release tag (v0.4.0)
         required: true
         type: string
       commit:
@@ -32,7 +32,7 @@ jobs:
       github.repository == 'avhn/secret' &&
       (github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'release' && github.event.release.draft == false &&
-        github.event.release.prerelease == false && github.event.release.tag_name == 'v0.3.5'))
+        github.event.release.prerelease == false && github.event.release.tag_name == 'v0.4.0'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          test "$TAG" = v0.3.5
+          test "$TAG" = v0.4.0
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             printf '%s\n' "$EXPECTED_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
           fi
@@ -63,7 +63,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$commit"
           if [ -n "$EXPECTED_COMMIT" ]; then test "$commit" = "$EXPECTED_COMMIT"; fi
           gh release view "$TAG" --repo avhn/secret --json tagName,isDraft,isPrerelease \
-            --jq '.tagName == "v0.3.5" and .isDraft == false and .isPrerelease == false' | grep -qx true
+            --jq '.tagName == "v0.4.0" and .isDraft == false and .isPrerelease == false' | grep -qx true
           printf 'tag=%s\ncommit=%s\n' "$TAG" "$commit" >> "$GITHUB_OUTPUT"
 
   public-native-installs:
