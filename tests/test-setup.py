@@ -18,7 +18,7 @@ import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 DOCUMENT = ROOT / "docs/setup.md"
 UNIX_COMMAND = "/ABSOLUTE/INSTALL DIR/secret"
 UNIX_STORE = "file:/ABSOLUTE/STORE DIR/STORE.secret"
@@ -169,7 +169,7 @@ class SetupTests(unittest.TestCase):
                     commands += 1
                 else:
                     self.assertIn(language, ("sh", "powershell"))
-                    self.assertIn("https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.", body)
+                    self.assertIn("https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.", body)
                     if language == "sh":
                         self.assertTrue(body.startswith("sh -c 'umask 077; d=$(mktemp -d) || exit\n"))
                         self.assertIn('&& sh "$d/install.sh" "$@"', body)
@@ -246,7 +246,7 @@ class SetupTests(unittest.TestCase):
     def test_bootstrap_examples_match_readme(self):
         def installers(document):
             return {language: body for language, body in blocks(document)
-                    if "https://raw.githubusercontent.com/avhn/secret/v0.4.0/install." in body}
+                    if "https://raw.githubusercontent.com/avhn/secret/v0.4.1/install." in body}
         canonical = installers(self.document)
         self.assertEqual(set(canonical), {"sh", "powershell"})
         self.assertEqual(installers((ROOT / "README.md").read_text()), canonical)
@@ -269,7 +269,7 @@ class SetupTests(unittest.TestCase):
         self.assertIsNotNone(real_shell)
         for document in (DOCUMENT, ROOT / "README.md"):
             examples = [body for language, body in blocks(document.read_text())
-                        if language == "sh" and "https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.sh" in body]
+                        if language == "sh" and "https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.sh" in body]
             self.assertEqual(len(examples), 1)
             for mode, installer_status, expected_status in (("fail", 0, 22), ("partial", 0, 22),
                                                            ("success", 0, 0), ("success", 7, 7)):
@@ -312,27 +312,27 @@ class SetupTests(unittest.TestCase):
                     self.assertFalse(Path(downloaded.read_text().strip()).parent.exists(), "temporary directory survived cleanup")
 
     def test_version_installer_urls_and_safe_placeholders(self):
-        # Migration prose retains the published staging name, but executable
-        # snippets must use only the current coordinated release pin.
+        # Migration prose retains published staging names and version boundaries,
+        # but executable snippets use only the current coordinated release pin.
         version_pattern = r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d.])"
-        self.assertEqual(set(re.findall(version_pattern, self.names_only_document)), {VERSION, "0.3.4"})
+        self.assertEqual(set(re.findall(version_pattern, self.names_only_document)), {VERSION, "0.3.4", "0.4.0"})
         snippet_versions = set(re.findall(version_pattern, "\n".join(body for _, body in self.examples)))
         self.assertEqual(snippet_versions, {VERSION})
         self.assertIn("v0.4.0 onward", self.names_only_document)
         self.assertIn("v0.3.4 installer uses `secret-go`", self.names_only_document)
         self.assertIn("re-register each MCP client", self.names_only_document)
         urls = re.findall(r"https://raw\.githubusercontent\.com/[^\s`]+", self.document)
-        self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.sh",
-                                "https://raw.githubusercontent.com/avhn/secret/v0.4.0/install.ps1"])
+        self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.sh",
+                                "https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.ps1"])
         self.assertIn('curl -fsSL ' + urls[0] + ' -o "$d/install.sh" && sh "$d/install.sh" "$@"', self.document)
         self.assertIn('irm ' + urls[1] + r' -OutFile "$d\install.ps1" -ErrorAction Stop', self.document)
         self.assertNotIn(urls[0] + " | sh", self.document)
         self.assertNotIn(urls[1] + " | iex", self.document)
         self.assertIn("io.github.avhn/secret", self.document)
-        self.assertIn("secret-v0.4.0-desktop.mcpb", self.document)
+        self.assertIn("secret-v0.4.1-desktop.mcpb", self.document)
         for installer in ("install.sh", "install.ps1"):
             source = (ROOT / installer).read_text()
-            self.assertIn("0.4.0", source)
+            self.assertIn("0.4.1", source)
             for option in ("SECRET_VERSION", "SECRET_RELEASE_COMMIT", "INSTALL_DIR", "--version", "--commit", "--dir", "--help"):
                 self.assertIn(option, source)
         self.assertNotRegex(self.document, r"(?:sk-[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{16,}|AKIA[A-Z0-9]{16}|-----BEGIN .*PRIVATE KEY)")

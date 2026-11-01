@@ -43,7 +43,7 @@ bootstrap() {
         base=${XDG_CACHE_HOME:-$HOME/.cache}
     fi
     while [ "${base%/}" != "$base" ]; do base=${base%/}; done
-    cached=$base/secret/v0.4.0/secret
+    cached=$base/secret/v0.4.1/secret
 }
 if bootstrap 2>/dev/null; then
     exec "$cached" hook claude

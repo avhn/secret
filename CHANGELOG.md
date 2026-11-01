@@ -4,7 +4,25 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.4.0 (2026-11-01)
+### 0.4.1 (unreleased)
+
+#### Fixed
+
+- Use `9.9.9` for mismatching install and release-verifier test versions so
+  future release pins cannot collide with the negative fixture. This repairs
+  the Linux/macOS public-install gate that blocked v0.4.0 MCP Registry
+  publication; the active Registry record remains 0.3.4. No product change.
+
+#### Changed
+
+- Advance current release identities equally to 0.4.1 without changing Go
+  1.27.3, installed Bash hooks, published tags or checksum manifests.
+
+### 0.4.0 (2026-11-01, published)
+
+Published at checksum commit C `06027fe` (tag `v0.4.0`, source S `5a54b17`).
+GitHub publication completed; the install test fixture blocked Linux/macOS
+public-install jobs and therefore Registry publication. Windows jobs passed.
 
 - Windows stores work on real profiles: a store folder may be owned by the
   user, SYSTEM or Administrators and grant other principals traverse only (for

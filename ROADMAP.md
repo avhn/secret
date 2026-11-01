@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.4.0 (final CLI naming, Windows store parents and clip, Mute Agent branding, opt-in approval gate) is in preparation, based on main after v0.3.4 was published on 2026-11-01 with an active MCP Registry record `io.github.avhn/secret` 0.3.4; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.4.1 (install test-fixture patch, no product change) is in preparation, based on main after v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`). The active MCP Registry record remains `io.github.avhn/secret` 0.3.4 because the v0.4.0 Linux/macOS public-install fixture failed; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Windows store parent policy (in progress)
 
@@ -29,29 +29,60 @@ the historical M5a completion gate and changes no release identity or defaults.
 
 Current branding work adds the approved Mute Agent resources, README header and
 synced MCPB icon with offline byte checks. Branding does not activate hooks or
-authorize publication; current release identities advance together to 0.4.0.
+authorize publication; it shipped in v0.4.0 and current release identities advance
+together to 0.4.1.
 
-## v0.4.0: Final CLI naming and Windows refinements
+## v0.4.1: Install test-fixture patch
 
-Based on main after published v0.3.4 at checksum commit C `6ee3664`
-(source S `5309977`); all published tags and checksum manifests remain immutable.
-The release keeps Go 1.27.3 and the [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md).
-It adopts final `secret[.exe]` CLI naming with explicit byte-identical Bash rollback,
-Windows trusted store parents and native clip, Mute Agent branding and the opt-in
-approval gate. Installed Bash hooks and waiting-sponsorship boundaries stay unchanged.
+Based on main after published v0.4.0 at checksum commit C `06027fe` (tag
+`v0.4.0`, source S `5a54b17`); the tag and `dist/checksums-v0.4.0.txt` remain
+immutable on rel/v0.4.0, not in this tree. The patch changes the install test's
+mismatching version to `9.9.9` so release bumps cannot make it equal the pin.
+There is no product change. Go 1.27.3, the
+[v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash hooks
+and waiting-sponsorship boundaries stay unchanged.
 
-- [ ] Review the coordinated 0.4.0 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
-- [ ] Require green applicable hosted CI, including native Windows parent/clipboard and compatibility gates
+- [ ] Review the coordinated 0.4.1 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
+- [ ] Require green applicable hosted CI, including native install and compatibility gates
 - [ ] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
-- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.0.txt`
-- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.4.0 (reviewers only when the approval gate is enabled)
-- [ ] Owner authorizes the signed v0.4.0 tag, draft, publication and Registry publication
-- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.4.0, MCPB `fileSha256` equal to the checksum manifest
+- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.1.txt`
+- [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.4.1 (reviewers only when the approval gate is enabled)
+- [ ] Owner authorizes the signed v0.4.1 tag, draft, publication and Registry publication
+- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.4.1, MCPB `fileSha256` equal to the checksum manifest
 - [ ] Owner authorizes promotion of main to source S, never checksum commit C
 
 This release is not published. Tags, publication, installed-default promotion and
 real Claude Code/Codex/OpenCode compatibility remain separate approval/evidence
 boundaries.
+
+## v0.4.0: Final CLI naming and Windows refinements
+
+Published on GitHub Releases on 2026-11-01, with immutable tag `v0.4.0` at
+checksum commit C `06027fe` (source S `5a54b17`). main was promoted to S, never
+C; `dist/checksums-v0.4.0.txt` remains only at C on rel/v0.4.0, not in this tree.
+
+Based on main after published v0.3.4 at checksum commit C `6ee3664`
+(source S `5309977`); all published tags and checksum manifests remain immutable.
+The release keeps Go 1.27.3 and the [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md).
+It adopted final `secret[.exe]` CLI naming with explicit byte-identical Bash rollback,
+Windows trusted store parents and native clip, Mute Agent branding and the opt-in
+approval gate. Installed Bash hooks and waiting-sponsorship boundaries stayed unchanged.
+
+- [x] Review the coordinated 0.4.0 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
+- [x] Require green applicable hosted CI, including native Windows parent/clipboard and compatibility gates
+- [x] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
+- [x] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.0.txt`
+- [x] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.4.0 (reviewers only when the approval gate is enabled)
+- [x] Owner authorizes the signed v0.4.0 tag, draft and GitHub publication
+- [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.4.0, MCPB `fileSha256` equal to the checksum manifest
+- [x] Owner authorizes promotion of main to source S, never checksum commit C
+
+GitHub publication is complete. Registry publication was blocked by Linux/macOS
+`test_help_unknown_and_pin_validation`: its expected mismatching `--version
+0.4.0` equaled the `SECRET_VERSION=0.4.0` pin. Windows public-install jobs passed;
+the active MCP Registry record remains 0.3.4. v0.4.1 repairs the fixture without
+replacing published assets. Real Claude Code/Codex/OpenCode compatibility remains
+a separate approval/evidence boundary.
 
 ## v0.3.4: Windows long-lived exec launcher patch
 
@@ -573,10 +604,10 @@ publish it. No draft or release exists. The tag ruleset keeps this dead tag;
 never reuse, move or delete it. The owner-approved new release identity is
 **0.2.3**, with a new candidate/source/checksum cycle.
 
-## CLI-only extraction from M4.1 (v0.4.0, pending CI)
+## CLI-only extraction from M4.1 (published v0.4.0)
 
-Main now differs from published v0.3.4. This change must ship in a new v0.4.0
-release; current identities and installer snippets now pin 0.4.0 together.
+This change shipped in published v0.4.0, after v0.3.4. Current identities and
+installer snippets now pin 0.4.1 together for the test-fixture patch.
 No published tag or asset may be replaced. Published v0.3.4 installers retain
 the staging name. Main's launcher intentionally exits 70 without release-C metadata; use standalone installation or explicit
 `compat/secret`. Checkout-launcher instructions target v0.4.0-or-later release C.
@@ -584,8 +615,8 @@ the staging name. Main's launcher intentionally exits 70 without release-C metad
 Owner-approved narrow policy change: `bin/secret` is the verified Go launcher;
 `compat/secret` preserves the last Bash blob and executable mode. Standalone
 installers publish `secret` / `secret.exe`; MCPB uses `server/secret[.exe]`.
-Release asset grammar and Registry identity stay unchanged; current version pins
-advance together to 0.4.0 in the coordinated release bump. The `cli-only` plugin
+Release asset grammar and Registry identity stayed unchanged; version pins
+advanced together to 0.4.0 in that coordinated release bump. The `cli-only` plugin
 contract checks Go CLI plus Bash hooks, not deferred M4.1 activation. Standalone overwrite is intentionally
 reclassified: a verified atomic install replaces a safe regular final-name CLI;
 failed verification preserves it. No automatic Bash fallback is permitted.
@@ -603,7 +634,7 @@ Status: waiting sponsorship (paid model usage for the real-host harness, plus ow
 - [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
 - [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.3 and add Claude onFailure block
 - [ ] feat(hook): switch hooks/hooks.json to guard-go after host evidence
-- [ ] feat(cli): CLI-only extraction implemented above (pending hosted CI), no hook activation
+- [x] feat(cli): CLI-only extraction published in v0.4.0 above, no hook activation
 - [ ] fix(hook): adopt host-tested neutral output and output-failure contract in internal/hook
 - [ ] test(compat): CLI-only compatibility gate implemented above (pending hosted CI); retain it through hook activation
 

@@ -6,7 +6,7 @@ checksums and the attestation bypass marker exist only in disposable clones.
 Transport fault injection is a PATH shim in the test, not a production option.
 --published repeats the public release install without the fixture bypass.
 The default --stage cli-only checks the final Go CLI with unchanged Bash hooks.
-This is the v0.4.0-style contract; version identities remain independently pinned.
+This is the v0.4.1-style contract; version identities remain independently pinned.
 --stage m4.1 explicitly selects deferred activation, never the release gate.
 Linux/macOS checkout-launcher tests are separate from test-release-windows.ps1.
 """
@@ -292,7 +292,7 @@ class ReleaseManifestTests(CLIOnlyManifestTests):
     """CLI-only packaging with the coordinated release identity."""
 
     def test_four_versions_match_release(self):
-        self.assertEqual(VERSION, "0.4.0")
+        self.assertEqual(VERSION, "0.4.1")
         for name, keys in CONTRACT["manifests"].items():
             with self.subTest(manifest=name):
                 value = json.loads((CHECKOUT / name).read_text())

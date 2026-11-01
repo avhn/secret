@@ -153,8 +153,8 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4's v0.2.3 release is complete. The v0.4.0 extension changes packaging and
-keeps all four manifests at 0.4.0. The owner-approved CLI-only extraction puts
+M4's v0.2.3 release is complete. The v0.4.1 test-fixture patch retains packaging and
+keeps all four manifests at 0.4.1. The owner-approved CLI-only extraction puts
 the verified launcher at `bin/secret`, retaining Bash at `compat/secret`.
 Claude/Codex hooks remain Bash. M4.1 still owns `onFailure: "block"`, `guard-go`
 activation and Go hook output-contract changes, waiting sponsorship. See [the release plan](docs/design/v0.3.0-plan.md),
@@ -216,7 +216,7 @@ CI runs independent macOS full assembly plus native Linux/macOS/Windows
 amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
 `--stage cli-only`, the final Go CLI plus unchanged Bash hook contract.
 The test default is `cli-only`; `--stage m4.1` preserves the stronger
-activation assertions for that milestone. Do not use it as a v0.4.0 gate or
+activation assertions for that milestone. Do not use it as a v0.4.1 gate or
 weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.
 `.secret-release-test-fixture` is forbidden in the shipped tree, S and C,

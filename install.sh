@@ -52,7 +52,7 @@ def unique(pairs):
 
 
 def main():
-    version = os.environ.get('SECRET_VERSION', '0.4.0')
+    version = os.environ.get('SECRET_VERSION', '0.4.1')
     commit = os.environ.get('SECRET_RELEASE_COMMIT', '')
     destination = os.environ.get('INSTALL_DIR', '')
     options = {'--version': version, '--commit': commit, '--dir': destination}
@@ -78,7 +78,7 @@ def main():
         seen.add(arg)
     if show_help:
         print('Usage: sh install.sh [--version V] [--commit C] [--dir DIR] [--help]')
-        print('SECRET_VERSION defaults to 0.4.0; SECRET_RELEASE_COMMIT is an optional full SHA.')
+        print('SECRET_VERSION defaults to 0.4.1; SECRET_RELEASE_COMMIT is an optional full SHA.')
         print('INSTALL_DIR defaults to ~/.local/bin. gh, curl and Python 3 are required.')
         print('Existing install directories must be user-owned and not group/other-writable (chmod go-w DIR).')
         print('No source build, PATH/profile edits, stores or client configuration changes.')

@@ -17,7 +17,7 @@ import (
 
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "version" {
-		fmt.Println("secret 0.4.0 (go)")
+		fmt.Println("secret 0.4.1 (go)")
 		return
 	}
 	var mode, record, binary string

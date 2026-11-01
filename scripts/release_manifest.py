@@ -31,7 +31,7 @@ REPO = "avhn/secret"
 REPOSITORY = "https://github.com/" + REPO
 NAME = "io.github.avhn/secret"
 SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
-PUBLISH_TAG = "v0.4.0"
+PUBLISH_TAG = "v0.4.1"
 PUBLISHER_VERSION = "1.8.1"
 PUBLISHER_SHA256 = "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
 PUBLISHER_URL = ("https://github.com/modelcontextprotocol/registry/releases/download/v"
@@ -328,7 +328,7 @@ def git(*args):
 
 
 def verify_source(tag, commit=None):
-    require(tag == PUBLISH_TAG, "registry publication requires exactly v0.4.0")
+    require(tag == PUBLISH_TAG, "registry publication requires exactly v0.4.1")
     if commit is not None:
         require(re.fullmatch(r"[0-9a-f]{40}", commit), "expected full commit SHA")
     git("fetch", "--no-tags", "--force", "origin", f"refs/tags/{tag}:refs/tags/{tag}")
