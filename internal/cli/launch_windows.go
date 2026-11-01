@@ -107,8 +107,11 @@ func (c command) waitWindowsExec(process *transport.WindowsProcess, signals <-ch
 		err  error
 	}
 	waited := make(chan result, 1)
+	// Read the swappable seam before the goroutine starts, so a waiter that
+	// outlives its caller never reads the package variable concurrently.
+	wait := waitWindowsProcess
 	go func() {
-		code, err := waitWindowsProcess(process)
+		code, err := wait(process)
 		waited <- result{code, err}
 	}()
 	var grace <-chan time.Time
@@ -204,9 +207,10 @@ func (c command) windowsRelaySignals(args, env []string, values [][]byte, filter
 		}
 	}()
 	waitErrors := make(chan error, 1)
+	wait := waitWindowsProcess // read once; the supervisor calls it on its own goroutine
 	child := supervisedProcess{
 		wait: func() int {
-			code, err := waitWindowsProcess(process)
+			code, err := wait(process)
 			waitErrors <- err
 			if err != nil {
 				return 1
