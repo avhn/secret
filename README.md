@@ -1,6 +1,17 @@
-# secret
+<h1 align="center"><img src="resources/logo.svg" width="88" height="88" alt=""><br>secret</h1>
 
-Let coding agents use your credentials without reading them.
+<p align="center">
+  Let coding agents use your credentials without reading them.
+</p>
+
+<p align="center">
+  <a href="https://github.com/avhn/secret/releases"><img alt="Release" src="https://img.shields.io/github/v/release/avhn/secret"></a>
+  <a href="https://github.com/avhn/secret/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/avhn/secret/ci.yml?branch=main&label=ci"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/avhn/secret"></a>
+  <a href="docs/setup.md"><img alt="MCP: stdio" src="https://img.shields.io/badge/MCP-stdio-000000?logo=modelcontextprotocol&logoColor=white"></a>
+  <a href="docs/install.md"><img alt="Go CLI platforms: macOS, Linux, Windows" src="https://img.shields.io/badge/Go_CLI-macOS%20%7C%20Linux%20%7C%20Windows-6A4BFF"></a>
+  <a href="docs/install.md"><img alt="Go CLI architectures: amd64 and arm64" src="https://img.shields.io/badge/Go_CLI_arch-amd64%20%7C%20arm64-6A4BFF"></a>
+</p>
 
 An agent with a shell can `cat .env`, run `printenv`, or grep a token out of a
 config file, and the value lands in its context, its logs, and possibly a

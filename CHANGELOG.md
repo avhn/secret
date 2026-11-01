@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- Mute Agent logo resources and centered README header with project badges.
+
+### Changed
+
+- MCPB icon now uses the reviewed Mute Agent artwork, with a byte-for-byte sync
+  script and offline branding checks.
+
 ### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted

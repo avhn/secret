@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- Original abstract metadata card, copyright Mert Dede, GPL-3.0-or-later. -->
-  <rect width="256" height="256" rx="48" fill="#173042"/>
-  <rect x="52" y="48" width="152" height="160" rx="16" fill="#eff5f5"/>
-  <g fill="#177d83">
-    <circle cx="80" cy="88" r="8"/><rect x="104" y="80" width="72" height="16" rx="4"/>
-    <circle cx="80" cy="128" r="8"/><rect x="104" y="120" width="56" height="16" rx="4"/>
-    <circle cx="80" cy="168" r="8"/><rect x="104" y="160" width="64" height="16" rx="4"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6A4BFF"/><stop offset="1" stop-color="#2B1690"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><rect width="512" height="512" fill="#fff"/><rect x="156.0" y="214.0" width="200" height="84" rx="18" fill="#000"/></mask></defs><path d="M 256 88 C 299.68 212.32 299.68 212.32 424 256 C 299.68 299.68 299.68 299.68 256 424 C 212.32 299.68 212.32 299.68 88 256 C 212.32 212.32 212.32 212.32 256 88 Z" fill="#FFFFFF" mask="url(#m)"/></svg>

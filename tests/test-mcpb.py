@@ -9,6 +9,7 @@ Only the current host's freshly built Go binary runs; no Desktop or model calls.
 import argparse
 from contextlib import redirect_stdout
 import copy
+from html.parser import HTMLParser
 import importlib.util
 import io
 import json
@@ -22,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.parse import unquote, urlsplit
 import warnings
 import zipfile
 
@@ -60,6 +62,102 @@ def pe(machine=0x8664):
     struct.pack_into("<H", data, 68, machine)
     struct.pack_into("<H", data, 88, 0x20B)
     return bytes(data)
+
+
+class BrandingTests(unittest.TestCase):
+    def test_packaging_icons_match_reviewed_resources(self):
+        for source, target in (("logo.svg", "icon.svg"), ("logo-256.png", "icon.png")):
+            with self.subTest(source=source):
+                self.assertEqual((ROOT / "resources" / source).read_bytes(),
+                                 (mcpb.PACKAGING / target).read_bytes())
+        manifest = json.loads((mcpb.PACKAGING / "manifest.template.json").read_text())
+        self.assertEqual(manifest["icon"], "icon.png")
+
+    def test_reviewed_png_dimensions(self):
+        for path, size in ((mcpb.PACKAGING / "icon.png", 256),
+                           (ROOT / "resources/logo-512.png", 512)):
+            with self.subTest(path=path):
+                data = path.read_bytes()
+                self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(data[8:16], b"\x00\x00\x00\x0dIHDR")
+                self.assertEqual(struct.unpack_from(">II", data, 16), (size, size))
+
+    def test_readme_header_local_links_exist(self):
+        class HeaderLinks(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.links = []
+
+            def handle_starttag(self, tag, attrs):
+                self.links.extend(value for name, value in attrs
+                                  if name in ("src", "href") and value is not None)
+
+        header = (ROOT / "README.md").read_text(encoding="utf-8").split("\n## ", 1)[0]
+        parser = HeaderLinks()
+        parser.feed(header)
+        self.assertTrue(parser.links)
+        local = []
+        for link in parser.links:
+            url = urlsplit(link)
+            if not url.scheme and not url.netloc and url.path:
+                local.append(unquote(url.path))
+        self.assertIn("resources/logo.svg", local)
+        for path in local:
+            with self.subTest(path=path):
+                self.assertTrue((ROOT / path).is_file(), f"missing README header target: {path}")
+
+    def sync(self, *args):
+        return subprocess.run([sys.executable, "-I", str(ROOT / "scripts/sync-branding.py"),
+                               *map(str, args)], cwd=ROOT, capture_output=True, text=True, timeout=15)
+
+    def test_sync_check_real_tree(self):
+        result = self.sync("--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS branding", result.stdout)
+
+    def test_sync_copies_reviewed_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="secret-branding-") as temporary:
+            root = Path(temporary)
+            shutil.copytree(ROOT / "resources", root / "resources")
+            sources = {path.name: path.read_bytes() for path in (root / "resources").iterdir()}
+            result = self.sync("--root", root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for source, target in (("logo.svg", "icon.svg"), ("logo-256.png", "icon.png")):
+                self.assertEqual((root / "packaging/mcpb" / target).read_bytes(), sources[source])
+            self.assertEqual({path.name: path.read_bytes() for path in (root / "resources").iterdir()},
+                             sources)
+            self.assertEqual(self.sync("--root", root, "--check").returncode, 0)
+
+    def test_sync_check_rejects_mismatch_and_missing_files_without_writing(self):
+        for relative, problem in (("packaging/mcpb/icon.svg", "mismatch"),
+                                  ("packaging/mcpb/icon.png", "mismatch"),
+                                  ("packaging/mcpb/icon.svg", "missing"),
+                                  ("packaging/mcpb/icon.png", "missing"),
+                                  ("resources/logo.svg", "missing"),
+                                  ("resources/logo-256.png", "missing")):
+            with self.subTest(path=relative, problem=problem), \
+                    tempfile.TemporaryDirectory(prefix="secret-branding-") as temporary:
+                root = Path(temporary)
+                shutil.copytree(ROOT / "resources", root / "resources")
+                packaging = root / "packaging/mcpb"
+                packaging.mkdir(parents=True)
+                for name in ("icon.svg", "icon.png"):
+                    shutil.copyfile(mcpb.PACKAGING / name, packaging / name)
+                path = root / relative
+                if problem == "missing":
+                    path.unlink()
+                else:
+                    path.write_bytes(b"synthetic mismatched icon")
+                before = {item.relative_to(root): item.read_bytes()
+                          for item in root.rglob("*") if item.is_file()}
+                result = self.sync("--root", root, "--check")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(relative, result.stderr)
+                self.assertIn("missing source" if relative.startswith("resources/") else "differs from",
+                              result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual({item.relative_to(root): item.read_bytes()
+                                  for item in root.rglob("*") if item.is_file()}, before)
 
 
 class BundleTests(unittest.TestCase):
