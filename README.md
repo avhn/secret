@@ -12,7 +12,7 @@ Three parts, usable together or alone:
 
 | Part                      | What it does                                                                                                                                                                                                |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/secret`              | CLI. Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                                |
+| `bin/secret`              | Verified Go CLI launcher (no Bash fallback). Parses `KEY=VALUE` stores (never sources them), shows masked names, runs a child with selected keys, and redacts every loaded value from the child's stdout and stderr.                                |
 | `hooks/guard-secrets`     | Claude Code and Codex `PreToolUse` hook. Denies reads of store files, environment dumps, credential printers (`gh auth token`, `security -w`, `pbpaste`, ...) and searches that would print store contents. |
 | `skills/secrets/SKILL.md` | Tells the agent how to work with the CLI and how to recover from a guard denial without asking for values in chat.                                                                                          |
 
@@ -73,7 +73,18 @@ installer before verification. Both require gh and verify release attestations,
 not checksums alone; `SECRET_RELEASE_COMMIT` optionally pins an independently
 authenticated full C. Unix also needs curl and Python 3; Windows needs curl.exe.
 Download/review/run or a trusted checkout offers stronger bootstrap review.
-Installers publish only `secret-go` / `secret-go.exe` and print the absolute path.
+Final CLI names and destinations described below ship from **v0.3.5 onward**.
+The download snippets install their pinned release, not main. The published
+v0.3.4 installer uses `secret-go` on Unix and
+`%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
+Use the printed executable path for that release; do not infer the installed
+name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
+published assets or tags.
+
+From v0.3.5 onward, installers publish `secret` / `secret.exe` and print the absolute path.
+Defaults are `~/.local/bin/secret` on Unix and `$HOME\.local\bin\secret.exe`
+on Windows (native profile fallback when HOME is absent). A verified install
+atomically replaces a safe existing CLI; `compat/secret` is explicit Bash rollback.
 Unix does not edit PATH; Windows adds only its directory to user PATH. Neither
 registers MCP, reads stores or activates hooks. Raw executables do not have the
 checkout launcher's per-execution rehash.
@@ -91,17 +102,30 @@ Paste to your agent: Follow https://github.com/avhn/secret/blob/v0.3.4/docs/setu
 See [installation and rollback](docs/install.md) for pins, dependencies, offline
 options and failure recovery, and [release approvals](docs/release.md).
 
-### Bash CLI, guard and skill (installed defaults)
+### Verified CLI, Bash guard and skill
 
 Requirements: bash 3.2 or newer (stock macOS bash works), perl, and jq for the
-guard. These remain separate from the opt-in Go executable and MCP registration.
+guard and explicit `compat/secret` rollback. The final CLI is Go; CLI naming
+does not activate Go hooks or change MCP registration.
 
-The CLI:
+The checkout `bin/secret` launcher requires a release checksum commit C with
+its committed checksum manifest. It works at an authenticated release tag that
+includes this change, **v0.3.5 onward**, after verified cache installation. A
+plain main checkout has no current release checksum manifest and exits 70;
+it does not build from source or fall back to Bash.
+
+For main/clone users, use the standalone installer above (and its printed path),
+or explicitly select the retained Bash implementation:
 
 ```bash
 git clone https://github.com/avhn/secret ~/.local/share/secret
-ln -s ~/.local/share/secret/bin/secret ~/.local/bin/secret
+bash ~/.local/share/secret/compat/secret help
 ```
+
+For a released checkout launcher, first select the authenticated release C as
+shown in [installation](docs/install.md), then preinstall its verified cache and
+link that release checkout's `bin/secret`. Do not link main's launcher expecting
+it to work without release metadata.
 
 The guard and skill, as a Claude Code plugin:
 
@@ -122,14 +146,10 @@ In Codex, open `/hooks` and trust the installed secret hook before relying on
 it. Untrusted hooks are listed but do not run; review and re-trust the hook
 when it changes. `/plugins` lets you inspect the installed plugin. The plugin
 does not put `bin/secret` on `PATH`. Install the CLI separately if you want to
-use it (the symlink requires `~/.local/bin` on `PATH`):
-
-```bash
-mkdir -p ~/.local/bin
-# If you have not already cloned the repo in the CLI step above:
-git clone https://github.com/avhn/secret ~/.local/share/secret
-ln -s ~/.local/share/secret/bin/secret ~/.local/bin/secret
-```
+use it. Main/clone users should choose the standalone installer or invoke
+`bash ~/.local/share/secret/compat/secret` explicitly. A `bin/secret` symlink
+requires an authenticated v0.3.5-or-later release checkout at C, not main, plus
+its verified cache and `~/.local/bin` on `PATH`.
 
 If your Codex version has no plugin marketplace support, use the manual route
 with a checkout of the repo. Copy the hook template with an absolute command
@@ -255,21 +275,22 @@ Run `secret help` for the full reference, including exit statuses.
 ## Staged Go operator workflow (M3)
 
 M3 passed its hosted CI gate (PR #8). These commands are implemented in the Go
-CLI, while the shipped `bin/secret` remains Bash; this is not a CLI or plugin cutover. Build
-`go build -o /absolute/private/build/secret-go ./cmd/secret` to try the staged CLI.
-The examples below use `secret-go` for that binary and placeholder store paths.
+CLI through the final `bin/secret` launcher. The CLI-only cutover leaves both
+installed guards on Bash. Build
+`go build -o /absolute/private/build/secret ./cmd/secret` to try the staged CLI.
+The examples below use `secret` for that binary and placeholder store paths.
 Invoke operators directly in your own terminal, never through agent tools.
 
 ```bash
-secret-go import --from dotenv:/absolute/source.env --into file:/absolute/team.secret
-secret-go import --from op:OPAQUE_ID --into file:/absolute/team.secret --map password=API_TOKEN
-secret-go export --from file:/absolute/team.secret --to libsecret:team --on-conflict=fail
-secret-go rotate file:/absolute/team.secret API_TOKEN --env prod
-secret-go rename file:/absolute/team.secret API_TOKEN SERVICE_TOKEN --env prod
-secret-go delete file:/absolute/team.secret SERVICE_TOKEN --env prod
-secret-go show --format=json file:/absolute/team.secret
-secret-go diff --format=json --env dev --env prod file:/absolute/team.secret
-secret-go doctor --format=json libsecret:team
+secret import --from dotenv:/absolute/source.env --into file:/absolute/team.secret
+secret import --from op:OPAQUE_ID --into file:/absolute/team.secret --map password=API_TOKEN
+secret export --from file:/absolute/team.secret --to libsecret:team --on-conflict=fail
+secret rotate file:/absolute/team.secret API_TOKEN --env prod
+secret rename file:/absolute/team.secret API_TOKEN SERVICE_TOKEN --env prod
+secret delete file:/absolute/team.secret SERVICE_TOKEN --env prod
+secret show --format=json file:/absolute/team.secret
+secret diff --format=json --env dev --env prod file:/absolute/team.secret
+secret doctor --format=json libsecret:team
 ```
 
 Operators require both stdin and stdout terminals before store access, then exact
@@ -287,7 +308,7 @@ or complete historical orphan inventory or installed-host trust.
 Private templates use literal `{{KEY}}` placeholders and selected keys only:
 
 ```bash
-secret-go run -f file:/absolute/team.secret --key API_TOKEN \
+secret run -f file:/absolute/team.secret --key API_TOKEN \
   --template-file /absolute/client.template -- ./consumer
 ```
 
@@ -308,7 +329,7 @@ code, and reads only explicit `-f` scopes. Audit is off unless an operator recei
 Names-only events rotate across four private 0600 files capped at 1 MiB each.
 
 MCP is off until explicitly allowlisted, for example
-`secret-go mcp --store file:/absolute/team.secret --store libsecret:team`.
+`secret mcp --store file:/absolute/team.secret --store libsecret:team`.
 The stdio server exposes only list/show/diff/health, never values or mutation;
 requests cannot expand that exact allowlist. Configuring it permits the path and
 account metadata above to reach its clients. No network listener or ambient store

@@ -470,7 +470,7 @@ Status: done (2026-10-24, [v0.2.3](https://github.com/avhn/secret/releases/tag/v
 - [x] fix(plugin): isolate failed denial writes and correct test cache cleanup, Darwin link limits and cwd aliases (27de241, 306618e)
 - [x] docs(install): document pins, host limits, release sequence and failure modes; update doctor (d00072e)
 
-Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. `bin/secret`, Claude and Codex hooks and all four manifest versions remain on the existing Bash installation state. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.
+Gate: two green integrated candidates, source commit S, checksum-only commit C and immutable final tag at C; byte-reproducible final-tag assets with repository/workflow/commit/ref/subject attestations; hosted native Linux/macOS install matrix plus retained corpus, provider and race CI. The model-using host harness is built but inactive, not a required M4 check. At the M4 gate, the CLI, Claude and Codex hooks and all four manifest versions retained the Bash installation state; the later CLI-only extraction below supersedes CLI naming only. No Windows release or host protection claim. Tag, draft, publication and promotion each need explicit owner go-ahead.
 
 Release evidence for v0.2.3 (source S `7141a13`, checksum commit C `7998002`, full C
 `79980020b3ffaea14833684592ffa2c97d78aae0`, signed annotated tag `v0.2.3` peeling to C):
@@ -489,8 +489,9 @@ Release evidence for v0.2.3 (source S `7141a13`, checksum commit C `7998002`, fu
   verified all five subjects online and offline (bundles renamed to `sha256:DIGEST.jsonl`).
 - Published 2026-10-24. [Published-asset plugin install 40130118807](https://github.com/avhn/secret/actions/runs/40130118807)
   passed on native Linux x86_64 and aarch64 and macOS arm64 and x86_64.
-- Installed defaults are unchanged: `bin/secret`, the Bash hooks and all four manifest
-  versions stay on the Bash installation; promotion and Go activation move to M4.1.
+- At M4 publication the CLI, hooks and manifest versions retained the Bash
+  installation. The later owner-approved CLI-only extraction below supersedes
+  CLI staging only; hook activation still requires M4.1 evidence.
 
 Earlier candidate evidence (source 306618e): ci 39405526391, release 39405526406, plugin
 install 39405526490, all green.
@@ -519,17 +520,40 @@ publish it. No draft or release exists. The tag ruleset keeps this dead tag;
 never reuse, move or delete it. The owner-approved new release identity is
 **0.2.3**, with a new candidate/source/checksum cycle.
 
+## CLI-only extraction from M4.1 (v0.3.5, pending CI)
+
+Main now differs from published v0.3.4. This change must ship in a new v0.3.5
+release; the coordinator will bump all identities together after integration.
+No published tag or asset may be replaced. Until that bump, pinned v0.3.4
+installer snippets still install the staging name. Main's launcher intentionally
+exits 70 without release-C metadata; use standalone installation or explicit
+`compat/secret`. Checkout-launcher instructions target v0.3.5-or-later release C.
+
+Owner-approved narrow policy change: `bin/secret` is the verified Go launcher;
+`compat/secret` preserves the last Bash blob and executable mode. Standalone
+installers publish `secret` / `secret.exe`; MCPB uses `server/secret[.exe]`.
+Release asset grammar, Registry identity and all 0.3.4 version pins stay unchanged
+until a separate release bump. The `cli-only` plugin contract checks Go CLI plus
+Bash hooks, not deferred M4.1 activation. Standalone overwrite is intentionally
+reclassified: a verified atomic install replaces a safe regular final-name CLI;
+failed verification preserves it. No automatic Bash fallback is permitted.
+
+Compatibility gates retain exact inventories, explicit absolute Bash selection,
+forced stock Bash 3.2 and a deliberately broken final launcher. Native hosted
+installer, packaging, provider and compatibility CI is still required. Every
+release, tag, publication and external metadata action needs separate owner approval.
+
 ## M4.1: Host evidence and Claude cutover
 
-Status: waiting sponsorship (paid model usage for the real-host harness, plus owner-provisioned protected environment and keys). Goal: prove real host failure behavior before changing what main installs.
+Status: waiting sponsorship (paid model usage for the real-host harness, plus owner-provisioned protected environment and keys). Goal: prove real host failure behavior before changing the installed hooks.
 
 - [ ] test(host): enable sponsored protected host sessions and record Linux/macOS Claude failure evidence
 - [ ] test(codex): record pinned host failure and trust behavior while retaining the Bash guard
 - [ ] chore(plugin): bump all four plugin/marketplace manifests to 0.2.3 and add Claude onFailure block
 - [ ] feat(hook): switch hooks/hooks.json to guard-go after host evidence
-- [ ] feat(cli): stage bin/secret as the verified launcher with byte-identical executable compat/secret
+- [ ] feat(cli): CLI-only extraction implemented above (pending hosted CI), no hook activation
 - [ ] fix(hook): adopt host-tested neutral output and output-failure contract in internal/hook
-- [ ] test(compat): retain explicit Bash rollback, exact divergence and stock Bash 3.2 CI
+- [ ] test(compat): CLI-only compatibility gate implemented above (pending hosted CI); retain it through hook activation
 
 Gate: sponsored `host-hooks.yml` sessions prove Claude Code 2.1.295+ blocks missing/failed launchers, exec errors, post-exec crashes, malformed/schema-invalid output and timeouts on both synchronous groups. Healthy controls must execute the identical tool requests. Configure `vars.SECRET_HOST_TESTS == 'enabled'` and protected secrets only with owner approval; missing authentication or model evidence is incomplete. Enable `tests/test-plugin.py --stage m4.1` only here. Repeat applicable candidate/release gates for the changed source identity before owner-approved promotion; never mutate the M4 tag. Codex stays on Bash.
 

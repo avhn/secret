@@ -23,12 +23,12 @@ while IFS='|' read -r name mode options files keys; do
     rc=0
     if [[ "$mode" == show ]]; then
         env -i HOME="$TMP/home" SECRETS_DIR="$TMP/private" SECRETS_ENV="$TMP/fallback.store" LC_ALL=C PATH="$PATH" BASH_ENV='' ENV='' \
-            bash "$ROOT/bin/secret" show ${args[@]+"${args[@]}"} ${file_args[@]+"${file_args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" || rc=$?
+            bash "$ROOT/compat/secret" show ${args[@]+"${args[@]}"} ${file_args[@]+"${file_args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" || rc=$?
     elif [[ "$mode" == run ]]; then
         for file in ${file_args[@]+"${file_args[@]}"}; do args+=(-f "$file"); done
         env -i HOME="$TMP/home" SECRETS_DIR="$TMP/private" SECRETS_ENV="$TMP/fallback.store" LC_ALL=C PATH="$PATH" BASH_ENV='' ENV='' \
             KEY=ambient TOKEN=ambient SECOND=ambient ONLY=ambient OTHER=ambient \
-            bash "$ROOT/bin/secret" run ${args[@]+"${args[@]}"} -- perl -e '
+            bash "$ROOT/compat/secret" run ${args[@]+"${args[@]}"} -- perl -e '
                 for my $name (@ARGV) {
                     print "$name=", (exists $ENV{$name} ? length($ENV{$name}) : "<unset>"), "\n";
                 }
@@ -50,6 +50,6 @@ while IFS='|' read -r name fixture key labels value; do
         for pair in ${pairs[@]+"${pairs[@]}"}; do args+=(--label "$pair"); done
     fi
     printf '%b' "$value" | env -i HOME="$TMP/home" SECRETS_DIR="$TMP/private" LC_ALL=C PATH="$PATH" BASH_ENV='' ENV='' \
-        bash "$ROOT/bin/secret" stash ${args[@]+"${args[@]}"} "$TMP/private/$name.store" "$key" > /dev/null
+        bash "$ROOT/compat/secret" stash ${args[@]+"${args[@]}"} "$TMP/private/$name.store" "$key" > /dev/null
     cp "$TMP/private/$name.store" "$OUT/stash-$name.store"
 done <"$ROOT/testdata/store/stash-cases.txt"

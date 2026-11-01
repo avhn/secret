@@ -2,7 +2,7 @@
 # Synthetic keystore dispatch regression suite; no host keystore is accessed.
 # shellcheck disable=SC2016  # child fixture scripts contain literal dollars
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home" SECRETS_DIR="$TMP/home/.secrets" SECRETS_ENV="$TMP/home/.secrets.env"
@@ -10,12 +10,13 @@ export SECRET_BACKEND_STUB_DIR="$TMP/stub" CLIPBOARD="$TMP/clipboard" BASH_ENV='
 mkdir -p "$HOME" "$SECRET_BACKEND_STUB_DIR" "$TMP/bin" "$TMP/cwd"
 export PATH="$TMP/bin:$PATH"
 cd "$TMP/cwd"
-SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
+SECRET="${SECRET_CLI:-$ROOT/compat/secret}"
+SECRET="$(cd -P "$(dirname "$SECRET")" && pwd -P)/${SECRET##*/}"
 # The Bash CLI needs its interpreter; the Go CLI is an executable.
-if [[ -z "${SECRET_CLI:-}" ]]; then
+if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then
     cat >"$TMP/bin/secret-cli" <<EOF
 #!$BASH
-exec "$BASH" "$ROOT/bin/secret" "\$@"
+exec "$BASH" "$ROOT/compat/secret" "\$@"
 EOF
     chmod +x "$TMP/bin/secret-cli"
     SECRET="$TMP/bin/secret-cli"

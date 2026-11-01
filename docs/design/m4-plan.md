@@ -1,8 +1,22 @@
 # M4 plan: releasable Linux/macOS core
 
-M4 prepares digest-pinned, provenance-verified Linux/macOS binaries, verified opt-in launchers and an inactive host-test harness. Items 1-5 and 7 are M4 scope. Item 6 moves entirely to M4.1, Host evidence and Claude cutover. M4 does not change what main installs. Publication and later installed-default promotion require separate explicit owner approval.
+M4 prepares digest-pinned, provenance-verified Linux/macOS binaries, verified opt-in launchers and an inactive host-test harness. Items 1-5 and 7 were M4 scope. Item 6 originally moved entirely to M4.1, Host evidence and Claude cutover. The binding later CLI-only extraction below supersedes only its CLI naming and compatibility timing. M4 itself did not change what main installed. Publication and later installed-default promotion require separate explicit owner approval.
 
-## Current boundaries and assumptions
+## Binding CLI-only extraction (owner approved, pending CI)
+
+The later CLI-only policy supersedes item 6 only for CLI naming and compatibility:
+`bin/secret` is the verified launcher, `compat/secret` is byte-identical executable
+Bash, and standalone/MCPB payloads use `secret[.exe]`. The plugin stage is
+`cli-only` (Go CLI plus Bash hooks), distinct from `m4.1`. Compatibility must pin
+the last Bash blob, enforce executable identity and force the selected interpreter
+even with explicit `SECRET_CLI`, including stock Bash 3.2. A broken final launcher
+must leave the exact Bash baseline results and inventory unchanged. See
+`tests/test-compat.sh`. Hook activation, `onFailure` and output contracts remain
+M4.1 work after sponsored host evidence. Current release identities remain 0.3.4;
+all reserved release actions still need separate approval. Original M4 historical
+boundaries below do not authorize changing immutable tags or checksum commits.
+
+## Historical M4 boundaries and assumptions
 
 - `bin/secret` is Bash. Both Claude entries in `hooks/hooks.json` call Bash with timeout 5 and no `onFailure`. All four marketplace and plugin versions are 0.1.0. The Codex plugin and manual configurations point to `hooks/guard-secrets`.
 - `cmd/secret/main.go` already supports `-X main.version`; leave it unchanged.
@@ -12,7 +26,7 @@ M4 prepares digest-pinned, provenance-verified Linux/macOS binaries, verified op
 
 ```text
 Before: CLI symlink -> Bash CLI; Claude/Codex -> Bash guard; Go -> staged tests
-M4:     Default CLI and Claude/Codex -> unchanged Bash; opt-in secret-go -> Go CLI
+M4:     Default CLI and Claude/Codex -> unchanged Bash; opt-in secret -> Go CLI
         Release S -> checksum C -> final tag C; host harness inactive
 M4.1:   CLI symlink -> verified launcher -> Go CLI; rollback -> compat/secret
         Claude -> guard-go -> Go hook after real host evidence; Codex -> Bash
@@ -50,7 +64,7 @@ Workers A to D build against this contract; changing it needs a coordinator edit
 - Claude hook launcher: `hooks/guard-go` (POSIX sh). On any bootstrap failure it prints exactly one line and exits 0:
   `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"secret: verified binary unavailable; run scripts/install-release.sh"}}`
   If that write fails it exits 2 with fixed stderr `secret: verified binary unavailable`. On success it `exec`s `<cache>/secret hook claude` with stdin untouched.
-- CLI launcher: `bin/secret-go` (POSIX sh, later staged as `bin/secret`). On bootstrap failure it prints `secret: verified binary unavailable; run scripts/install-release.sh` to stderr and exits 70; otherwise `exec <cache>/secret "$@"`. No Bash fallback in either launcher.
+- CLI launcher: `bin/secret` (POSIX sh, final CLI path under the later extraction). On bootstrap failure it prints `secret: verified binary unavailable; run scripts/install-release.sh` to stderr and exits 70; otherwise `exec <cache>/secret "$@"`. No Bash fallback in either launcher.
 
 Launcher regression tests retain caller Go module/build caches before changing HOME and repair permissions only in owned disposable scratch during cleanup. Overlong symlink tests accept Darwin's kernel ELOOP rejection while independently exercising the launcher's 32-link bound with the chain supplied as shell `$0`. Closed-stdout tests require exact fixed stderr under the native sh and available dash/Bash POSIX interpreters. Offline fixture tests pass physical cwd paths and distinguish aliases from genuinely different directories; none of these synthetic checks proves installed-host protection.
 
@@ -102,7 +116,7 @@ Acceptance: byte equality; a changed binary, repo, workflow, source SHA, ref, su
 
 ### 3. Verified installation and launchers (worker B, after 1)
 
-Files: `hooks/guard-go`, `scripts/install-release.sh`, `bin/secret-go`, `tests/test-launchers.sh`. `bin/secret` stays unchanged throughout M4; M4.1 stages the final CLI path in moved item 6.
+Files: `hooks/guard-go`, `scripts/install-release.sh`, `bin/secret`, `tests/test-launchers.sh`. The Bash CLI stayed unchanged throughout M4; the later CLI-only extraction stages the final path and compatibility gate from item 6.
 
 - Bounded portable `readlink` traversal for relative and absolute symlink chains, `cd -P`/`pwd -P` checkout discovery, quoted paths. Reject cycles, dangling links, aliased cache or manifest destinations and unsafe owners or modes. Permitted entrypoint symlinks do not imply permitted checksum or cache symlinks. Never source checkout metadata or trust a PATH `secret`.
 - The installer requires an explicit trusted checkout or release pin, validates the committed checksum manifest, downloads only exact HTTPS tag assets with restricted redirects and size/time limits into 0700 scratch, then verifies digest and authenticated repository/workflow/C/tag/subject before `chmod` and atomic cache publication. C comes from the trusted pin or authenticated tag identity, never a self-referential field at C. Persist bounded names-only verification metadata and attestation material for offline preinstallation; test the pinned `gh` offline trust-root requirements rather than assuming `--bundle` removes network access.
@@ -140,14 +154,17 @@ with bounded session and model spend and only disposable fixture permissions.
 
 Acceptance: build and offline-test the harness in M4, keeping model sessions inactive until sponsorship. M4.1 requires real host evidence for every required Claude failure on Linux and macOS. Authentication or model outages block that gate. Synthetic hook subprocess tests never establish host failure blocking. Evidence records version, runner, commit, case and result, never credentials or raw sessions.
 
-### 6. Moved to M4.1: Stage activation and compatibility (after sponsored host evidence)
+### 6. M4.1 hook activation; CLI compatibility independently extracted
 
-Entirely out of M4 scope, including manifest versions, `onFailure`, CLI staging and the hook output contract. Do not modify these installed surfaces in M4.
+Originally entirely outside M4 scope. The owner-approved CLI-only extraction now
+authorizes the CLI move and compatibility gate in the second bullet. Manifest
+activation, `onFailure` and the hook output contract still require sponsored host
+evidence. Do not infer hook activation permission from the CLI change.
 
 Files: `hooks/hooks.json`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `bin/secret`, `compat/secret`, `.github/workflows/ci.yml`, `tests/test-compat.sh`.
 
 - On the release branch only: quote both Claude `guard-go` commands, keep timeout 5, add `onFailure: "block"` to every synchronous entry and bump all four versions together. Leave `.codex-plugin/hooks.json`, `codex/hooks.json` and `hooks/guard-secrets` on Bash.
-- Copy the Bash CLI byte-for-byte to executable `compat/secret`, stage the verified CLI launcher as `bin/secret`, remove `bin/secret-go` if redundant. Point every retained Bash CLI, provider, current-Bash, stock-3.2 and inventory job at absolute `SECRET_CLI=.../compat/secret`, assert the resolved executable identity, and test that a broken `bin/secret` cannot redirect or invalidate the compatibility gate. Keep separate verified-launcher Go integration and exact divergence tests.
+- Copy the Bash CLI byte-for-byte to executable `compat/secret`, stage the verified CLI launcher as `bin/secret`, remove the redundant staging launcher. Point every retained Bash CLI, provider, current-Bash, stock-3.2 and inventory job at absolute `SECRET_CLI=.../compat/secret`, assert the resolved executable identity, and test that a broken `bin/secret` cannot redirect or invalidate the compatibility gate. Keep separate verified-launcher Go integration and exact divergence tests.
 - Resolve the output contract in `internal/hook/hook.go`, `internal/hook/hook_test.go` and the `internal/cli` hook dispatch tests: safe Claude requests emit a host-tested neutral response, not an explicit allow that overrides other permission rules; preserve Codex compatibility. Output-write failure and panic paths return denial or nonzero. A zero-exit empty-output fault may remain a host-valid no-decision and must be documented, not claimed as covered by `onFailure`. Regenerate affected expectations only with review.
 
 Acceptance: the existing lint/test/libsecret/keychain/go matrix stays green, the exact corpus is preserved, both Claude groups are exercised through the installed branch plugin, M2 safe/deny semantics are unchanged. All M4.1 activation, version, CLI and build input changes require a new candidate source identity; never alter the frozen M4 S or C.
@@ -166,7 +183,7 @@ Acceptance: documented install and Bash-default commands run on hosted runners. 
 2. Build S twice in hosted CI with its fixed epoch, compare every byte, and commit only `dist/checksums-v<V>.txt` as signed checksum commit C. Check the exact S..C diff. The branch stays unpromoted; the installed default stays Bash.
 3. Create and push the immutable protected annotated tag `v<V>` at C: **requires explicit owner go-ahead**. Final-tag jobs rebuild twice from C, compare with the committed S digests, attest and verify C/tag subjects. A failure means a new release identity, never retagging.
 4. Create a draft GitHub Release with verified assets and bundles: **requires explicit owner go-ahead**. Verify uploaded bytes and provenance. Publish it: **requires explicit owner go-ahead**. Then run final public cold, offline, corruption and install tests on hosted runners. Real host tests remain deferred to M4.1; publishing does not authorize default promotion.
-5. M4 may promote only its unchanged Bash-default installation surfaces after those checks: **requires explicit owner go-ahead**. Bumped manifests, `onFailure: "block"`, Go CLI staging with `compat/secret`, `guard-go` activation and hook output-contract changes all belong to M4.1 after sponsored host evidence. Any default-branch setting change also **requires explicit owner go-ahead**. M4.1 must repeat applicable candidate and release gates for its new source identity; it cannot mutate the immutable M4 tag.
+5. M4 may promote only its unchanged Bash-default installation surfaces after those checks: **requires explicit owner go-ahead**. Bumped manifests, `onFailure: "block"`, `guard-go` activation and hook output-contract changes still belong to M4.1 after sponsored host evidence. The later CLI-only staging with `compat/secret` is separately owner-approved, not permission to change the frozen M4 release. Any default-branch setting change also **requires explicit owner go-ahead**. M4.1 must repeat applicable candidate and release gates for its new source identity; it cannot mutate the immutable M4 tag.
 
 ## Residual risks
 

@@ -151,7 +151,7 @@ def main():
         raise InstallError(auth_message)
     make(directory)
     safe_destination(directory)
-    target = directory / 'secret-go'
+    target = directory / 'secret'
 
     def check_target():
         if target.exists() or target.is_symlink():
@@ -159,7 +159,7 @@ def main():
 
     check_target()
     scratch = Path(tempfile.mkdtemp(prefix='.secret-install-', dir=directory))
-    lock = directory / '.secret-go.install-lock'
+    lock = directory / '.secret.install-lock'
     token = 'pid=' + str(os.getpid()) + '\ntoken=' + secrets.token_hex(24) + '\n'
     owned = False
     try:

@@ -31,7 +31,7 @@
     if ($showHelp) {
         Write-Output 'Usage: install.ps1 [--version V] [--commit C] [--dir DIR] [--help]'
         Write-Output 'SECRET_VERSION defaults to 0.3.4; SECRET_RELEASE_COMMIT optionally pins a full SHA.'
-        Write-Output 'INSTALL_DIR defaults to %LOCALAPPDATA%\Programs\secret. gh and curl.exe are required.'
+        Write-Output 'INSTALL_DIR defaults to $HOME\.local\bin (native user profile fallback). gh and curl.exe are required.'
         Write-Output 'Adds only its directory to user PATH. No source build, stores, profiles or client edits.'
         return
     }
@@ -267,8 +267,11 @@ namespace SecretInstallerV032 {
     $failureCategory = 'destination-safety'
     try {
         if (-not $directory) {
-            if (-not $env:LOCALAPPDATA) { throw 'missing LOCALAPPDATA' }
-            $directory = Join-Path $env:LOCALAPPDATA 'Programs\secret'
+            # HOME is optional for native Windows callers. Never use LOCALAPPDATA.
+            $profileRoot = $env:HOME
+            if (-not $profileRoot) { $profileRoot = [Environment]::GetFolderPath('UserProfile') }
+            if (-not $profileRoot) { throw 'missing user profile' }
+            $directory = Join-Path $profileRoot '.local\bin'
         }
         if ($directory -match '[\x00-\x1f\x7f;~]' -or $directory -match '(^|[\\/])\.{1,2}([\\/]|$)' -or $directory.StartsWith('\\') -or
             $directory -match '(^|[\\/])[^\\/]*[. ]([\\/]|$)' -or $directory -match '(^|[\\/])(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])([.]|[\\/]|$)') { throw 'unsafe directory' }
@@ -282,11 +285,11 @@ namespace SecretInstallerV032 {
         catch { throw 'secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry' }
         $failureCategory = 'destination-safety'
         New-PrivateDirectory $directory; Assert-SafePath $directory $false $true
-        $target = Join-Path $directory 'secret-go.exe'
+        $target = Join-Path $directory 'secret.exe'
         if (Test-Path -LiteralPath $target) { Assert-SafePath $target }
         $scratch = Join-Path $directory ('.secret-install-' + [Guid]::NewGuid().ToString('N'))
         New-PrivateDirectory $scratch
-        $lock = Join-Path $directory '.secret-go.install-lock'
+        $lock = Join-Path $directory '.secret.install-lock'
         $token = "pid=$PID`ntoken=" + [Guid]::NewGuid().ToString('N') + "`n"
         for ($attempt = 0; $attempt -lt 4; $attempt++) {
             try {

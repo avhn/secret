@@ -126,9 +126,12 @@ and Python readers use `-I`.
 ## 1. Two green integrated candidates, then source S
 
 Finish every release lane before freezing S, including setup documentation. Keep
-`bin/secret`, `hooks/hooks.json`, `hooks/guard-secrets`, both Codex hook configs
+`hooks/hooks.json`, `hooks/guard-secrets`, both Codex hook configs
 and `internal/hook` unchanged. The only installed-manifest change is the separately
-approved equal version bump to 0.3.4, never Go activation or onFailure. Keep the test-only
+approved equal version bump to 0.3.4, never Go hook activation or onFailure.
+The separate owner-approved CLI-only extraction uses verified `bin/secret`,
+byte-identical executable `compat/secret` and the `--stage cli-only` contract.
+Standalone `secret[.exe]` replacement is verified and atomic, not a hook cutover. Keep the test-only
 `.secret-release-test-fixture` marker out of the entire shipped tree; CI rejects
 its tracked or on-disk presence, including symlinks.
 
@@ -137,8 +140,8 @@ coverage is retained CI (including native OS, provider, race, corpus and Bash 3.
 independent reproducible release builds and native plugin installation/failure
 matrices. PRs retain release/launcher/plugin and offline host classification suites, and
 add `tests/test-install.sh`, native `tests/test-install.ps1`, `tests/test-mcpb.py`,
-`tests/test-registry.py` and `tests/test-setup.py`. Select plugin `--stage v0.3.4`
-explicitly: it checks version equality and unchanged Bash activation, not M4.1. Native install
+`tests/test-registry.py` and `tests/test-setup.py`. Select plugin `--stage cli-only`
+explicitly: it checks version equality, the final Go CLI and unchanged Bash hooks, not M4.1. Native install
 jobs record actual runner OS/image/architecture, not just cross-build success.
 Candidate tests use disposable HOME/checkouts and candidate checksum metadata;
 fixture bypass is never final provenance or an installation instruction.
@@ -281,12 +284,13 @@ installers remain online-only; Windows cold offline installs are unsupported.
 A digest or bundle alone is insufficient offline trust.
 
 Only after final published checks are green may the owner separately authorize
-promotion of the M4 branch to exactly C. This does not activate Go, change hook
-paths or create `compat/secret`. The release's version-only manifest bump does
-not authorize promotion of installed defaults. A default-branch setting
-change or external package publication is yet another owner-approved action.
-Do not alter C to record results; use GitHub run/release records and a later
-tracking PR to mark M4 complete with links.
+promotion of main to source S, never checksum commit C. Keep C and its immutable
+tag on the release branch; bringing C onto main breaks later candidate-source
+checks. The CLI-only extraction does not activate Go hooks or change hook paths,
+and a version bump does not authorize installed-default promotion. A default-branch
+setting change or external package publication is another owner-approved action.
+Do not alter S or C to record results; use GitHub run/release records and a later
+tracking PR with links.
 
 ## 6. Public native evidence and Registry publication
 
@@ -330,7 +334,7 @@ Record final evidence outside S/C, then in a later tracking PR.
 
 ## M4.1 follow-up, not v0.3.4 publication work
 
-Before any Claude/default CLI activation, sponsors must fund model use and the
+Before any Claude hook activation, sponsors must fund model use and the
 owner must provision the protected `host-hook-tests` environment and applicable
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` secrets without exposing values. Only then
 may the owner enable `vars.SECRET_HOST_TESTS == 'enabled'` and dispatch trusted
@@ -339,8 +343,7 @@ the gate incomplete. Pins start at Claude Code 2.1.295 and Codex 0.163.0; host
 upgrades need new evidence. Codex stays on Bash regardless of Claude results.
 
 M4.1 stages and tests its separately reviewed release manifests, both Claude `onFailure: "block"`
-entries pointing to `guard-go`, the verified `bin/secret` launcher with
-byte-identical executable `compat/secret`, and neutral-output/error behavior in
+entries pointing to `guard-go` and neutral-output/error behavior in
 `internal/hook`. Enable `tests/test-plugin.py --stage m4.1` there, not in the v0.3.4
 workflow. The harness requires that staged configuration on a disposable hosted
 branch. Changed inputs require new source/candidate/release identity and renewed

@@ -126,7 +126,7 @@ func TestWincredOutsideBashDiscovery(t *testing.T) {
 	if err := testutil.WriteFile(file, []byte("TOKEN=synthetic\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("bash", filepath.Join("..", "..", "bin", "secret"), "list")
+	cmd := exec.Command("bash", filepath.Join("..", "..", "compat", "secret"), "list")
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "SECRETS_DIR=" + dir, "SECRETS_ENV=" + filepath.Join(dir, "missing.env")}
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -172,7 +172,7 @@ class Install(unittest.TestCase):
         self.fixtures = self.work / 'fixtures'
         self.fixtures.mkdir(mode=0o700)
         self.destination = self.home / 'bin with spaces and \'single "double'
-        self.target = self.destination / 'secret-go'
+        self.target = self.destination / 'secret'
         self.log = self.work / 'log'
         self.ready = self.work / 'ready'
         self.env = dict(HOME=str(self.home), PATH=str(self.tools), INSTALL_DIR=str(self.destination),
@@ -210,7 +210,7 @@ class Install(unittest.TestCase):
         self.assertNotIn(b'provider diagnostic', result.stderr)
         if self.destination.exists():
             self.assertEqual(list(self.destination.glob('.secret-install-*')), [])
-            self.assertFalse((self.destination / '.secret-go.install-lock').exists())
+            self.assertFalse((self.destination / '.secret.install-lock').exists())
         return result
 
     def test_install_and_quoted_registration(self):
@@ -352,17 +352,16 @@ exec(compile(sys.stdin.read(), '<installer>', 'exec'))
 
     def test_existing_destination_preserved_and_replaced(self):
         self.destination.mkdir(mode=0o700)
-        bash = self.destination / 'secret'
-        bash.write_bytes(b'original Bash secret')
-        self.target.write_bytes(b'old Go install'); self.target.chmod(0o500)
+        # Classified CLI-only change: a safe existing Bash executable is replaced.
+        # Verification failure must preserve it byte-for-byte.
+        self.target.write_bytes(b'original Bash secret'); self.target.chmod(0o500)
         self.env['MODE'] = 'corrupt'
         result = self.run_install()
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.target.read_bytes(), b'old Go install')
+        self.assertEqual(self.target.read_bytes(), b'original Bash secret')
         self.env.pop('MODE')
         self.assertEqual(self.run_install().returncode, 0)
         self.assertEqual(self.target.read_bytes(), NATIVE)
-        self.assertEqual(bash.read_bytes(), b'original Bash secret')
 
     def test_existing_default_directory_modes_and_symlink(self):
         # Existing ~/.local/bin is commonly 0755. Do not repair it or require 0700.
@@ -370,7 +369,7 @@ exec(compile(sys.stdin.read(), '<installer>', 'exec'))
         self.destination = self.home / '.local/bin'
         self.destination.mkdir(mode=0o700, parents=True)
         self.destination.chmod(0o755)
-        self.target = self.destination / 'secret-go'
+        self.target = self.destination / 'secret'
         result = self.run_install()
         self.assertEqual((result.returncode, result.stderr), (0, b''))
         self.assertEqual(stat.S_IMODE(self.destination.stat().st_mode), 0o755)
@@ -413,7 +412,7 @@ exec(compile(sys.stdin.read(), '<installer>', 'exec'))
 
     def test_lock_never_stolen(self):
         self.destination.mkdir(mode=0o700)
-        lock = self.destination / '.secret-go.install-lock'
+        lock = self.destination / '.secret.install-lock'
         lock.mkdir(mode=0o700); (lock / 'owner').write_text('stale')
         result = self.run_install()
         self.assertNotEqual(result.returncode, 0)

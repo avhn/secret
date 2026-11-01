@@ -14,7 +14,7 @@ not local mocks alone.
 - `internal/store/manifest.go` supports names-only v1 records; `internal/store/write.go` supplies
   the shared `.write-lock` and private atomic replacement; `internal/secure/bytes.go` supplies
   byte clearing and fixed errors. Reuse them.
-- `bin/secret` recognizes only `keychain:NAME` and `libsecret:NAME`, and its default discovery
+- `compat/secret` recognizes only `keychain:NAME` and `libsecret:NAME`, and its default discovery
   rejects unknown backends in every `*.keys` file, so `backend=pass` in an ordinary `NAME.keys`
   would break the active Bash CLI.
 - Non-goals: Bash CLI or guard edits, hook-policy changes, installed-default promotion, release
@@ -127,8 +127,8 @@ The plan review (2026-10-25) required these changes; they override earlier text:
 - A required `pass` matrix job on `ubuntu-latest` and `macos-latest` with Go 1.26.10 and
   `GOTOOLCHAIN=local`. Install GnuPG, Bash and GNU getopt; stage pass 1.7.4 from a reviewed
   immutable source and digest, not an unpinned package. Record GPG and Bash versions.
-- `go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret`, then
-  `python3 -I tests/test-pass.py "$RUNNER_TEMP/secret-go"`. The driver creates private disposable
+- `go build -o "$RUNNER_TEMP/secret" ./cmd/secret`, then
+  `python3 -I tests/test-pass.py "$RUNNER_TEMP/secret"`. The driver creates private disposable
   HOME, GNUPGHOME, PASSWORD_STORE_DIR, SECRETS_DIR and temp roots first, generates a throwaway key
   in batch mode, initializes only that store and sets `SECRET_REQUIRE_PASS=1` only for isolated
   children. It runs `TestPassIntegration` and `TestOperatorPassIntegration`; when the gate is

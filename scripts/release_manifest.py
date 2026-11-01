@@ -113,7 +113,7 @@ def source_metadata(version):
 def inspect_bundle(path, version, directory):
     """Inspect only allowlisted bytes, never extract or execute downloaded code."""
     file_bytes(path)
-    expected = {"manifest.json", "LICENSE", "icon.png", "server/secret-go", "server/secret-go.exe"}
+    expected = {"manifest.json", "LICENSE", "icon.png", "server/secret", "server/secret.exe"}
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         require(len(names) == len(set(names)) and set(names) == expected
@@ -136,12 +136,12 @@ def inspect_bundle(path, version, directory):
         require(isinstance(compatibility, dict) and compatibility.get("platforms") == ["darwin", "win32"],
                 "bundle platform mismatch")
         server = manifest.get("server", {})
-        require(isinstance(server, dict) and server.get("type") == "binary" and server.get("entry_point") == "server/secret-go",
+        require(isinstance(server, dict) and server.get("type") == "binary" and server.get("entry_point") == "server/secret",
                 "invalid bundle server")
         config = server.get("mcp_config", {})
-        require(config == {"command": "${__dirname}/server/secret-go",
+        require(config == {"command": "${__dirname}/server/secret",
                            "args": ["mcp", "--store", "${user_config.store_reference}"],
-                           "platform_overrides": {"win32": {"command": "${__dirname}/server/secret-go.exe"}}},
+                           "platform_overrides": {"win32": {"command": "${__dirname}/server/secret.exe"}}},
                 "invalid bundle argv or transport")
         settings = manifest.get("user_config", {})
         require(isinstance(settings, dict) and set(settings) == {"store_reference"}, "unexpected bundle settings")
@@ -152,7 +152,7 @@ def inspect_bundle(path, version, directory):
         reviewed["version"] = version
         reviewed["documentation"] = f"{REPOSITORY}/blob/v{version}/docs/setup.md"
         require(manifest == reviewed, "bundle manifest differs from reviewed template")
-        windows = archive.read("server/secret-go.exe")
+        windows = archive.read("server/secret.exe")
         require(len(windows) >= 64 and windows[:2] == b"MZ", "missing Windows executable")
         offset = struct.unpack_from("<I", windows, 60)[0]
         require(offset >= 64 and offset + 26 <= len(windows)
@@ -161,7 +161,7 @@ def inspect_bundle(path, version, directory):
                 "wrong Windows bundle architecture")
         require(windows == file_bytes(directory / f"secret-v{version}-windows-amd64.exe"),
                 "bundle Windows payload differs from release")
-        mac = archive.read("server/secret-go")
+        mac = archive.read("server/secret")
         require(len(mac) >= 8 and mac[:4] in (b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf")
                 and struct.unpack_from(">I", mac, 4)[0] == 2, "missing two-slice universal Mach-O")
         wide = mac[:4] == b"\xca\xfe\xba\xbf"

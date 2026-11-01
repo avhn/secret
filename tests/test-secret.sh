@@ -5,7 +5,7 @@
 # Usage: bash tests/test-secret.sh (also run with stock /bin/bash on macOS).
 # shellcheck disable=SC2016  # fixtures and child programs deliberately contain literal dollars
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home" SECRETS_DIR="$TMP/home/.secrets" SECRETS_ENV="$TMP/home/.secrets.env"
@@ -15,12 +15,13 @@ unset KEY TOKEN SECOND ALPHA BETA OPTIONAL MISSING EMPTY ONE TWO SHORT THREE LON
 mkdir -p "$HOME" "$TMP/bin" "$TMP/cwd"
 export PATH="$TMP/bin:$PATH"
 cd "$TMP/cwd"
-SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
+SECRET="${SECRET_CLI:-$ROOT/compat/secret}"
+SECRET="$(cd -P "$(dirname "$SECRET")" && pwd -P)/${SECRET##*/}"
 # The Bash CLI needs its interpreter; the Go CLI is an executable.
-if [[ -z "${SECRET_CLI:-}" ]]; then
+if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then
     cat >"$TMP/bin/secret-cli" <<EOF
 #!$BASH
-exec "$BASH" "$ROOT/bin/secret" "\$@"
+exec "$BASH" "$ROOT/compat/secret" "\$@"
 EOF
     chmod +x "$TMP/bin/secret-cli"
     SECRET="$TMP/bin/secret-cli"

@@ -21,7 +21,7 @@ for tool in security perl script ps; do
         exit 0
     fi
 done
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TMP="$(mktemp -d)"
 SAMPLER=""
 cleanup() {
@@ -38,7 +38,16 @@ security set-keychain-settings "$SECRET_KEYCHAIN" >/dev/null 2>&1 || { printf 'F
 export HOME="$TMP/home" SECRETS_DIR="$TMP/home/.secrets" SECRETS_ENV="$TMP/home/.secrets.env" BASH_ENV='' ENV=''
 unset SECRET_BACKEND_STUB_DIR TOKEN OTHER
 mkdir -p "$HOME"
-SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
+SECRET="${SECRET_CLI:-$ROOT/compat/secret}"
+SECRET="$(cd -P "$(dirname "$SECRET")" && pwd -P)/${SECRET##*/}"
+if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then
+    cat >"$TMP/secret-cli" <<EOF
+#!$BASH
+exec "$BASH" "$ROOT/compat/secret" "\$@"
+EOF
+    chmod +x "$TMP/secret-cli"
+    SECRET="$TMP/secret-cli"
+fi
 PASSED=0 FAILED=0
 check() {
     local name="$1" want="$2" got=0

@@ -1,7 +1,7 @@
 # Optional pass backend (staged Go CLI)
 
 The opt-in Go CLI supports `pass:NAME` on Linux and macOS with upstream pass
-1.7.4. This is not installed-default promotion: `bin/secret`, the Bash guard,
+1.7.4. Provider support does not activate hooks: the Bash guard,
 hook configuration and plugin manifests are unchanged. Native GitHub runner
 results remain a milestone gate; local synthetic tests are not native evidence.
 Windows rejects pass value operations before launching a provider.
@@ -21,9 +21,9 @@ With your opt-in Go executable, use the usual commands with `pass:team` in place
 of a file reference:
 
 ```sh
-secret-go stash pass:team TOKEN
-secret-go show pass:team
-secret-go run -f pass:team -- consumer
+secret stash pass:team TOKEN
+secret show pass:team
+secret run -f pass:team -- consumer
 ```
 
 `stash` reads hidden terminal input or stdin, not a value argument. `get` remains

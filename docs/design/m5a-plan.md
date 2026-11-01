@@ -11,7 +11,7 @@ execution, private persistence and exact Credential Manager access. Completion r
   hidden input, supervised `run` and unfiltered `exec` emulation. Extend existing operator,
   template and audit paths only together with their native permission, terminal and lifecycle
   tests.
-- Preserve `bin/secret`, installed Bash guards, plugin manifests, Unix behavior and existing v1
+- Preserve `compat/secret`, installed Bash guards, plugin manifests, Unix behavior and existing v1
   manifests. M5a is independent of the blocked M4.1 activation milestone.
 - Non-goals: Windows release assets, Scoop, automatic installation, default promotion,
   PowerShell/CMD analysis, host fail-closed claims, clipboard parity and Windows arm64 runtime

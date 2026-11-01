@@ -86,25 +86,46 @@ without it, C is derived from verified attestation identity, not a checksum fiel
 The scripts also accept `--version`, `--commit`, `--dir` and `--help` when run as
 files. Conflicting environment/flag pins fail. Do not substitute a guessed C.
 
-Unix installs only `~/.local/bin/secret-go` by default and does not edit PATH or
-profiles. Windows installs `%LOCALAPPDATA%\Programs\secret\secret-go.exe` by
-default and adds only its own directory to the user PATH. Open a new terminal to
+Final CLI names and destinations described below ship from **v0.3.5 onward**.
+The download snippets install their pinned release, not main. The published
+v0.3.4 installer uses `secret-go` on Unix and
+`%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
+Use the printed executable path for that release; do not infer the installed
+name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
+published assets or tags.
+
+From v0.3.5 onward, Unix installs only `~/.local/bin/secret` by default and does not edit PATH or
+profiles. Windows installs `$HOME\.local\bin\secret.exe` by
+default, falls back to the native user profile when HOME is absent, and adds only
+its own directory to the user PATH. Open a new terminal to
 see that PATH change. Both print the absolute executable path. Neither registers
 MCP, edits client files, reads stores or installs hooks. Existing unsafe or
 aliased destination directories fail rather than being silently repaired.
 
-The standalone executable is distinct from the Bash `secret` CLI. Unlike the
-trusted-checkout `bin/secret-go` launcher, it does not rehash itself before each
+The standalone executable and checkout launcher both run the Go CLI.
+Bash rollback is explicit at `compat/secret`, never a bootstrap fallback. Unlike the
+trusted-checkout `bin/secret` launcher, it does not rehash itself before each
 execution. Install/update verification is not ongoing same-user tamper protection.
 Consumers do not need Go, Node, npm, Python packaging tools or lipo to run MCP;
 Python 3 is needed by the Unix installer, not the installed server.
 
+## Migrate an earlier installation
+
+From v0.3.5 onward, re-register each MCP client with the new installer's printed
+`secret` / `secret.exe` path, preserving the approved store references and other
+arguments. Restart clients and verify the new registration before removing the
+old `secret-go` / `secret-go.exe` file. Review each old path first; do not delete
+an unknown or custom executable. On Windows, remove the old
+`%LOCALAPPDATA%\Programs\secret` user PATH entry only after confirming no other
+installation uses it. Installers do not delete old binaries, remove old PATH
+entries, or rewrite MCP registrations automatically. See [rollback](install.md#explicit-bash-rollback).
+
 ## Choose the store scope
 
-In every example replace `/ABSOLUTE/INSTALL DIR/secret-go` with the installer's
+In every example replace `/ABSOLUTE/INSTALL DIR/secret` with the installer's
 printed absolute path, and `file:/ABSOLUTE/STORE DIR/STORE.secret` with one exact
 human-approved reference. These uppercase placeholders are paths, not values.
-Windows examples use `C:\ABSOLUTE\INSTALL DIR\secret-go.exe` and
+Windows examples use `C:\ABSOLUTE\INSTALL DIR\secret.exe` and
 `file:C:\ABSOLUTE\STORE DIR\STORE.secret`. JSON and TOML double backslashes are
 syntax escaping, not literal doubled separators. Resolve paths without reading
 store contents. Never put a secret value in configuration.
@@ -139,13 +160,13 @@ supports the same UI. Use an up-to-date client and review startup/trust prompts.
 Register at user scope, with the separator before the absolute command:
 
 ```sh
-claude mcp add --transport stdio --scope user secret -- "/ABSOLUTE/INSTALL DIR/secret-go" mcp --store "file:/ABSOLUTE/STORE DIR/STORE.secret"
+claude mcp add --transport stdio --scope user secret -- "/ABSOLUTE/INSTALL DIR/secret" mcp --store "file:/ABSOLUTE/STORE DIR/STORE.secret"
 ```
 
 For PowerShell, the same client command passes Windows paths as single arguments:
 
 ```powershell
-claude mcp add --transport stdio --scope user secret -- 'C:\ABSOLUTE\INSTALL DIR\secret-go.exe' mcp --store 'file:C:\ABSOLUTE\STORE DIR\STORE.secret'
+claude mcp add --transport stdio --scope user secret -- 'C:\ABSOLUTE\INSTALL DIR\secret.exe' mcp --store 'file:C:\ABSOLUTE\STORE DIR\STORE.secret'
 ```
 
 Open `/mcp` and select secret's Reconnect action, or restart Claude Code. User
@@ -182,7 +203,7 @@ Use Settings > Developer > Edit Config. Merge the secret entry into
 {
   "mcpServers": {
     "secret": {
-      "command": "/ABSOLUTE/INSTALL DIR/secret-go",
+      "command": "/ABSOLUTE/INSTALL DIR/secret",
       "args": ["mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"]
     }
   }
@@ -195,7 +216,7 @@ For Windows, the equivalent entry is:
 {
   "mcpServers": {
     "secret": {
-      "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret-go.exe",
+      "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret.exe",
       "args": ["mcp", "--store", "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret"]
     }
   }
@@ -211,21 +232,21 @@ explicitly relocated). Do not create a duplicate table or replace other settings
 
 ```toml
 [mcp_servers.secret]
-command = "/ABSOLUTE/INSTALL DIR/secret-go"
+command = "/ABSOLUTE/INSTALL DIR/secret"
 args = ["mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"]
 ```
 
 Alternatively, register the same server with the CLI:
 
 ```sh
-codex mcp add secret -- "/ABSOLUTE/INSTALL DIR/secret-go" mcp --store "file:/ABSOLUTE/STORE DIR/STORE.secret"
+codex mcp add secret -- "/ABSOLUTE/INSTALL DIR/secret" mcp --store "file:/ABSOLUTE/STORE DIR/STORE.secret"
 ```
 
 Windows TOML uses escaped backslashes:
 
 ```toml
 [mcp_servers.secret]
-command = "C:\\ABSOLUTE\\INSTALL DIR\\secret-go.exe"
+command = "C:\\ABSOLUTE\\INSTALL DIR\\secret.exe"
 args = ["mcp", "--store", "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret"]
 ```
 
@@ -255,7 +276,7 @@ Merge into the global `~/.config/opencode/opencode.json` (or the existing
   "mcp": {
     "secret": {
       "type": "local",
-      "command": ["/ABSOLUTE/INSTALL DIR/secret-go", "mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"],
+      "command": ["/ABSOLUTE/INSTALL DIR/secret", "mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"],
       "enabled": true
     }
   }
@@ -272,7 +293,7 @@ Merge into the user-wide `~/.cursor/mcp.json`, not a project file unless asked:
 {
   "mcpServers": {
     "secret": {
-      "command": "/ABSOLUTE/INSTALL DIR/secret-go",
+      "command": "/ABSOLUTE/INSTALL DIR/secret",
       "args": ["mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"]
     }
   }
@@ -292,7 +313,7 @@ profile's `mcp.json`. This is the VS Code user-profile schema, not settings.json
   "servers": {
     "secret": {
       "type": "stdio",
-      "command": "/ABSOLUTE/INSTALL DIR/secret-go",
+      "command": "/ABSOLUTE/INSTALL DIR/secret",
       "args": ["mcp", "--store", "file:/ABSOLUTE/STORE DIR/STORE.secret"]
     }
   }
@@ -344,7 +365,7 @@ above and a distinct server name:
 {
   "mcpServers": {
     "openproject-launcher": {
-      "command": "/ABSOLUTE/INSTALL DIR/secret-go",
+      "command": "/ABSOLUTE/INSTALL DIR/secret",
       "args": ["exec", "-f", "file:/ABSOLUTE/STORE DIR/STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
     }
   }
@@ -357,7 +378,7 @@ Windows JSON preserves each argument and escapes backslashes, not a shell string
 {
   "mcpServers": {
     "openproject-launcher": {
-      "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret-go.exe",
+      "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret.exe",
       "args": ["exec", "-f", "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
     }
   }
@@ -392,7 +413,7 @@ supported argv. Old Bash-only releases are not MCP substitutes. Keep the Bash
 CLI/guard installation unchanged; no automatic fallback or Go hook cutover occurs.
 
 To remove, stop the server, remove only its registration (or uninstall the Desktop
-extension), and delete only the installed secret-go executable when no other
+extension), and delete only the installed secret executable when no other
 client uses it. Preserve other servers and settings. If desired, manually remove
 the installer's Windows user PATH entry only if no remaining installation needs
 it. Never delete stores, names-only manifests, recovery records or identity files.

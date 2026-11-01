@@ -231,8 +231,8 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
         config = manifest["server"]["mcp_config"]
         self.assertEqual(config["args"], ["mcp", "--store", "${user_config.store_reference}"])
         self.assertNotIn("env", config)
-        self.assertEqual(config["command"], "${__dirname}/server/secret-go")
-        self.assertEqual(config["platform_overrides"], {"win32": {"command": "${__dirname}/server/secret-go.exe"}})
+        self.assertEqual(config["command"], "${__dirname}/server/secret")
+        self.assertEqual(config["platform_overrides"], {"win32": {"command": "${__dirname}/server/secret.exe"}})
         self.assertEqual([tool["name"] for tool in manifest["tools"]], ["list", "show", "diff", "health"])
         privacy = manifest["long_description"].lower()
         for text in ("key names", "labels", "presence", "paths", "account ids", "model", "hashes",
@@ -254,7 +254,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
             changed = copy.deepcopy(original)
             changed["user_config"]["store_reference"][name] = value
             variants.append(changed)
-        for config in ({"command": "sh", "args": ["-c", "secret-go mcp"]},
+        for config in ({"command": "sh", "args": ["-c", "secret mcp"]},
                        {**original["server"]["mcp_config"], "env": {"TOKEN": "value"}},
                        {**original["server"]["mcp_config"], "args": ["mcp"]}):
             changed = copy.deepcopy(original)
@@ -288,8 +288,8 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
                 self.assertEqual(entry.compress_type, zipfile.ZIP_STORED)
                 self.assertEqual(entry.external_attr >> 16, mcpb.zip_mode(entry.filename))
                 self.assertFalse(entry.extra)
-            self.assertEqual(archive.read("server/secret-go"), fat(self.parts))
-            self.assertEqual(archive.read("server/secret-go.exe"), pe())
+            self.assertEqual(archive.read("server/secret"), fat(self.parts))
+            self.assertEqual(archive.read("server/secret.exe"), pe())
 
     def test_unpack_exact_bytes_and_modes(self):
         bundle = self.root / "test.mcpb"
@@ -371,7 +371,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
 
         with patch.object(mcpb.shutil, "which", return_value="/synthetic/lipo"), patch.object(mcpb, "run", side_effect=lipo):
             mcpb.stage_payloads(self.args, stage)
-        self.assertEqual((stage / "server/secret-go").read_bytes(), fat(self.parts))
+        self.assertEqual((stage / "server/secret").read_bytes(), fat(self.parts))
         changed = bytearray(fat(self.parts))
         changed[-1] ^= 1
         self.args.darwin_universal = self.root / "modified-universal"
@@ -415,7 +415,7 @@ assert.throws(() => tmp.tmpNameSync({ tmpdir: root, prefix: { toString: () => ".
         return bundle
 
     def test_zip_traversal_duplicates_and_unapproved_entries(self):
-        for name in ("../outside", "/absolute", "server/../../outside", r"server\secret-go",
+        for name in ("../outside", "/absolute", "server/../../outside", r"server\secret",
                      "C:/outside", "./manifest.json", "server//other", "unexpected", "manifest.json"):
             bundle = self.archive(extra=name)
             with self.subTest(name=name), self.assertRaises(ValueError):
@@ -471,7 +471,7 @@ class NativeSmokeTests(unittest.TestCase):
         cls.temporary = tempfile.TemporaryDirectory(prefix="secret-mcpb-native-")
         cls.addClassCleanup(cls.temporary.cleanup)
         root = Path(cls.temporary.name).resolve()
-        cls.binary = root / ("secret-go.exe" if os.name == "nt" else "secret-go")
+        cls.binary = root / ("secret.exe" if os.name == "nt" else "secret")
         home = root / "home"
         home.mkdir(mode=0o700)
         env = os.environ.copy()

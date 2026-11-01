@@ -61,9 +61,12 @@ jobs:
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-      # Version-only exception. M4.1 still needs separate sponsored host evidence.
-      - name: Check v0.3.4 versions and unchanged Bash activation
-        run: python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP" --stage v0.3.4 --manifest-only
+      # CLI-only extraction. M4.1 hook activation still needs sponsored host evidence.
+      - name: Check release versions, final Go CLI and unchanged Bash hooks
+        run: |
+          # Select the contract supported by the checked-out release, not this workflow.
+          stage="$(python3 -I -c 'import json,re,subprocess,sys; help_text=subprocess.check_output([sys.executable,"-I","tests/test-plugin.py","--help"],text=True); choices=re.search(r"--stage \{([^}]+)\}",help_text).group(1).split(","); tag=json.load(open("testdata/plugin/contracts.json"))["tag"]; print("cli-only" if "cli-only" in choices else tag if tag in choices else "m4")')"
+          python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$RUNNER_TEMP" --stage "$stage" --manifest-only
       - name: Check portable shell syntax
         run: |
           sh -n scripts/build-release.sh
@@ -71,8 +74,10 @@ jobs:
           sh -n scripts/install-release.sh
           sh -n install.sh
           sh -n hooks/guard-go
-          sh -n bin/secret-go
-          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh install.sh hooks/guard-go bin/secret-go
+          cli=bin/secret
+          if [ -f bin/secret-go ]; then cli=bin/secret-go; fi
+          sh -n "$cli"
+          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh install.sh hooks/guard-go "$cli"
 
   # A single integrated macOS build supplies all eight payloads to every native
   # target. No Linux/Windows job may substitute a locally built candidate binary.
@@ -165,7 +170,10 @@ jobs:
       - name: Standalone installer regressions
         run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" bash tests/test-install.sh
       - name: Native synthetic checkout install and failure matrix
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.4
+        run: |
+          # Select the contract supported by the checked-out release, not this workflow.
+          stage="$(python3 -I -c 'import json,re,subprocess,sys; help_text=subprocess.check_output([sys.executable,"-I","tests/test-plugin.py","--help"],text=True); choices=re.search(r"--stage \{([^}]+)\}",help_text).group(1).split(","); tag=json.load(open("testdata/plugin/contracts.json"))["tag"]; print("cli-only" if "cli-only" in choices else tag if tag in choices else "m4")')"
+          TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage "$stage"
       - name: Require final checksum commit C for published verification
         if: inputs.published || inputs.commit != ''
         env:
@@ -185,7 +193,10 @@ jobs:
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.4 --published
+        run: |
+          # Select the contract supported by the checked-out release, not this workflow.
+          stage="$(python3 -I -c 'import json,re,subprocess,sys; help_text=subprocess.check_output([sys.executable,"-I","tests/test-plugin.py","--help"],text=True); choices=re.search(r"--stage \{([^}]+)\}",help_text).group(1).split(","); tag=json.load(open("testdata/plugin/contracts.json"))["tag"]; print("cli-only" if "cli-only" in choices else tag if tag in choices else "m4")')"
+          TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage "$stage" --published
 
   plugin-install-macos:
     needs: plugin-candidate-assets
@@ -241,8 +252,10 @@ jobs:
           sh -n scripts/install-release.sh
           sh -n install.sh
           sh -n hooks/guard-go
-          sh -n bin/secret-go
-          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh install.sh hooks/guard-go bin/secret-go tests/test-launchers.sh tests/test-install.sh
+          cli=bin/secret
+          if [ -f bin/secret-go ]; then cli=bin/secret-go; fi
+          sh -n "$cli"
+          shellcheck scripts/build-release.sh scripts/verify-release.sh scripts/install-release.sh install.sh hooks/guard-go "$cli" tests/test-launchers.sh tests/test-install.sh
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: plugin-integrated-candidate
@@ -252,7 +265,10 @@ jobs:
           TMPDIR="$PLUGIN_TEST_ROOT/tmp" /bin/bash tests/test-launchers.sh
           TMPDIR="$PLUGIN_TEST_ROOT/tmp" /bin/bash tests/test-install.sh
       - name: Native synthetic checkout install and failure matrix
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.4
+        run: |
+          # Select the contract supported by the checked-out release, not this workflow.
+          stage="$(python3 -I -c 'import json,re,subprocess,sys; help_text=subprocess.check_output([sys.executable,"-I","tests/test-plugin.py","--help"],text=True); choices=re.search(r"--stage \{([^}]+)\}",help_text).group(1).split(","); tag=json.load(open("testdata/plugin/contracts.json"))["tag"]; print("cli-only" if "cli-only" in choices else tag if tag in choices else "m4")')"
+          TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage "$stage"
       - name: Require final checksum commit C for published verification
         if: inputs.published || inputs.commit != ''
         env:
@@ -272,7 +288,10 @@ jobs:
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage v0.3.4 --published
+        run: |
+          # Select the contract supported by the checked-out release, not this workflow.
+          stage="$(python3 -I -c 'import json,re,subprocess,sys; help_text=subprocess.check_output([sys.executable,"-I","tests/test-plugin.py","--help"],text=True); choices=re.search(r"--stage \{([^}]+)\}",help_text).group(1).split(","); tag=json.load(open("testdata/plugin/contracts.json"))["tag"]; print("cli-only" if "cli-only" in choices else tag if tag in choices else "m4")')"
+          TMPDIR="$PLUGIN_TEST_ROOT/tmp" python3 -I tests/test-plugin.py "$GITHUB_WORKSPACE" "$PLUGIN_TEST_ROOT/assets" --stage "$stage" --published
 
   plugin-install-windows:
     needs: plugin-candidate-assets

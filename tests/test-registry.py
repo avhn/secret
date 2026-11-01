@@ -67,7 +67,7 @@ def make_inputs(directory, mutation=None, manifest_bytes=None):
         mutation(manifest)
     entries = {"manifest.json": manifest_bytes if manifest_bytes is not None else json_bytes(manifest),
                "LICENSE": b"synthetic license", "icon.png": b"synthetic icon",
-               "server/secret-go": mac, "server/secret-go.exe": bytes(windows)}
+               "server/secret": mac, "server/secret.exe": bytes(windows)}
     with zipfile.ZipFile(directory / f"secret-{TAG}-desktop.mcpb", "w") as archive:
         for name, value in sorted(entries.items()):
             info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
@@ -204,14 +204,14 @@ class GenerationTests(OfflineTest):
                 for key, (info, value) in original.items():
                     archive.writestr(info, data if name == key else value)
 
-        windows = bytearray(original["server/secret-go.exe"][1])
+        windows = bytearray(original["server/secret.exe"][1])
         windows[68:70] = b"\x64\xaa"
-        replace_entry("server/secret-go.exe", windows)
+        replace_entry("server/secret.exe", windows)
         with self.assertRaisesRegex(ValueError, "Windows bundle architecture"):
             M.generate(VERSION, self.assets)
-        mac = bytearray(original["server/secret-go"][1])
+        mac = bytearray(original["server/secret"][1])
         mac[52:56] = struct.pack("<I", 0x0100000C)
-        replace_entry("server/secret-go", mac)
+        replace_entry("server/secret", mac)
         with self.assertRaisesRegex(ValueError, "Mach-O architecture"):
             M.generate(VERSION, self.assets)
         amd = (self.assets / f"secret-{TAG}-darwin-amd64").read_bytes()
@@ -219,7 +219,7 @@ class GenerationTests(OfflineTest):
         fat64 = (b"\xca\xfe\xba\xbf" + struct.pack(">I", 2)
                  + struct.pack(">IIQQII", 0x01000007, 3, 72, len(amd), 0, 0)
                  + struct.pack(">IIQQII", 0x0100000C, 0, 72 + len(amd), len(arm), 0, 0) + amd + arm)
-        replace_entry("server/secret-go", fat64)
+        replace_entry("server/secret", fat64)
         M.generate(VERSION, self.assets)
 
     def test_stale_hash_and_exact_checksum_grammar(self):

@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Final CLI naming for v0.3.5 (pending CI)
+
+- Migration: main now differs from published v0.3.4 and must ship as a new
+  v0.3.5 release, never replacement v0.3.4 assets. Version pins remain unchanged
+  here pending the separate coordinated identity bump.
+- Main's `bin/secret` now exits 70 without release-C checksum metadata; unlike
+  the old Bash CLI it cannot run directly from a plain clone. Use `compat/secret`
+  explicitly or the standalone installer. The final checkout launcher is for
+  authenticated v0.3.5-or-later release tags. Published v0.3.4 keeps its staging
+  name; after upgrading, re-register MCP and manually retire reviewed old
+  `secret-go` files and the obsolete Windows installer PATH entry.
+
+- Extract CLI-only staging from M4.1 with owner approval: verified `bin/secret`,
+  byte-identical executable Bash at `compat/secret`, no automatic fallback.
+- Publish standalone `secret` / `secret.exe`; Windows defaults to
+  `$HOME\.local\bin` with native profile fallback. Keep attestation, ancestor
+  checks, tokened locks and verified atomic replacement. Existing safe CLI files
+  are intentionally replaced; failures preserve their bytes.
+- Name Desktop payloads `server/secret[.exe]`; retain release asset grammar,
+  Registry identity and 0.3.4 pins until the separate release bump.
+- Add the CLI-only plugin contract, forced Bash interpreter and compatibility
+  identity/broken-launcher gates. Exact divergence inventories remain unchanged.
+  Claude and Codex stay on Bash hooks; Go hook activation, `onFailure` and output
+  contracts still require sponsored M4.1 host evidence.
+
 ### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted
@@ -34,7 +59,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### 0.3.2 patch (published 2026-10-30)
 
-- Set the Windows `secret-go.exe` scratch owner to the current user before
+- Set the Windows `secret.exe` scratch owner to the current user before
   atomic creation or replacement, and correct the published owner afterwards
   if it still differs. Elevated tokens otherwise default new files to
   `BUILTIN\Administrators`, which `File.Replace` then publishes.
@@ -64,7 +89,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Add pinned POSIX and PowerShell standalone installers with mandatory gh
   attestation verification, optional authenticated checksum-commit pin, exact
-  versions and atomic secret-go publication. Unix keeps PATH unchanged;
+  versions and atomic secret publication. Unix keeps PATH unchanged;
   Windows adds only its own install directory to user PATH. No automatic MCP
   registration, store discovery, hook installation or source-build fallback.
 - Extend deterministic assembly to six raw Linux/macOS/Windows amd64/arm64
@@ -434,7 +459,7 @@ commit C `7998002`, source S `7141a13`.
 - Prepare M4 v0.2.3 Linux/macOS reproducible assets, checksum-only source identity
   checks, scoped final-tag provenance verification and owner-approved draft workflow
   (candidate CI green in PR #9; replacement candidates and publication pending).
-- Add opt-in POSIX `bin/secret-go`, `hooks/guard-go` and explicit release installer
+- Add the opt-in POSIX CLI launcher (now `bin/secret`), `hooks/guard-go` and explicit release installer
   with digest/provenance checks, private cache, offline preinstallation and no
   automatic Bash fallback. Add native install, launcher and synthetic release tests.
 - Keep failed hook denial writes on fixed stderr across POSIX shells, including

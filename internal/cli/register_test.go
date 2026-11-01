@@ -169,7 +169,7 @@ func TestOnePasswordMixedBashDiscovery(t *testing.T) {
 	request, _ := parseRegister(registrationArgs())
 	v2, _ := store.EncodeManifestV2([]store.ManifestV2Record{{Key: request.Key, Labels: request.Labels, ID: strings.Repeat("b", 32), Provider: request.Provider}}, "onepassword")
 	os.WriteFile(filepath.Join(dir, "test.onepassword-keys"), v2, 0600)
-	cmd := exec.Command("bash", "../../bin/secret", "list")
+	cmd := exec.Command("bash", "../../compat/secret", "list")
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + root, "SECRETS_DIR=" + dir, "SECRETS_ENV=" + filepath.Join(root, "missing")}
 	output, err := cmd.CombinedOutput()
 	if err != nil {

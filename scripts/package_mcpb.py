@@ -60,7 +60,7 @@ CLI_VERSION = "2.1.2"
 ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 MAX_PAYLOAD = 256 << 20
 CPU = {"amd64": 0x01000007, "arm64": 0x0100000C}
-APPROVED = {"LICENSE", "icon.png", "manifest.json", "server/secret-go", "server/secret-go.exe"}
+APPROVED = {"LICENSE", "icon.png", "manifest.json", "server/secret", "server/secret.exe"}
 
 
 def run(args, **kwargs):
@@ -155,12 +155,12 @@ def manifest(version):
     mcp = value["server"]["mcp_config"]
     if (set(config) != {"store_reference"} or setting["type"] != "string"
             or setting.get("required") is not True or "default" in setting
-            or mcp != {"command": "${__dirname}/server/secret-go",
+            or mcp != {"command": "${__dirname}/server/secret",
                        "args": ["mcp", "--store", "${user_config.store_reference}"],
-                       "platform_overrides": {"win32": {"command": "${__dirname}/server/secret-go.exe"}}}
+                       "platform_overrides": {"win32": {"command": "${__dirname}/server/secret.exe"}}}
             or value["compatibility"] != {"platforms": ["darwin", "win32"]}
             or value["manifest_version"] != "0.3" or value["name"] != "secret"
-            or value["server"]["type"] != "binary" or value["server"]["entry_point"] != "server/secret-go"
+            or value["server"]["type"] != "binary" or value["server"]["entry_point"] != "server/secret"
             or [tool["name"] for tool in value["tools"]] != ["list", "show", "diff", "health"]):
         raise ValueError("manifest violates the exact names-only configuration contract")
     return value
@@ -254,7 +254,7 @@ def stage_payloads(args, stage):
         check_thin(data, arch)
     server = stage / "server"
     server.mkdir(mode=0o700)
-    binary = server / "secret-go"
+    binary = server / "secret"
     if args.darwin_universal is not None:
         universal = regular_bytes(args.darwin_universal)
     else:
@@ -266,7 +266,7 @@ def stage_payloads(args, stage):
     if universal_slices(universal) != thin:
         raise ValueError("universal slices differ from the approved Darwin inputs")
     binary.write_bytes(universal)
-    (server / "secret-go.exe").write_bytes(windows)
+    (server / "secret.exe").write_bytes(windows)
     for path in server.iterdir():
         path.chmod(0o755)
 
@@ -309,8 +309,8 @@ def inspect_zip(bundle, stage=None):
             data = archive.read(entry)
             if stage is not None and data != regular_bytes(stage / entry.filename):
                 raise ValueError("ZIP bytes differ from approved staging bytes")
-        universal_slices(archive.read("server/secret-go"))
-        check_windows(archive.read("server/secret-go.exe"))
+        universal_slices(archive.read("server/secret"))
+        check_windows(archive.read("server/secret.exe"))
         embedded = load_json(archive.read("manifest.json"))
         if embedded != manifest(embedded["version"]):
             raise ValueError("ZIP manifest differs from reviewed template")
@@ -531,7 +531,7 @@ def build(args):
         (stage / "manifest.json").write_bytes((json.dumps(manifest(version), indent=2) + "\n").encode())
         for source, name in ((ROOT / "LICENSE", "LICENSE"), (PACKAGING / "icon.png", "icon.png")):
             (stage / name).write_bytes(regular_bytes(source))
-        for name in APPROVED - {"server/secret-go", "server/secret-go.exe"}:
+        for name in APPROVED - {"server/secret", "server/secret.exe"}:
             (stage / name).chmod(0o644)
         cli("validate", stage / "manifest.json")
         bundle = Path(packed) / output.name
@@ -539,7 +539,7 @@ def build(args):
         inspect_zip(bundle, stage)
         unpack(bundle, unpacked, stage)
         cli("validate", unpacked / "manifest.json")
-        native = {"Darwin": "secret-go", "Windows": "secret-go.exe"}.get(platform.system())
+        native = {"Darwin": "secret", "Windows": "secret.exe"}.get(platform.system())
         if native:
             smoke(unpacked / "server" / native, version)
         else:

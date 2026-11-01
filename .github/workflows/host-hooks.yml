@@ -73,7 +73,7 @@ jobs:
         run: |
           export HOME="$HOST_TEST_ROOT/build-home"
           go build -tags hosthookfixture -o "$HOST_TEST_ROOT/host-hook-fixture" tests/host-hook-fixture.go
-          go build -o "$HOST_TEST_ROOT/secret-go" ./cmd/secret
+          go build -o "$HOST_TEST_ROOT/secret" ./cmd/secret
           python3 -I tests/test-host-hooks.py --fixture "$HOST_TEST_ROOT/host-hook-fixture"
           command -v jq
           perl -MJSON::PP -e 1
@@ -98,7 +98,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         shell: bash
         run: |
-          binary="$HOST_TEST_ROOT/secret-go"
+          binary="$HOST_TEST_ROOT/secret"
           if [ "$HOST_KIND" = codex ]; then binary="$GITHUB_WORKSPACE/hooks/guard-secrets"; fi
           python3 -I tests/test-host-hooks.py --hosted --host "$HOST_KIND" \
             --root "$HOST_TEST_ROOT/session" --checkout "$GITHUB_WORKSPACE" \

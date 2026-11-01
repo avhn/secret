@@ -35,11 +35,21 @@ If the installer reports
 authenticate gh privately or correct its trusted environment, then retry. Do not
 paste or print a token to troubleshoot it.
 
-The default destination is `%LOCALAPPDATA%\Programs\secret\secret-go.exe`.
+The snippet installs its pinned release, not main. Published v0.3.4 installs `%LOCALAPPDATA%\Programs\secret\secret-go.exe`; use its
+printed path. After upgrading, re-register MCP and manually retire reviewed
+old binaries and obsolete user PATH entries as described in [setup](setup.md#migrate-an-earlier-installation).
+
+From v0.3.5 onward, the default destination is `$HOME\.local\bin\secret.exe`, with the native user
+profile as fallback when HOME is absent. Unsafe ancestors, including a
+CodexSandboxUsers Modify ACE, remain rejected without permission repair.
+Only the CLI name changes: Claude and Codex keep the Bash guard, and native
+hook activation remains deferred. Explicit Bash rollback requires Git Bash:
+`bash /absolute/trusted/checkout/compat/secret`. No automatic fallback occurs.
 `INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
 0.3.4, never latest; `--commit` supplies the optional full C and `--help` explains
 inputs. It adds only its own directory to user PATH. It does not modify client
-files, register MCP, install hooks or overwrite a Bash installation. Use the
+files, register MCP or install hooks. From v0.3.5 onward, verified atomic
+publication intentionally replaces a safe existing final-name executable. Use the
 printed absolute path, not an assumed PATH lookup. The raw executable does not
 perform the Unix checkout launcher's per-exec rehash. Cold offline Windows
 installation is unsupported; do not bypass attestation for an air-gapped machine.
