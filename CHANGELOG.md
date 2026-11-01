@@ -23,6 +23,26 @@ All notable changes to this project are documented here. Format follows [Keep a 
   distinct from owner-only `private` objects. Keep public artifact checksum
   inspection independent of store-parent ACL requirements.
 
+### Native Windows clipboard
+
+- Add native Unicode `clip` support to the staged Go CLI, with bounded busy-open
+  retries, byte-only UTF-8/UTF-16 conversion and fixed errors for invalid UTF-8/NUL.
+  Keep the default 45-second timeout, selectors, statuses and copy message.
+- Detach the pipe-fed Windows clearer from the parent console; request Job
+  breakaway and retry without it only on access denial. Jobs that forbid breakaway,
+  including this repo's run/exec Job, can still terminate the fallback clearer.
+  Compare and clear under one clipboard lock only if the text is unchanged.
+  Request exclusion from
+  cooperating Windows history/cloud consumers, without promising protection from
+  third-party readers or secure erasure. Unix providers and hook rules are unchanged.
+- Cap staged Go clipboard values at 16 MiB on every platform; reject oversized
+  input before publication and read helper input into one fully cleared buffer.
+  If timer setup fails after copying, immediately attempt a conditional clear
+  without replacing the original setup error.
+- Add injected synthetic tests and an initially-empty, disposable hosted Windows
+  clipboard gate for native round trips and post-exit conditional clearing. No
+  local real-clipboard testing or native hosted pass is claimed by these changes.
+
 ### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted

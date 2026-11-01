@@ -13,6 +13,20 @@ operator lifecycle/import/export and names-only MCP reads. Applicable hosted
 Windows CI remains required; naming, hook activation and release identity are
 unchanged by this work.
 
+## Native Windows clipboard extension (unreleased)
+
+PR C adds native Unicode `clip` copying, bounded clipboard-open retries,
+cooperating Windows history/cloud exclusion requests and a detached, pipe-fed
+conditional clearer. It preserves Unix providers, command messages, timeout
+semantics and all existing hook/consent boundaries. See [Windows clipboard
+support and limits](docs/windows.md#native-clipboard-unreleased). This is outside
+the historical M5a completion gate and changes no release identity or defaults.
+
+- [x] Implement byte-only native copying and atomic compare-before-clear with synthetic interface tests
+- [x] Add a disposable hosted Windows gate with private synthetic store fixtures and no local clipboard access by default
+- [x] Cover Job-breakaway fallback, immediate conditional cleanup on timer setup failure and bounded, fully cleared helper input
+- [ ] Require green applicable hosted CI, including native clipboard round-trip and detached-clear evidence
+
 ## v0.3.4: Windows long-lived exec launcher patch
 
 Based on main after published v0.3.3 at checksum commit C `ea85737`; the existing
