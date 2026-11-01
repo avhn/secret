@@ -225,11 +225,11 @@ func TestWindowsDoctorRecoveryAndPrivateInput(t *testing.T) {
 		t.Fatal("doctor did not inspect private names-only recovery")
 	}
 	bad := filepath.Join(dir, "public-input")
-	if err := os.WriteFile(bad, []byte("TOKEN=synthetic\n"), 0600); err != nil {
+	if err := testutil.WriteFile(bad, []byte("TOKEN=synthetic\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readOperatorFile(bad, false); err != secure.ErrTransaction {
-		t.Fatal("operator accepted inherited file DACL")
+		t.Fatal("operator accepted broad file DACL")
 	}
 }
 
