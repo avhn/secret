@@ -73,19 +73,26 @@ or publish merely because this procedure describes how. Use signed lowercase
 conventional commits, no co-author trailers, `git-safe-push` for an approved push
 and `git-merge-safe` for an approved fast-forward.
 
-The owner must configure the `release-publish` environment with at least one
-required reviewer and a deployment policy allowing only the `v0.3.4` tag before
-a tag can create a draft. The workflow checks both settings; YAML cannot create
-or independently prove every repository protection. Self-review is permitted
-because a sole maintainer must approve their own tag run; the reviewer gate
-still keeps the draft a separate human action. Protect `v*` tags with a ruleset
+The owner must configure the `release-publish` environment with a deployment
+policy allowing only the `v0.3.4` tag before a tag can create a draft; the
+workflow checks it. YAML cannot create or independently prove every repository
+protection.
+
+The owner approval gate (required reviewers on `release-publish` and
+`registry-publish`) is **disabled** by owner decision while the owner is the only
+user. To reactivate it, add the owner as required reviewer on both environments
+and set the repository variable `SECRET_RELEASE_APPROVAL_GATE` to `enabled`; the
+tag workflow then also requires the reviewer rule. Self-review is permitted
+because a sole maintainer approves their own tag run, which keeps the draft a
+separate human action. Protect `v*` tags with a ruleset
 blocking deletion and updates. PR jobs have read-only permissions and never receive publishing or model
 credentials. Only final-tag attestation gets OIDC/attestations write permission;
 only approved draft creation gets contents write permission.
 
 Configure both protected environments before their jobs run: `release-publish`
 for draft creation, and `registry-publish` for official Registry metadata. Each
-needs required owner-approved reviewers and trusted tag/ref restrictions; YAML
+needs trusted tag/ref restrictions, plus required owner reviewers whenever the
+approval gate is enabled (see above); YAML
 references alone are not repository configuration evidence. Registry OIDC write
 permission belongs only to the protected publishing job. Registry publication,
 public native-install checks, installed-default promotion and tag/draft/release
@@ -256,7 +263,7 @@ The verifier additionally checks subject name/digest and all nine subjects.
 Download bundles into new empty directories, keep readers/scripts elsewhere and
 use Python `-I`. `release-verify` transports bundles under colon-free names;
 `release-publish` restores gh's digest-named bundle files, re-verifies them and
-creates a **draft only**, after separately approved environment review. Creating
+creates a **draft only**, after environment review when the approval gate is enabled. Creating
 that draft itself requires explicit owner go-ahead, not just tag permission.
 The draft contains eight payloads, the checksum manifest and nine bundles named
 `sha256-DIGEST.jsonl`. Portable release names avoid server-side normalization of

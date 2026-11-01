@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- The release owner approval gate (required reviewers on `release-publish` and
+  `registry-publish`) is disabled by owner decision. The tag workflow keeps the
+  exact-tag environment check and requires reviewers only when
+  `vars.SECRET_RELEASE_APPROVAL_GATE` is `enabled`; see docs/release.md.
+
 ### 0.3.4 patch (2026-11-01)
 
 - Remove the Windows exec runtime deadline. File-backed outputs inherit restricted

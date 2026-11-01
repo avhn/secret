@@ -10,10 +10,11 @@ permissions:
   contents: read
 
 # Candidates only build and compare. Final-tag provenance is never borrowed from
-# a candidate run. Repository administrators must configure release-publish with
-# required reviewers and restrict it to the v0.3.4 tag before approving draft
-# creation. A sole maintainer approves their own deployment, so self-review is
-# permitted; the reviewer gate still makes the draft a separate human action.
+# a candidate run. Repository administrators must restrict release-publish to the
+# v0.3.4 tag. The owner approval gate (required reviewers) is disabled by
+# default; reactivate it by setting vars.SECRET_RELEASE_APPROVAL_GATE to
+# "enabled" and adding required reviewers. A sole maintainer then approves their
+# own deployment, which keeps the draft a separate human action.
 jobs:
   release-rehearsal:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
@@ -241,16 +242,26 @@ jobs:
             cp "$scratch"/sha256:*.jsonl assets/
           done
           sh scripts/verify-release.sh "$PWD/assets" "$GITHUB_SHA" --bundle-dir "$PWD/assets"
-      - name: Require configured protected publication environment
+      - name: Require exact-tag publication environment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api repos/avhn/secret/environments/release-publish --jq \
-            '([.protection_rules[] | select(.type == "required_reviewers" and (.reviewers | length) > 0)] | length > 0)
-             and .deployment_branch_policy.custom_branch_policies == true' \
+            '.deployment_branch_policy.custom_branch_policies == true' \
             | grep -qx true
           gh api repos/avhn/secret/environments/release-publish/deployment-branch-policies --jq \
             '[.branch_policies[] | {name, type}] == [{"name": "v0.3.4", "type": "tag"}]' \
+            | grep -qx true
+      # Owner approval gate, disabled by default. To reactivate it, set the
+      # repository variable SECRET_RELEASE_APPROVAL_GATE to "enabled" and add
+      # required reviewers to release-publish and registry-publish.
+      - name: Require reviewer approval gate when enabled
+        if: vars.SECRET_RELEASE_APPROVAL_GATE == 'enabled'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/avhn/secret/environments/release-publish --jq \
+            '[.protection_rules[] | select(.type == "required_reviewers" and (.reviewers | length) > 0)] | length > 0' \
             | grep -qx true
       # upload-artifact rejects colons in paths. Preserve gh's bundle contents
       # under portable transport names, then restore them in the approved job.

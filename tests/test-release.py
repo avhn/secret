@@ -959,7 +959,9 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("cmp ", jobs["release-repro"])
         self.assertIn("environment: release-publish", jobs["release-publish"])
         self.assertIn("--draft --title", jobs["release-publish"])
+        # The owner approval gate is kept but opt-in through a repository variable.
         self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
+        self.assertIn("if: vars.SECRET_RELEASE_APPROVAL_GATE == 'enabled'", jobs["release-verify"])
         self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
         self.assertIn('[{"name": "v0.3.4", "type": "tag"}]', jobs["release-verify"])
         self.assertNotIn("prevent_self_review", jobs["release-verify"])
