@@ -2,7 +2,7 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.4.1 (install test-fixture patch, no product change) is in preparation, based on main after v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`). The active MCP Registry record remains `io.github.avhn/secret` 0.3.4 because the v0.4.0 Linux/macOS public-install fixture failed; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`) and is the GitHub Latest release. v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. The active MCP Registry record remains `io.github.avhn/secret` 0.3.4; v0.4.1 Registry publication is pending the macOS public-install jobs; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
 ## Windows store parent policy (in progress)
 
@@ -34,6 +34,11 @@ together to 0.4.1.
 
 ## v0.4.1: Install test-fixture patch
 
+Published on 2026-11-01, with immutable tag `v0.4.1` at checksum commit C
+`eeb628c` (source S `8d0d46c`). This is the GitHub Latest release. main is at S,
+not C; the checksum manifest remains on the release branch at C. Registry
+publication is pending the macOS public-install jobs; the active record is 0.3.4.
+
 Based on main after published v0.4.0 at checksum commit C `06027fe` (tag
 `v0.4.0`, source S `5a54b17`); the tag and `dist/checksums-v0.4.0.txt` remain
 immutable on rel/v0.4.0, not in this tree. The patch changes the install test's
@@ -42,18 +47,19 @@ There is no product change. Go 1.27.3, the
 [v0.3.0 packaging contract](docs/design/v0.3.0-plan.md), installed Bash hooks
 and waiting-sponsorship boundaries stay unchanged.
 
+Historical candidate checks (not re-verified by this documentation update):
+
 - [ ] Review the coordinated 0.4.1 compiled release identity, packaging/manifests, workflows, tests and setup pins without Go hook activation
 - [ ] Require green applicable hosted CI, including native install and compatibility gates
 - [ ] Review local checks and complete two green candidate rounds of ci, release and plugin install at source S
-- [ ] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.1.txt`
+- [x] Owner authorizes the checksum commit C, adding only `dist/checksums-v0.4.1.txt`
 - [ ] Owner authorizes protected release-publish and registry-publish environment tag policies allowing exactly v0.4.1 (reviewers only when the approval gate is enabled)
-- [ ] Owner authorizes the signed v0.4.1 tag, draft, publication and Registry publication
+- [x] Owner authorizes the signed v0.4.1 tag, draft and GitHub publication
 - [ ] Complete public native installs on all six runners and confirm the active Registry record: version 0.4.1, MCPB `fileSha256` equal to the checksum manifest
-- [ ] Owner authorizes promotion of main to source S, never checksum commit C
+- [x] Owner authorizes promotion of main to source S, never checksum commit C
 
-This release is not published. Tags, publication, installed-default promotion and
-real Claude Code/Codex/OpenCode compatibility remain separate approval/evidence
-boundaries.
+GitHub publication is complete; Registry publication is not yet complete.
+Real Claude Code/Codex/OpenCode compatibility remains a separate evidence boundary.
 
 ## v0.4.0: Final CLI naming and Windows refinements
 

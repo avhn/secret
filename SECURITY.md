@@ -6,6 +6,12 @@ out of an agent's context when the agent reaches for them by habit or mistake:
 holding a store. It is **not a sandbox** and does not contain an agent that is
 deliberately trying to read a secret.
 
+The CLI provides a sanctioned alternative: the agent chooses keys by name and
+selected values go directly into the child process's environment. File stores
+are parsed as `KEY=VALUE` data, never sourced as shell code. The CLI, guard and
+agent skill can be used together or separately; guidance is not enforcement.
+The Bash guard requires jq and denies every request when jq is unavailable.
+
 ## Opt-in encrypted stores (M5d, staged Go CLI)
 
 Explicit `age:NAME` stores on Linux/macOS encrypt the whole dotenv payload at

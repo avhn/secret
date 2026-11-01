@@ -4,7 +4,20 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.4.1 (unreleased)
+### Changed
+
+- Reorganize README onboarding and move detailed workflows to docs/usage.md,
+  plugin and manual-hook setup to docs/install.md, and test guidance to CONTRIBUTING.md.
+- Correct published release and Windows exec launcher status without claiming
+  v0.4.x MCP Registry publication.
+
+## Published releases
+
+### 0.4.1 (2026-11-01, published)
+
+Published at checksum commit C `eeb628c` (tag `v0.4.1`, source S `8d0d46c`),
+the GitHub Latest release. Registry publication is pending the macOS public-install
+jobs; the active MCP Registry record remains `io.github.avhn/secret` 0.3.4.
 
 #### Fixed
 

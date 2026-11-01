@@ -2,10 +2,11 @@
 
 This is the canonical setup guide for the opt-in secret 0.4.1 local stdio MCP
 server. Install, choose exact references, register, reconnect and verify in that
-order. The v0.4.1 release is being prepared; the commands below require its
-owner-approved published assets. They do not select a different release if those
-assets are absent. See [installation](install.md) for checkout/offline options
-and [release approvals](release.md) for publication status and trust boundaries.
+order. v0.4.1 was published on 2026-11-01 and is the GitHub Latest release.
+The commands below use its pinned assets, never a different release if those
+assets are absent. Registry publication is pending the macOS public-install jobs.
+See [installation](install.md) for checkout/offline options and
+[release approvals](release.md) for publication status and trust boundaries.
 
 ## Paste to your agent
 
@@ -346,15 +347,16 @@ remain the Bash guard. Go hook activation is M4.1 and remains waiting sponsorshi
 Installing an executable, registering MCP or passing synthetic tests does not
 establish fail-closed host protection. This is accident prevention, not a sandbox.
 
-## Configured value-consuming launchers (unreleased)
+## Configured value-consuming launchers
 
 This separate, opt-in example is not the names-only secret MCP server above.
-The Windows long-lived exec behavior is unreleased and requires a reviewed build
-containing the [Windows exec change](design/windows-exec-plan.md); the pinned
-installer release above does not yet provide it. Unix exec remains unchanged.
+Windows long-lived exec shipped in v0.3.4 and is included in the pinned release
+above; see the [Windows exec contract](design/windows-exec-plan.md). Unix exec
+remains unchanged.
 Resolve the installer's printed absolute executable path, replacing the command
 placeholder below only with that concrete path after an approved update. Replace
-STORE with an explicit human-approved absolute file reference. Configuration
+STORE with an explicit human-approved absolute file path. `exec -f` takes a
+plain path, not a `file:` reference. Configuration
 contains key names, never values; do not discover stores or add this as an agent
 retrieval route. Keep unrelated servers and settings.
 
@@ -366,7 +368,7 @@ above and a distinct server name:
   "mcpServers": {
     "openproject-launcher": {
       "command": "/ABSOLUTE/INSTALL DIR/secret",
-      "args": ["exec", "-f", "file:/ABSOLUTE/STORE DIR/STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
+      "args": ["exec", "-f", "/ABSOLUTE/STORE DIR/STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
     }
   }
 }
@@ -379,7 +381,7 @@ Windows JSON preserves each argument and escapes backslashes, not a shell string
   "mcpServers": {
     "openproject-launcher": {
       "command": "C:\\ABSOLUTE\\INSTALL DIR\\secret.exe",
-      "args": ["exec", "-f", "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
+      "args": ["exec", "-f", "C:\\ABSOLUTE\\STORE DIR\\STORE.secret", "--key", "OPENPROJECT_API_TOKEN", "--optional-key", "X", "--", "uvx", "openproject-ce-mcp@0.4.1"]
     }
   }
 }
