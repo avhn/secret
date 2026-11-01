@@ -1,393 +1,239 @@
 #!/bin/sh
-# Pinned standalone installer. The script itself is trusted before payload verification.
-# Download/review/run or a reviewed checkout is stronger than piping HTTPS to sh.
-set -f
-umask 077
-command -v python3 >/dev/null 2>&1 || {
-    printf '%s\n' 'secret: Python 3 is required from a trusted package channel' >&2
-    exit 4
+# shellcheck disable=SC2015 # Every failed guard must fail the operation.
+# HTTPS script execution is the bootstrap trust root. Review/download is stronger.
+# Define everything before the final invocation to mitigate truncated pipe input.
+secret_install() {
+    set -f
+    umask 077
+    LC_ALL=C
+    export LC_ALL
+    fail() { printf 'secret: %s\n' "${1:-release installation failed}" >&2; exit 1; }
+    version=${SECRET_VERSION-}
+    directory=${INSTALL_DIR-}
+    seen_version=no; seen_dir=no; show_help=no
+    [ "${SECRET_RELEASE_COMMIT+x}" != x ] || fail 'commit pinning was removed; see docs/install.md for checkout verification'
+    while [ "$#" -gt 0 ]; do
+        case $1 in
+            --commit) fail 'commit pinning was removed; see docs/install.md for checkout verification' ;;
+            --help|-h) show_help=yes; shift ;;
+            --version)
+                [ "$#" -ge 2 ] && [ "$seen_version" = no ] || fail 'invalid arguments'
+                [ -z "$version" ] || [ "${version#v}" = "${2#v}" ] || fail 'conflicting version pins'
+                version=$2; seen_version=yes; [ -n "$version" ] || fail 'invalid version'; shift 2 ;;
+            --dir)
+                [ "$#" -ge 2 ] && [ "$seen_dir" = no ] && [ -n "$2" ] || fail 'invalid arguments'
+                directory=$2; seen_dir=yes; shift 2 ;;
+            *) fail 'invalid arguments (use --help)' ;;
+        esac
+    done
+    if [ "$show_help" = yes ]; then
+        printf '%s\n' 'Usage: sh install.sh [--version V] [--dir DIR]' \
+            'Defaults to the latest release and ~/.local/bin. SECRET_VERSION and INSTALL_DIR are supported.' \
+            'Requires curl and sha256sum or shasum. No PATH/profile or store changes.'
+        exit 0
+    fi
+    valid_version() { printf '%s\n' "$1" | awk '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ {ok=1} END {exit !(NR==1 && ok)}'; }
+    version=${version#v}
+    if [ "${SECRET_VERSION+x}" = x ] || [ "$seen_version" = yes ]; then
+        valid_version "$version" || fail 'invalid version'
+    fi
+    for tool in curl uname id stat awk wc cmp chmod mv rm rmdir mkdir mktemp sleep od tr cat; do
+        command -v "$tool" >/dev/null 2>&1 || fail "missing dependency: $tool"
+    done
+    if command -v sha256sum >/dev/null 2>&1; then hash_tool=sha256sum
+    elif command -v shasum >/dev/null 2>&1; then hash_tool=shasum
+    else fail 'sha256sum or shasum is required'; fi
+    case $(uname -s) in Linux) os=linux ;; Darwin) os=darwin ;; *) fail 'unsupported platform' ;; esac
+    case $(uname -m) in x86_64|amd64) arch=amd64 ;; aarch64|arm64) arch=arm64 ;; *) fail 'unsupported architecture' ;; esac
+    uid=$(id -u) || fail
+    attributes() {
+        bsd=no
+        attrs=$(stat -c '%u %a %h' "$1" 2>/dev/null) || { attrs=$(stat -f '%u %p %l' "$1" 2>/dev/null) && bsd=yes; } || return 1
+        owner=${attrs%% *}; rest=${attrs#* }; mode=${rest%% *}; links=${rest#* }
+        # BSD %Lp drops the sticky bit; %p carries the file type too. Keep the last four
+        # octal digits and drop one leading zero so modes match GNU %a (755, 1777).
+        if [ "$bsd" = yes ]; then mode=${mode#"${mode%????}"}; mode=${mode#0}; fi
+        case $owner:$links in *[!0-9:]*|:*) return 1 ;; esac
+        case $mode in *[!0-7]*|'') return 1 ;; esac
+        [ "$owner" = "$uid" ] || [ "$owner" = 0 ]
+    }
+    safe_node() {
+        [ ! -L "$1" ] && attributes "$1" || return 1
+        if [ -f "$1" ]; then [ "$links" = 1 ] || return 1
+        else [ -d "$1" ] || return 1; fi
+        [ $((0$mode & 022)) -eq 0 ] && return 0
+        [ -d "$1" ] && [ "$owner" = 0 ] && [ $((0$mode & 01000)) -ne 0 ]
+    }
+    safe_chain() {
+        path=$1
+        while :; do
+            safe_node "$path" || return 1
+            [ "$path" != / ] || break
+            path=${path%/*}; [ -n "$path" ] || path=/
+        done
+    }
+    make_chain() {
+        [ ! -L "$1" ] || return 1
+        if [ -e "$1" ]; then [ -d "$1" ] && safe_chain "$1"; return; fi
+        ancestor=${1%/*}; [ -n "$ancestor" ] || ancestor=/
+        make_chain "$ancestor" && { mkdir "$1" 2>/dev/null || [ -d "$1" ]; } && safe_chain "$1"
+    }
+    safe_directory() { [ -d "$directory" ] && safe_node "$directory" && [ "$owner" = "$uid" ] && [ $((0$mode & 022)) -eq 0 ]; }
+    private_dir() { [ -d "$1" ] && safe_node "$1" && [ "$owner" = "$uid" ] && [ "$mode" = 700 ]; }
+    private_file() { [ -f "$1" ] && safe_node "$1" && [ "$owner" = "$uid" ] && [ "$mode" = "$2" ]; }
+    bounded_file() { [ -f "$1" ] && [ ! -L "$1" ] && [ "$(wc -c <"$1")" -le "$2" ]; }
+    check_target() {
+        [ ! -L "$target" ] || return 1
+        if [ -e "$target" ]; then private_file "$target" 500 && bounded_file "$target" 67108864; fi
+    }
+    digest() {
+        if [ "$hash_tool" = sha256sum ]; then sha256sum <"$1"; else shasum -a 256 <"$1"; fi | awk '{print $1}'
+    }
+    [ -n "$directory" ] || directory=${HOME:?HOME is required}/.local/bin
+    case $directory in /*) ;; *) directory=$PWD/$directory ;; esac
+    case $directory in */../*|*/./*|*/..|*/.) fail 'unsafe install directory' ;; esac
+    [ "$(printf '%s' "$directory" | tr -d '[:cntrl:]')" = "$directory" ] || fail 'unsafe install directory'
+    while [ "${directory%/}" != "$directory" ]; do directory=${directory%/}; done
+    [ -n "$directory" ] || fail 'unsafe install directory'
+    # Bind symlinked ancestors (macOS /var and /tmp) to their physical path once.
+    # The install directory itself must never be a symlink.
+    [ ! -L "$directory" ] || fail 'unsafe install directory; use a user-owned directory and chmod go-w DIR'
+    existing=$directory; remainder=
+    while [ ! -e "$existing" ] && [ ! -L "$existing" ]; do
+        remainder=/${existing##*/}$remainder; existing=${existing%/*}; [ -n "$existing" ] || existing=/
+    done
+    physical=$(cd -P -- "$existing" 2>/dev/null && pwd -P) || fail 'unsafe install directory'
+    directory=${physical%/}$remainder
+    make_chain "$directory" && safe_directory || fail 'unsafe install directory; use a user-owned directory and chmod go-w DIR'
+    target=$directory/secret
+    check_target || fail 'unsafe destination'
+    scratch=$(mktemp -d "$directory/.secret-install-XXXXXXXXXX") || fail
+    lock=$directory/.secret.install-lock
+    token=${scratch##*/}; locked=no; worker=; watchdog=
+    # shellcheck disable=SC2329 # Called by traps.
+    cleanup() {
+        if [ -n "$worker" ]; then kill -KILL "$worker" 2>/dev/null || :; wait "$worker" 2>/dev/null || :; fi
+        if [ -n "$watchdog" ]; then kill "$watchdog" 2>/dev/null || :; wait "$watchdog" 2>/dev/null || :; fi
+        if [ "$locked" = yes ] && private_dir "$lock" && private_file "$lock/owner" 600 &&
+            printf 'pid=%s\ntoken=%s\n' "$$" "$token" | cmp -s - "$lock/owner"; then
+            rm -f "$lock/owner"; rmdir "$lock" 2>/dev/null || :
+        fi
+        rm -rf "$scratch"
+    }
+    trap cleanup 0
+    trap 'exit 1' HUP INT TERM
+    tries=0
+    until mkdir "$lock" 2>/dev/null; do
+        private_dir "$lock" || fail 'unsafe installation lock'
+        tries=$((tries + 1))
+        [ "$tries" -lt 4 ] || fail 'installation lock timeout; verify and remove stale lock manually'
+        sleep 1
+    done
+    locked=yes
+    printf 'pid=%s\ntoken=%s\n' "$$" "$token" >"$lock/owner" || fail
+    # Each response has a fresh body/header directory. No automatic redirects.
+    request=0
+    fetch() {
+        request=$((request + 1))
+        mkdir "$scratch/body-$request" "$scratch/header-$request" || fail
+        body=$scratch/body-$request/asset; headers=$scratch/header-$request/response
+        file_limit=$2; [ "$file_limit" -ge 65536 ] || file_limit=65536
+        (ulimit -f "$(((file_limit + 511) / 512))" || exit 1; exec curl --silent --proto '=https' --proto-redir '=https' --max-redirs 0 \
+            --connect-timeout 10 --max-time 60 --max-filesize "$2" \
+            --dump-header "$headers" --output "$body" --write-out '%{http_code}' "$1" </dev/null >"$scratch/code" 2>/dev/null) &
+        worker=$!
+        (
+            ticks=0
+            while kill -0 "$worker" 2>/dev/null; do
+                if [ "$ticks" -ge 65 ] ||
+                    { [ -f "$headers" ] && ! bounded_file "$headers" 65536; } ||
+                    { [ -f "$body" ] && ! bounded_file "$body" "$2"; }; then
+                    kill -KILL "$worker" 2>/dev/null; exit
+                fi
+                sleep 1; ticks=$((ticks + 1))
+            done
+        ) </dev/null >/dev/null 2>&1 &
+        watchdog=$!
+        result=0; wait "$worker" || result=$?; worker=
+        kill "$watchdog" 2>/dev/null || :; wait "$watchdog" 2>/dev/null || :; watchdog=
+        [ "$result" -eq 0 ] && bounded_file "$scratch/code" 3 || fail
+        code=$(cat "$scratch/code")
+        bounded_file "$body" "$2" && bounded_file "$headers" 65536 || fail 'oversized response'
+    }
+    location() {
+        # Shell variables cannot preserve NUL bytes; reject them before extraction.
+        [ "$(tr -d '\000' <"$headers" | wc -c)" -eq "$(wc -c <"$headers")" ] || fail 'invalid redirect'
+        url=$(awk 'tolower(substr($0,1,9))=="location:" {sub(/\r$/, ""); sub(/^[^:]*:[ \t]*/, ""); print; n++} END {if(n!=1) exit 1}' "$headers") || fail 'invalid redirect'
+        [ "$(printf '%s' "$url" | tr -d '[:cntrl:] ')" = "$url" ] || fail 'unsafe redirect'
+        case $url in *\\*) fail 'unsafe redirect' ;; esac
+    }
+    if [ -z "$version" ]; then
+        fetch https://github.com/avhn/secret/releases/latest 4096
+        case $code in 301|302|303|307|308) ;; *) fail 'invalid latest redirect' ;; esac
+        location
+        case $url in https://github.com/avhn/secret/releases/tag/v*) version=${url#https://github.com/avhn/secret/releases/tag/v} ;; *) fail 'invalid latest redirect' ;; esac
+        valid_version "$version" || fail 'invalid latest version'
+    fi
+    tag=v$version; asset=secret-$tag-$os-$arch
+    download() {
+        url=https://github.com/avhn/secret/releases/download/$tag/$1
+        redirects=0
+        while :; do
+            fetch "$url" "$2"
+            case $code in
+                200) break ;;
+                301|302|303|307|308)
+                    [ "$redirects" -lt 3 ] || fail 'redirect limit'
+                    location
+                    case $url in https://github.com/*|https://objects.githubusercontent.com/*|https://release-assets.githubusercontent.com/*) ;; *) fail 'unsafe redirect' ;; esac
+                    redirects=$((redirects + 1)) ;;
+                *) fail 'release asset download failed' ;;
+            esac
+        done
+    }
+    download "checksums-$tag.txt" 4096
+    manifest=$body
+    [ "$(tr -d '\012\040-\176' <"$manifest" | wc -c)" -eq 0 ] || fail 'invalid checksum manifest'
+    [ "$(wc -l <"$manifest")" -eq 8 ] || fail 'invalid checksum manifest'
+    sha=$(awk -v tag="$tag" -v asset="$asset" '
+        BEGIN {p="secret-" tag "-"; name[1]=p "darwin-amd64"; name[2]=p "darwin-arm64";
+          name[3]=p "desktop.mcpb"; name[4]=p "linux-amd64"; name[5]=p "linux-arm64";
+          name[6]=p "windows-amd64.exe"; name[7]=p "windows-arm64.exe"; name[8]="server.json"}
+        {if (NR>8 || length(substr($0,1,64))!=64 || substr($0,1,64) ~ /[^0-9a-f]/ ||
+             substr($0,65,2)!="  " || substr($0,67)!=name[NR]) bad=1;
+         if(substr($0,67)==asset) {digest=substr($0,1,64); found++}}
+        END {if(bad || NR!=8 || found!=1) exit 1; print digest}' "$manifest") || fail 'invalid checksum manifest'
+    safe_chain "$directory" && safe_directory && check_target || fail 'unsafe destination'
+    if [ -f "$target" ] && [ "$(digest "$target")" = "$sha" ]; then
+        printf 'secret %s is already installed at %s\n' "$version" "$target"
+        exit 0
+    fi
+    download "$asset" 67108864
+    binary=$body
+    [ "$(digest "$binary")" = "$sha" ] || fail 'checksum mismatch'
+    header=$(od -An -tx1 -N20 "$binary" | tr -d ' \n') || fail
+    case $os:$arch:$header in
+        linux:amd64:7f454c460201????????????????????????3e00|linux:arm64:7f454c460201????????????????????????b700) ;;
+        darwin:amd64:cffaedfe07000001*|darwin:arm64:cffaedfe0c000001*) ;;
+        *) fail 'wrong executable format or architecture' ;;
+    esac
+    chmod 500 "$binary" || fail
+    # Older releases expose only the version subcommand. Check only the new file.
+    version_arg=--version
+    case $version in 0.[0-4].*) version_arg=version ;; esac
+    # Bound regular-file output and runtime; stdin is detached.
+    (ulimit -f 2 || exit 1; exec "$binary" "$version_arg" </dev/null >"$scratch/version" 2>"$scratch/error") &
+    worker=$!
+    (sleep 10; kill -KILL "$worker" 2>/dev/null) </dev/null >/dev/null 2>&1 &
+    watchdog=$!
+    result=0; wait "$worker" || result=$?
+    worker=
+    kill "$watchdog" 2>/dev/null || :; wait "$watchdog" 2>/dev/null || :; watchdog=
+    [ "$result" -eq 0 ] && bounded_file "$scratch/version" 256 && bounded_file "$scratch/error" 1024 || fail 'invalid version output'
+    printf 'secret %s (go)\n' "$version" | cmp -s - "$scratch/version" || fail 'wrong version'
+    [ "$(digest "$binary")" = "$sha" ] || fail 'modified binary'
+    safe_chain "$directory" && safe_directory && check_target && private_file "$binary" 500 || fail 'unsafe destination'
+    mv -f "$binary" "$target" || fail
+    printf 'Installed secret %s at %s\n' "$version" "$target"
 }
-exec python3 -I - "$@" <<'PY'
-import base64
-import hashlib
-import json
-import os
-from pathlib import Path
-import re
-import secrets
-import shutil
-import signal
-import stat
-import struct
-import subprocess
-import sys
-import tempfile
-import time
-from urllib.parse import urlsplit
-
-REPO = 'avhn/secret'
-WORKFLOW = 'https://github.com/' + REPO + '/.github/workflows/release.yml'
-LIMIT = 64 * 1024 * 1024
-
-
-class InstallError(Exception):
-    pass
-
-
-def require(condition):
-    if not condition:
-        raise InstallError()
-
-
-def invalid_constant(value):
-    raise InstallError()
-
-
-def unique(pairs):
-    result = {}
-    for key, value in pairs:
-        require(key not in result)
-        result[key] = value
-    return result
-
-
-def main():
-    version = os.environ.get('SECRET_VERSION', '0.4.1')
-    commit = os.environ.get('SECRET_RELEASE_COMMIT', '')
-    destination = os.environ.get('INSTALL_DIR', '')
-    options = {'--version': version, '--commit': commit, '--dir': destination}
-    seen = set()
-    show_help = False
-    args = iter(sys.argv[1:])
-    for arg in args:
-        if arg in ('--help', '-h'):
-            show_help = True
-            continue
-        if arg not in options or arg in seen:
-            raise InstallError('invalid arguments (use --help)')
-        value = next(args, '')
-        if not value or value.startswith('--'):
-            raise InstallError('invalid arguments (use --help)')
-        old = options[arg]
-        # Environment and flag pins may agree, but must not silently conflict.
-        if arg != '--dir' and old and (arg != '--version' or 'SECRET_VERSION' in os.environ):
-            old_pin = old[1:] if arg == '--version' and old.startswith('v') else old
-            new_pin = value[1:] if arg == '--version' and value.startswith('v') else value
-            require(old_pin == new_pin)
-        options[arg] = value
-        seen.add(arg)
-    if show_help:
-        print('Usage: sh install.sh [--version V] [--commit C] [--dir DIR] [--help]')
-        print('SECRET_VERSION defaults to 0.4.1; SECRET_RELEASE_COMMIT is an optional full SHA.')
-        print('INSTALL_DIR defaults to ~/.local/bin. gh, curl and Python 3 are required.')
-        print('Existing install directories must be user-owned and not group/other-writable (chmod go-w DIR).')
-        print('No source build, PATH/profile edits, stores or client configuration changes.')
-        return
-    version = options['--version']
-    if version.startswith('v'):
-        version = version[1:]
-    require(re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version))
-    commit = options['--commit']
-    require(not commit or re.fullmatch('[0-9a-f]{40}', commit))
-    for tool in ('gh', 'curl'):
-        if not shutil.which(tool):
-            raise InstallError(tool + ' is required; install it through a trusted package channel')
-    os_name = {'Linux': 'linux', 'Darwin': 'darwin'}.get(os.uname().sysname)
-    arch = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}.get(os.uname().machine)
-    require(os_name and arch)
-    tag = 'v' + version
-    asset = 'secret-' + tag + '-' + os_name + '-' + arch
-    manifest_name = 'checksums-' + tag + '.txt'
-    uid = os.getuid()
-
-    def safe(path, private=False, directory=True):
-        info = path.lstat()
-        require(not stat.S_ISLNK(info.st_mode))
-        require(stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode))
-        require(info.st_uid in (0, uid))
-        require(not info.st_mode & 0o022 or (directory and info.st_uid == 0 and info.st_mode & stat.S_ISVTX))
-        if not directory:
-            require(info.st_nlink == 1)
-        if private:
-            require(info.st_uid == uid and stat.S_IMODE(info.st_mode) == (0o700 if directory else 0o500))
-
-    def chain(path):
-        for node in [*reversed(path.parents), path]:
-            safe(node)
-
-    def make(path):
-        if not path.exists() and not path.is_symlink():
-            make(path.parent)
-            path.mkdir(mode=0o700)
-        chain(path)
-
-    def safe_destination(path):
-        info = path.lstat()
-        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != uid or info.st_mode & 0o022):
-            raise InstallError('unsafe install directory; use a real user-owned directory and run chmod go-w DIR')
-
-    raw_dir = options['--dir'] or os.path.join(os.environ['HOME'], '.local', 'bin')
-    require(not any(ord(char) < 32 or ord(char) == 127 for char in raw_dir))
-    require('..' not in Path(raw_dir).parts and '.' not in raw_dir.split('/'))
-    directory = Path(os.path.abspath(raw_dir))
-    if directory.exists() or directory.is_symlink():
-        safe_destination(directory)
-    auth_message = 'GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry'
-    try:
-        # Discard status diagnostics, never inspect credentials or put them in argv.
-        # Do not create a destination or scratch before gh succeeds.
-        with subprocess.Popen(['gh', 'auth', 'status', '--hostname', 'github.com'],
-                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL, start_new_session=True) as authentication:
-            try:
-                status = authentication.wait(timeout=60)
-            finally:
-                if authentication.poll() is None:
-                    os.killpg(authentication.pid, signal.SIGKILL)
-                    authentication.wait()
-    except (OSError, subprocess.SubprocessError):
-        raise InstallError(auth_message)
-    if status != 0:
-        raise InstallError(auth_message)
-    make(directory)
-    safe_destination(directory)
-    target = directory / 'secret'
-
-    def check_target():
-        if target.exists() or target.is_symlink():
-            safe(target, private=True, directory=False)
-
-    check_target()
-    scratch = Path(tempfile.mkdtemp(prefix='.secret-install-', dir=directory))
-    lock = directory / '.secret.install-lock'
-    token = 'pid=' + str(os.getpid()) + '\ntoken=' + secrets.token_hex(24) + '\n'
-    owned = False
-    try:
-        for attempt in range(4):
-            try:
-                lock.mkdir(mode=0o700)
-                owned = True
-                (lock / 'owner').write_text(token, encoding='ascii')
-                break
-            except FileExistsError:
-                safe(lock, private=True)
-                if attempt == 3:
-                    raise InstallError('installation lock timeout; verify and remove stale lock manually')
-                time.sleep(1)
-        counter = 0
-
-        def run(argv, limit=1024 * 1024, timeout=90, watched=None):
-            nonlocal counter
-            counter += 1
-            control = scratch / ('control-' + str(counter))
-            control.mkdir(mode=0o700)
-            output = control / 'stdout'
-            error = control / 'stderr'
-            with output.open('wb') as out, error.open('wb') as err:
-                process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
-                                           start_new_session=True,
-                                           env=dict(os.environ, GH_PROMPT_DISABLED='1', GH_NO_UPDATE_NOTIFIER='1'))
-                deadline = time.monotonic() + timeout
-                try:
-                    while process.poll() is None:
-                        require(time.monotonic() < deadline)
-                        require(output.stat().st_size <= limit and error.stat().st_size <= 1048576)
-                        for watched_path, maximum in watched or ():
-                            if watched_path.exists():
-                                require(watched_path.stat().st_size <= maximum)
-                        time.sleep(0.02)
-                    require(process.returncode == 0)
-                    require(output.stat().st_size <= limit and error.stat().st_size <= 1048576)
-                finally:
-                    if process.poll() is None:
-                        os.killpg(process.pid, signal.SIGKILL)
-                        process.wait()
-            return output.read_bytes()
-
-        def download(name, limit):
-            url = 'https://github.com/' + REPO + '/releases/download/' + tag + '/' + name
-            for redirect in range(4):
-                request_id = secrets.token_hex(8)
-                body_dir = scratch / ('body-' + request_id)
-                header_dir = scratch / ('headers-' + request_id)
-                body_dir.mkdir(mode=0o700)
-                header_dir.mkdir(mode=0o700)
-                body, headers = body_dir / name, header_dir / 'response'
-                code = run(['curl', '--silent', '--proto', '=https', '--proto-redir', '=https',
-                            '--max-redirs', '0', '--connect-timeout', '10', '--max-time', '60',
-                            '--max-filesize', str(limit), '--dump-header', str(headers), '--output', str(body),
-                            '--write-out', '%{http_code}', url], watched=((body, limit), (headers, 65536)))
-                require(body.is_file() and body.stat().st_size <= limit)
-                require(headers.is_file() and headers.stat().st_size <= 65536)
-                if code == b'200':
-                    return body
-                require(code in (b'301', b'302', b'303', b'307', b'308') and redirect < 3)
-                locations = re.findall(rb'^location:[ \t]*([^\r\n]+)\r?$', headers.read_bytes(), re.I | re.M)
-                require(len(locations) == 1)
-                url = locations[0].decode('ascii')
-                parsed = urlsplit(url)
-                require(parsed.scheme == 'https' and parsed.netloc == 'release-assets.githubusercontent.com')
-                require(not any(ord(c) <= 32 or c == '\\' for c in url))
-            raise InstallError()
-
-        def digest(path):
-            with path.open('rb') as stream:
-                return hashlib.sha256(stream.read(LIMIT + 1)).hexdigest()
-
-        def verify(path, name, expected_commit=''):
-            sha = digest(path)
-            bundle = download('sha256-' + sha + '.jsonl', 1048576)
-            argv = ['gh', 'attestation', 'verify', str(path), '--repo', REPO,
-                    '--source-ref', 'refs/tags/' + tag,
-                    '--cert-oidc-issuer', 'https://token.actions.githubusercontent.com',
-                    '--cert-identity', WORKFLOW + '@refs/tags/' + tag,
-                    '--deny-self-hosted-runners', '--bundle', str(bundle), '--format', 'json']
-            if expected_commit:
-                argv += ['--source-digest', expected_commit, '--signer-digest', expected_commit]
-            result = json.loads(run(argv), object_pairs_hook=unique, parse_constant=invalid_constant)
-            require(isinstance(result, list) and result)
-            commits = set()
-            for item in result:
-                statement = item['verificationResult']['statement']
-                require(statement['predicateType'] == 'https://slsa.dev/provenance/v1')
-                subjects = statement['subject']
-                require(isinstance(subjects, list) and subjects)
-                require(all(isinstance(subject, dict) for subject in subjects))
-                matches = [subject for subject in subjects if subject.get('name') == name]
-                require(len(matches) == 1 and matches[0].get('digest') == {'sha256': sha})
-                definition = statement['predicate']['buildDefinition']
-                workflow = definition['externalParameters']['workflow']
-                require(workflow == {'repository': 'https://github.com/' + REPO,
-                                     'ref': 'refs/tags/' + tag, 'path': '.github/workflows/release.yml'})
-                dependencies = definition['resolvedDependencies']
-                source = [dep for dep in dependencies if dep.get('uri') in (
-                    'git+https://github.com/' + REPO + '@refs/tags/' + tag,
-                    'https://github.com/' + REPO + '@refs/tags/' + tag)]
-                require(len(source) == 1)
-                value = source[0]['digest']['gitCommit']
-                require(re.fullmatch('[0-9a-f]{40}', value))
-                commits.add(value)
-            require(len(commits) == 1)
-            value = commits.pop()
-            require(not expected_commit or value == expected_commit)
-            return value
-
-        def api(endpoint, limit=16384):
-            response = run(['gh', 'api', '--hostname', 'github.com', '--method', 'GET',
-                            'repos/' + REPO + '/' + endpoint], limit=limit)
-            result = json.loads(response, object_pairs_hook=unique, parse_constant=invalid_constant)
-            require(isinstance(result, dict))
-            return result
-
-        def source_boundary(authenticated, manifest):
-            reference = api('git/ref/tags/' + tag)
-            require(reference['ref'] == 'refs/tags/' + tag)
-            target = reference['object']
-            require(target['type'] == 'tag')  # Lightweight tags never establish C.
-            visited = set()
-            for depth in range(8):
-                sha = target['sha']
-                require(re.fullmatch('[0-9a-f]{40}', sha) and sha not in visited)
-                visited.add(sha)
-                annotated = api('git/tags/' + sha)
-                require(annotated['sha'] == sha)
-                if depth == 0:
-                    require(annotated['tag'] == tag)
-                target = annotated['object']
-                if target['type'] == 'commit':
-                    require(target['sha'] == authenticated)
-                    break
-                require(target['type'] == 'tag')
-            else:
-                raise InstallError()
-            # The commit endpoint reports the diff against the sole parent. Do
-            # not paginate or accept a partial multi-file result as a one-file C.
-            final = api('commits/' + authenticated + '?per_page=100', limit=1048576)
-            require(final['sha'] == authenticated)
-            parents = final['parents']
-            require(isinstance(parents, list) and len(parents) == 1)
-            require(re.fullmatch('[0-9a-f]{40}', parents[0]['sha']))
-            require(parents[0]['sha'] != authenticated)
-            changed = final['files']
-            require(isinstance(changed, list) and len(changed) == 1)
-            checksum_path = 'dist/' + manifest_name
-            require(changed[0]['filename'] == checksum_path and changed[0]['status'] == 'added')
-            require('previous_filename' not in changed[0])
-            blob = changed[0]['sha']
-            require(re.fullmatch('[0-9a-f]{40}', blob))
-            contents = api('contents/' + checksum_path + '?ref=' + authenticated)
-            require(contents['type'] == 'file' and contents['path'] == checksum_path)
-            require(contents['sha'] == blob and contents['encoding'] == 'base64')
-            size, encoded = contents['size'], contents['content']
-            require(type(size) is int and 0 <= size <= 4096)
-            require(isinstance(encoded, str) and len(encoded) <= 8192)
-            require(re.fullmatch('[A-Za-z0-9+/=\\r\\n]*', encoded))
-            committed = base64.b64decode(encoded.replace('\r', '').replace('\n', ''), validate=True)
-            require(len(committed) == size and committed == manifest.read_bytes())
-
-        manifest = download(manifest_name, 4096)
-        authenticated = verify(manifest, manifest_name, commit)
-        # First verification authenticates C; the second also pins signer/source C.
-        verify(manifest, manifest_name, authenticated)
-        source_boundary(authenticated, manifest)
-        names = sorted(['secret-' + tag + '-' + system + '-' + cpu + ('.exe' if system == 'windows' else '')
-                        for system in ('darwin', 'linux', 'windows') for cpu in ('amd64', 'arm64')] +
-                       ['secret-' + tag + '-desktop.mcpb', 'server.json'])
-        lines = manifest.read_bytes().splitlines(keepends=True)
-        require(len(lines) == len(names))
-        entries = {}
-        for name, line in zip(names, lines):
-            require(re.fullmatch(rb'[0-9a-f]{64}  ' + re.escape(name.encode()) + rb'\n', line))
-            entries[name] = line[:64].decode('ascii')
-        binary = download(asset, LIMIT)
-        sha = entries[asset]
-        require(digest(binary) == sha)
-        require(verify(binary, asset, authenticated) == authenticated)
-        with binary.open('rb') as stream:
-            header = stream.read(32)
-        if os_name == 'linux':
-            require(header[:6] == b'\x7fELF\x02\x01')
-            require(struct.unpack_from('<H', header, 18)[0] == {'amd64': 62, 'arm64': 183}[arch])
-        else:
-            require(header[:4] == b'\xcf\xfa\xed\xfe')
-            require(struct.unpack_from('<I', header, 4)[0] == {'amd64': 0x1000007, 'arm64': 0x100000c}[arch])
-        binary.chmod(0o500)
-        require(run([str(binary), 'version'], limit=256, timeout=10) == ('secret ' + version + ' (go)\n').encode())
-        require(digest(binary) == sha)
-        safe_destination(directory)
-        chain(directory)
-        check_target()
-        os.replace(binary, target)
-        print('Installed ' + str(target))
-        quoted = "'" + str(target).replace("'", "'\\''") + "'"
-        print("claude mcp add --scope user --transport stdio secret -- " + quoted + " mcp --store 'file:/ABSOLUTE/STORE'")
-        print('Raw executable only: no per-exec checkout rehash, MCP registration or hook activation.')
-    finally:
-        if owned and not lock.is_symlink():
-            owner_path = lock / 'owner'
-            try:
-                safe(lock, private=True)
-                safe(owner_path, directory=False)
-                require(owner_path.stat().st_size <= 128)
-                if owner_path.read_text(encoding='ascii') == token:
-                    owner_path.unlink()
-                    lock.rmdir()
-            except (InstallError, OSError, UnicodeError):
-                pass  # A changed owner/lock requires manual recovery, never stealing.
-        shutil.rmtree(scratch)
-
-
-# Catchable termination cleans owned scratch/locks; SIGKILL leaves a manual lock.
-def terminate(signum, frame):
-    raise InstallError()
-
-
-for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
-    signal.signal(sig, terminate)
-try:
-    main()
-except Exception as error:
-    message = str(error) if isinstance(error, InstallError) and str(error) else 'release installation failed'
-    print('secret: ' + message, file=sys.stderr)
-    sys.exit(1)
-PY
+secret_install "$@"

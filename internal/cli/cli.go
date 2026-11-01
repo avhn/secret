@@ -84,7 +84,7 @@ func Main(args []string, in *os.File, out, errOut io.Writer) int {
 	case "help", "--help", "-h":
 		fmt.Fprint(out, usage)
 		return 0
-	case "version":
+	case "version", "--version":
 		if len(args) != 0 {
 			return c.fail("version takes no arguments", 1)
 		}

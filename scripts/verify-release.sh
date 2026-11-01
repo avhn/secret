@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 ROOT = Path(sys.argv[1])
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 TAG = "v" + VERSION
 REPO = "avhn/secret"
 WORKFLOW = REPO + "/.github/workflows/release.yml"

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "secret",
   "display_name": "secret metadata",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Read-only, names-only metadata for one explicitly approved secret store: list, show, diff and health. Never returns secret values.",
   "long_description": "Opt-in local stdio MCP server. Configure one exact, human-approved store reference, for example file:/absolute/path or libsecret:name. No default store, discovery, shell expansion, comma splitting, network listener, mutations, resources or prompts. Manual MCP registration supports multiple separately approved references.\n\nPrivacy: metadata can reveal key names, labels, presence, backend, store references and paths, and provider account IDs to Claude Desktop and its connected model or services. Never enter a secret value in this setting. File metadata parsing opens local file bytes internally; provider metadata never calls value Get. Age outer metadata is unauthenticated. Values, value hashes and value lengths are not returned.\n\nHealth reports metadata schema version, configured readiness and store count, not provider availability, value validity, release version or hook protection. This extension grants no hook exceptions and does not install or activate hooks.\n\nPayloads: macOS universal (amd64/arm64), Windows amd64. No Linux Desktop or Windows-on-Arm compatibility claim. The bundle is validated with the locked MCPB CLI and native subprocess smoke tests; actual Desktop installation, configuration interpolation and restart behavior are not evidenced by those tests. See setup documentation before opting in.",
   "author": {
@@ -10,7 +10,7 @@
     "url": "https://github.com/avhn"
   },
   "homepage": "https://github.com/avhn/secret",
-  "documentation": "https://github.com/avhn/secret/blob/v0.4.1/docs/setup.md",
+  "documentation": "https://github.com/avhn/secret/blob/v0.5.0/docs/setup.md",
   "support": "https://github.com/avhn/secret/issues",
   "repository": {
     "type": "git",

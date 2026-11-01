@@ -8,7 +8,7 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('secret-installer-tests-' + [Guid]
 $go = (Get-Command go -CommandType Application -TotalCount 1).Source
 $names = @('HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'PATH', 'TEMP', 'TMP', 'SECRET_VERSION',
     'SECRET_RELEASE_COMMIT', 'INSTALL_DIR', 'SECRET_INSTALL_MODE', 'SECRET_INSTALL_FIXTURES', 'SECRET_INSTALL_LOG',
-    'SECRET_INSTALL_ASSET', 'SECRET_INSTALL_READY', 'GOCACHE', 'GOMODCACHE', 'GOTOOLCHAIN', 'GOENV', 'GOWORK', 'CGO_ENABLED')
+    'SECRET_INSTALL_LATEST', 'SECRET_INSTALL_ASSET', 'SECRET_INSTALL_READY', 'GOCACHE', 'GOMODCACHE', 'GOTOOLCHAIN', 'GOENV', 'GOWORK', 'CGO_ENABLED')
 $saved = @{}
 foreach ($name in $names) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $script:fakeUserPath = '%USERPROFILE%\synthetic-existing'
@@ -17,6 +17,12 @@ $script:environmentChanges = 0
 $script:nativeMachine = [uint16]0 # Exercise the existing environment fallback by default.
 $originalProcessPath = $env:PATH
 # Registry access is shadowed only in this test process. File access stays native.
+function Get-TestSha256([string]$path) {
+    $stream = [IO.File]::OpenRead($path)
+    try { $sha = [Security.Cryptography.SHA256]::Create(); try { -join ($sha.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) } finally { $sha.Dispose() } }
+    finally { $stream.Dispose() }
+}
+
 function Get-Item {
     [CmdletBinding()] param([string]$LiteralPath, [switch]$Force)
     if ($LiteralPath -eq 'HKCU:\Environment') {
@@ -119,13 +125,10 @@ try {
     New-TestPrivateDirectory $work
     foreach ($name in @('home', 'source', 'fixtures', 'tools', 'temp', 'modules', 'build-cache')) { New-TestPrivateDirectory (Join-Path $work $name) }
     $source = Join-Path $work 'source\transport.go'
-    # Native fake gh/curl share one executable. No Go subprocess is available to the installer.
+    # Native fake curl and release payloads share synthetic source. No Go subprocess is available to the installer.
     [IO.File]::WriteAllText($source, @'
 package main
 import (
- "crypto/sha256"
- "encoding/base64"
- "encoding/hex"
  "encoding/json"
  "fmt"
  "os"
@@ -135,23 +138,23 @@ import (
 )
 func die() { os.Exit(9) }
 func val(args []string, flag string) string { for i,v := range args { if v == flag && i+1<len(args) { return args[i+1] } }; return "" }
-func hash(b []byte) string { x:=sha256.Sum256(b); return hex.EncodeToString(x[:]) }
+var version = "0.5.0"
 func main() {
  args:=os.Args[1:]; mode:=os.Getenv("SECRET_INSTALL_MODE")
- if len(args)==1 && args[0]=="version" { if mode=="version" { fmt.Println("secret 9.9.9 (go)") } else { fmt.Println("secret 0.4.1 (go)") }; return }
+ versionArg:="--version"; if strings.HasPrefix(version,"0.4.") { versionArg="version" }
+ if len(args)==1 && args[0]==versionArg { if mode=="version" { fmt.Println("secret 9.9.9 (go)") } else { fmt.Println("secret "+version+" (go)") }; return }
  log,_:=os.OpenFile(os.Getenv("SECRET_INSTALL_LOG"), os.O_CREATE|os.O_APPEND|os.O_WRONLY,0600)
  if log!=nil { b,_:=json.Marshal(args); log.Write(append(b,'\n')); log.Close() }
- if len(args)>=2 && args[0]=="auth" && args[1]=="status" {
-  if len(args)!=4 || val(args,"--hostname")!="github.com" { die() }
-  if mode=="unauthenticated" { fmt.Fprintln(os.Stderr,"synthetic authentication diagnostic must not escape"); os.Exit(4) }
-  if mode=="slow-auth" { time.Sleep(11*time.Second) }
-  fmt.Println("synthetic authenticated status"); return
- }
  if strings.HasPrefix(filepath.Base(os.Args[0]),"curl") {
   if val(args,"--proto")!="=https" || val(args,"--proto-redir")!="=https" || val(args,"--max-redirs")!="0" || val(args,"--connect-timeout")!="10" || val(args,"--max-time")!="60" { die() }
   body:=val(args,"--output"); header:=val(args,"--dump-header"); url:=args[len(args)-1]
-  if !strings.Contains(url,"/v0.4.1/") && !strings.Contains(url,"release-assets.githubusercontent.com/") { die() }
+
   os.WriteFile(body,nil,0600); os.WriteFile(header,[]byte("HTTP/1.1 200 OK\r\n\r\n"),0600)
+  if strings.HasSuffix(url,"/latest") {
+   location:="https://github.com/avhn/secret/releases/tag/v0.5.0"
+   if os.Getenv("SECRET_INSTALL_LATEST")!="" { location=os.Getenv("SECRET_INSTALL_LATEST") }
+   os.WriteFile(header,[]byte("Location: "+location+"\r\n"),0600); fmt.Print("302"); return
+  }
   if mode=="network" || mode=="interrupted" { os.WriteFile(body,[]byte("partial"),0600); die() }
   if mode=="oversize" { os.WriteFile(body,make([]byte,4097),0600); fmt.Print("200"); return }
   if mode=="redirect" || mode=="redirect-loop" {
@@ -164,69 +167,7 @@ func main() {
   if mode=="corrupt" && name==os.Getenv("SECRET_INSTALL_ASSET") { b=[]byte("corruption") }
   os.WriteFile(body,b,0600); fmt.Print("200"); return
  }
- if len(args)>0 && args[0]=="api" {
-  if val(args,"--hostname")!="github.com" || val(args,"--method")!="GET" { die() }
-  if mode=="api-error" { die() }
-  if mode=="api-size" { fmt.Print("{\"padding\":\""+strings.Repeat("x",16384)+"\"}"); return }
-  endpoint:=args[len(args)-1]; prefix:="repos/avhn/secret/"
-  if !strings.HasPrefix(endpoint,prefix) { die() }; endpoint=strings.TrimPrefix(endpoint,prefix)
-  commit:=strings.Repeat("a",40); tagSHA:=strings.Repeat("d",40); blob:=strings.Repeat("e",40)
-  result:=map[string]interface{}{}
-  switch endpoint {
-  case "git/ref/tags/v0.4.1":
-   kind:="tag"; sha:=tagSHA; if mode=="lightweight-tag" { kind="commit"; sha=commit }
-   result=map[string]interface{}{"ref":"refs/tags/v0.4.1","object":map[string]interface{}{"type":kind,"sha":sha}}
-  case "git/tags/"+tagSHA:
-   sha:=commit; if mode=="wrong-tag-commit" { sha=strings.Repeat("b",40) }
-   result=map[string]interface{}{"sha":tagSHA,"tag":"v0.4.1","object":map[string]interface{}{"type":"commit","sha":sha}}
-  case "commits/"+commit+"?per_page=100":
-   parents:=[]interface{}{map[string]interface{}{"sha":strings.Repeat("c",40)}}
-   if mode=="two-parents" { parents=append(parents,map[string]interface{}{"sha":strings.Repeat("b",40)}) }
-   status:="added"; if mode=="modified-checksums" { status="modified" }
-   files:=[]interface{}{map[string]interface{}{"filename":"dist/checksums-v0.4.1.txt","status":status,"sha":blob}}
-   if mode=="extra-file" { files=append(files,map[string]interface{}{"filename":"README.md","status":"modified","sha":strings.Repeat("f",40)}) }
-   result=map[string]interface{}{"sha":commit,"parents":parents,"files":files}
-  case "contents/dist/checksums-v0.4.1.txt?ref="+commit:
-   data,err:=os.ReadFile(filepath.Join(os.Getenv("SECRET_INSTALL_FIXTURES"),"checksums-v0.4.1.txt")); if err!=nil { die() }
-   if mode=="committed-mismatch" { data=append(data,[]byte("committed bytes differ\n")...) }
-   result=map[string]interface{}{"type":"file","path":"dist/checksums-v0.4.1.txt","sha":blob,"encoding":"base64",
-    "size":len(data),"content":base64.StdEncoding.EncodeToString(data)}
-  default: die()
-  }
-  encoded,_:=json.Marshal(result); text:=string(encoded)
-  if mode=="api-duplicate" { text=strings.Replace(text,"\"ref\":","\"ref\":\"wrong\",\"ref\":",1) }
-  fmt.Print(text); return
- }
- if len(args)<3 || args[0]!="attestation" || args[1]!="verify" { die() }
- if val(args,"--repo")!="avhn/secret" || val(args,"--source-ref")!="refs/tags/v0.4.1" ||
-    val(args,"--cert-oidc-issuer")!="https://token.actions.githubusercontent.com" ||
-    val(args,"--cert-identity")!="https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.4.1" ||
-    !strings.Contains(strings.Join(args," "),"--deny-self-hosted-runners") || val(args,"--format")!="json" { die() }
- if mode=="attestation" { fmt.Fprintln(os.Stderr,"synthetic diagnostic must not escape"); die() }
- b,err:=os.ReadFile(args[2]); if err!=nil { die() }; name:=filepath.Base(args[2]); commit:=strings.Repeat("a",40)
- if mode=="inconsistent" && name==os.Getenv("SECRET_INSTALL_ASSET") { commit=strings.Repeat("b",40) }
- if pin:=val(args,"--source-digest"); pin!="" && (pin!=commit || val(args,"--signer-digest")!=commit) { die() }
- // One release-workflow statement contains all eight payloads and checksums.
- entries,err:=os.ReadDir(os.Getenv("SECRET_INSTALL_FIXTURES")); if err!=nil || len(entries)!=9 { die() }
- subjects:=[]interface{}{}; var matching map[string]interface{}
- for _,entry:=range entries {
-  payload,err:=os.ReadFile(filepath.Join(os.Getenv("SECRET_INSTALL_FIXTURES"),entry.Name())); if err!=nil { die() }
-  sha:=hash(payload); if entry.Name()==name { sha=hash(b) }
-  subject:=map[string]interface{}{"name":entry.Name(),"digest":map[string]interface{}{"sha256":sha}}
-  subjects=append(subjects,subject); if entry.Name()==name { matching=subject }
- }
- if matching==nil { die() }
- if mode=="subject" { matching["name"]="wrong-name" }
- if mode=="subject-duplicate" || (mode=="binary-subject-duplicate" && name==os.Getenv("SECRET_INSTALL_ASSET")) { subjects=append(subjects,matching) }
- if mode=="subject-digest" || (mode=="binary-subject-digest" && name==os.Getenv("SECRET_INSTALL_ASSET")) { matching["digest"]=map[string]interface{}{"sha256":strings.Repeat("0",64)} }
- workflow:=map[string]interface{}{"repository":"https://github.com/avhn/secret","ref":"refs/tags/v0.4.1","path":".github/workflows/release.yml"}
- if mode=="workflow" { workflow["path"]="wrong.yml" }
- statement:=map[string]interface{}{"predicateType":"https://slsa.dev/provenance/v1",
-  "subject":subjects,
-  "predicate":map[string]interface{}{"buildDefinition":map[string]interface{}{"externalParameters":map[string]interface{}{"workflow":workflow},
-   "resolvedDependencies":[]interface{}{map[string]interface{}{"uri":"git+https://github.com/avhn/secret@refs/tags/v0.4.1","digest":map[string]interface{}{"gitCommit":commit}}}}}}
- result,_:=json.Marshal([]interface{}{map[string]interface{}{"verificationResult":map[string]interface{}{"statement":statement}}})
- text:=string(result); if mode=="duplicate" { text=strings.Replace(text,"\"predicateType\":","\"predicateType\":\"wrong\",\"predicateType\":",1) }; fmt.Print(text)
+ die()
 }
 '@)
     $env:HOME = Join-Path $work 'home'; $env:USERPROFILE = $env:HOME
@@ -234,53 +175,71 @@ func main() {
     $env:TEMP = Join-Path $work 'temp'; $env:TMP = $env:TEMP
     $env:GOMODCACHE = Join-Path $work 'modules'; $env:GOCACHE = Join-Path $work 'build-cache'
     $env:GOTOOLCHAIN = 'local'; $env:GOENV = 'off'; $env:GOWORK = 'off'; $env:CGO_ENABLED = '0'
-    $transport = Join-Path $work 'tools\gh.exe'
+    $transport = Join-Path $work 'tools\curl.exe'
     & $go build -trimpath -buildvcs=false -o $transport $source
     if ($LASTEXITCODE -ne 0) { throw 'synthetic helper build failed' }
-    Copy-Item -LiteralPath $transport -Destination (Join-Path $work 'tools\curl.exe')
     $env:PATH = Join-Path $work 'tools'
-    $env:SECRET_VERSION = '0.4.1'; $env:SECRET_RELEASE_COMMIT = $null
+    $env:SECRET_VERSION = '0.5.0'; $env:SECRET_RELEASE_COMMIT = $null
     $env:SECRET_INSTALL_FIXTURES = Join-Path $work 'fixtures'
     $env:SECRET_INSTALL_LOG = Join-Path $work 'transport.log'
     $env:SECRET_INSTALL_READY = Join-Path $work 'ready'
     $architecture = $env:PROCESSOR_ARCHITECTURE
     if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
     $cpu = 'amd64'; if ($architecture -eq 'ARM64') { $cpu = 'arm64' }
-    $env:SECRET_INSTALL_ASSET = "secret-v0.4.1-windows-$cpu.exe"
+    $env:SECRET_INSTALL_ASSET = "secret-v0.5.0-windows-$cpu.exe"
     $env:INSTALL_DIR = Join-Path $work "bin with 'quote and space"
     foreach ($system in @('darwin', 'linux', 'windows')) {
         foreach ($arch in @('amd64', 'arm64')) {
             $suffix = ''; if ($system -eq 'windows') { $suffix = '.exe' }
-            Copy-Item -LiteralPath $transport -Destination (Join-Path $env:SECRET_INSTALL_FIXTURES "secret-v0.4.1-$system-$arch$suffix")
+            Copy-Item -LiteralPath $transport -Destination (Join-Path $env:SECRET_INSTALL_FIXTURES "secret-v0.5.0-$system-$arch$suffix")
         }
     }
-    [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'secret-v0.4.1-desktop.mcpb'), 'synthetic bundle')
+    [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'secret-v0.5.0-desktop.mcpb'), 'synthetic bundle')
     [IO.File]::WriteAllText((Join-Path $env:SECRET_INSTALL_FIXTURES 'server.json'), '{}')
-    $manifest = Join-Path $env:SECRET_INSTALL_FIXTURES 'checksums-v0.4.1.txt'
+    $manifest = Join-Path $env:SECRET_INSTALL_FIXTURES 'checksums-v0.5.0.txt'
     $files = @(Get-ChildItem -LiteralPath $env:SECRET_INSTALL_FIXTURES | Sort-Object Name)
-    $records = @($files | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name })
+    $records = @($files | ForEach-Object { (Get-TestSha256 $_.FullName) + '  ' + $_.Name })
     [IO.File]::WriteAllText($manifest, ($records -join "`n") + "`n", [Text.Encoding]::ASCII)
+    $nextFixtures = Join-Path $work 'fixtures-next'; New-TestPrivateDirectory $nextFixtures
+    $nextBinary = Join-Path $work 'source\next.exe'
+    & $go build -trimpath -buildvcs=false '-ldflags=-X main.version=0.5.1' -o $nextBinary $source
+    if ($LASTEXITCODE -ne 0) { throw 'second synthetic release build failed' }
+    foreach ($file in $files) {
+        $nextName = $file.Name.Replace('v0.5.0', 'v0.5.1')
+        $input = $file.FullName
+        if ($file.Name -like 'secret-*-windows-*.exe') { $input = $nextBinary }
+        Copy-Item -LiteralPath $input -Destination (Join-Path $nextFixtures $nextName)
+    }
+    $nextRecords = @(Get-ChildItem -LiteralPath $nextFixtures | Sort-Object Name | ForEach-Object {
+        (Get-TestSha256 $_.FullName) + '  ' + $_.Name
+    })
+    [IO.File]::WriteAllText((Join-Path $nextFixtures 'checksums-v0.5.1.txt'), ($nextRecords -join "`n") + "`n", [Text.Encoding]::ASCII)
+    $legacyFixtures = Join-Path $work 'fixtures-legacy'; New-TestPrivateDirectory $legacyFixtures
+    $legacyBinary = Join-Path $work 'source\legacy.exe'
+    & $go build -trimpath -buildvcs=false '-ldflags=-X main.version=0.4.1' -o $legacyBinary $source
+    if ($LASTEXITCODE -ne 0) { throw 'legacy synthetic release build failed' }
+    foreach ($file in $files) {
+        $legacyName = $file.Name.Replace('v0.5.0', 'v0.4.1')
+        $input = $file.FullName
+        if ($file.Name -like 'secret-*-windows-*.exe') { $input = $legacyBinary }
+        Copy-Item -LiteralPath $input -Destination (Join-Path $legacyFixtures $legacyName)
+    }
+    $legacyRecords = @(Get-ChildItem -LiteralPath $legacyFixtures | Sort-Object Name | ForEach-Object {
+        (Get-TestSha256 $_.FullName) + '  ' + $_.Name
+    })
+    [IO.File]::WriteAllText((Join-Path $legacyFixtures 'checksums-v0.4.1.txt'), ($legacyRecords -join "`n") + "`n", [Text.Encoding]::ASCII)
     $output = Invoke-TestInstaller -Arguments @('--help')
-    Assert-True ($output.Contains('0.4.1') -and -not (Test-Path -LiteralPath $env:SECRET_INSTALL_LOG)) 'help had side effects'
+    Assert-True ($output.Contains('latest') -and -not (Test-Path -LiteralPath $env:SECRET_INSTALL_LOG)) 'help had side effects'
     Expect-Failure 'unknown argument' -Arguments @('--unknown')
     Expect-Failure 'unknown argument after help' -Arguments @('--help', '--unknown')
-    foreach ($pin in @('latest', '0.03.0', '1.2.3-rc1', '../0.4.1', 'vv0.4.1')) {
+    foreach ($pin in @('latest', '0.03.0', '1.2.3-rc1', '../0.5.0', 'vv0.5.0')) {
         $env:SECRET_VERSION = $pin; Expect-Failure "version pin $pin"
     }
-    $env:SECRET_VERSION = '0.4.1'
+    $env:SECRET_VERSION = '0.5.0'
     foreach ($pin in @('bad', ('A' * 40), ('a' * 39))) {
         $env:SECRET_RELEASE_COMMIT = $pin; Expect-Failure 'invalid commit pin'
     }
     $env:SECRET_RELEASE_COMMIT = $null
-    $env:SECRET_INSTALL_MODE = 'unauthenticated'
-    Expect-Failure 'unauthenticated gh' -ExpectedMessage 'secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry'
-    Assert-True ($script:lastInstallFailure -clike 'stage=github-auth;*') 'authentication failure used the wrong category'
-    Assert-True ($installer.Contains("@('auth', 'status', '--hostname', 'github.com') 1048576 60")) 'gh auth status must have a sixty-second bound'
-    Assert-True (-not (Test-Path -LiteralPath $env:INSTALL_DIR)) 'authentication failure created destination'
-    $authCalls = @([IO.File]::ReadAllLines($env:SECRET_INSTALL_LOG))
-    Assert-True ($authCalls.Count -eq 1 -and $authCalls[0] -ceq '["auth","status","--hostname","github.com"]') 'authentication failure called curl or another command'
-    [IO.File]::Delete($env:SECRET_INSTALL_LOG)
-    $env:SECRET_INSTALL_MODE = $null
     $safeInstallDir = $env:INSTALL_DIR
     try {
         $env:INSTALL_DIR = Join-Path $work '%LOCALAPPDATA%\secret'
@@ -292,9 +251,6 @@ func main() {
     $env:SECRET_RELEASE_COMMIT = 'b' * 40; Expect-Failure 'wrong commit pin'
     Expect-Failure 'conflicting commit pins' -Arguments @('--commit', ('a' * 40))
     $env:SECRET_RELEASE_COMMIT = $null
-    Rename-Item -LiteralPath $transport -NewName 'missing-gh.exe'
-    Expect-Failure 'missing gh'
-    Rename-Item -LiteralPath (Join-Path $work 'tools\missing-gh.exe') -NewName 'gh.exe'
     $emulatedProcess = @{
         Architecture = $env:PROCESSOR_ARCHITECTURE; Wow = $env:PROCESSOR_ARCHITEW6432
         Asset = $env:SECRET_INSTALL_ASSET; Mode = $env:SECRET_INSTALL_MODE; Machine = $script:nativeMachine
@@ -302,15 +258,15 @@ func main() {
     try {
         $env:PROCESSOR_ARCHITECTURE = 'AMD64'; $env:PROCESSOR_ARCHITEW6432 = 'AMD64'
         $script:nativeMachine = [uint16]0xaa64
-        $env:SECRET_INSTALL_ASSET = 'secret-v0.4.1-windows-arm64.exe'
+        $env:SECRET_INSTALL_ASSET = 'secret-v0.5.0-windows-arm64.exe'
         # Stop at checksum validation: an x64 runner cannot execute Arm64 code,
         # but the transport log must prove native, not process, asset selection.
         $env:SECRET_INSTALL_MODE = 'corrupt'
         [IO.File]::Delete($env:SECRET_INSTALL_LOG)
         Expect-Failure 'native Arm64 with an AMD64 PowerShell process'
         $selectionLog = [IO.File]::ReadAllText($env:SECRET_INSTALL_LOG)
-        Assert-True ($selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.4.1/secret-v0.4.1-windows-arm64.exe')) 'emulated AMD64 process did not select Arm64 asset'
-        Assert-True (-not $selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.4.1/secret-v0.4.1-windows-amd64.exe')) 'emulated AMD64 process selected process architecture'
+        Assert-True ($selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.5.0/secret-v0.5.0-windows-arm64.exe')) 'emulated AMD64 process did not select Arm64 asset'
+        Assert-True (-not $selectionLog.Contains('https://github.com/avhn/secret/releases/download/v0.5.0/secret-v0.5.0-windows-amd64.exe')) 'emulated AMD64 process selected process architecture'
         Write-Output 'PASS native Arm64 overrides AMD64 process architecture'
     } finally {
         $env:PROCESSOR_ARCHITECTURE = $emulatedProcess.Architecture
@@ -318,14 +274,11 @@ func main() {
         $env:SECRET_INSTALL_ASSET = $emulatedProcess.Asset; $env:SECRET_INSTALL_MODE = $emulatedProcess.Mode
         $script:nativeMachine = $emulatedProcess.Machine
     }
-    foreach ($mode in @('attestation', 'subject', 'subject-duplicate', 'subject-digest', 'binary-subject-duplicate', 'binary-subject-digest',
-        'workflow', 'duplicate', 'inconsistent', 'corrupt', 'network', 'interrupted', 'oversize', 'redirect', 'redirect-loop', 'version',
-        'lightweight-tag', 'wrong-tag-commit', 'two-parents', 'extra-file', 'modified-checksums', 'committed-mismatch',
-        'api-error', 'api-duplicate', 'api-size')) {
+    foreach ($mode in @('corrupt', 'network', 'interrupted', 'oversize', 'redirect', 'redirect-loop', 'version')) {
         $env:SECRET_INSTALL_MODE = $mode; Expect-Failure $mode
     }
     $env:SECRET_INSTALL_MODE = $null
-    # Authenticate a deliberately wrong PE machine to prove pre-execution inspection.
+    # Checksum a deliberately wrong PE machine to prove pre-execution inspection.
     $nativeAsset = Join-Path $env:SECRET_INSTALL_FIXTURES $env:SECRET_INSTALL_ASSET
     $nativeBytes = [IO.File]::ReadAllBytes($nativeAsset)
     $wrongBytes = [byte[]]$nativeBytes.Clone()
@@ -333,7 +286,7 @@ func main() {
     $wrongMachine = [uint16]0xaa64; if ($cpu -eq 'arm64') { $wrongMachine = [uint16]0x8664 }
     [BitConverter]::GetBytes($wrongMachine).CopyTo($wrongBytes, $peOffset + 4)
     [IO.File]::WriteAllBytes($nativeAsset, $wrongBytes)
-    $wrongRecords = @($files | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name })
+    $wrongRecords = @($files | ForEach-Object { (Get-TestSha256 $_.FullName) + '  ' + $_.Name })
     [IO.File]::WriteAllText($manifest, ($wrongRecords -join "`n") + "`n", [Text.Encoding]::ASCII)
     Expect-Failure 'wrong PE architecture'
     [IO.File]::WriteAllBytes($nativeAsset, $nativeBytes)
@@ -346,6 +299,29 @@ func main() {
     $originalManifest = [IO.File]::ReadAllBytes($manifest)
     [IO.File]::WriteAllText($manifest, ([IO.File]::ReadAllText($manifest).TrimEnd("`n")), [Text.Encoding]::ASCII)
     Expect-Failure 'missing final newline'; [IO.File]::WriteAllBytes($manifest, $originalManifest)
+    foreach ($bad in @(($records[0] + "`n" + ($records -join "`n") + "`n"),
+            (($records -join "`n").Replace('  ', ' ') + "`n"),
+            (($records[1..7] -join "`n") + "`n"))) {
+        [IO.File]::WriteAllText($manifest, $bad, [Text.Encoding]::ASCII)
+        Expect-Failure 'malformed or duplicate checksum records'
+    }
+    [IO.File]::WriteAllBytes($manifest, $originalManifest)
+    $env:SECRET_VERSION = $null
+    foreach ($redirect in @('http://github.com/avhn/secret/releases/tag/v0.5.0',
+            'https://github.com/other/secret/releases/tag/v0.5.0',
+            'https://github.com/avhn/secret/releases/tag/v01.2.3',
+            'https://github.com/avhn/secret/releases/tag/v0.5.0?x=1',
+            'https://github.com/avhn/secret/releases/tag/v0.5.0-rc1',
+            'https://github.com@evil.invalid/avhn/secret/releases/tag/v0.5.0',
+            "https://github.com/avhn/secret/releases/tag/v0.5.0`r`nLocation: https://evil.invalid/")) {
+        $env:SECRET_INSTALL_LATEST = $redirect; Expect-Failure 'invalid latest redirect'
+    }
+    $env:SECRET_INSTALL_LATEST = $null
+    $env:SECRET_VERSION = '0.5.0'
+    Expect-Failure 'conflicting version pins' -Arguments @('--version', '0.5.1')
+    $missing = Join-Path $env:SECRET_INSTALL_FIXTURES $env:SECRET_INSTALL_ASSET
+    [IO.File]::Move($missing, ($missing + '.missing'))
+    try { Expect-Failure 'missing release asset' } finally { [IO.File]::Move(($missing + '.missing'), $missing) }
     # Each fault owns a fresh directory. Never restore serialized ACLs or mutate
     # the primary installation's permissions between otherwise independent cases.
     $primaryInstallDir = $env:INSTALL_DIR
@@ -392,10 +368,10 @@ func main() {
     $inheritedAcl = Get-Acl -LiteralPath $env:INSTALL_DIR
     Assert-True (-not $inheritedAcl.AreAccessRulesProtected) 'test destination unexpectedly protected'
     $originalAclState = Get-TestAclState $env:INSTALL_DIR
-    $env:SECRET_RELEASE_COMMIT = 'a' * 40
-    $env:SECRET_INSTALL_MODE = 'slow-auth'
-    $output = Invoke-TestInstaller -Arguments @('--version', '0.4.1', '--commit', ('a' * 40)) -ExpectedSuccess
-    $env:SECRET_INSTALL_MODE = $null
+    $env:SECRET_RELEASE_COMMIT = $null
+    $env:SECRET_VERSION = $null
+    # Real iex evaluation with registry operations shadowed in this test scope.
+    $output = $installer | Invoke-Expression | Out-String
     $target = Join-Path $env:INSTALL_DIR 'secret.exe'
     Assert-True (Test-Path -LiteralPath $target) 'valid install absent'
     $currentUserSID = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -412,10 +388,44 @@ func main() {
     Assert-True ($command.CommandElements[9].Value -ceq $target) 'quoted registration changed binary argv'
     Assert-True ($script:pathWrites -eq 1 -and $script:fakeUserPath -ceq ('%USERPROFILE%\synthetic-existing;' + $env:INSTALL_DIR)) 'user PATH changed beyond destination'
     Assert-True ($script:environmentChanges -eq 1) 'changed user PATH did not broadcast exactly once'
-    $before = (Get-FileHash -LiteralPath $target).Hash
+    $held = [IO.File]::Open($target, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $mtime = (Get-Item -LiteralPath $target).LastWriteTimeUtc
+    try {
+        # The open handle denies replacement, proving no-op preserves file identity.
+        $env:SECRET_INSTALL_MODE = 'version'
+        $noop = Invoke-TestInstaller -ExpectedSuccess
+        Assert-True ($noop.Contains('secret 0.5.0 is already installed at')) 'missing no-op message'
+        # File invocation retains the same synthetic registry wrappers and HOME.
+        $fileOutput = & (Join-Path $root 'install.ps1') --version 0.5.0 --dir $env:INSTALL_DIR | Out-String
+        Assert-True ($fileOutput.Contains('secret 0.5.0 is already installed at')) 'file parameters were not forwarded'
+        Assert-True ((Get-Item -LiteralPath $target).LastWriteTimeUtc -eq $mtime) 'no-op changed mtime'
+        Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'no-op changed PATH'
+    } finally { $held.Dispose(); $env:SECRET_INSTALL_MODE = $null }
+    $firstFixtures = $env:SECRET_INSTALL_FIXTURES
+    $firstDigest = (Get-TestSha256 $target)
+    $env:SECRET_INSTALL_FIXTURES = $nextFixtures
+    $env:SECRET_INSTALL_LATEST = 'https://github.com/avhn/secret/releases/tag/v0.5.1'
+    $upgraded = Invoke-TestInstaller -ExpectedSuccess
+    Assert-True ($upgraded.Contains('Installed secret 0.5.1 at')) 'latest upgrade absent'
+    Assert-True ((Get-TestSha256 $target) -cne $firstDigest) 'upgrade payloads are identical'
+    $env:SECRET_INSTALL_FIXTURES = $firstFixtures
+    $env:SECRET_VERSION = 'v0.5.0'
+    [IO.File]::Delete($env:SECRET_INSTALL_LOG)
+    Invoke-TestInstaller -Arguments @('--version', '0.5.0') -ExpectedSuccess | Out-Null
+    Assert-True (-not [IO.File]::ReadAllText($env:SECRET_INSTALL_LOG).Contains('/latest')) 'pin resolved latest'
+    Assert-True ((Get-TestSha256 $target) -ceq $firstDigest) 'explicit rollback failed'
+    $env:SECRET_VERSION = '0.4.1'; $env:SECRET_INSTALL_FIXTURES = $legacyFixtures
+    Invoke-TestInstaller -ExpectedSuccess | Out-Null
+    Assert-True ((Get-TestSha256 $target) -ceq (Get-TestSha256 $legacyBinary)) 'pre-alias release rollback failed'
+    $env:SECRET_VERSION = '0.5.0'; $env:SECRET_INSTALL_FIXTURES = $firstFixtures
+    Invoke-TestInstaller -ExpectedSuccess | Out-Null
+    $env:SECRET_VERSION = $null; $env:SECRET_INSTALL_LATEST = $null
+    $before = (Get-TestSha256 $target)
+    [IO.File]::AppendAllText($target, 'synthetic old payload')
+    $oldDigest = (Get-TestSha256 $target)
     $env:SECRET_INSTALL_MODE = 'corrupt'
     $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
-    Assert-True ($failed -and (Get-FileHash -LiteralPath $target).Hash -ceq $before) 'failure damaged existing destination'
+    Assert-True ($failed -and (Get-TestSha256 $target) -ceq $oldDigest) 'failure damaged existing destination'
     Assert-True ($script:lastInstallFailure -clike 'stage=download-verification; types=*; hresults=*') 'missing path-free failure diagnostic'
     $env:SECRET_INSTALL_MODE = $null
     # Where the token permits it, seed an elevated install's Administrators owner;
@@ -437,7 +447,7 @@ func main() {
     Invoke-TestInstaller -ExpectedSuccess | Out-Null
     Assert-True ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'replacement owner is not the current user'
     if ($administratorsOwnerApplied) { Write-Output 'PASS replacement corrects Administrators owner to current user' }
-    Assert-True ((Get-FileHash -LiteralPath $target).Hash -ceq $before) 'atomic replacement changed verified bytes'
+    Assert-True ((Get-TestSha256 $target) -ceq $before) 'atomic replacement changed verified bytes'
     Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'atomic replacement changed PATH or broadcast again'
     Assert-TestAclState $env:INSTALL_DIR $originalAclState 'atomic replacement changed destination DACL'
     Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'atomic replacement left backup, lock or scratch'
@@ -472,7 +482,7 @@ func main() {
                 $unsafeState = Get-TestAclState $unsafeDirectory
                 $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
                 Assert-True $failed "$rights accepted for $sid"
-                Assert-True ((Get-FileHash -LiteralPath $caseBinary).Hash -ceq $before) 'DACL rejection damaged installed binary'
+                Assert-True ((Get-TestSha256 $caseBinary) -ceq $before) 'DACL rejection damaged installed binary'
                 Assert-TestAclState $unsafeDirectory $unsafeState 'DACL rejection rewrote existing permissions'
                 Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'DACL rejection changed user PATH or broadcast'
                 Assert-True (@(Get-ChildItem -LiteralPath $caseDirectory -Force).Count -eq 1) 'DACL rejection left scratch or lock'
@@ -492,6 +502,7 @@ func main() {
     New-TestPrivateDirectory $caseDirectory
     $caseBinary = Join-Path $caseDirectory 'secret.exe'
     Copy-Item -LiteralPath $target -Destination $caseBinary
+    [IO.File]::AppendAllText($caseBinary, 'synthetic old payload')
     try {
         $currentUser = New-Object Security.Principal.SecurityIdentifier($currentUserSID)
         $ownerOnly = New-Object Security.AccessControl.FileSecurity
@@ -512,7 +523,7 @@ func main() {
         Invoke-TestInstaller -ExpectedSuccess | Out-Null
         Assert-True ((Get-Acl -LiteralPath $caseBinary).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'modify-only replacement owner is not the current user'
         Assert-TestAclState $caseBinary $modifyState 'modify-only replacement changed binary DACL'
-        Assert-True ((Get-FileHash -LiteralPath $caseBinary).Hash -ceq $before) 'modify-only replacement changed verified bytes'
+        Assert-True ((Get-TestSha256 $caseBinary) -ceq $before) 'modify-only replacement changed verified bytes'
         Assert-True (@(Get-ChildItem -LiteralPath $caseDirectory -Force).Count -eq 1) 'modify-only replacement left backup, lock or scratch'
         Write-Output 'PASS current-user-owned Modify-only replacement skips owner write'
     } finally {
@@ -537,7 +548,7 @@ func main() {
     $defaultOutput = Invoke-TestInstaller -ExpectedSuccess
     $defaultTarget = Join-Path $env:HOME '.local\bin\secret.exe'
     Assert-True ((Test-Path -LiteralPath $defaultTarget) -and $defaultOutput.Contains($defaultTarget)) 'HOME default destination differs'
-    Assert-True ((Get-FileHash -LiteralPath $defaultTarget).Hash -ceq $before) 'HOME default payload differs'
+    Assert-True ((Get-TestSha256 $defaultTarget) -ceq $before) 'HOME default payload differs'
     # Evaluate only the path-selection AST when HOME is absent. No native profile
     # file is touched and no host installer/registry action can execute here.
     $env:HOME = $null
@@ -555,7 +566,7 @@ func main() {
     }
     Assert-True ($fallbackDirectory -ceq (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.local\bin')) 'native profile fallback differs'
     Write-Output 'PASS HOME default destination and side-effect-free native profile fallback'
-    Write-Output 'PASS nine-subject install, authenticated source boundary, quoted registration, safe ACL, replacement and synthetic user PATH'
+    Write-Output 'PASS latest checksum install, quoted registration, safe ACL, replacement and synthetic user PATH'
 } finally {
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
     if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force }

@@ -11,13 +11,13 @@ param(
     [Parameter(Mandatory)][string] $Assets,
     [Parameter(Mandatory)][ValidateSet('amd64', 'arm64')][string] $ExpectedArchitecture,
     [switch] $Published,
-    [string] $Tag = 'v0.4.1',
+    [string] $Tag = 'v0.5.0',
     [string] $Commit = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$version = '0.4.1'
+$version = '0.5.0'
 $checkout = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object Text.UTF8Encoding($false)
 
@@ -28,7 +28,7 @@ function Assert-True([bool] $Condition, [string] $Name) {
 Assert-True ($env:OS -eq 'Windows_NT' -and $env:GITHUB_ACTIONS -eq 'true' -and
     $env:RUNNER_OS -eq 'Windows') 'native disposable hosted Windows required'
 Assert-True ([IO.Path]::IsPathRooted($Assets) -and (Test-Path -LiteralPath $Assets -PathType Container)) 'absolute candidate input'
-Assert-True ($Tag -ceq 'v0.4.1') 'exact release tag'
+Assert-True ($Tag -ceq 'v0.5.0') 'exact release tag'
 Assert-True (-not (Get-Item -LiteralPath (Join-Path $checkout '.secret-release-test-fixture') -Force -ErrorAction SilentlyContinue)) 'no shipped fixture marker'
 
 # OS architecture and process architecture must both be native. In particular,
@@ -176,7 +176,10 @@ function Invoke-Captured([string] $Image, [string[]] $Arguments, [string] $Input
         $start.EnvironmentVariables[$name] = Join-Path $root $name
     }
     $start.EnvironmentVariables['SECRETS_DIR'] = Join-Path $root 'absent stores'
-    $start.EnvironmentVariables['GH_PROMPT_DISABLED'] = '1'
+    # Public standalone installs and local source checks require no credentials.
+    foreach ($name in @('GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN')) {
+        $start.EnvironmentVariables.Remove($name)
+    }
     $process = New-Object Diagnostics.Process
     $process.StartInfo = $start
     $stdout = New-Object IO.MemoryStream
@@ -257,7 +260,7 @@ try {
     $shell = (Get-Process -Id $PID).Path
     $installer = Join-Path $checkout 'install.ps1'
     $installArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,
-        '--version', $version, '--commit', $Commit, '--dir', $destination)
+        '--version', $version, '--dir', $destination)
     if ($Published) {
         Assert-True ($Commit -cmatch '^[0-9a-f]{40}$') 'authenticated full checksum commit'
         $git = (Get-Command git -CommandType Application -TotalCount 1).Source
@@ -350,9 +353,9 @@ try {
         $replacementArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,
             '--version', $version, '--dir', $destination)
         $got = Invoke-Captured $shell $replacementArgs
-        Assert-True ($got.Code -eq 0 -and (Hash $binary) -ceq $before) 'verified public replacement with attestation-derived C'
+        Assert-True ($got.Code -eq 0 -and (Hash $binary) -ceq $before) 'verified public digest no-op'
         $badArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,
-            '--version', '0.4.1/invalid', '--commit', $Commit, '--dir', $destination)
+            '--version', '0.5.0/invalid', '--dir', $destination)
         $got = Invoke-Captured $shell $badArgs
         Assert-True ($got.Code -ne 0 -and (Hash $binary) -ceq $before) 'failed install preserves existing binary'
         Assert-InstallAcl $binary $false

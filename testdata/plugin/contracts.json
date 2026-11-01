@@ -1,19 +1,19 @@
 {
-  "version": "0.4.1",
-  "tag": "v0.4.1",
+  "version": "0.5.0",
+  "tag": "v0.5.0",
   "cli_stage": "cli-only",
   "cli_launcher": "bin/secret",
   "bash_compat": "compat/secret",
   "bash_blob": "529a7dd7f2fa3d1bc8cfb69339baa6b1832f58a8",
   "standalone_overwrite": "verified-atomic-replacement",
   "assets": [
-    "secret-v0.4.1-darwin-amd64",
-    "secret-v0.4.1-darwin-arm64",
-    "secret-v0.4.1-desktop.mcpb",
-    "secret-v0.4.1-linux-amd64",
-    "secret-v0.4.1-linux-arm64",
-    "secret-v0.4.1-windows-amd64.exe",
-    "secret-v0.4.1-windows-arm64.exe",
+    "secret-v0.5.0-darwin-amd64",
+    "secret-v0.5.0-darwin-arm64",
+    "secret-v0.5.0-desktop.mcpb",
+    "secret-v0.5.0-linux-amd64",
+    "secret-v0.5.0-linux-arm64",
+    "secret-v0.5.0-windows-amd64.exe",
+    "secret-v0.5.0-windows-arm64.exe",
     "server.json"
   ],
   "manifests": {

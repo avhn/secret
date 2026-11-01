@@ -6,10 +6,28 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Changed
 
+- Prepare v0.5.0 (unreleased): standalone install/update one-liners need no gh,
+  GitHub account or Python. Resolve latest once, verify HTTPS checksums and the
+  new executable, preserve matching installs, and allow explicit version rollback.
+- Add `secret --version` as an alias for `secret version`. Installer checks use
+  the historical subcommand for pre-v0.5.0 rollback downloads.
+- Remove standalone commit pins and automatic provenance verification; document
+  manual attestations and the stronger authenticated checkout route instead.
+- Preserve private atomic publication, path/ACL safety, tokened locks and the
+  eight-payload, nine-subject, eighteen-public-asset release inventory.
+- Windows installer: load core modules from `$PSHOME` and hash with .NET, so
+  Windows PowerShell 5.1 started from PowerShell 7 (which leaks its module path)
+  still finds `Get-Acl` and SHA-256.
+- Unix installer: resolve symlinked parents such as macOS `/var` and `/tmp` once,
+  still rejecting a symlinked install directory, and read BSD modes with `%p` so
+  root-owned sticky parents like `/tmp` are accepted on macOS.
+- Installer tests build distinct release binaries instead of byte-patching one,
+  which broke the ad-hoc Mach-O signature and got the fixture killed on macOS arm64.
+
 - Reorganize README onboarding and move detailed workflows to docs/usage.md,
   plugin and manual-hook setup to docs/install.md, and test guidance to CONTRIBUTING.md.
-- Correct published release and Windows exec launcher status without claiming
-  v0.4.x MCP Registry publication.
+- Correct published release and Windows exec launcher status, and record the
+  v0.4.1 MCP Registry publication.
 
 ## Published releases
 

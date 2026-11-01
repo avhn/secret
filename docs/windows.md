@@ -2,62 +2,45 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-The v0.4.1 test-fixture patch retains raw `secret-v0.4.1-windows-amd64.exe` and
-`secret-v0.4.1-windows-arm64.exe` assets plus `install.ps1`; native candidate and
+v0.5.0 installer simplification (prepared, unreleased) retains raw `secret-v0.5.0-windows-amd64.exe` and
+`secret-v0.5.0-windows-arm64.exe` assets plus `install.ps1`; native candidate and
 public-release installs on both architectures remain separate required evidence.
 This document does not claim those new installs have passed or publication exists.
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
-Plugin manifests become 0.4.1
+Plugin manifests become 0.5.0
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
 
 ## Release installation and MCP
 
-The version-pinned PowerShell bootstrap snippet is in [setup.md](setup.md#install).
-It needs gh and curl.exe from trusted channels. gh must already be authenticated:
-run `gh auth login` yourself in a private terminal, or supply `GH_TOKEN` through
-your trusted credential environment without displaying it. Never paste a token
-into chat or client configuration. Verification checks checksum/binary
-attestations, exact workflow/tag identity, their common C, digest and PE machine.
-`SECRET_RELEASE_COMMIT` optionally pins a separately authenticated full C;
-missing gh never falls back to checksums. Executing the bootstrap script still
-trusts GitHub HTTPS, tag governance and the reviewed script before verification.
+Use the [PowerShell one-liner](setup.md#install) to install or update latest.
+Only PowerShell 5.1 or 7 and curl.exe are needed, not gh or GitHub credentials.
+For iex, use environment inputs `SECRET_VERSION` and `INSTALL_DIR`; when running
+as a file, `--version` and `--dir` also work. Explicit versions permit rollback;
+conflicting pins fail. Commit pinning (`--commit` / `SECRET_RELEASE_COMMIT`) was
+removed; use [checkout verification](install.md#release-and-platform-pins) instead.
+No execution policy is changed by the snippet or installer.
 
-The download completes with `-ErrorAction Stop` before the snippet starts a
-child process of the current PowerShell host using `-NoProfile -ExecutionPolicy
-Bypass -File`. This bypass applies only to that one child process, not persistent
-policy, so Windows PowerShell 5.1's default Restricted policy does not block the
-downloaded file. Centrally enforced Group Policy can still take precedence.
-`finally` cleans up and the saved child exit code is propagated afterward.
+The default destination is `$HOME\.local\bin\secret.exe`, with the native user
+profile as fallback when HOME is absent. Only its directory is added to user
+PATH once. A matching installed digest is a no-op with no PATH write; otherwise
+checksum, PE architecture and bounded new-binary version verification precede
+atomic replacement. The installed executable is never run. Stop clients first;
+open-image failures preserve the old binary. Private scratch, owner/DACL and
+ancestor checks, the elevated scratch-owner fix, and tokened locks remain in
+place. Unsafe ACLs, reparse points and aliases fail without permission repair.
 
-If the installer reports
-`secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry`,
-authenticate gh privately or correct its trusted environment, then retry. Do not
-paste or print a token to troubleshoot it.
-
-The snippet installs its pinned release, not main. Published v0.3.4 installs `%LOCALAPPDATA%\Programs\secret\secret-go.exe`; use its
-printed path. After upgrading, re-register MCP and manually retire reviewed
-old binaries and obsolete user PATH entries as described in [setup](setup.md#migrate-an-earlier-installation).
-
-From v0.4.0 onward, the default destination is `$HOME\.local\bin\secret.exe`, with the native user
-profile as fallback when HOME is absent. Unsafe ancestors, including a
-CodexSandboxUsers Modify ACE, remain rejected without permission repair.
-Only the CLI name changes: Claude and Codex keep the Bash guard, and native
-hook activation remains deferred. Explicit Bash rollback requires Git Bash:
-`bash /absolute/trusted/checkout/compat/secret`. No automatic fallback occurs.
-`INSTALL_DIR` / `--dir` overrides it; `SECRET_VERSION` / `--version` defaults to
-0.4.1, never latest; `--commit` supplies the optional full C and `--help` explains
-inputs. It adds only its own directory to user PATH. It does not modify client
-files, register MCP or install hooks. From v0.4.0 onward, verified atomic
-publication intentionally replaces a safe existing final-name executable. Use the
-printed absolute path, not an assumed PATH lookup. The raw executable does not
-perform the Unix checkout launcher's per-exec rehash. Cold offline Windows
-installation is unsupported; do not bypass attestation for an air-gapped machine.
-
-Stop clients before replacement. Open-image failures preserve the old executable;
-there is no delete-first/copy fallback. Private destination and tokened locking
-checks reject unsafe ACLs/reparse points and never steal stale locks.
+HTTPS checksums detect corruption, not a compromised publisher. The script is
+trusted before verification and does not verify attestations. Optional manual
+provenance uses `gh attestation verify FILE --repo avhn/secret`; the stronger
+checkout route also establishes the S/C source boundary. See
+[bootstrap trust](install.md#standalone-install-and-bootstrap-trust), including
+the Unix pipe truncation limitation. Offline standalone installation is unsupported.
+No MCP registration, stores, client files or hooks are changed. The raw executable
+has no checkout-style per-execution rehash. The final name remains `secret.exe`;
+Bash hooks remain unchanged. Older `secret-go.exe` installations need explicit
+[client migration](setup.md#migrate-an-earlier-installation).
 
 Local MCP uses exactly `mcp --store STORE_REFERENCE`; Windows file references
 are absolute, for example `file:C:\ABSOLUTE\STORE DIR\STORE.secret`.

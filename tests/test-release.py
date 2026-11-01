@@ -15,7 +15,7 @@ import textwrap
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 TAG = "v" + VERSION
 MANIFEST = "checksums-" + TAG + ".txt"
 HISTORICAL_MANIFESTS = ("dist/checksums-v0.3.0.txt", "dist/checksums-v0.3.1.txt",
@@ -39,7 +39,7 @@ if args[:2] == ["attestation", "download"]:
     sys.exit(0)
 if args[:2] == ["release", "create"]:
     import shutil
-    assert args[2] == "v0.4.1"
+    assert args[2] == "v0.5.0"
     assert "--draft" in args and "--verify-tag" in args
     assert args[args.index("--target") + 1] == os.environ["EXPECTED_COMMIT"]
     assert args[args.index("--repo") + 1] == "avhn/secret"
@@ -53,14 +53,14 @@ if args[:2] == ["release", "create"]:
     sys.exit(0)
 if args[:2] == ["release", "download"]:
     import shutil
-    assert args[2:5] == ["v0.4.1", "--repo", "avhn/secret"]
+    assert args[2:5] == ["v0.5.0", "--repo", "avhn/secret"]
     destination = pathlib.Path(args[args.index("--dir") + 1])
     assert not any(destination.iterdir())
     for asset in pathlib.Path(os.environ["GH_RELEASE_ASSETS"]).iterdir():
         shutil.copyfile(asset, destination / asset.name)
     mode = os.environ.get("GH_MODE")
     if mode == "corrupt-draft":
-        (destination / "secret-v0.4.1-linux-amd64").write_bytes(b"corrupt uploaded binary")
+        (destination / "secret-v0.5.0-linux-amd64").write_bytes(b"corrupt uploaded binary")
     if mode == "extra-draft":
         (destination / "unexpected.exe").write_bytes(b"unexpected")
     if mode == "missing-draft":
@@ -74,8 +74,8 @@ expected = {
     "--repo": "avhn/secret",
     "--source-digest": os.environ["EXPECTED_COMMIT"],
     "--signer-digest": os.environ["EXPECTED_COMMIT"],
-    "--source-ref": "refs/tags/v0.4.1",
-    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.4.1",
+    "--source-ref": "refs/tags/v0.5.0",
+    "--cert-identity": "https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.5.0",
     "--cert-oidc-issuer": "https://token.actions.githubusercontent.com",
     "--format": "json",
 }
@@ -115,7 +115,7 @@ if args == ["env", "GOVERSION"]:
 if args in (["mod", "download"], ["mod", "verify"]):
     sys.exit(0)
 assert args[:3] == ["build", "-trimpath", "-buildvcs=false"]
-assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.4.1"
+assert args[3] == "-ldflags=-buildid= -s -w -X main.version=0.5.0"
 assert args[4] == "-o" and args[6:] == ["./cmd/secret"]
 if os.environ.get("GO_FAIL_BUILD") == "1": sys.exit(1)
 expected = {"CGO_ENABLED": "0", "GOAMD64": "v1", "GOARM64": "v8.0",
@@ -137,7 +137,7 @@ p = argparse.ArgumentParser()
 for flag in ("version", "darwin-amd64", "darwin-arm64", "windows-amd64", "out"):
     p.add_argument("--" + flag, required=True)
 a = p.parse_args()
-assert a.version == "0.4.1"
+assert a.version == "0.5.0"
 if os.environ.get("PACKAGE_FAIL"): raise SystemExit(1)
 parts = []
 for system, arch in (("darwin", "amd64"), ("darwin", "arm64"), ("windows", "amd64")):
@@ -318,7 +318,7 @@ class ReleaseTest(unittest.TestCase):
             "one space": self.manifest.replace(b"  ", b" "),
             "path": self.manifest.replace(b"  secret", b"  ./secret"),
             "uppercase": self.manifest.upper(),
-            "other version": self.manifest.replace(b"v0.4.1", b"v9.9.9"),
+            "other version": self.manifest.replace(b"v0.5.0", b"v9.9.9"),
             "windows without exe": self.manifest.replace(b".exe", b""),
             "unix with exe": self.manifest.replace(b"linux-amd64\n", b"linux-amd64.exe\n"),
             "six binaries only": b"".join(line for line in lines if b"desktop.mcpb" not in line and b"server.json" not in line),
@@ -745,8 +745,8 @@ class ReleaseTest(unittest.TestCase):
         self.env["EXPECTED_COMMIT"] = final
         # Same mechanical substitution as the rehearsal, only in disposable code.
         verify = self.repo / "scripts/verify-release.sh"
-        verify.write_text(verify.read_text().replace("0.4.1", "0.2.2"))
-        (self.tools / "gh").write_text(GH.replace("0.4.1", "0.2.2"))
+        verify.write_text(verify.read_text().replace("0.5.0", "0.2.2"))
+        (self.tools / "gh").write_text(GH.replace("0.5.0", "0.2.2"))
         self.assert_ok(self.script("verify-release.sh", assets, final))
         calls = Path(self.env["GH_CALLS"]).read_text().splitlines()
         self.assertEqual(len(calls), 5, "old subjects are not Windows/MCPB evidence")
@@ -761,6 +761,18 @@ class ReleaseTest(unittest.TestCase):
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_standalone_latest_and_script_url_release_identity(self):
+        for name in ('install.sh', 'install.ps1'):
+            source = (ROOT / name).read_text()
+            self.assertIn('https://github.com/avhn/secret/releases/latest', source)
+            self.assertNotIn(VERSION, source)
+            self.assertIn('commit pinning was removed', source)
+            self.assertNotIn('Confirm-Attestation', source)
+        for name in ('README.md', 'docs/setup.md'):
+            source = (ROOT / name).read_text()
+            urls = re.findall(r'https://raw\.githubusercontent\.com/avhn/secret/([^/]+)/install\.(?:sh|ps1)', source)
+            self.assertEqual(urls, ['v' + VERSION, 'v' + VERSION])
+
     def test_bash_baselines_resolve_physical_identity(self):
         for name in ("secret", "backends", "keychain", "libsecret"):
             source = (ROOT / ("tests/test-" + name + ".sh")).read_text()
@@ -777,7 +789,7 @@ class WorkflowTest(unittest.TestCase):
         selectors = re.findall(r"stage=\"\$\(python3 -I -c '([^']+)'\)\"", workflow)
         self.assertEqual(len(selectors), 5)
         self.assertEqual(len(set(selectors)), 1)
-        cases = [('choices=("cli-only", "m4.1")', "v0.4.1", "cli-only"),
+        cases = [('choices=("cli-only", "m4.1")', "v0.5.0", "cli-only"),
                  ('choices=("m4", "m4.1", "v0.3.4")', "v0.3.4", "v0.3.4"),
                  ('choices=("m4", "m4.1")', "v0.2.3", "m4")]
         with tempfile.TemporaryDirectory(prefix="plugin-stage-") as temporary:
@@ -808,7 +820,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertNotIn("--stage m4.1", workflow)
         self.assertIn('sh -n "$cli"', workflow)
         self.assertEqual(workflow.count("if [ -f bin/secret-go ]; then cli=bin/secret-go; fi"), 2)
-        self.assertIn("secret-v0.4.1-windows-amd64.exe", contract["assets"])
+        self.assertIn("secret-v0.5.0-windows-amd64.exe", contract["assets"])
         for name in ("hooks/hooks.json", ".codex-plugin/hooks.json", "codex/hooks.json"):
             hooks = (ROOT / name).read_text()
             self.assertIn("guard-secrets", hooks)
@@ -860,9 +872,9 @@ class WorkflowTest(unittest.TestCase):
                 ("release.yml", ("release-repro", "release-verify", "release-publish")),
                 ("plugin.yml", ("plugin-install-linux", "plugin-install-macos"))):
             if filename == "release.yml":
-                fetch = 'git fetch --no-tags --force origin "refs/tags/v0.4.1:refs/tags/v0.4.1"'
-                tag_type = 'git cat-file -t refs/tags/v0.4.1'
-                peel = "git rev-parse 'refs/tags/v0.4.1^{commit}'"
+                fetch = 'git fetch --no-tags --force origin "refs/tags/v0.5.0:refs/tags/v0.5.0"'
+                tag_type = 'git cat-file -t refs/tags/v0.5.0'
+                peel = "git rev-parse 'refs/tags/v0.5.0^{commit}'"
                 final = "$GITHUB_SHA"
             else:
                 fetch = 'git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"'
@@ -885,7 +897,7 @@ class WorkflowTest(unittest.TestCase):
                     self.assertLess(job.index(fetch), entry.start())
                     if filename == "plugin.yml":
                         self.assertIn("if: inputs.published || inputs.commit != ''", job)
-                        self.assertIn('test "$RELEASE_TAG" = v0.4.1', job)
+                        self.assertIn('test "$RELEASE_TAG" = v0.5.0', job)
                         self.assertLess(job.index(fetch), job.index("--published"))
 
     def test_real_provenance_rehearsal_is_read_only_and_runs_on_pr_head(self):
@@ -908,7 +920,7 @@ class WorkflowTest(unittest.TestCase):
         rehearsal = (ROOT / "scripts/rehearse-release.py").read_text()
         self.assertIn('TAG = "v0.2.2"', rehearsal)
         self.assertIn('FINAL = "68b2cf8c5e9196f4d79afc032ea95b535751971d"', rehearsal)
-        self.assertIn('source.replace("0.4.1", "0.2.2")', rehearsal)
+        self.assertIn('source.replace("0.5.0", "0.2.2")', rehearsal)
         self.assertIn('"cat-file", "-t", "refs/tags/" + TAG', rehearsal)
         self.assertIn('run("sh", verify, assets, FINAL, env=env)', rehearsal)
         self.assertIn('"--bundle-dir", bundles', rehearsal)
@@ -917,11 +929,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('run("sh", install, "--from-dir", corrupt, env=bad_env, deny=True)', rehearsal)
         self.assertIn('run("sh", verify, assets, source, env=env, deny=True)', rehearsal)
         self.assertIn('("--source-digest", source)', rehearsal)
-        self.assertIn('("--source-ref", "refs/tags/v0.4.1")', rehearsal)
+        self.assertIn('("--source-ref", "refs/tags/v0.5.0")', rehearsal)
         self.assertIn('"--offline", "--from-dir", inputs', rehearsal)
         self.assertIn('"worktree", "remove", "--force", worktree', rehearsal)
         self.assertLess(rehearsal.index('worktree / "scripts/build-release.sh"'),
-                        rehearsal.index('source.replace("0.4.1", "0.2.2")'))
+                        rehearsal.index('source.replace("0.5.0", "0.2.2")'))
 
     def test_gh_attestation_argvs_respect_mutually_exclusive_flag_groups(self):
         # gh 2.102.0 verify/verify.go and download/download.go declare these
@@ -983,7 +995,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('for asset in artifacts-a/*', repro)
         self.assertIn('find artifacts-a -type f | wc -l)" -eq 9', repro)
         self.assertIn('find artifacts-b -type f | wc -l)" -eq 9', repro)
-        self.assertIn('cmp dist/checksums-v0.4.1.txt', repro)
+        self.assertIn('cmp dist/checksums-v0.5.0.txt', repro)
         # The complete build, not the tests, invokes the two frozen lane APIs.
         build = (ROOT / "scripts/build-release.sh").read_text()
         self.assertIn('npm ci --ignore-scripts', build)
@@ -1004,7 +1016,7 @@ class WorkflowTest(unittest.TestCase):
                                      "release-rehearsal"})
         for name in ("release-attest", "release-verify", "release-publish"):
             self.assertIn("github.event_name == 'push'", jobs[name])
-            self.assertIn("github.ref == 'refs/tags/v0.4.1'", jobs[name])
+            self.assertIn("github.ref == 'refs/tags/v0.5.0'", jobs[name])
             self.assertIn("github.repository == 'avhn/secret'", jobs[name])
         for name in ("release-build-a", "release-build-b"):
             self.assertIn("cache: false", jobs[name])
@@ -1017,7 +1029,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('select(.type == "required_reviewers" and (.reviewers | length) > 0)', jobs["release-verify"])
         self.assertIn("if: vars.SECRET_RELEASE_APPROVAL_GATE == 'enabled'", jobs["release-verify"])
         self.assertIn(".deployment_branch_policy.custom_branch_policies == true", jobs["release-verify"])
-        self.assertIn('[{"name": "v0.4.1", "type": "tag"}]', jobs["release-verify"])
+        self.assertIn('[{"name": "v0.5.0", "type": "tag"}]', jobs["release-verify"])
         self.assertNotIn("prevent_self_review", jobs["release-verify"])
         self.assertIn("attestations: read", jobs["release-verify"])
         for job, dependency in (("release-attest", "release-repro"),

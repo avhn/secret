@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       published:
-        description: Repeat against published v0.4.1 assets from final checksum commit C
+        description: Repeat against published v0.5.0 assets from final checksum commit C
         type: boolean
         default: false
       tag:
         description: Exact published tag
         type: string
-        default: v0.4.1
+        default: v0.5.0
       commit:
         description: Authenticated full checksum commit C (required for published checks)
         type: string
@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.4.1
+          test "$RELEASE_TAG" = v0.5.0
           printf '%s\n' "$RELEASE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -180,16 +180,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.4.1
+          test "$RELEASE_TAG" = v0.5.0
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.4.1.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.4.1.txt
+          test -f dist/checksums-v0.5.0.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.5.0.txt
           sh scripts/verify-release.sh --source
-      - name: Public standalone and checkout installs with real offline verification
+      - name: Public anonymous standalone and authenticated checkout installs
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -275,16 +275,16 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.4.1
+          test "$RELEASE_TAG" = v0.5.0
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.4.1.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.4.1.txt
+          test -f dist/checksums-v0.5.0.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.5.0.txt
           sh scripts/verify-release.sh --source
-      - name: Public standalone and checkout installs with real offline verification
+      - name: Public anonymous standalone and authenticated checkout installs
         if: inputs.published || inputs.commit != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -357,7 +357,6 @@ jobs:
         if: inputs.published || inputs.commit != ''
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
           EXPECTED_ARCH: ${{ matrix.arch }}

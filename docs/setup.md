@@ -1,16 +1,15 @@
 # Set up secret MCP
 
-This is the canonical setup guide for the opt-in secret 0.4.1 local stdio MCP
-server. Install, choose exact references, register, reconnect and verify in that
-order. v0.4.1 was published on 2026-11-01 and is the GitHub Latest release.
-The commands below use its pinned assets, never a different release if those
-assets are absent. The MCP Registry lists this version.
-See [installation](install.md) for checkout/offline options and
-[release approvals](release.md) for publication status and trust boundaries.
+This is the canonical setup guide for the opt-in secret local stdio MCP server.
+v0.5.0 is prepared and unreleased. Install, choose exact references, register,
+reconnect and verify in that order. See [installation](install.md) for pins and
+checkout verification and [release approvals](release.md) for publication status.
 
 ## Paste to your agent
 
-Follow https://github.com/avhn/secret/blob/v0.4.1/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
+```text
+Follow https://github.com/avhn/secret/blob/v0.5.0/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
+```
 
 ## For an AI agent
 
@@ -27,68 +26,66 @@ Follow https://github.com/avhn/secret/blob/v0.4.1/docs/setup.md to install and r
 
 ## Install
 
-Linux/macOS, from a terminal with Python 3, curl and GitHub CLI gh installed
-through a trusted package channel. gh must already be authenticated: run
-`gh auth login` yourself in a private terminal, or provide `GH_TOKEN` through
-your trusted credential environment without displaying it. Never paste a token
-into chat, client configuration or these examples.
+Install or update to the latest release.
+
+Linux/macOS:
 
 ```sh
-sh -c 'umask 077; d=$(mktemp -d) || exit
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.sh -o "$d/install.sh" && sh "$d/install.sh" "$@"
-status=$?; rm -rf "$d"; exit "$status"' sh
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh | sh
 ```
 
-Windows PowerShell, with gh authenticated as above and gh/curl.exe installed
-through a trusted channel:
+Windows PowerShell:
 
 ```powershell
-& { $ErrorActionPreference = 'Stop'; $d = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $d | Out-Null
-try { irm https://raw.githubusercontent.com/avhn/secret/v0.4.1/install.ps1 -OutFile "$d\install.ps1" -ErrorAction Stop; & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File "$d\install.ps1" @args; $status = $LASTEXITCODE }
-finally { Remove-Item -LiteralPath $d -Recurse -Force }; exit $status }
+irm https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1 | iex
 ```
 
-Both snippets download to a new temporary directory before running the script.
-The POSIX form uses private creation permissions, runs only after curl succeeds,
-and preserves download/installer status through cleanup. The PowerShell form
-sets `-ErrorAction Stop` explicitly: a failed irm request throws before the
-installer can run, and `finally` cleans up without converting failure to success.
-It starts a child process of the same PowerShell host with `-NoProfile` and
-`-ExecutionPolicy Bypass`, then returns that child's exit code after cleanup.
-This bypass applies only to that one child process, allowing the downloaded file
-to run under Windows PowerShell 5.1's default Restricted policy without changing
-any persistent policy. Centrally enforced Group Policy can still take precedence.
-Append installer flags after the final `sh` or closing PowerShell brace; both
-forward them as separate arguments. Environment inputs below also work.
+The script defaults to the latest release, resolved once from GitHub's release
+redirect, then downloads only that explicit tag. No GitHub account, gh, Python
+or credentials are required. Unix needs POSIX sh, curl, standard GNU/BSD utilities
+and sha256sum or shasum. Windows needs PowerShell 5.1 or 7 and curl.exe.
+Install dependencies through trusted channels.
 
-These commands execute an installer trusted through GitHub HTTPS, repository
-ownership, tag governance and your review of that script, before payload
-verification runs. A tag-pinned script is not a cryptographically verified
-bootstrap. Download it into a new empty directory, review it and run it from a
-separate trusted directory for stronger review, or use the trusted-checkout
-procedure in [install.md](install.md).
+Set `SECRET_VERSION` to a strict release version (optional leading `v`) to pin
+or roll back. File invocations also accept `--version V`, `--dir DIR` and
+`--help`; conflicting environment and flag pins fail. `INSTALL_DIR` selects the
+destination. For `irm | iex`, set `SECRET_VERSION` and `INSTALL_DIR` in that
+PowerShell process, rather than appending file parameters. `--commit` and
+`SECRET_RELEASE_COMMIT` were removed and fail with a link to checkout verification
+in docs/install.md. No installer changes execution policy.
 
-Both installers require gh attestation verification. They verify the checksum
-asset and selected binary against avhn/secret, the exact release workflow/tag,
-GitHub Actions OIDC identity and hosted runners, require both attestations to
-agree on the full checksum commit C, check the complete eight-record manifest,
-and verify binary digest and architecture before execution/publication. Missing
-gh fails; there is no checksum-only or source-build fallback.
+Unix defaults to `~/.local/bin/secret` and does not edit PATH or profiles.
+Windows defaults to `$HOME\.local\bin\secret.exe`, with the native user profile
+as fallback when HOME is absent, and adds only its install directory to user
+PATH once. Open a new terminal afterward. Both print the concrete executable
+path. Neither reads stores, registers MCP, installs hooks or edits clients.
 
-If installation stops with
-`secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry`,
-authenticate gh in your own private terminal or correct its trusted environment,
-then retry. Do not paste or print a token to diagnose it.
+Rerunning updates to latest. Under the tokened lock, a matching installed digest
+is a no-op that preserves file identity, mtime and Windows PATH. Otherwise a new
+binary is downloaded, checksum/format/architecture/version-checked and atomically
+published. The existing executable is never run. Explicit pins permit rollback;
+a corrupt safe installation is repaired. Verification failures preserve the old
+file. Unsafe ownership, writable ancestors, aliases, reparse points and DACLs are
+rejected, not repaired. Locks are never stolen. Stop clients before replacement,
+especially on Windows where an open executable can block atomic replacement.
 
-Inputs are `SECRET_VERSION` (default `0.4.1`, never latest), optional
-`SECRET_RELEASE_COMMIT` (a full lowercase 40-hex C from independently authenticated
-release records), and `INSTALL_DIR`. A supplied C must match verified provenance;
-without it, C is derived from verified attestation identity, not a checksum field.
-The scripts also accept `--version`, `--commit`, `--dir` and `--help` when run as
-files. Conflicting environment/flag pins fail. Do not substitute a guessed C.
+The one-liners trust GitHub HTTPS, repository/tag governance and the script before
+payload verification. `curl | sh` cannot guarantee a complete download before
+execution; the function wrapper mitigates truncation, but is not a complete-download
+guarantee. A pinned script URL does not pin the default binary release. Download
+and review the script first, or use the stronger trusted-checkout route.
+HTTPS checksums detect corruption, not a compromised release publisher. The
+standalone installers do not verify attestations or provenance and do not rehash
+themselves on each run. They have no offline or source-build fallback.
+
+For optional manual provenance verification, install gh separately and run
+`gh attestation verify FILE --repo avhn/secret` on the downloaded asset. This does
+not by itself establish the full source-S/checksum-C boundary. The stronger
+[checkout verification](install.md#release-and-platform-pins) below pins an
+independently authenticated C and checks the release workflow, tag and inventory.
 
 Final CLI names and destinations described below ship from **v0.4.0 onward**.
-The download snippets install their pinned release, not main. The published
+The download snippets select latest by default; explicit version pins select a release, not main. The published
 v0.3.4 installer uses `secret-go` on Unix and
 `%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
 Use the printed executable path for that release; do not infer the installed
@@ -107,8 +104,8 @@ The standalone executable and checkout launcher both run the Go CLI.
 Bash rollback is explicit at `compat/secret`, never a bootstrap fallback. Unlike the
 trusted-checkout `bin/secret` launcher, it does not rehash itself before each
 execution. Install/update verification is not ongoing same-user tamper protection.
-Consumers do not need Go, Node, npm, Python packaging tools or lipo to run MCP;
-Python 3 is needed by the Unix installer, not the installed server.
+Consumers do not need Go, Node, npm, Python packaging tools or lipo to install
+the standalone CLI or run MCP.
 
 ## Migrate an earlier installation
 
@@ -175,8 +172,8 @@ scope is stored in `~/.claude.json`; do not replace that file manually.
 
 ### Claude Desktop: bundle
 
-The planned release asset is `secret-v0.4.1-desktop.mcpb`. Obtain it from the
-exact v0.4.1 release and verify its committed checksum and attestation using the
+The planned release asset is `secret-v0.5.0-desktop.mcpb`. Obtain it from the
+exact v0.5.0 release and verify its committed checksum and attestation using the
 trusted-checkout verifier in [install.md](install.md), not an adjacent checksum
 alone. The registry identity is `io.github.avhn/secret`; listing/publication is
 owner-gated and is not claimed here.
@@ -327,7 +324,7 @@ changes. Restart the agent session if needed. Do not accept unrelated trust gran
 ## Verify and understand the limits
 
 Run the installed binary's `version` command in a terminal, using its absolute
-path. Expected release output is `secret 0.4.1 (go)`. The MCP initialize response
+path. Expected release output is `secret 0.5.0 (go)`. The MCP initialize response
 instead identifies `secret-metadata` version `1`; health reports metadata schema
 version, configured readiness and store count, not the release version.
 
@@ -342,7 +339,7 @@ paths and provider account IDs may reach the client, its model and its logs.
 File metadata parsing can open local file bytes internally; provider metadata
 never calls value Get. Unauthenticated age outer metadata is not integrity proof.
 
-All four plugin/marketplace manifests are version 0.4.1, but the installed hooks
+All four plugin/marketplace manifests are version 0.5.0, but the installed hooks
 remain the Bash guard. Go hook activation is M4.1 and remains waiting sponsorship.
 Installing an executable, registering MCP or passing synthetic tests does not
 establish fail-closed host protection. This is accident prevention, not a sandbox.
@@ -403,16 +400,17 @@ exception and does not change agent-denial rules or installed defaults.
 
 ## Update, rollback and remove
 
-Review a new exact release and its setup guide before updating; never switch to
-latest implicitly. Stop the server before replacing its executable, especially
-on Windows. Re-run the reviewed version-pinned installer, retain the exact
-approved references, then restart/reconnect and verify. Do not overwrite a
-running binary or bypass a lock; verify stale lock ownership manually.
+Rerun either one-liner to update to the latest release. Review release changes
+and stop the server first, especially on Windows. Matching installed bytes are
+left untouched. Retain the exact approved references, then restart/reconnect and
+verify. Do not bypass a lock; verify stale lock ownership manually.
 
-For rollback, install a separately verified older release to a separate absolute
-path and change only the registration command after checking that release's
-supported argv. Old Bash-only releases are not MCP substitutes. Keep the Bash
-CLI/guard installation unchanged; no automatic fallback or Go hook cutover occurs.
+Set `SECRET_VERSION` (or use `--version` when running the script as a file) for
+an explicit pin or rollback. Pins skip latest resolution and may replace a newer
+version. A separate `INSTALL_DIR` lets you review an older release before changing
+the registration path. Check that release's supported argv. Old Bash-only releases
+are not MCP substitutes. Keep the Bash CLI/guard installation unchanged; no
+automatic fallback or Go hook cutover occurs.
 
 To remove, stop the server, remove only its registration (or uninstall the Desktop
 extension), and delete only the installed secret executable when no other

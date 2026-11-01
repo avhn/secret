@@ -2,6 +2,7 @@
 # Offline synthetic transport only; all installer HOME/PATH/destinations are disposable.
 set -euo pipefail
 umask 077
+case $(uname -s) in Linux|Darwin) ;; *) echo "SKIP native Unix installer tests: Linux/macOS required"; exit 0 ;; esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TMP="$(mktemp -d)"
 TMP="$(cd "$TMP" && pwd -P)"
@@ -13,12 +14,22 @@ cat >"$TMP/source/main.go" <<'GO'
 package main
 import ("fmt"; "os")
 func main() {
-    if len(os.Args) != 2 || os.Args[1] != "version" { os.Exit(9) }
-    fmt.Println("secret 0.4.1 (go)")
+    if len(os.Args) != 2 || os.Args[1] != "--version" { os.Exit(9) }
+    fmt.Println("secret 0.5.0 (go)")
 }
 GO
+sed 's/--version/version/; s/0.5.0/0.4.1/' "$TMP/source/main.go" >"$TMP/source/legacy.go"
 HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -o "$TMP/build/native" "$TMP/source/main.go"
+HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+    -o "$TMP/build/legacy" "$TMP/source/legacy.go"
+# Distinct real builds, never byte-patched copies: editing a signed Mach-O
+# invalidates its ad-hoc signature and macOS arm64 then kills it (SIGKILL).
+for fixture in next:0.5.1 wrong:9.9.9; do
+    sed "s/0.5.0/${fixture#*:}/" "$TMP/source/main.go" >"$TMP/source/${fixture%%:*}.go"
+    HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+        -o "$TMP/build/${fixture%%:*}" "$TMP/source/${fixture%%:*}.go"
+done
 python3 -I - "$ROOT" "$TMP" <<'PY'
 import ast
 import hashlib
@@ -39,9 +50,11 @@ ROOT, WORK = map(Path, sys.argv[1:])
 PYTHON = sys.executable
 SH = shutil.which('sh')
 NATIVE = (WORK / 'build/native').read_bytes()
+NEXT = (WORK / 'build/next').read_bytes()
+WRONG = (WORK / 'build/wrong').read_bytes()
 OS = {'Linux': 'linux', 'Darwin': 'darwin'}[os.uname().sysname]
 ARCH = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[os.uname().machine]
-ASSET = f'secret-v0.4.1-{OS}-{ARCH}'
+ASSET = f'secret-v0.5.0-{OS}-{ARCH}'
 COMMIT = 'a' * 40
 
 CURL = r'''
@@ -52,12 +65,16 @@ assert value('--proto') == '=https' and value('--proto-redir') == '=https'
 assert value('--max-redirs') == '0' and value('--connect-timeout') == '10'
 assert value('--max-time') == '60' and '--location' not in args
 limit = int(value('--max-filesize')); assert limit in (4096, 1048576, 67108864)
-url = args[-1]; assert '/latest' not in url
+url = args[-1]
 with open(os.environ['LOG'], 'a') as stream: stream.write(json.dumps(['curl'] + args) + '\n')
 body = pathlib.Path(value('--output')); headers = pathlib.Path(value('--dump-header'))
 assert not list(body.parent.iterdir()) and not list(headers.parent.iterdir())
 mode = os.environ.get('MODE', '')
 body.write_bytes(b''); headers.write_bytes(b'HTTP/1.1 200 OK\r\n\r\n')
+if url.endswith('/latest'):
+    headers.write_text('Location: ' + os.environ.get('LATEST', 'https://github.com/avhn/secret/releases/tag/v0.5.0') + '\r\n')
+    if mode == 'latest-nul': headers.write_bytes(headers.read_bytes().replace(b'/tag/', b'/tag/\x00'))
+    print('302', end=''); sys.exit()
 if mode in ('interrupt', 'kill'):
     pathlib.Path(os.environ['READY']).touch()
     while True: time.sleep(.1)
@@ -80,88 +97,6 @@ else:
     if mode == 'corrupt' and name == os.environ['ASSET']: body.write_bytes(b'corruption')
 print('200', end='')
 '''
-GH = r'''
-import base64, hashlib, json, os, pathlib, sys
-args = sys.argv[1:]
-def value(flag): return args[args.index(flag) + 1]
-with open(os.environ['LOG'], 'a') as stream: stream.write(json.dumps(['gh'] + args) + '\n')
-mode = os.environ.get('MODE', '')
-if args[:2] == ['auth', 'status']:
-    assert args == ['auth', 'status', '--hostname', 'github.com']
-    if mode == 'unauthenticated':
-        print('provider diagnostic must not escape', file=sys.stderr)
-        sys.exit(4)
-    if mode == 'slow-auth':
-        import time
-        time.sleep(11)
-    print('synthetic authenticated status')
-    sys.exit()
-fixtures = pathlib.Path(os.environ['FIXTURES'])
-commit, source, tag_sha, blob = 'a' * 40, 'c' * 40, 'd' * 40, 'e' * 40
-if args[0] == 'api':
-    assert value('--hostname') == 'github.com' and value('--method') == 'GET'
-    endpoint = args[-1]
-    assert endpoint.startswith('repos/avhn/secret/')
-    endpoint = endpoint[len('repos/avhn/secret/'):]
-    if mode == 'api-error': sys.exit(1)
-    if mode == 'api-size': print('{"padding":"' + 'x' * 16384 + '"}'); sys.exit()
-    if endpoint == 'git/ref/tags/v0.4.1':
-        result = {'ref': 'refs/tags/v0.4.1', 'object': {'type': 'tag', 'sha': tag_sha}}
-        if mode == 'lightweight-tag': result['object'] = {'type': 'commit', 'sha': commit}
-    elif endpoint == 'git/tags/' + tag_sha:
-        result = {'sha': tag_sha, 'tag': 'v0.4.1', 'object': {'type': 'commit', 'sha': commit}}
-        if mode == 'wrong-tag-commit': result['object']['sha'] = 'b' * 40
-    elif endpoint == 'commits/' + commit + '?per_page=100':
-        result = {'sha': commit, 'parents': [{'sha': source}],
-                  'files': [{'filename': 'dist/checksums-v0.4.1.txt', 'status': 'added', 'sha': blob}]}
-        if mode == 'two-parents': result['parents'].append({'sha': 'b' * 40})
-        if mode == 'extra-file': result['files'].append({'filename': 'README.md', 'status': 'modified', 'sha': 'f' * 40})
-        if mode == 'modified-checksums': result['files'][0]['status'] = 'modified'
-    elif endpoint == 'contents/dist/checksums-v0.4.1.txt?ref=' + commit:
-        data = (fixtures / 'checksums-v0.4.1.txt').read_bytes()
-        if mode == 'committed-mismatch': data += b'committed bytes differ\n'
-        result = {'type': 'file', 'path': 'dist/checksums-v0.4.1.txt', 'sha': blob, 'encoding': 'base64',
-                  'size': len(data), 'content': base64.b64encode(data).decode('ascii')}
-    else: raise AssertionError(endpoint)
-    if mode == 'api-nonfinite': result['unexpected'] = float('nan')
-    text = json.dumps(result)
-    if mode == 'api-duplicate': text = text.replace('"ref":', '"ref":"wrong", "ref":')
-    print(text); sys.exit()
-assert args[:2] == ['attestation', 'verify']
-assert value('--repo') == 'avhn/secret' and '--owner' not in args and '--signer-workflow' not in args
-assert value('--source-ref') == 'refs/tags/v0.4.1'
-assert value('--cert-identity') == 'https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.4.1'
-assert value('--cert-oidc-issuer') == 'https://token.actions.githubusercontent.com'
-assert '--deny-self-hosted-runners' in args and value('--format') == 'json'
-assert pathlib.Path(value('--bundle')).read_text() == 'synthetic bundle'
-if mode == 'attestation': print('provider diagnostic must not escape', file=sys.stderr); sys.exit(1)
-if mode == 'empty': print('[]'); sys.exit()
-path = pathlib.Path(args[2])
-if mode == 'inconsistent' and path.name == os.environ['ASSET']: commit = 'b' * 40
-if '--source-digest' in args:
-    if value('--source-digest') != commit or value('--signer-digest') != commit: sys.exit(1)
-# The workflow emits one statement for all eight payloads and the checksum file.
-subjects = [{'name': p.name, 'digest': {'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}}
-            for p in sorted(fixtures.iterdir())]
-assert len(subjects) == 9
-matching = next(subject for subject in subjects if subject['name'] == path.name)
-if mode == 'subject': matching['name'] = 'wrong-name'
-if mode == 'subject-duplicate' or (mode == 'binary-subject-duplicate' and path.name == os.environ['ASSET']):
-    subjects.append(dict(matching))
-if mode == 'subject-digest' or (mode == 'binary-subject-digest' and path.name == os.environ['ASSET']):
-    matching['digest'] = {'sha256': '0' * 64}
-statement = {'predicateType': 'https://slsa.dev/provenance/v1', 'subject': subjects,
-    'predicate': {'buildDefinition': {'externalParameters': {'workflow': {
-        'repository': 'https://github.com/avhn/secret', 'ref': 'refs/tags/v0.4.1', 'path': '.github/workflows/release.yml'}},
-        'resolvedDependencies': [{'uri': 'git+https://github.com/avhn/secret@refs/tags/v0.4.1', 'digest': {'gitCommit': commit}}]}}}
-if mode == 'workflow': statement['predicate']['buildDefinition']['externalParameters']['workflow']['path'] = 'wrong.yml'
-if mode == 'source': statement['predicate']['buildDefinition']['resolvedDependencies'] = []
-result = json.dumps([{'verificationResult': {'statement': statement}}])
-if mode == 'duplicate': result = result.replace('"predicateType":', '"predicateType":"wrong", "predicateType":')
-print(result)
-'''
-
-
 class Install(unittest.TestCase):
     def setUp(self):
         self.work = Path(tempfile.mkdtemp(prefix='case ', dir=WORK))
@@ -177,16 +112,17 @@ class Install(unittest.TestCase):
         self.ready = self.work / 'ready'
         self.env = dict(HOME=str(self.home), PATH=str(self.tools), INSTALL_DIR=str(self.destination),
                         FIXTURES=str(self.fixtures), LOG=str(self.log), ASSET=ASSET, READY=str(self.ready))
-        (self.tools / 'python3').symlink_to(PYTHON)
+        for tool in ('uname', 'id', 'stat', 'awk', 'wc', 'cmp', 'chmod', 'mv', 'rm', 'rmdir', 'mkdir', 'mktemp', 'sleep', 'od', 'tr', 'cat', 'sha256sum', 'shasum'):
+            source = shutil.which(tool)
+            if source: (self.tools / tool).symlink_to(source)
         self.script('curl', CURL)
-        self.script('gh', GH)
         for system in ('linux', 'darwin', 'windows'):
             for arch in ('amd64', 'arm64'):
-                name = f'secret-v0.4.1-{system}-{arch}' + ('.exe' if system == 'windows' else '')
+                name = f'secret-v0.5.0-{system}-{arch}' + ('.exe' if system == 'windows' else '')
                 (self.fixtures / name).write_bytes(NATIVE)
-        (self.fixtures / 'secret-v0.4.1-desktop.mcpb').write_bytes(b'synthetic bundle')
+        (self.fixtures / 'secret-v0.5.0-desktop.mcpb').write_bytes(b'synthetic bundle')
         (self.fixtures / 'server.json').write_bytes(b'{}\n')
-        self.manifest = self.fixtures / 'checksums-v0.4.1.txt'
+        self.manifest = self.fixtures / 'checksums-v0.5.0.txt'
         self.rehash()
 
     def script(self, name, body):
@@ -218,22 +154,10 @@ class Install(unittest.TestCase):
         self.assertEqual((result.returncode, result.stderr), (0, b''))
         self.assertEqual(self.target.read_bytes(), NATIVE)
         self.assertEqual(stat.S_IMODE(self.target.stat().st_mode), 0o500)
-        line = next(line for line in result.stdout.decode().splitlines() if line.startswith('claude '))
-        self.assertEqual(shlex.split(line), ['claude', 'mcp', 'add', '--scope', 'user', '--transport', 'stdio', 'secret', '--',
-                                          str(self.target), 'mcp', '--store', 'file:/ABSOLUTE/STORE'])
+        self.assertIn(b'Installed secret 0.5.0 at ', result.stdout)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
-        self.assertEqual(calls[0], ['gh', 'auth', 'status', '--hostname', 'github.com'])
-        attestations = [c for c in calls if c[:2] == ['gh', 'attestation']]
-        api_calls = [c for c in calls if c[:2] == ['gh', 'api']]
-        self.assertEqual(len(attestations), 3)
-        self.assertIn('--source-digest', attestations[1])
-        self.assertEqual([c[-1] for c in api_calls], [
-            'repos/avhn/secret/git/ref/tags/v0.4.1',
-            'repos/avhn/secret/git/tags/' + 'd' * 40,
-            'repos/avhn/secret/commits/' + COMMIT + '?per_page=100',
-            'repos/avhn/secret/contents/dist/checksums-v0.4.1.txt?ref=' + COMMIT])
-        binary_download = next(c for c in calls if c[0] == 'curl' and c[-1].endswith('/' + ASSET))
-        self.assertGreater(calls.index(binary_download), calls.index(api_calls[-1]))
+        self.assertEqual(sum(c[-1].endswith('/latest') for c in calls), 1)
+        self.assertTrue(all(c[0] == 'curl' for c in calls))
         self.assertFalse((self.home / '.profile').exists())
         self.assertEqual(list(self.destination.iterdir()), [self.target])
 
@@ -241,12 +165,12 @@ class Install(unittest.TestCase):
         for args in [('--help',), ('-h',)]:
             self.assertEqual(self.run_install(*args).returncode, 0)
         for args in [('--wat',), ('--help', '--wat'), ('--version',), ('--commit',), ('--dir',),
-                     ('--version', '0.4.1', '--version', '0.4.1')]:
+                     ('--version', '0.5.0', '--version', '0.5.0')]:
             self.failure(*args)
-        for version in ('', 'latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.4.1', 'v', 'vv0.4.1', '0.4.1\n'):
+        for version in ('latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.5.0', 'v', 'vv0.5.0', '0.5.0\n'):
             self.env['SECRET_VERSION'] = version
             self.failure()
-        self.env['SECRET_VERSION'] = '0.4.1'
+        self.env['SECRET_VERSION'] = '0.5.0'
         self.failure('--version', '9.9.9')
         for commit in ('latest', 'a' * 39, 'A' * 40, 'a' * 40 + '\n'):
             self.env['SECRET_RELEASE_COMMIT'] = commit
@@ -254,82 +178,99 @@ class Install(unittest.TestCase):
         self.assertFalse(self.log.exists())
 
     def test_matching_pin_and_flags(self):
-        self.env['SECRET_VERSION'] = 'v0.4.1'
-        self.env['SECRET_RELEASE_COMMIT'] = COMMIT
-        result = self.run_install('--version', '0.4.1', '--commit', COMMIT, '--dir', str(self.destination))
+        self.env['SECRET_VERSION'] = 'v0.5.0'
+        result = self.run_install('--version', '0.5.0', '--dir', str(self.destination))
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('/latest', self.log.read_text())
 
-    def test_missing_gh(self):
-        (self.tools / 'gh').unlink()
-        result = self.failure()
-        self.assertIn(b'trusted package channel', result.stderr)
-        self.assertFalse(self.log.exists())
+    def test_checksum_and_transport_failures(self):
+        for mode in ('corrupt', 'network', 'truncated', 'oversize', 'header-size', 'redirect', 'redirect-loop', 'redirect-user', 'redirect-http', 'redirect-duplicate', 'latest-nul'):
+            with self.subTest(mode=mode):
+                self.env['MODE'] = mode
+                self.failure()
 
-    def test_unauthenticated_gh_fails_before_download_or_directory_creation(self):
-        self.env['MODE'] = 'unauthenticated'
-        result = self.failure()
-        self.assertEqual(result.stdout, b'')
-        self.assertEqual(result.stderr, b'secret: GitHub CLI is not authenticated; '
-                         b'run gh auth login or set GH_TOKEN, then retry\n')
-        self.assertFalse(self.destination.exists())
-        self.assertEqual([json.loads(line) for line in self.log.read_text().splitlines()],
-                         [['gh', 'auth', 'status', '--hostname', 'github.com']])
+    def test_latest_redirect_validation(self):
+        for url in ('http://github.com/avhn/secret/releases/tag/v0.5.0',
+                    'https://github.com/other/secret/releases/tag/v0.5.0',
+                    'https://github.com/avhn/secret/releases/tag/v01.2.3',
+                    'https://github.com/avhn/secret/releases/tag/v0.5.0?x=1',
+                    'https://github.com/avhn/secret/releases/tag/v0.5.0-rc1',
+                    'https://github.com@evil.invalid/avhn/secret/releases/tag/v0.5.0',
+                    'https://github.com/avhn/secret/releases/tag/v0.5.0\r\nLocation: https://evil.invalid/'):
+            self.env['LATEST'] = url
+            self.failure()
 
-    def test_auth_status_has_a_sixty_second_bound(self):
-        source = (ROOT / 'install.sh').read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
-        calls = [node for node in ast.walk(ast.parse(source))
-                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                 and isinstance(node.func.value, ast.Name) and node.func.value.id == 'authentication'
-                 and node.func.attr == 'wait' and node.keywords]
-        self.assertEqual(len(calls), 1)
-        self.assertEqual([(item.arg, ast.literal_eval(item.value)) for item in calls[0].keywords],
-                         [('timeout', 60)])
-
-    def test_cold_authenticated_gh_can_exceed_ten_seconds(self):
-        self.env['MODE'] = 'slow-auth'
+    def test_pipe_and_noop(self):
+        result = subprocess.run([SH], input=(ROOT / 'install.sh').read_bytes(), env=self.env,
+                                cwd=self.work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        before = self.target.stat()
         result = self.run_install()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn(b'synthetic authenticated status', result.stdout + result.stderr)
+        self.assertIn(b'is already installed at', result.stdout)
+        after = self.target.stat()
+        self.assertEqual((before.st_ino, before.st_mtime_ns), (after.st_ino, after.st_mtime_ns))
 
-    def test_attestation_checksum_and_transport_failures(self):
-        for mode in ('attestation', 'empty', 'subject', 'workflow', 'source', 'duplicate', 'inconsistent', 'corrupt',
-                     'network', 'truncated', 'oversize', 'header-size', 'redirect', 'redirect-loop', 'redirect-user',
-                     'redirect-http', 'redirect-duplicate'):
-            with self.subTest(mode=mode):
-                self.env['MODE'] = mode
-                self.failure()
+    def test_upgrade_rollback_repair_and_failed_update(self):
+        self.assertEqual(self.run_install().returncode, 0)
+        original = self.target.read_bytes()
+        newer = NEXT
+        self.assertNotEqual(original, newer, 'release fixtures must differ')
+        next_fixtures = self.work / 'next-fixtures'
+        next_fixtures.mkdir(mode=0o700)
+        for source in self.fixtures.iterdir():
+            if source == self.manifest: continue
+            name = source.name.replace('v0.5.0', 'v0.5.1')
+            (next_fixtures / name).write_bytes(newer if source.name == ASSET else source.read_bytes())
+        (next_fixtures / 'checksums-v0.5.1.txt').write_bytes(b''.join(
+            hashlib.sha256(p.read_bytes()).hexdigest().encode() + b'  ' + p.name.encode() + b'\n'
+            for p in sorted(next_fixtures.iterdir())))
+        self.env.update(FIXTURES=str(next_fixtures), LATEST='https://github.com/avhn/secret/releases/tag/v0.5.1',
+                        ASSET=ASSET.replace('v0.5.0', 'v0.5.1'), MODE='corrupt')
+        self.assertNotEqual(self.run_install().returncode, 0)
+        self.assertEqual(self.target.read_bytes(), original)
+        self.env.pop('MODE')
+        result = self.run_install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.target.read_bytes(), newer)
+        self.env.update(FIXTURES=str(self.fixtures), SECRET_VERSION='v0.5.0', ASSET=ASSET)
+        self.assertEqual(self.run_install('--version', '0.5.0').returncode, 0)
+        self.assertEqual(self.target.read_bytes(), original)
+        self.target.chmod(0o700); self.target.write_bytes(b'corrupt installed executable'); self.target.chmod(0o500)
+        self.assertEqual(self.run_install().returncode, 0)
+        self.assertEqual(self.target.read_bytes(), original)
 
-    def test_nine_subject_attestation_rejects_ambiguous_name_and_wrong_digest(self):
-        # All successful installs use the nine-subject release-workflow fixture.
-        # Reject checksum and binary collisions independently, even with eight
-        # unrelated subjects carrying otherwise valid digests.
-        for mode in ('subject-duplicate', 'subject-digest', 'binary-subject-duplicate', 'binary-subject-digest'):
-            with self.subTest(mode=mode):
-                self.env['MODE'] = mode
-                self.failure()
+    def test_pre_alias_release_rollback(self):
+        self.assertEqual(self.run_install().returncode, 0)
+        legacy = self.work / 'legacy-fixtures'; legacy.mkdir(mode=0o700)
+        data = (WORK / 'build/legacy').read_bytes()
+        for source in self.fixtures.iterdir():
+            if source == self.manifest: continue
+            (legacy / source.name.replace('v0.5.0', 'v0.4.1')).write_bytes(data if source.name == ASSET else source.read_bytes())
+        (legacy / 'checksums-v0.4.1.txt').write_bytes(b''.join(
+            hashlib.sha256(p.read_bytes()).hexdigest().encode() + b'  ' + p.name.encode() + b'\n'
+            for p in sorted(legacy.iterdir())))
+        self.env.update(FIXTURES=str(legacy), SECRET_VERSION='0.4.1')
+        result = self.run_install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.target.read_bytes(), data)
 
-    def test_authenticated_source_boundary_failures(self):
-        for mode in ('lightweight-tag', 'wrong-tag-commit', 'two-parents', 'extra-file',
-                     'modified-checksums', 'committed-mismatch', 'api-error', 'api-duplicate', 'api-nonfinite', 'api-size'):
-            with self.subTest(mode=mode):
-                self.env['MODE'] = mode
-                self.failure()
-                calls = [json.loads(line) for line in self.log.read_text().splitlines()]
-                self.assertFalse(any(c[0] == 'curl' and c[-1].endswith('/' + ASSET) for c in calls))
-                self.log.unlink()
-
-    def test_wrong_commit_and_conflicting_pin(self):
-        self.env['SECRET_RELEASE_COMMIT'] = 'b' * 40
+    def test_missing_release_asset(self):
+        (self.fixtures / ASSET).unlink()
         self.failure()
-        self.log.unlink()
-        self.failure('--commit', COMMIT)
+
+    def test_truncated_pipe_does_not_execute(self):
+        result = subprocess.run([SH], input=(ROOT / 'install.sh').read_bytes().rsplit(b'secret_install "$@"', 1)[0],
+                                env=self.env, cwd=self.work, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertFalse(self.destination.exists())
         self.assertFalse(self.log.exists())
 
     def test_manifest_grammar(self):
         original = self.manifest.read_bytes()
         lines = original.splitlines(keepends=True)
         for data in (original[:-1], original.replace(b'\n', b'\r\n'), b''.join(reversed(lines)), b''.join(lines[:-1]),
-                     original + lines[0], b''.join([lines[0], *lines[:-1]]), original.replace(b'  ', b' ', 1)):
+                     original + lines[0], b''.join([lines[0], *lines[:-1]]), original.replace(b'  ', b' ', 1),
+                     original.replace(b'\n', b'\0\n', 1)):
             self.manifest.write_bytes(data)
             self.failure()
 
@@ -339,14 +280,11 @@ class Install(unittest.TestCase):
         if OS == 'linux': data[18:20] = (183 if ARCH == 'amd64' else 62).to_bytes(2, 'little')
         else: data[4:8] = (0x100000c if ARCH == 'amd64' else 0x1000007).to_bytes(4, 'little')
         native.write_bytes(data); self.rehash(); self.failure()
-        native.write_bytes(NATIVE.replace(b'secret 0.4.1 (go)', b'secret 9.9.9 (go)'))
+        native.write_bytes(WRONG)
         self.rehash(); self.failure()
 
     def test_unsupported_platform(self):
-        self.script('python3', '''import os, sys
-os.uname = lambda: type('U', (), {'sysname': 'Unsupported', 'machine': 'x86_64'})()
-exec(compile(sys.stdin.read(), '<installer>', 'exec'))
-''')
+        self.script('uname', "print('Unsupported')")
         self.failure()
         self.assertFalse(self.log.exists())
 
@@ -377,8 +315,8 @@ exec(compile(sys.stdin.read(), '<installer>', 'exec'))
         self.assertEqual(self.target.read_bytes(), NATIVE)
         self.target.unlink()
         self.log.unlink()
-        diagnostic = (b'secret: unsafe install directory; use a real user-owned directory '
-                      b'and run chmod go-w DIR\n')
+        diagnostic = (b'secret: unsafe install directory; use a user-owned directory '
+                      b'and chmod go-w DIR\n')
         for mode in (0o775, 0o757):
             with self.subTest(mode=oct(mode)):
                 self.destination.chmod(mode)
@@ -394,6 +332,34 @@ exec(compile(sys.stdin.read(), '<installer>', 'exec'))
         self.assertEqual(result.stderr, diagnostic)
         self.assertTrue(self.destination.is_symlink())
         self.assertFalse(self.log.exists())
+
+    def test_symlinked_ancestor_binds_physical_parent(self):
+        # macOS /var and /tmp are symlinks. Bind the physical parent once;
+        # a final symlinked install directory is still rejected above.
+        real = self.work / 'real-parent'
+        real.mkdir(mode=0o700)
+        linked = self.work / 'linked-parent'
+        linked.symlink_to(real)
+        self.env['INSTALL_DIR'] = str(linked / 'bin')
+        self.destination = real / 'bin'
+        self.target = self.destination / 'secret'
+        result = self.run_install()
+        self.assertEqual((result.returncode, result.stderr), (0, b''))
+        self.assertEqual(self.target.read_bytes(), NATIVE)
+        self.assertTrue(linked.is_symlink())
+        # /tmp is root-owned and sticky everywhere, and a symlink on macOS.
+        # BSD stat %Lp hides the sticky bit, which once rejected this parent.
+        sticky = Path(tempfile.mkdtemp(prefix='secret-install-sticky-', dir='/tmp'))
+        try:
+            self.env['INSTALL_DIR'] = str(sticky / 'bin')
+            self.destination = Path(os.path.realpath(sticky)) / 'bin'
+            self.target = self.destination / 'secret'
+            self.log.unlink(missing_ok=True)
+            result = self.run_install()
+            self.assertEqual((result.returncode, result.stderr), (0, b''))
+            self.assertEqual(self.target.read_bytes(), NATIVE)
+        finally:
+            shutil.rmtree(sticky)
 
     def test_aliases_and_unsafe_modes(self):
         self.destination.mkdir(mode=0o700)

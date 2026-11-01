@@ -26,7 +26,7 @@ sys.dont_write_bytecode = True
 SPEC = importlib.util.spec_from_file_location("release_manifest", ROOT / "scripts/release_manifest.py")
 M = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(M)
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 TAG = "v" + VERSION
 COMMIT = "a" * 40
 
@@ -108,7 +108,7 @@ class GenerationTests(OfflineTest):
         package = first["packages"]
         self.assertEqual(len(package), 1)
         self.assertEqual(package[0], {"registryType": "mcpb",
-                         "identifier": "https://github.com/avhn/secret/releases/download/v0.4.1/secret-v0.4.1-desktop.mcpb",
+                         "identifier": "https://github.com/avhn/secret/releases/download/v0.5.0/secret-v0.5.0-desktop.mcpb",
                          "version": VERSION, "fileSha256": M.digest(self.assets / f"secret-{TAG}-desktop.mcpb"),
                          "transport": {"type": "stdio"}})
         data = (self.assets / M.checksum_name(VERSION)).read_bytes()
@@ -125,7 +125,7 @@ class GenerationTests(OfflineTest):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_bad_versions(self):
-        for version in ("v0.4.1", "0.03.0", "0.4.1-rc1", "0.3", "0.4.1\n", "../0.4.1"):
+        for version in ("v0.5.0", "0.03.0", "0.5.0-rc1", "0.3", "0.5.0\n", "../0.5.0"):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 M.payload_names(version)
 
@@ -157,7 +157,7 @@ class GenerationTests(OfflineTest):
         make_inputs(self.assets)
         M.generate(VERSION, self.assets)
         path = self.assets / "server.json"
-        path.write_bytes(path.read_bytes().replace(b'"version": "0.4.1",', b'"version": "0.4.1", "version": "0.4.1",', 1))
+        path.write_bytes(path.read_bytes().replace(b'"version": "0.5.0",', b'"version": "0.5.0", "version": "0.5.0",', 1))
         with self.assertRaisesRegex(ValueError, "duplicate"):
             M.generate(VERSION, self.assets)
 
@@ -444,13 +444,13 @@ class TrustAndNetworkTests(OfflineTest):
                      ("rev-parse", f"refs/tags/{TAG}^{{commit}}"): COMMIT + "\n",
                      ("rev-parse", "HEAD"): COMMIT + "\n",
                      ("rev-list", "--parents", "-n", "1", COMMIT): COMMIT + " " + source + "\n",
-                     ("diff-tree", "--no-commit-id", "--name-status", "-r", source, COMMIT): "A\tdist/checksums-v0.4.1.txt\n",
+                     ("diff-tree", "--no-commit-id", "--name-status", "-r", source, COMMIT): "A\tdist/checksums-v0.5.0.txt\n",
                      ("ls-tree", "--name-only", source, "--", ".secret-release-test-fixture"): "",
                      ("ls-tree", "--name-only", COMMIT, "--", ".secret-release-test-fixture"): ""}
         with patch.object(M, "git", side_effect=lambda *args: responses[args]), \
                 patch.object(M, "run", return_value=b"committed"):
             self.assertEqual(M.verify_source(TAG, COMMIT), (COMMIT, b"committed"))
-            for tag in ("v1.0.0", "v0.4.1-rc1", "v0.4.10", "v0.4.1\n"):
+            for tag in ("v1.0.0", "v0.5.0-rc1", "v0.5.00", "v0.5.0\n"):
                 with self.subTest(tag=tag), self.assertRaises(ValueError):
                     M.verify_source(tag, COMMIT)
             with self.assertRaisesRegex(ValueError, "mismatch"):
@@ -471,7 +471,7 @@ class TrustAndNetworkTests(OfflineTest):
             opener.return_value.open.return_value = Response(json_bytes(active_record({"name": M.NAME})))
             self.assertEqual(M.registry_record(VERSION)["server"]["name"], M.NAME)
             self.assertEqual(opener.return_value.open.call_args.args[0],
-                             "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.avhn%2Fsecret/versions/0.4.1")
+                             "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.avhn%2Fsecret/versions/0.5.0")
             for data in (b'{"server":{},"server":{}}', b"x" * (M.MAX_JSON + 1)):
                 opener.return_value.open.return_value = Response(data)
                 with self.assertRaises(ValueError):
@@ -530,12 +530,14 @@ class TrustAndNetworkTests(OfflineTest):
         self.assertIn("$root = Join-Path $base ('secret release ' + [Guid]::NewGuid().ToString('N'))", source)
         self.assertIn("New-PrivateDirectory $root", source)
         self.assertIn("$destination = Join-Path $root 'installed binary with spaces'", source)
-        self.assertIn("'--version', $version, '--commit', $Commit, '--dir', $destination", source)
+        self.assertIn("'--version', $version, '--dir', $destination", source)
+        self.assertNotIn("'--commit', $Commit", source)
+        self.assertIn("$start.EnvironmentVariables.Remove($name)", source)
 
     def test_workflow_gate_and_permission_contract(self):
         text = (ROOT / ".github/workflows/registry.yml").read_text()
         self.assertIn("types: [published]", text)
-        self.assertIn("github.event.release.tag_name == 'v0.4.1'", text)
+        self.assertIn("github.event.release.tag_name == 'v0.5.0'", text)
         self.assertIn("github.event.release.draft == false", text)
         self.assertIn("github.event.release.prerelease == false", text)
         self.assertIn("uses: ./.github/workflows/plugin.yml", text)

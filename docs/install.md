@@ -5,7 +5,7 @@
 From v0.4.0 onward, the final CLI name is `secret` on Unix and `secret.exe` on Windows. The
 owner-approved CLI-only extraction from M4.1 puts the verified Go launcher at
 `bin/secret` and retains byte-identical executable Bash at `compat/secret`.
-v0.4.1 was published on 2026-11-01 and is the GitHub Latest release. Published
+v0.5.0 is prepared and unreleased. Published
 tags and assets are immutable; fixes require a new patch version.
 Claude and Codex plugin hooks remain Bash. `hooks/guard-go` stays inactive.
 Claude cutover, `onFailure: "block"` and Go hook output-contract changes
@@ -18,7 +18,7 @@ was published on 2026-10-24, at checksum commit C
 The [recorded release evidence](../ROADMAP.md#m4-releasable-linuxmacos-core)
 includes native published-asset installs on all four Linux/macOS targets.
 That historical evidence does not certify the new Windows assets or Desktop
-bundle. The procedure below targets published v0.4.1; do not use a candidate branch as C.
+bundle. The checkout procedure below targets v0.5.0 after publication; do not use a candidate branch as C.
 See [release.md](release.md) for owner approval boundaries and
 [canonical MCP setup](setup.md) for per-client registration.
 
@@ -107,77 +107,70 @@ block tools.
 
 ## Standalone install and bootstrap trust
 
-The pinned Linux/macOS and PowerShell bootstrap snippets are in [setup.md](setup.md#install).
-`install.sh` needs Python 3, curl and gh; `install.ps1` needs Windows PowerShell,
-curl.exe and gh. gh must already be authenticated: run `gh auth login` yourself
-in a private terminal, or supply `GH_TOKEN` through your trusted credential
-environment without displaying it. Never paste a token into chat or client
-configuration. Install dependencies through trusted channels. The bootstrap
-trusts GitHub HTTPS, repository/tag governance and the installer before payload
-verification. Download/review/run or a reviewed checkout offers stronger bootstrap
-review; this is not cryptographically verified script execution.
+The one-liners are in [setup.md](setup.md#install).
 
-The PowerShell snippet runs the downloaded file in a child process of the same
-host using `-NoProfile -ExecutionPolicy Bypass`, preserves its exit code and
-cleans up in `finally`. The bypass applies only to that one child process, not
-persistent policy. It permits execution under Windows PowerShell 5.1's default
-Restricted policy; centrally enforced Group Policy can still take precedence.
+The script defaults to the latest release, resolved once from GitHub's release
+redirect, then downloads only that explicit tag. No GitHub account, gh, Python
+or credentials are required. Unix needs POSIX sh, curl, standard GNU/BSD utilities
+and sha256sum or shasum. Windows needs PowerShell 5.1 or 7 and curl.exe.
+Install dependencies through trusted channels.
 
-Inputs: `SECRET_VERSION` defaults to `0.4.1`, never latest;
-`SECRET_RELEASE_COMMIT` optionally supplies an independently authenticated full
-lowercase 40-hex C; `INSTALL_DIR` selects the destination. Equivalent file-mode
-flags are `--version`, `--commit`, `--dir` and `--help`. Conflicting pins fail.
-Without an explicit C, both scripts derive it only from verified attestation
-identity and require checksum and binary provenance to agree. gh is mandatory;
-missing gh never enables a checksum-only fallback. The auth status check is bounded
-to 60 seconds; its fixed recovery message never includes gh diagnostics. Digest, architecture and
-`secret 0.4.1 (go)` are checked before atomic publication.
+Set `SECRET_VERSION` to a strict release version (optional leading `v`) to pin
+or roll back. File invocations also accept `--version V`, `--dir DIR` and
+`--help`; conflicting environment and flag pins fail. `INSTALL_DIR` selects the
+destination. For `irm | iex`, set `SECRET_VERSION` and `INSTALL_DIR` in that
+PowerShell process, rather than appending file parameters. `--commit` and
+`SECRET_RELEASE_COMMIT` were removed and fail with a link to checkout verification
+in docs/install.md. No installer changes execution policy.
 
-Final CLI names and destinations described below ship from **v0.4.0 onward**.
-The download snippets install their pinned release, not main. The published
-v0.3.4 installer uses `secret-go` on Unix and
-`%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
-Use the printed executable path for that release; do not infer the installed
-name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
-published assets or tags.
+Unix defaults to `~/.local/bin/secret` and does not edit PATH or profiles.
+Windows defaults to `$HOME\.local\bin\secret.exe`, with the native user profile
+as fallback when HOME is absent, and adds only its install directory to user
+PATH once. Open a new terminal afterward. Both print the concrete executable
+path. Neither reads stores, registers MCP, installs hooks or edits clients.
 
-From v0.4.0 onward, Unix defaults to `~/.local/bin/secret` without PATH/profile edits. Windows
-defaults to `$HOME\.local\bin\secret.exe` (native user profile when HOME is absent) and adds only its own
-directory to user PATH; open a new terminal afterward. Neither edits client
-configuration, registers MCP, reads stores or installs hooks. A safe existing
-regular `secret` executable is intentionally replaced only after verification;
-failed verification preserves its bytes. Unsafe ownership/modes, reparse points,
-DACLs and aliases are rejected, including sandbox-writable ancestors such as a
-CodexSandboxUsers Modify ACE;
-arbitrary existing parents are not repaired. Stop clients before replacement,
-especially Windows open-image replacement. After atomic Windows publication,
-the installed binary owner is explicitly set to the current user, including
-when replacing an Administrators-owned binary. Owner-setting failures use the
-`publication-owner` category. Locks are tokened and never stolen.
+Rerunning updates to latest. Under the tokened lock, a matching installed digest
+is a no-op that preserves file identity, mtime and Windows PATH. Otherwise a new
+binary is downloaded, checksum/format/architecture/version-checked and atomically
+published. The existing executable is never run. Pre-v0.5.0 downloads are checked with
+`secret version`, because those releases lack the new `--version` alias. Explicit pins permit rollback;
+a corrupt safe installation is repaired. Verification failures preserve the old
+file. Unsafe ownership, writable ancestors, aliases, reparse points and DACLs are
+rejected, not repaired. Locks are never stolen. Stop clients before replacement,
+especially on Windows where an open executable can block atomic replacement.
 
-The raw standalone executable has install-time verification, not the checkout
-launcher's per-execution rehash. The standalone installers are online-only and
-have no `--offline` or `--from-dir` mode. Windows cold offline installation is
-not supported. The separate Unix trusted-checkout cache retains the explicit
-offline interfaces below.
+The one-liners trust GitHub HTTPS, repository/tag governance and the script before
+payload verification. `curl | sh` cannot guarantee a complete download before
+execution; the function wrapper mitigates truncation, but is not a complete-download
+guarantee. A pinned script URL does not pin the default binary release. Download
+and review the script first, or use the stronger trusted-checkout route.
+HTTPS checksums detect corruption, not a compromised release publisher. The
+standalone installers do not verify attestations or provenance and do not rehash
+themselves on each run. They have no offline or source-build fallback.
+
+For optional manual provenance verification, install gh separately and run
+`gh attestation verify FILE --repo avhn/secret` on the downloaded asset. This does
+not by itself establish the full source-S/checksum-C boundary. The stronger
+[checkout verification](install.md#release-and-platform-pins) below pins an
+independently authenticated C and checks the release workflow, tag and inventory.
 
 ## Release and platform pins
 
-Release identity is fixed at V=0.4.1, annotated tag `v0.4.1`, source commit S and
+Release identity is fixed at V=0.5.0, annotated tag `v0.5.0`, source commit S and
 checksum-only child commit C. The trusted checkout must be exactly the full C
 which the annotated tag peels to. Obtain C from separately authenticated owner
 release records, not a field inside the downloaded binary or its checksum file.
-Never use a `latest` URL, candidate S attestation or an arbitrary PATH `secret`.
+For this stronger checkout route, never use a `latest` URL, candidate S attestation or an arbitrary PATH `secret`.
 
 | Platform | Asset suffixes | Native hosted targets | Evidence status |
 | --- | --- | --- | --- |
-| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | Prior v0.2.3 installs passed; new v0.4.1 candidate/public installs required |
-| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | Prior v0.2.3 installs and Bash 3.2 passed; new v0.4.1 gates required |
-| Windows | windows-amd64.exe, windows-arm64.exe | windows-latest, windows-11-arm | M5a amd64 runtime gate passed; v0.4.1 native candidate/public installs on both architectures remain required |
+| Linux | linux-amd64, linux-arm64 | ubuntu-latest (record ImageOS), ubuntu-24.04-arm | Prior v0.2.3 installs passed; new v0.5.0 candidate/public installs required |
+| macOS | darwin-amd64, darwin-arm64 | macos-15-intel, macos-latest (record sw_vers) | Prior v0.2.3 installs and Bash 3.2 passed; new v0.5.0 gates required |
+| Windows | windows-amd64.exe, windows-arm64.exe | windows-latest, windows-11-arm | M5a amd64 runtime gate passed; v0.5.0 native candidate/public installs on both architectures remain required |
 
-All six are raw executables named `secret-v0.4.1-SUFFIX`, not archives. The other
-payloads are `secret-v0.4.1-desktop.mcpb` and generated `server.json`. The sorted
-`checksums-v0.4.1.txt` has exactly eight payload records; nine attestation bundles
+All six are raw executables named `secret-v0.5.0-SUFFIX`, not archives. The other
+payloads are `secret-v0.5.0-desktop.mcpb` and generated `server.json`. The sorted
+`checksums-v0.5.0.txt` has exactly eight payload records; nine attestation bundles
 cover those payloads plus the checksum asset. There are eighteen public assets.
 The Desktop bundle contains macOS universal and Windows amd64 payloads only;
 actual Desktop installation is not host-tested. Registry name:
@@ -214,7 +207,7 @@ gh with `gh auth login` in your private terminal or an already configured
 release assets. Do not paste or print the token. Local synthetic checks use
 gh 2.102.0. The earlier read-only rehearsal used genuine v0.2.2
 provenance with identity-substituted scripts. The published v0.2.3 workflow passed
-its historical four-target checks; it is not evidence for the v0.4.1 integrated
+its historical four-target checks; it is not evidence for the v0.5.0 integrated
 artifacts or Windows installs. Online downloading additionally needs curl with
 HTTPS, redirect, connect and total-time limits. Install these tools through your
 trusted OS/package channel. This checkout path does not execute a downloaded
@@ -223,15 +216,15 @@ bootstrap script.
 ```sh
 # In the trusted checkout, after independently authenticating C and the tag:
 git checkout --detach FULL_AUTHENTICATED_C
-git fetch --no-tags --force origin "refs/tags/v0.4.1:refs/tags/v0.4.1"
-test "$(git cat-file -t refs/tags/v0.4.1)" = tag
-test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.4.1^{commit}')"
+git fetch --no-tags --force origin "refs/tags/v0.5.0:refs/tags/v0.5.0"
+test "$(git cat-file -t refs/tags/v0.5.0)" = tag
+test "$(git rev-parse HEAD)" = "$(git rev-parse 'refs/tags/v0.5.0^{commit}')"
 sh scripts/verify-release.sh --source
 sh scripts/install-release.sh
 ./bin/secret version
 ```
 
-The commands above target the authenticated v0.4.1 release tag/C and its final
+The commands above target the authenticated v0.5.0 release tag/C and its final
 `bin/secret` launcher. Published v0.3.4 instead uses `bin/secret-go`, while its
 `bin/secret` is Bash. Main is source S, not release C: without the
 committed release checksum manifest its launcher exits 70, even with a cache.
@@ -243,22 +236,22 @@ installer itself never fetches tags, including on warm or offline paths, and
 rejects lightweight tags rather than weakening the pin.
 
 The installer fetches only the exact platform asset under
-`https://github.com/avhn/secret/releases/download/v0.4.1/`. It checks the committed
+`https://github.com/avhn/secret/releases/download/v0.5.0/`. It checks the committed
 eight-line checksum manifest, provenance repository `avhn/secret`, signer workflow
 `.github/workflows/release.yml`, source C, tag ref, certificate issuer and subject
 name/digest before execution. The checkout is the bootstrap trust root; a matching
 checksum alone is not independent provenance.
 
 The verifier keeps `--repo avhn/secret`, `--source-digest C`,
-`--signer-digest C`, `--source-ref refs/tags/v0.4.1`,
+`--signer-digest C`, `--source-ref refs/tags/v0.5.0`,
 `--cert-oidc-issuer https://token.actions.githubusercontent.com`, the exact SAN
-`--cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.4.1`
+`--cert-identity https://github.com/avhn/secret/.github/workflows/release.yml@refs/tags/v0.5.0`
 and `--deny-self-hosted-runners`. Do not add `--signer-workflow`: gh 2.102.0
 rejects it together with `--cert-identity`. The exact SAN already pins the
 same-repository signer workflow and tag. Likewise, use `--repo`, not both
 `--repo` and `--owner`, for verification or attestation download.
 
-Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.4.1/`. Keep it on a
+Cache location is `${XDG_CACHE_HOME:-$HOME/.cache}/secret/v0.5.0/`. Keep it on a
 user-owned direct path with private directories (0700); `secret` is 0500 and
 names-only `verified` metadata is 0600. Do not symlink cache or checksum paths.
 The launchers resolve bounded entrypoint symlink chains and rehash before every
@@ -267,7 +260,7 @@ exec. They do not trust PATH binaries or silently fall back to Bash.
 ## Verify the complete release, including Desktop MCPB
 
 From the independently authenticated checkout at C, acquire all eight payloads
-and `checksums-v0.4.1.txt`, each initially into its own new empty directory, then
+and `checksums-v0.5.0.txt`, each initially into its own new empty directory, then
 assemble only those reviewed inputs into a private asset directory. Download
 all nine portable `sha256-DIGEST.jsonl` bundles into separate fresh directories
 and assemble them in a private bundle directory. Keep scripts outside all
@@ -296,7 +289,7 @@ GitHub Release bundles use portable `sha256-DIGEST.jsonl` asset names.
 The Unix checkout installer expects gh's `sha256:DIGEST.jsonl` local form; rename
 only the reviewed scratch copy for `--from-dir`. Windows cannot use colon
 filenames and uses its separate native installer, not this Unix cache path.
-Then, from the authenticated v0.4.1 trusted release checkout, run:
+Then, from the authenticated v0.5.0 trusted release checkout, run:
 
 ```sh
 sh scripts/install-release.sh --from-dir /absolute/private/release-input
@@ -318,7 +311,7 @@ inputs, `sh scripts/install-release.sh --from-dir /absolute/private/release-inpu
 --offline` re-verifies using gh's custom trusted root. A bundle alone is not
 sufficient. Missing trust fails rather than bootstrapping over the network.
 The published-assets workflow removes the cached executable/metadata before
-checking this path with the real verifier and a network witness. The v0.4.1 path
+checking this path with the real verifier and a network witness. The v0.5.0 path
 still requires its own public-asset run; candidate fixture installs do not prove
 offline provenance.
 
@@ -344,28 +337,14 @@ The numbered installer exits in this table apply only to the trusted-checkout
 
 Standalone behavior is separate:
 
-- `install.sh` exits 1 for failures caught by its Python entrypoint, including
-  arguments, dependencies other than Python, unsupported platforms, verification
-  and locks. Missing Python 3 exits 4 before that entrypoint. Successful install
-  and `--help` return 0; it does not expose the checkout installer's 2/3/4 taxonomy.
-- `install.ps1` uses terminating PowerShell errors (`throw`, with
-  `$ErrorActionPreference = 'Stop'`), not that numbered taxonomy. A terminating
-  failure propagates to the caller; numeric process status depends on how the
-  host invokes PowerShell (for example, a failing `-File` invocation exits 1).
-  Successful install and help return normally. Do not infer success from a
-  previous native command's `$LASTEXITCODE` after an in-process script call.
-- The [bootstrap snippets](setup.md#install) download before execution. POSIX
-  preserves curl's nonzero download status (for example 22 for an HTTP failure)
-  through cleanup and never starts the installer on that failure. PowerShell
-  uses `-ErrorAction Stop` before starting the same host's child process, saves
-  `$LASTEXITCODE`, cleans up in `finally` and exits with the saved child status.
-  A failed download remains a terminating error, not an empty successful install.
-  `-ExecutionPolicy Bypass` applies only to that child, with no persistent change.
-
-If a standalone installer reports
-`secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry`,
-authenticate gh in your own private terminal or correct its trusted credential
-environment, then retry. No token value is needed in chat, logs or client config.
+- `install.sh` exits 1 on argument, dependency, platform, verification, lock or
+  publication failure; successful installation, no-op and help exit 0.
+- `install.ps1` uses terminating errors. A failing file invocation exits nonzero;
+  in-process iex callers should handle errors, not inspect a stale LASTEXITCODE.
+- The POSIX pipeline reports the shell status, not necessarily curl's status.
+  Empty or truncated downloads can therefore appear successful without installing.
+  The function wrapper mitigates partial execution; download/review/run is stronger.
+  The PowerShell pipeline changes no execution policy and propagates installer errors.
 
 Doctor inspects explicit metadata only. A launcher/config/cache present on disk,
 a matching supplied digest or a names-only `verified` file proves neither host
@@ -373,7 +352,7 @@ activation nor release provenance. It does not contact a host or repair stores.
 
 ## Migration from the staging name
 
-After installing v0.4.1 or later, re-register MCP clients with the printed final
+After installing v0.5.0 or later, re-register MCP clients with the printed final
 executable path and restart them. Once verified, manually remove only the
 reviewed old `secret-go` / `secret-go.exe` installation. Windows users should
 also remove the obsolete `%LOCALAPPDATA%\Programs\secret` user PATH entry if

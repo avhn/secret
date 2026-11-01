@@ -6,7 +6,7 @@ checksums and the attestation bypass marker exist only in disposable clones.
 Transport fault injection is a PATH shim in the test, not a production option.
 --published repeats the public release install without the fixture bypass.
 The default --stage cli-only checks the final Go CLI with unchanged Bash hooks.
-This is the v0.4.1-style contract; version identities remain independently pinned.
+This is the v0.5.0-style contract; version identities remain independently pinned.
 --stage m4.1 explicitly selects deferred activation, never the release gate.
 Linux/macOS checkout-launcher tests are separate from test-release-windows.ps1.
 """
@@ -292,7 +292,7 @@ class ReleaseManifestTests(CLIOnlyManifestTests):
     """CLI-only packaging with the coordinated release identity."""
 
     def test_four_versions_match_release(self):
-        self.assertEqual(VERSION, "0.4.1")
+        self.assertEqual(VERSION, "0.5.0")
         for name, keys in CONTRACT["manifests"].items():
             with self.subTest(manifest=name):
                 value = json.loads((CHECKOUT / name).read_text())
@@ -788,8 +788,11 @@ class PublishedTests(unittest.TestCase):
             bash_cli.chmod(0o500)
             standalone = standalone_dir / "secret"
             bootstrap = CHECKOUT / "install.sh"
-            command(["sh", bootstrap, "--version", VERSION, "--commit", commit.decode(),
-                     "--dir", standalone_dir])
+            standalone_env = {key: value for key, value in env.items()
+                              if key not in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "SECRET_RELEASE_COMMIT")}
+            result = subprocess.run(["sh", str(bootstrap), "--version", VERSION, "--dir", str(standalone_dir)],
+                                    env=standalone_env, cwd=root, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotEqual(standalone.read_bytes(), b"synthetic-existing-bash-cli\n")
             self.assertEqual(command([standalone, "version"]).stdout,
                              ("secret " + VERSION + " (go)\n").encode())
