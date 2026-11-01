@@ -90,7 +90,7 @@ class BrandingTests(unittest.TestCase):
 
             def handle_starttag(self, tag, attrs):
                 self.links.extend(value for name, value in attrs
-                                  if name in ("src", "href") and value is not None)
+                                  if name in ("src", "href", "srcset") and value is not None)
 
         header = (ROOT / "README.md").read_text(encoding="utf-8").split("\n## ", 1)[0]
         parser = HeaderLinks()
@@ -101,7 +101,8 @@ class BrandingTests(unittest.TestCase):
             url = urlsplit(link)
             if not url.scheme and not url.netloc and url.path:
                 local.append(unquote(url.path))
-        self.assertIn("resources/logo.svg", local)
+        self.assertIn("resources/logo-mark.svg", local)
+        self.assertIn("resources/logo-mark-dark.svg", local)
         for path in local:
             with self.subTest(path=path):
                 self.assertTrue((ROOT / path).is_file(), f"missing README header target: {path}")

@@ -1,4 +1,4 @@
-<h1 align="center"><img src="resources/logo.svg" width="88" height="88" alt=""><br>secret</h1>
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="resources/logo-mark-dark.svg"><img src="resources/logo-mark.svg" width="88" height="88" alt=""></picture><br>secret</h1>
 
 <p align="center">
   Let coding agents use your credentials without reading them.
