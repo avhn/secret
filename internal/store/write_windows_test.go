@@ -217,7 +217,7 @@ func TestWindowsPrivateReadAndMutationRejectModeOnlyFixtures(t *testing.T) {
 	dir := testutil.TempDir(t)
 	path := filepath.Join(dir, "mode-only.secret")
 	original := []byte("KEY=synthetic-unprotected\n")
-	if err := os.WriteFile(path, original, 0600); err != nil {
+	if err := testutil.WriteFile(path, original, 0644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ReadFile(path); err == nil {
