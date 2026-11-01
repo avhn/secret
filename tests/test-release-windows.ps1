@@ -253,7 +253,7 @@ try {
     Assert-True ($contract.assets.Count -eq 8 -and
         [IO.File]::ReadAllText((Join-Path $Assets "checksums-v$version.txt")) -ceq $manifest) 'exact eight-entry candidate manifest'
     $destination = Join-Path $root 'installed binary with spaces'
-    $binary = Join-Path $destination 'secret-go.exe'
+    $binary = Join-Path $destination 'secret.exe'
     $shell = (Get-Process -Id $PID).Path
     $installer = Join-Path $checkout 'install.ps1'
     $installArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,

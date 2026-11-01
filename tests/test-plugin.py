@@ -5,8 +5,8 @@ Run with Python -I and absolute checkout and candidate asset directories. Candid
 checksums and the attestation bypass marker exist only in disposable clones.
 Transport fault injection is a PATH shim in the test, not a production option.
 --published repeats the public release install without the fixture bypass.
-The default --stage m4 retains Bash installation and checks version equality.
---stage v0.3.4 additionally requires the release version, without Go activation.
+The default --stage cli-only checks the final Go CLI with unchanged Bash hooks.
+This is the v0.3.5-style contract; version identities remain independently pinned.
 --stage m4.1 explicitly selects deferred activation, never the release gate.
 Linux/macOS checkout-launcher tests are separate from test-release-windows.ps1.
 """
@@ -243,8 +243,8 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(result.stdout, b"")
 
 
-class M4ShippedManifestTests(unittest.TestCase):
-    """M4 packages opt-in launchers without changing what the plugins install."""
+class CLIOnlyManifestTests(unittest.TestCase):
+    """Owner-approved CLI-only extraction; hook activation is still deferred."""
 
     def test_claude_stays_on_bash(self):
         groups = json.loads((CHECKOUT / "hooks/hooks.json").read_text())["hooks"]["PreToolUse"]
@@ -259,8 +259,8 @@ class M4ShippedManifestTests(unittest.TestCase):
                 self.assertEqual(hook["command"], "${CLAUDE_PLUGIN_ROOT}/hooks/guard-secrets")
                 self.assertNotIn("onFailure", hook)
 
-    def test_go_launchers_exist_but_are_not_activated(self):
-        for name in ("hooks/guard-go", "bin/secret-go"):
+    def test_final_cli_and_inactive_hook_launcher(self):
+        for name in ("hooks/guard-go", "bin/secret"):
             path = CHECKOUT / name
             self.assertTrue(path.is_file(), "missing staged launcher: " + name)
             self.assertTrue(os.access(path, os.X_OK), "launcher is not executable: " + name)
@@ -269,11 +269,27 @@ class M4ShippedManifestTests(unittest.TestCase):
             with self.subTest(manifest=name):
                 contents = (CHECKOUT / name).read_text()
                 self.assertNotIn("guard-go", contents)
-                self.assertNotIn("secret-go", contents)
+                self.assertNotIn("bin/secret", contents)
+
+    def test_cli_only_contract(self):
+        self.assertEqual(CONTRACT["cli_stage"], "cli-only")
+        self.assertEqual(CONTRACT["cli_launcher"], "bin/secret")
+        self.assertEqual(CONTRACT["bash_compat"], "compat/secret")
+        self.assertEqual(CONTRACT["standalone_overwrite"], "verified-atomic-replacement")
+        launcher = (CHECKOUT / CONTRACT["cli_launcher"]).read_text()
+        self.assertIn('exec "$cached" "$@"', launcher)
+        self.assertIn('exit 70', launcher)
+        self.assertNotIn('compat/secret', launcher)
+        compat = CHECKOUT / CONTRACT["bash_compat"]
+        self.assertTrue(os.access(compat, os.X_OK))
+        # Pin the last Bash CLI blob, independent of shallow checkout history.
+        blob = compat.read_bytes()
+        identity = hashlib.sha1(b"blob " + str(len(blob)).encode() + b"\0" + blob).hexdigest()
+        self.assertEqual(identity, CONTRACT["bash_blob"])
 
 
-class V034ManifestTests(M4ShippedManifestTests):
-    """Version-only release: inherit the unchanged Bash/nonactivation contract."""
+class ReleaseManifestTests(CLIOnlyManifestTests):
+    """CLI-only packaging, without changing the pending release identity."""
 
     def test_four_versions_match_release(self):
         self.assertEqual(VERSION, "0.3.4")
@@ -324,7 +340,7 @@ class InstallTests(unittest.TestCase):
         cls.expected_manifest = "".join(digest(ASSET_DIR / name) + "  " + name + "\n" for name in ASSETS)
         if (ASSET_DIR / ("checksums-v" + VERSION + ".txt")).read_bytes() != cls.expected_manifest.encode():
             raise RuntimeError("candidate checksum manifest does not match all eight payloads")
-        cls.required = ["scripts/install-release.sh", "hooks/guard-go", "bin/secret-go"]
+        cls.required = ["scripts/install-release.sh", "hooks/guard-go", "bin/secret"]
         for name in cls.required:
             if not (CHECKOUT / name).is_file():
                 raise RuntimeError("missing frozen release entrypoint: " + name)
@@ -380,7 +396,7 @@ class InstallTests(unittest.TestCase):
         self.store.write_text(CONTRACT["synthetic_store"])
         self.store.chmod(0o600)
         self.env.update(SECRETS_ENV=str(self.store), SECRETS_DIR=str(self.home / "absent stores"))
-        self.cli = self.checkout / "bin/secret-go"
+        self.cli = self.checkout / "bin/secret"
         self.hook = self.checkout / "hooks/guard-go"
         self.installer = self.checkout / "scripts/install-release.sh"
 
@@ -763,17 +779,18 @@ class PublishedTests(unittest.TestCase):
 
             command([CHECKOUT / "scripts/verify-release.sh", "--source"])
             # Public standalone installation is distinct from the checkout
-            # cache. Neither path may overwrite an existing Bash CLI name.
+            # cache. The final CLI intentionally replaces an existing safe regular
+            # executable only after verification; compatibility lives in compat/secret.
             standalone_dir = home / "standalone binary with spaces"
             standalone_dir.mkdir(mode=0o700)
             bash_cli = standalone_dir / "secret"
             bash_cli.write_bytes(b"synthetic-existing-bash-cli\n")
             bash_cli.chmod(0o500)
-            standalone = standalone_dir / "secret-go"
+            standalone = standalone_dir / "secret"
             bootstrap = CHECKOUT / "install.sh"
             command(["sh", bootstrap, "--version", VERSION, "--commit", commit.decode(),
                      "--dir", standalone_dir])
-            self.assertEqual(bash_cli.read_bytes(), b"synthetic-existing-bash-cli\n")
+            self.assertNotEqual(standalone.read_bytes(), b"synthetic-existing-bash-cli\n")
             self.assertEqual(command([standalone, "version"]).stdout,
                              ("secret " + VERSION + " (go)\n").encode())
             standalone_digest = digest(standalone)
@@ -781,7 +798,6 @@ class PublishedTests(unittest.TestCase):
             # latest or a checksum-only path. Replacement keeps exact bytes.
             command(["sh", bootstrap, "--version", VERSION, "--dir", standalone_dir])
             self.assertEqual(digest(standalone), standalone_digest)
-            self.assertEqual(bash_cli.read_bytes(), b"synthetic-existing-bash-cli\n")
             command([installer])
             cache = home / (".cache/secret/v" + VERSION)
             binary = cache / "secret"
@@ -835,7 +851,7 @@ class PublishedTests(unittest.TestCase):
                 self.assertFalse(binary.exists(), "trustless offline install published a binary")
                 self.assertFalse(metadata.exists())
                 self.assertFalse(calls.exists(), "verification ran without authenticated trust")
-                result = command([CHECKOUT / "bin/secret-go", "version"], 70, offline)
+                result = command([CHECKOUT / "bin/secret", "version"], 70, offline)
                 self.assertEqual(result.stdout, b"")
                 result = command([CHECKOUT / "hooks/guard-go"], environment=offline, input=b"{}")
                 self.assertEqual(json.loads(result.stdout), CONTRACT["bootstrap_denial"])
@@ -855,7 +871,7 @@ class PublishedTests(unittest.TestCase):
                     self.assertEqual(stat.S_IMODE(path.stat().st_mode), mode)
                     self.assertEqual(path.stat().st_uid, os.getuid())
                 self.assertFalse(Path(str(cache) + ".lock").exists())
-                result = command([CHECKOUT / "bin/secret-go", "version"], environment=offline)
+                result = command([CHECKOUT / "bin/secret", "version"], environment=offline)
                 self.assertEqual(result.stdout, ("secret " + VERSION + " (go)\n").encode())
                 binary.chmod(0o700)
                 binary.write_bytes(b"#!/bin/sh\nexit 0\n")
@@ -876,8 +892,8 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--manifest-only", action="store_true")
     mode.add_argument("--published", action="store_true")
-    parser.add_argument("--stage", choices=("m4", "m4.1", "v0.3.4"), default="m4",
-                        help="default: m4 equality/Bash; v0.3.4 pins versions only; m4.1 is deferred activation")
+    parser.add_argument("--stage", choices=("cli-only", "m4.1"), default="cli-only",
+                        help="default: Go CLI and Bash hooks; m4.1 is deferred hook activation")
     args = parser.parse_args()
     if not args.checkout.is_absolute() or not args.asset_dir.is_absolute():
         parser.error("checkout and asset directory must be absolute paths")
@@ -893,8 +909,8 @@ def main():
     suite = unittest.TestSuite()
     loader = unittest.defaultTestLoader
     suite.addTests(loader.loadTestsFromTestCase(ManifestTests))
-    stage_checks = {"m4": M4ShippedManifestTests, "m4.1": M41ActivationManifestTests,
-                    "v0.3.4": V034ManifestTests}[args.stage]
+    stage_checks = {"cli-only": ReleaseManifestTests,
+                    "m4.1": M41ActivationManifestTests}[args.stage]
     suite.addTests(loader.loadTestsFromTestCase(stage_checks))
     if manifest_only:
         pass

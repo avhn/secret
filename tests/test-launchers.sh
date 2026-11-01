@@ -78,7 +78,7 @@ class Launchers(unittest.TestCase):
         self.work = Path(tempfile.mkdtemp(prefix='case ', dir=WORK))
         self.root = self.work / 'trusted checkout with spaces'
         self.root.mkdir(mode=0o700)
-        for relative in ('hooks/guard-go', 'bin/secret-go', 'scripts/install-release.sh'):
+        for relative in ('hooks/guard-go', 'bin/secret', 'scripts/install-release.sh'):
             dst = self.root / relative
             dst.parent.mkdir(mode=0o700, exist_ok=True)
             shutil.copyfile(ROOT / relative, dst)
@@ -107,11 +107,12 @@ class Launchers(unittest.TestCase):
                         BASH_ENV='', ENV='', GIT_CONFIG_GLOBAL='/dev/null',
                         GIT_CONFIG_NOSYSTEM='1', GIT_TERMINAL_PROMPT='0')
         self.install = self.root / 'scripts/install-release.sh'
-        self.cli = self.root / 'bin/secret-go'
+        self.cli = self.root / 'bin/secret'
         self.hook = self.root / 'hooks/guard-go'
         self.lock = Path(str(self.cache) + '.lock')
         self.witness = self.work / 'unexpected-execution'
-        for fallback in (self.root / 'bin/secret', self.tools / 'secret'):
+        (self.root / 'compat').mkdir(mode=0o700)
+        for fallback in (self.root / 'compat/secret', self.tools / 'secret'):
             self.script(fallback, f'printf fallback >"{self.witness}"\nexit 0\n')
 
     def tearDown(self):

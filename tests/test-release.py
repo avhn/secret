@@ -761,6 +761,60 @@ class ReleaseTest(unittest.TestCase):
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_bash_baselines_resolve_physical_identity(self):
+        for name in ("secret", "backends", "keychain", "libsecret"):
+            source = (ROOT / ("tests/test-" + name + ".sh")).read_text()
+            self.assertIn('ROOT="$(cd -P ', source)
+            self.assertIn('SECRET="$(cd -P ', source)
+            self.assertIn('if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then', source)
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertNotIn('SECRET_CLI="$GITHUB_WORKSPACE/compat/secret"', ci)
+        self.assertIn('SECRET_REQUIRE_KEYCHAIN=1 /bin/bash tests/test-keychain.sh', ci)
+        self.assertIn('BASH_BIN=/bin/bash /bin/bash tests/inventory.sh --check --suite keychain', ci)
+
+    def test_plugin_stage_selection_supports_historical_release_trees(self):
+        workflow = (ROOT / ".github/workflows/plugin.yml").read_text()
+        selectors = re.findall(r"stage=\"\$\(python3 -I -c '([^']+)'\)\"", workflow)
+        self.assertEqual(len(selectors), 5)
+        self.assertEqual(len(set(selectors)), 1)
+        cases = [('choices=("cli-only", "m4.1")', "v0.3.4", "cli-only"),
+                 ('choices=("m4", "m4.1", "v0.3.4")', "v0.3.4", "v0.3.4"),
+                 ('choices=("m4", "m4.1")', "v0.2.3", "m4")]
+        with tempfile.TemporaryDirectory(prefix="plugin-stage-") as temporary:
+            root = Path(temporary)
+            (root / "tests").mkdir()
+            (root / "testdata/plugin").mkdir(parents=True)
+            for source, tag, expected in cases:
+                with self.subTest(tag=tag, expected=expected):
+                    # Documentation may mention a stage the historical parser
+                    # does not accept. Select actual choices, not source substrings.
+                    script = ('import argparse\nparser = argparse.ArgumentParser()\n'
+                              'parser.add_argument("--stage", ' + source + ')\n'
+                              '# unsupported documentation: "cli-only" "v0.2.3"\n'
+                              'parser.parse_args()\n')
+                    (root / "tests/test-plugin.py").write_text(script)
+                    (root / "testdata/plugin/contracts.json").write_text(json.dumps({"tag": tag}))
+                    result = subprocess.run([sys.executable, "-I", "-c", selectors[0]],
+                                            cwd=root, capture_output=True, text=True, check=True)
+                    self.assertEqual(result.stdout.strip(), expected)
+
+    def test_cli_only_stage_keeps_bash_hooks_and_asset_grammar(self):
+        contract = json.loads((ROOT / "testdata/plugin/contracts.json").read_text())
+        self.assertEqual(contract["cli_stage"], "cli-only")
+        self.assertEqual(contract["cli_launcher"], "bin/secret")
+        self.assertEqual(contract["bash_compat"], "compat/secret")
+        workflow = (ROOT / ".github/workflows/plugin.yml").read_text()
+        self.assertIn('--stage "$stage"', workflow)
+        self.assertNotIn("--stage m4.1", workflow)
+        self.assertIn('sh -n "$cli"', workflow)
+        self.assertEqual(workflow.count("if [ -f bin/secret-go ]; then cli=bin/secret-go; fi"), 2)
+        self.assertIn("secret-v0.3.4-windows-amd64.exe", contract["assets"])
+        for name in ("hooks/hooks.json", ".codex-plugin/hooks.json", "codex/hooks.json"):
+            hooks = (ROOT / name).read_text()
+            self.assertIn("guard-secrets", hooks)
+            self.assertNotIn("guard-go", hooks)
+            self.assertNotIn("onFailure", hooks)
+
     def test_bounded_fuzz_steps_use_the_uniform_pinned_toolchain(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertIn("\nenv:\n  GOTOOLCHAIN: local\n", workflow)

@@ -20,9 +20,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "0.3.4"
 DOCUMENT = ROOT / "docs/setup.md"
-UNIX_COMMAND = "/ABSOLUTE/INSTALL DIR/secret-go"
+UNIX_COMMAND = "/ABSOLUTE/INSTALL DIR/secret"
 UNIX_STORE = "file:/ABSOLUTE/STORE DIR/STORE.secret"
-WINDOWS_COMMAND = "C:\\ABSOLUTE\\INSTALL DIR\\secret-go.exe"
+WINDOWS_COMMAND = "C:\\ABSOLUTE\\INSTALL DIR\\secret.exe"
 WINDOWS_STORE = "file:C:\\ABSOLUTE\\STORE DIR\\STORE.secret"
 AUTHENTICATION_ERROR = "secret: GitHub CLI is not authenticated; run gh auth login or set GH_TOKEN, then retry"
 
@@ -189,9 +189,9 @@ class SetupTests(unittest.TestCase):
 
     def test_quoting_and_merge_preserve_exact_arguments(self):
         variants = [
-            ('/synthetic install/with "double" and \'single\'/secret-go',
+            ('/synthetic install/with "double" and \'single\'/secret',
              'file:/synthetic stores/with "double" and \'single\'.secret'),
-            ('C:\\synthetic install\\with "double" and \'single\'\\secret-go.exe',
+            ('C:\\synthetic install\\with "double" and \'single\'\\secret.exe',
              'file:C:\\synthetic stores\\with "double" and \'single\'.secret'),
         ]
         for language, body in self.examples:
@@ -312,7 +312,15 @@ class SetupTests(unittest.TestCase):
                     self.assertFalse(Path(downloaded.read_text().strip()).parent.exists(), "temporary directory survived cleanup")
 
     def test_version_installer_urls_and_safe_placeholders(self):
-        self.assertEqual(set(re.findall(r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d.])", self.names_only_document)), {VERSION})
+        # Migration prose names the next release, but executable snippets must
+        # retain only the current pin until the coordinated identity bump.
+        version_pattern = r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d.])"
+        self.assertEqual(set(re.findall(version_pattern, self.names_only_document)), {VERSION, "0.3.4", "0.3.5"})
+        snippet_versions = set(re.findall(version_pattern, "\n".join(body for _, body in self.examples)))
+        self.assertEqual(snippet_versions, {VERSION})
+        self.assertIn("v0.3.5 onward", self.names_only_document)
+        self.assertIn("v0.3.4 installer uses `secret-go`", self.names_only_document)
+        self.assertIn("re-register each MCP client", self.names_only_document)
         urls = re.findall(r"https://raw\.githubusercontent\.com/[^\s`]+", self.document)
         self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.3.4/install.sh",
                                 "https://raw.githubusercontent.com/avhn/secret/v0.3.4/install.ps1"])
@@ -343,7 +351,7 @@ class SetupTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             powershell_words("claude 'unterminated")
         with self.assertRaises(ValueError):
-            client_argv("sh", "claude mcp add --scope project secret -- /synthetic/secret-go mcp --store file:/synthetic/STORE")
+            client_argv("sh", "claude mcp add --scope project secret -- /synthetic/secret mcp --store file:/synthetic/STORE")
 
 
 class ConfiguredLauncherTests(unittest.TestCase):
@@ -374,9 +382,9 @@ class ConfiguredLauncherTests(unittest.TestCase):
         for _, body in self.examples:
             entry = json.loads(body)["mcpServers"]["openproject-launcher"]
             for command, reference in [
-                ('/synthetic install/with "double" and \'single\'/secret-go',
+                ('/synthetic install/with "double" and \'single\'/secret',
                  'file:/synthetic stores/with "double" and \'single\'.secret'),
-                ('C:\\synthetic install\\with "double" and \'single\'\\secret-go.exe',
+                ('C:\\synthetic install\\with "double" and \'single\'\\secret.exe',
                  'file:C:\\synthetic stores\\with "double" and \'single\'.secret'),
             ]:
                 rewritten = body.replace(json.dumps(entry["command"]), json.dumps(command))

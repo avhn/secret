@@ -43,16 +43,16 @@ agent tool. Substitute your absolute key-file paths in these examples. No key
 material or credential value belongs in argv.
 
 ```sh
-secret-go age-init age:team \
+secret age-init age:team \
   --age-recipients "$HOME/.secrets/.age-keys/team.recipients" \
   --age-identity "$HOME/.secrets/.age-keys/team.identity"
-secret-go stash --age-identity "$HOME/.secrets/.age-keys/team.identity" age:team TOKEN
-secret-go show age:team
-secret-go show --format=json age:team
-secret-go list --backend age
-secret-go run --age-identity "$HOME/.secrets/.age-keys/team.identity" \
+secret stash --age-identity "$HOME/.secrets/.age-keys/team.identity" age:team TOKEN
+secret show age:team
+secret show --format=json age:team
+secret list --backend age
+secret run --age-identity "$HOME/.secrets/.age-keys/team.identity" \
   -f age:team --key TOKEN -- ./consumer
-secret-go age-rekey age:team \
+secret age-rekey age:team \
   --age-identity "$HOME/.secrets/.age-keys/team.identity" \
   --age-recipients "$HOME/.secrets/.age-keys/next.recipients" \
   --age-new-identity "$HOME/.secrets/.age-keys/next.identity"

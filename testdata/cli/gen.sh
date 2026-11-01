@@ -21,10 +21,10 @@ while IFS='|' read -r name inventory arguments; do
     rc=0
     if [[ "$name" == stash_valid ]]; then
         printf 'synthetic\n' | env -i HOME="$TMP/home" SECRETS_DIR="$TMP/stores" SECRETS_ENV="$TMP/home/fallback.store" PATH="$PATH" LC_ALL=C BASH_ENV='' ENV='' \
-            bash "$ROOT/bin/secret" ${args[@]+"${args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" || rc=$?
+            bash "$ROOT/compat/secret" ${args[@]+"${args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" || rc=$?
     else
         env -i HOME="$TMP/home" SECRETS_DIR="$TMP/stores" SECRETS_ENV="$TMP/home/fallback.store" PATH="$PATH" LC_ALL=C BASH_ENV='' ENV='' \
-            bash "$ROOT/bin/secret" ${args[@]+"${args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" </dev/null || rc=$?
+            bash "$ROOT/compat/secret" ${args[@]+"${args[@]}"} >"$OUT/$name.stdout" 2>"$OUT/$name.stderr" </dev/null || rc=$?
     fi
     printf '%s\n' "$rc" >"$OUT/$name.status"
 done <"$ROOT/testdata/cli/cases.txt"

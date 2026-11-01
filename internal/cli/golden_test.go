@@ -19,7 +19,7 @@ func TestBashGoldens(t *testing.T) {
 		t.Skip("Bash golden generation, TTY and clipboard tools require Unix hosts")
 	}
 	root := filepath.Join("..", "..")
-	binary := filepath.Join(t.TempDir(), "secret-go")
+	binary := filepath.Join(t.TempDir(), "secret")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/secret")
 	build.Dir = root
 	if output, err := build.CombinedOutput(); err != nil {
@@ -132,7 +132,7 @@ func TestClipboardClearAfterExit(t *testing.T) {
 		t.Skip("clipboard stub uses Unix shell scripts")
 	}
 	root := filepath.Join("..", "..")
-	binary := filepath.Join(t.TempDir(), "secret-go")
+	binary := filepath.Join(t.TempDir(), "secret")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/secret")
 	build.Dir = root
 	if output, err := build.CombinedOutput(); err != nil {

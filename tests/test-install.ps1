@@ -109,7 +109,7 @@ function Expect-Failure([string]$label, [string[]]$Arguments = @(), [string]$Exp
     Assert-True $failed "$label accepted"
     Assert-True ($script:pathWrites -eq $before) "$label changed user PATH"
     Assert-True ($script:environmentChanges -eq $beforeBroadcasts) "$label broadcast an environment change"
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret-go.exe'))) "$label published binary"
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe'))) "$label published binary"
     if (Test-Path -LiteralPath $env:INSTALL_DIR) {
         Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 0) "$label left scratch/lock"
     }
@@ -349,7 +349,8 @@ func main() {
     # Each fault owns a fresh directory. Never restore serialized ACLs or mutate
     # the primary installation's permissions between otherwise independent cases.
     $primaryInstallDir = $env:INSTALL_DIR
-    foreach ($sid in @('S-1-1-0', 'S-1-5-32-545', 'S-1-5-11')) {
+    foreach ($sid in @('S-1-1-0', 'S-1-5-32-545', 'S-1-5-11',
+            'S-1-5-21-111111111-222222222-333333333-4242')) {
         foreach ($rights in @('Modify', 'AppendData', 'DeleteSubdirectoriesAndFiles')) {
             $caseDirectory = Join-Path $work ('dacl-deny-' + [Guid]::NewGuid().ToString('N'))
             New-TestPrivateDirectory $caseDirectory
@@ -370,7 +371,7 @@ func main() {
     }
     # Existing destinations are never repaired, aliases are refused, stale locks stay.
     if (-not (Test-Path -LiteralPath $env:INSTALL_DIR)) { New-TestPrivateDirectory $env:INSTALL_DIR }
-    $lock = Join-Path $env:INSTALL_DIR '.secret-go.install-lock'
+    $lock = Join-Path $env:INSTALL_DIR '.secret.install-lock'
     [IO.File]::WriteAllText($lock, 'stale token')
     $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
     Assert-True ($failed -and [IO.File]::ReadAllText($lock) -ceq 'stale token') 'stale lock stolen'
@@ -395,7 +396,7 @@ func main() {
     $env:SECRET_INSTALL_MODE = 'slow-auth'
     $output = Invoke-TestInstaller -Arguments @('--version', '0.3.4', '--commit', ('a' * 40)) -ExpectedSuccess
     $env:SECRET_INSTALL_MODE = $null
-    $target = Join-Path $env:INSTALL_DIR 'secret-go.exe'
+    $target = Join-Path $env:INSTALL_DIR 'secret.exe'
     Assert-True (Test-Path -LiteralPath $target) 'valid install absent'
     $currentUserSID = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     Assert-True ((Get-Acl -LiteralPath $target).GetOwner([Security.Principal.SecurityIdentifier]).Value -ceq $currentUserSID) 'first install owner is not the current user'
@@ -445,13 +446,19 @@ func main() {
     # even when that is the broad principal's only granted write-like right.
     # Each case gets an isolated parent/destination and an existing synthetic
     # binary. Never restore ACLs or alter the shared work/primary directories.
+    # The unregistered synthetic local-group SID models a sandbox user group
+    # such as CodexSandboxUsers, without reading or changing real group membership.
     foreach ($location in @('destination', 'ancestor')) {
-        foreach ($sid in @('S-1-1-0', 'S-1-5-32-545', 'S-1-5-11')) {
+        foreach ($case in @(@('S-1-1-0', 'DeleteSubdirectoriesAndFiles'),
+            @('S-1-5-32-545', 'DeleteSubdirectoriesAndFiles'),
+            @('S-1-5-11', 'DeleteSubdirectoriesAndFiles'),
+            @('S-1-5-21-111111111-222222222-333333333-4242', 'Modify'))) {
+            $sid, $rights = $case
             $caseRoot = Join-Path $work ('dacl-preserve-' + [Guid]::NewGuid().ToString('N'))
             New-TestPrivateDirectory $caseRoot
             $caseDirectory = Join-Path $caseRoot 'bin'
             New-TestPrivateDirectory $caseDirectory
-            $caseBinary = Join-Path $caseDirectory 'secret-go.exe'
+            $caseBinary = Join-Path $caseDirectory 'secret.exe'
             Copy-Item -LiteralPath $target -Destination $caseBinary
             try {
                 $env:INSTALL_DIR = $caseDirectory
@@ -459,17 +466,17 @@ func main() {
                 if ($location -eq 'ancestor') { $unsafeDirectory = $caseRoot }
                 $unsafeAcl = Get-Acl -LiteralPath $unsafeDirectory
                 $principal = New-Object Security.Principal.SecurityIdentifier($sid)
-                $deleteChild = New-Object Security.AccessControl.FileSystemAccessRule($principal, 'DeleteSubdirectoriesAndFiles', 'Allow')
+                $deleteChild = New-Object Security.AccessControl.FileSystemAccessRule($principal, $rights, 'Allow')
                 $unsafeAcl.AddAccessRule($deleteChild)
                 Set-Acl -LiteralPath $unsafeDirectory -AclObject $unsafeAcl
                 $unsafeState = Get-TestAclState $unsafeDirectory
                 $failed = $false; try { Invoke-TestInstaller | Out-Null } catch { $failed = $true }
-                Assert-True $failed "DeleteSubdirectoriesAndFiles accepted for $sid"
+                Assert-True $failed "$rights accepted for $sid"
                 Assert-True ((Get-FileHash -LiteralPath $caseBinary).Hash -ceq $before) 'DACL rejection damaged installed binary'
                 Assert-TestAclState $unsafeDirectory $unsafeState 'DACL rejection rewrote existing permissions'
                 Assert-True ($script:pathWrites -eq 1 -and $script:environmentChanges -eq 1) 'DACL rejection changed user PATH or broadcast'
                 Assert-True (@(Get-ChildItem -LiteralPath $caseDirectory -Force).Count -eq 1) 'DACL rejection left scratch or lock'
-                Write-Output "PASS DeleteSubdirectoriesAndFiles rejection preserves DACL and binary ($sid, $location)"
+                Write-Output "PASS $rights rejection preserves DACL and binary ($sid, $location)"
             } finally {
                 $env:INSTALL_DIR = $primaryInstallDir
                 Remove-Item -LiteralPath $caseRoot -Recurse -Force
@@ -483,7 +490,7 @@ func main() {
     New-TestPrivateDirectory $caseRoot
     $caseDirectory = Join-Path $caseRoot 'bin'
     New-TestPrivateDirectory $caseDirectory
-    $caseBinary = Join-Path $caseDirectory 'secret-go.exe'
+    $caseBinary = Join-Path $caseDirectory 'secret.exe'
     Copy-Item -LiteralPath $target -Destination $caseBinary
     try {
         $currentUser = New-Object Security.Principal.SecurityIdentifier($currentUserSID)
@@ -519,8 +526,35 @@ func main() {
     Assert-True ($script:pathWrites -eq 1) 'replacement duplicated PATH'
     Assert-True ($script:environmentChanges -eq 1) 'unchanged user PATH broadcast an environment change'
     Assert-True ($env:PATH -ceq (Join-Path $work 'tools')) 'installer edited process PATH'
-    Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe'))) 'installer touched Bash name'
+    # The final name intentionally replaces the old standalone Bash-name contract.
+    Assert-True (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'secret.exe')) 'final CLI absent'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $env:INSTALL_DIR 'compat'))) 'standalone installer published Bash fallback'
     Assert-True (@(Get-ChildItem -LiteralPath $env:INSTALL_DIR -Force).Count -eq 1) 'successful install left scratch/lock'
+    # Exercise default HOME publication in a disposable directory, including spaces.
+    $env:HOME = Join-Path $work 'default home with spaces'
+    New-TestPrivateDirectory $env:HOME
+    $env:INSTALL_DIR = $null
+    $defaultOutput = Invoke-TestInstaller -ExpectedSuccess
+    $defaultTarget = Join-Path $env:HOME '.local\bin\secret.exe'
+    Assert-True ((Test-Path -LiteralPath $defaultTarget) -and $defaultOutput.Contains($defaultTarget)) 'HOME default destination differs'
+    Assert-True ((Get-FileHash -LiteralPath $defaultTarget).Hash -ceq $before) 'HOME default payload differs'
+    # Evaluate only the path-selection AST when HOME is absent. No native profile
+    # file is touched and no host installer/registry action can execute here.
+    $env:HOME = $null
+    $tokens = $null; $parseErrors = $null
+    $installerAst = [Management.Automation.Language.Parser]::ParseInput($installer, [ref]$tokens, [ref]$parseErrors)
+    $defaultSelection = @($installerAst.FindAll({ param($node)
+        $node -is [Management.Automation.Language.IfStatementAst] -and
+        $node.Extent.Text.StartsWith('if (-not $directory) {')
+    }, $true))
+    Assert-True ($parseErrors.Count -eq 0 -and $defaultSelection.Count -eq 1) 'default path selection is ambiguous'
+    $fallbackDirectory = & {
+        $directory = $null
+        . ([scriptblock]::Create($defaultSelection[0].Extent.Text))
+        $directory
+    }
+    Assert-True ($fallbackDirectory -ceq (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.local\bin')) 'native profile fallback differs'
+    Write-Output 'PASS HOME default destination and side-effect-free native profile fallback'
     Write-Output 'PASS nine-subject install, authenticated source boundary, quoted registration, safe ACL, replacement and synthetic user PATH'
 } finally {
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }

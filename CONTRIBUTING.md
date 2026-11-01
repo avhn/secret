@@ -11,10 +11,10 @@ bash tests/test-secret.sh    # CLI; Perl, Python 3 and ripgrep
 bash tests/test-backends.sh  # disposable provider stub
 bash tests/test-guard.sh     # Claude Code guard; jq
 bash tests/test-codex.sh     # Codex guard
-shellcheck bin/secret hooks/guard-secrets tests/*.sh
+shellcheck compat/secret bin/secret hooks/guard-secrets tests/*.sh
 ```
 
-The four CLI/provider suites also accept `SECRET_CLI=/absolute/path/to/secret` to run an alternate executable instead of `bin/secret`. Build a regular Go CLI for `secret`, `libsecret` and `keychain`, and a separate `go build -tags secretstub` executable for `backends`. The tag enables the disposable directory provider only in that test binary; the default build ignores `SECRET_BACKEND_STUB_DIR`. `bash tests/go-cli.sh SUITE /absolute/path/to/binary` compares every case with `testdata/inventory/go-expected-divergence.tsv`: listed failures must still fail and unlisted cases must pass. The current `deliberate` entries cover Bash-specific Perl fault injection, not Go filter tests; Go filter failure and signal injection are covered in `internal/cli/supervise_test.go`. Do not add values to diagnostics or argv.
+The four CLI/provider suites also accept `SECRET_CLI=/absolute/path/to/secret` to run an alternate executable instead of `compat/secret`. Build a regular Go CLI for `secret`, `libsecret` and `keychain`, and a separate `go build -tags secretstub` executable for `backends`. The tag enables the disposable directory provider only in that test binary; the default build ignores `SECRET_BACKEND_STUB_DIR`. `bash tests/go-cli.sh SUITE /absolute/path/to/binary` compares every case with `testdata/inventory/go-expected-divergence.tsv`: listed failures must still fail and unlisted cases must pass. The current `deliberate` entries cover Bash-specific Perl fault injection, not Go filter tests; Go filter failure and signal injection are covered in `internal/cli/supervise_test.go`. Do not add values to diagnostics or argv.
 
 The Claude and Codex guard suites also accept `SECRET_GUARD='/absolute/path/to/secret hook claude'` and `SECRET_GUARD='/absolute/path/to/secret hook codex'` respectively. Run `bash tests/go-hook.sh guard /absolute/path/to/secret claude` and `bash tests/go-hook.sh codex /absolute/path/to/secret codex` to require exact case outcomes from `testdata/inventory/go-hook-divergence.tsv`. The listed `pending-M2-ast` shell cases are not yet protected by Go; the Bash guard remains installed. Malformed-call denials are recorded in [hook tightening decisions](docs/design/hook-tightening.md). Do not broaden a divergence list without classifying the cause.
 
@@ -23,7 +23,7 @@ In isolated provider environments, run `SECRET_REQUIRE_LIBSECRET=1 bash tests/te
 ## M3 operator and metadata tests
 
 M3 passed its hosted CI gate (PR #8) and is implemented in the staged Go CLI,
-not in the installed Bash `bin/secret`.
+not in the retained Bash `compat/secret`.
 Use disposable synthetic files and HOME directories; never use an actual store.
 
 ```bash
@@ -36,8 +36,8 @@ go test -count=1 ./...
 go test -race ./internal/...
 go test ./internal/cli ./internal/feature ./internal/secure ./internal/backend ./internal/store
 build_dir="$(mktemp -d)"
-go build -o "$build_dir/secret-go" ./cmd/secret
-python3 -I tests/test-operator.py "$build_dir/secret-go"
+go build -o "$build_dir/secret" ./cmd/secret
+python3 -I tests/test-operator.py "$build_dir/secret"
 ```
 
 The Unix PTY suite covers exact consent, hidden bounded value entry, cancellation,
@@ -136,7 +136,7 @@ go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 go test ./internal/store -run '^$' -fuzz '^FuzzAgeEnvelope$' -fuzztime=15s -parallel=2
 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeDecrypt$' -fuzztime=15s -parallel=2
 go test ./internal/backend -run '^$' -fuzz '^FuzzAgeKeyFiles$' -fuzztime=15s -parallel=2
-python3 -I tests/test-age.py /absolute/fresh/secret-go
+python3 -I tests/test-age.py /absolute/fresh/secret
 ```
 
 Each fuzz invocation runs one target only. The PTY/crash suite builds a test-only
@@ -154,14 +154,14 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 ## M4 release, launcher and offline host tests
 
 M4's v0.2.3 release is complete. The v0.3.4 extension changes packaging and
-independently bumps all four manifests to 0.3.4 without changing installed Bash
-CLI/Claude/Codex hooks. M4.1 remains waiting sponsorship and owns
-`onFailure: "block"`, `guard-go` activation, the `bin/secret`/`compat/secret`
-switch and Go hook output-contract changes. See [the release plan](docs/design/v0.3.0-plan.md),
+keeps all four manifests at 0.3.4. The owner-approved CLI-only extraction puts
+the verified launcher at `bin/secret`, retaining Bash at `compat/secret`.
+Claude/Codex hooks remain Bash. M4.1 still owns `onFailure: "block"`, `guard-go`
+activation and Go hook output-contract changes, waiting sponsorship. See [the release plan](docs/design/v0.3.0-plan.md),
 [installation](docs/install.md) and [release approvals](docs/release.md).
 
 New production files are `scripts/build-release.sh`, `scripts/verify-release.sh`,
-`scripts/install-release.sh`, `hooks/guard-go` and `bin/secret-go`. New workflows
+`scripts/install-release.sh`, `hooks/guard-go` and `bin/secret`. New workflows
 are `release.yml`, `plugin.yml` and inactive `host-hooks.yml`. Synthetic fixtures
 live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.go`
 is test-only under `-tags hosthookfixture`, never a shipped binary.
@@ -187,10 +187,10 @@ python3 -I tests/test-setup.py
 # Full assembly requires macOS/lipo and the pinned packaging tools above:
 assets="$(mktemp -d)"
 sh scripts/build-release.sh "$assets"
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.4 --manifest-only
-python3 -I tests/test-plugin.py "$PWD" "$assets" --stage v0.3.4
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage cli-only --manifest-only
+python3 -I tests/test-plugin.py "$PWD" "$assets" --stage cli-only
 python3 -I tests/test-host-hooks.py # offline classification, no model calls
-shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go install.sh scripts/*.sh tests/*.sh
+shellcheck compat/secret bin/secret hooks/guard-secrets hooks/guard-go install.sh scripts/*.sh tests/*.sh
 # On macOS, also run retained shell suites with stock Bash 3.2:
 /bin/bash tests/test-launchers.sh
 /bin/bash tests/test-install.sh
@@ -214,8 +214,8 @@ proves Desktop install/interpolation/restart behavior.
 
 CI runs independent macOS full assembly plus native Linux/macOS/Windows
 amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
-`--stage v0.3.4`, a version-only bump plus unchanged Bash nonactivation contract.
-The test default remains historical `m4`; `--stage m4.1` preserves the stronger
+`--stage cli-only`, the final Go CLI plus unchanged Bash hook contract.
+The test default is `cli-only`; `--stage m4.1` preserves the stronger
 activation assertions for that milestone. Do not use it as a v0.3.4 gate or
 weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.

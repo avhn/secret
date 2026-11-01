@@ -20,13 +20,13 @@
   "icon": "icon.png",
   "server": {
     "type": "binary",
-    "entry_point": "server/secret-go",
+    "entry_point": "server/secret",
     "mcp_config": {
-      "command": "${__dirname}/server/secret-go",
+      "command": "${__dirname}/server/secret",
       "args": ["mcp", "--store", "${user_config.store_reference}"],
       "platform_overrides": {
         "win32": {
-          "command": "${__dirname}/server/secret-go.exe"
+          "command": "${__dirname}/server/secret.exe"
         }
       }
     }

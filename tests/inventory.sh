@@ -50,7 +50,7 @@ for suite in "${SUITES[@]}"; do
     [[ "$suite" == libsecret ]] && require_libsecret=1
     [[ "$suite" == keychain ]] && require_keychain=1
     if ! env SECRET_TEST_INVENTORY="$raw" SECRET_REQUIRE_LIBSECRET="$require_libsecret" \
-        SECRET_REQUIRE_KEYCHAIN="$require_keychain" "${BASH_BIN:-bash}" \
+        SECRET_REQUIRE_KEYCHAIN="$require_keychain" SECRET_CLI="$ROOT/compat/secret" "${BASH_BIN:-bash}" \
         "$ROOT/tests/test-$suite.sh" >"$TMP/$suite.log" 2>&1; then
         cat "$TMP/$suite.log" >&2
         printf '%s: suite failed\n' "$suite" >&2

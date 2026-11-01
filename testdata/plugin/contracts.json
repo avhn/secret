@@ -1,6 +1,11 @@
 {
   "version": "0.3.4",
   "tag": "v0.3.4",
+  "cli_stage": "cli-only",
+  "cli_launcher": "bin/secret",
+  "bash_compat": "compat/secret",
+  "bash_blob": "529a7dd7f2fa3d1bc8cfb69339baa6b1832f58a8",
+  "standalone_overwrite": "verified-atomic-replacement",
   "assets": [
     "secret-v0.3.4-darwin-amd64",
     "secret-v0.3.4-darwin-arm64",

@@ -2,13 +2,15 @@
 
 ## What is installed today
 
-The installed default `bin/secret` and Claude/Codex plugin hooks remain Bash.
-The v0.3.4 packaging update independently bumps all four marketplace/plugin
-versions to 0.3.4; this is not Go activation. Opt-in standalone installers publish
-`secret-go` or `secret-go.exe`, while trusted checkouts retain `bin/secret-go`
-and `hooks/guard-go`. No installed manifest references those launchers.
-Claude cutover, `onFailure: "block"`, `compat/secret` and Go hook output-contract
-changes remain M4.1, waiting sponsorship. Do not activate Go hooks based on
+From v0.3.5 onward, the final CLI name is `secret` on Unix and `secret.exe` on Windows. The
+owner-approved CLI-only extraction from M4.1 puts the verified Go launcher at
+`bin/secret` and retains byte-identical executable Bash at `compat/secret`.
+Main now differs from published v0.3.4. Release identities remain 0.3.4 only
+until the coordinator performs the separate v0.3.5 bump; this checkout must not
+be published under the existing tag or replace its assets.
+Claude and Codex plugin hooks remain Bash. `hooks/guard-go` stays inactive.
+Claude cutover, `onFailure: "block"` and Go hook output-contract changes
+remain M4.1, waiting sponsorship. Do not activate Go hooks based on
 an executable, cache, MCP registration or doctor report.
 
 M4 is complete: [v0.2.3](https://github.com/avhn/secret/releases/tag/v0.2.3)
@@ -22,9 +24,10 @@ separate owner-approved publication; do not use a candidate branch as C.
 See [release.md](release.md) for owner approval boundaries and
 [canonical MCP setup](setup.md) for per-client registration.
 
-## Current Bash installation
+## Checkout installation and Bash compatibility
 
-Use the [README installation](../README.md#install) for the Bash CLI and plugins.
+Use the [README installation](../README.md#install) for the verified CLI and Bash plugins.
+Use `compat/secret` explicitly for Bash rollback, never as an automatic fallback.
 Bash needs Bash 3.2+, Perl, and jq for the guard. Install ripgrep's protective
 configuration as documented there. Create `~/.local/bin` before making the CLI
 symlink. For a reproducible checkout, fetch and review a full commit ID, then use
@@ -61,11 +64,22 @@ missing gh never enables a checksum-only fallback. The auth status check is boun
 to 60 seconds; its fixed recovery message never includes gh diagnostics. Digest, architecture and
 `secret 0.3.4 (go)` are checked before atomic publication.
 
-Unix defaults to `~/.local/bin/secret-go` without PATH/profile edits. Windows
-defaults to `%LOCALAPPDATA%\Programs\secret\secret-go.exe` and adds only its own
+Final CLI names and destinations described below ship from **v0.3.5 onward**.
+The download snippets install their pinned release, not main. The published
+v0.3.4 installer uses `secret-go` on Unix and
+`%LOCALAPPDATA%\Programs\secret\secret-go.exe` on Windows, not the final paths.
+Use the printed executable path for that release; do not infer the installed
+name from the checkout documentation. Update release pins together in the coordinated identity bump; never replace
+published assets or tags.
+
+From v0.3.5 onward, Unix defaults to `~/.local/bin/secret` without PATH/profile edits. Windows
+defaults to `$HOME\.local\bin\secret.exe` (native user profile when HOME is absent) and adds only its own
 directory to user PATH; open a new terminal afterward. Neither edits client
-configuration, registers MCP, reads stores, installs hooks or overwrites Bash
-`secret`. Unsafe ownership/modes, reparse points, DACLs and aliases are rejected;
+configuration, registers MCP, reads stores or installs hooks. A safe existing
+regular `secret` executable is intentionally replaced only after verification;
+failed verification preserves its bytes. Unsafe ownership/modes, reparse points,
+DACLs and aliases are rejected, including sandbox-writable ancestors such as a
+CodexSandboxUsers Modify ACE;
 arbitrary existing parents are not repaired. Stop clients before replacement,
 especially Windows open-image replacement. After atomic Windows publication,
 the installed binary owner is explicitly set to the current user, including
@@ -120,7 +134,7 @@ No model sessions have run. See [host evidence](design/host-failure-evidence.md)
 ## Explicit preinstallation after publication
 
 Run only from a trusted, reviewed checkout at C. These instructions do not
-install hooks or change the Bash default. Production verification needs Git,
+install hooks or change the retained Bash hook default. Production verification needs Git,
 Python 3, POSIX sh, ordinary GNU/BSD utilities (`readlink`, `stat`, `awk`, `cmp`,
 `mktemp`, and file/mode utilities), plus `sha256sum` or `shasum -a 256`.
 Cold verification also needs GitHub CLI `gh` with `attestation download`,
@@ -147,6 +161,14 @@ sh scripts/verify-release.sh --source
 sh scripts/install-release.sh
 ./bin/secret-go version
 ```
+
+The commands above are historical v0.3.4 instructions: its Go launcher is
+`bin/secret-go`, while its `bin/secret` is Bash. For the release that includes
+this change (v0.3.5 onward), use that authenticated release tag/C and
+`./bin/secret version` instead. Main is source S, not release C: without the
+committed release checksum manifest its launcher exits 70, even with a cache.
+Main/clone users must use the standalone installer and its printed executable
+path, or explicitly invoke `compat/secret` for Bash.
 
 The explicit fetch restores only the local annotated tag after checkout. The
 installer itself never fetches tags, including on warm or offline paths, and
@@ -206,7 +228,8 @@ GitHub Release bundles use portable `sha256-DIGEST.jsonl` asset names.
 The Unix checkout installer expects gh's `sha256:DIGEST.jsonl` local form; rename
 only the reviewed scratch copy for `--from-dir`. Windows cannot use colon
 filenames and uses its separate native installer, not this Unix cache path.
-Then, from the trusted checkout, run:
+Then, from the historical v0.3.4 trusted release checkout, run (use
+`./bin/secret version` instead at v0.3.5-or-later release C):
 
 ```sh
 sh scripts/install-release.sh --from-dir /absolute/private/release-input
@@ -281,14 +304,27 @@ Doctor inspects explicit metadata only. A launcher/config/cache present on disk,
 a matching supplied digest or a names-only `verified` file proves neither host
 activation nor release provenance. It does not contact a host or repair stores.
 
+## Migration from the staging name
+
+After installing v0.3.5 or later, re-register MCP clients with the printed final
+executable path and restart them. Once verified, manually remove only the
+reviewed old `secret-go` / `secret-go.exe` installation. Windows users should
+also remove the obsolete `%LOCALAPPDATA%\Programs\secret` user PATH entry if
+nothing else uses it. Neither installer deletes old executables, removes old
+PATH entries or edits client registrations. See [setup migration](setup.md#migrate-an-earlier-installation).
+
 ## Explicit Bash rollback
 
-Until M4.1, the existing `bin/secret` is itself the Bash rollback. Keep a reviewed
-Bash checkout alongside any opt-in Go installation. Invoke its absolute
-`/absolute/trusted/bash-checkout/bin/secret` or point a separate test symlink there;
-never change behavior automatically on a Go failure. Existing Claude and Codex
+Invoke `/absolute/trusted/checkout/compat/secret` directly for the reviewed Bash
+implementation, or explicitly point your own Unix CLI symlink at that path.
+For example, after reviewing an existing symlink, replace only that link with
+`ln -s /absolute/trusted/checkout/compat/secret ~/.local/bin/secret`. Do not
+overwrite an unknown executable or a custom link. Windows Bash rollback requires
+Git Bash and an explicit `bash /absolute/trusted/checkout/compat/secret` invocation;
+it is not a native replacement executable. Never switch behavior automatically
+on a Go failure. Existing Claude and Codex
 manifests already reference `hooks/guard-secrets`. If you changed experimental
 local configuration, restore the reviewed Bash config manually, restart the host
-and review/re-trust Codex hooks. M4 does not create `compat/secret`; that explicit
-compatibility path and its CI belong to M4.1. No rollback procedure grants an
+and review/re-trust Codex hooks. Compatibility CI pins the original Bash blob,
+executable mode and interpreter and proves independence from a broken final launcher. No rollback procedure grants an
 agent permission to retrieve values or install hooks into your real HOME.

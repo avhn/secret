@@ -5,7 +5,7 @@
 # invocation refuses to contact a provider unless those match its launch.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 if [[ "${1:-}" != --session ]]; then
     for tool in dbus-run-session gnome-keyring-daemon secret-tool perl script; do
         if ! command -v "$tool" >/dev/null 2>&1; then
@@ -25,11 +25,11 @@ if [[ "${1:-}" != --session ]]; then
     env -i PATH="$PATH" HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" \
         XDG_RUNTIME_DIR="$TMP/run" XDG_CONFIG_HOME="$TMP/config" \
         SECRET_TEST_ROOT="$TMP" SECRET_TEST_INVENTORY="${SECRET_TEST_INVENTORY:-}" SECRET_TEST_RESULTS="${SECRET_TEST_RESULTS:-}" SECRET_CLI="${SECRET_CLI:-}" SECRET_REQUIRE_LIBSECRET="${SECRET_REQUIRE_LIBSECRET:-}" \
-        dbus-run-session -- bash -c '
+        dbus-run-session -- "$BASH" -c '
             [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] || exit 77
             export SECRET_TEST_BUS="$DBUS_SESSION_BUS_ADDRESS"
-            exec bash "$1" --session
-        ' test "$ROOT/tests/test-libsecret.sh"
+            exec "$1" "$2" --session
+        ' test "$BASH" "$ROOT/tests/test-libsecret.sh"
     exit $?
 fi
 
@@ -50,7 +50,16 @@ printf '\n' | gnome-keyring-daemon --unlock --components=secrets >"$TMP/daemon-o
     printf 'FAIL: temporary keyring failed to start\n' >&2
     exit 1
 }
-SECRET="${SECRET_CLI:-$ROOT/bin/secret}"
+SECRET="${SECRET_CLI:-$ROOT/compat/secret}"
+SECRET="$(cd -P "$(dirname "$SECRET")" && pwd -P)/${SECRET##*/}"
+if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then
+    cat >"$TMP/secret-cli" <<EOF
+#!$BASH
+exec "$BASH" "$ROOT/compat/secret" "\$@"
+EOF
+    chmod +x "$TMP/secret-cli"
+    SECRET="$TMP/secret-cli"
+fi
 PASSED=0 FAILED=0
 
 # check NAME STATUS COMMAND: bound each synthetic operation and count its status.

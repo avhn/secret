@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck bin/secret bin/secret-go hooks/guard-secrets hooks/guard-go scripts/*.sh tests/*.sh testdata/store/gen.sh testdata/cli/gen.sh
+      - run: shellcheck compat/secret bin/secret hooks/guard-secrets hooks/guard-go scripts/*.sh tests/*.sh testdata/store/gen.sh testdata/cli/gen.sh
       - name: Reject shipped release fixture marker
         run: |
           test ! -e .secret-release-test-fixture
@@ -146,11 +146,11 @@ jobs:
       - name: Install Secret Service test dependencies
         run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring dbus-x11
       - name: Build Go CLI for provider suite
-        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+        run: go build -o "$RUNNER_TEMP/secret" ./cmd/secret
       - name: Go libsecret suite
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
-        run: bash tests/go-cli.sh libsecret "$RUNNER_TEMP/secret-go"
+        run: bash tests/go-cli.sh libsecret "$RUNNER_TEMP/secret"
       - name: Isolated libsecret suite
         env:
           SECRET_REQUIRE_LIBSECRET: "1"
@@ -176,13 +176,13 @@ jobs:
         run: |
           if [ ! -f testdata/inventory/keychain.tsv ]; then echo "missing=true" >>"$GITHUB_OUTPUT"; fi
       - name: Build Go CLI for provider suite
-        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+        run: go build -o "$RUNNER_TEMP/secret" ./cmd/secret
       - name: Go Keychain suite
         env:
           SECRET_REQUIRE_KEYCHAIN: "1"
-        run: bash tests/go-cli.sh keychain "$RUNNER_TEMP/secret-go"
+        run: bash tests/go-cli.sh keychain "$RUNNER_TEMP/secret"
       - name: Isolated Keychain suite
-        run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/keychain-cases.tsv" SECRET_REQUIRE_KEYCHAIN=1 bash tests/test-keychain.sh
+        run: SECRET_TEST_INVENTORY="$RUNNER_TEMP/keychain-cases.tsv" SECRET_REQUIRE_KEYCHAIN=1 /bin/bash tests/test-keychain.sh
       - name: Isolated Go Keychain integration
         env:
           SECRET_REQUIRE_KEYCHAIN: "1"
@@ -190,10 +190,10 @@ jobs:
       - name: Check keychain inventory
         env:
           SECRET_INVENTORY_STRICT: "1"
-        run: bash tests/inventory.sh --check --suite keychain
+        run: BASH_BIN=/bin/bash /bin/bash tests/inventory.sh --check --suite keychain
       - name: Generate missing keychain inventory artifact
         if: steps.missing_keychain.outputs.missing == 'true'
-        run: bash tests/inventory.sh --write --suite keychain
+        run: BASH_BIN=/bin/bash /bin/bash tests/inventory.sh --write --suite keychain
       - uses: actions/upload-artifact@v4
         if: steps.missing_keychain.outputs.missing == 'true'
         with:
@@ -236,13 +236,13 @@ jobs:
         shell: bash
         run: PATH="$SECRET_PASS_TOOL_PATH:$PATH" sh scripts/install-test-pass.sh "$SECRET_PASS_PREFIX"
       - name: Build staged Go CLI
-        run: go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
+        run: go build -o "$RUNNER_TEMP/secret" ./cmd/secret
       - name: Isolated native pass and operator matrix
         shell: bash
         run: |
           # Keep the pinned setup-go toolchain ahead of any runner image Go in /usr/bin.
           go_bin=$(go env GOROOT)/bin
-          PATH="$SECRET_PASS_PREFIX/bin:$go_bin:$SECRET_PASS_TOOL_PATH:$PATH" python3 -I tests/test-pass.py "$RUNNER_TEMP/secret-go"
+          PATH="$SECRET_PASS_PREFIX/bin:$go_bin:$SECRET_PASS_TOOL_PATH:$PATH" python3 -I tests/test-pass.py "$RUNNER_TEMP/secret"
 
   test:
     strategy:
@@ -265,8 +265,8 @@ jobs:
           cache: true
       - name: Build Go CLI suites
         run: |
-          go build -o "$RUNNER_TEMP/secret-go" ./cmd/secret
-          go build -tags secretstub -o "$RUNNER_TEMP/secret-go-stub" ./cmd/secret
+          go build -o "$RUNNER_TEMP/secret" ./cmd/secret
+          go build -tags secretstub -o "$RUNNER_TEMP/secret-stub" ./cmd/secret
       - name: Offline host fault fixtures (no model calls)
         run: |
           go build -tags hosthookfixture -o "$RUNNER_TEMP/host-hook-fixture" tests/host-hook-fixture.go
@@ -278,15 +278,17 @@ jobs:
       - name: Offline 1Password fake-op and detached PTY contract
         run: python3 -I tests/test-onepassword.py
       - name: Go age terminal and killed-writer integration
-        run: python3 -I tests/test-age.py "$RUNNER_TEMP/secret-go"
+        run: python3 -I tests/test-age.py "$RUNNER_TEMP/secret"
       - name: Go operator terminal integration
-        run: python3 -I tests/test-operator.py "$RUNNER_TEMP/secret-go"
+        run: python3 -I tests/test-operator.py "$RUNNER_TEMP/secret"
       - name: Go CLI matrix
-        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh secret "$RUNNER_TEMP/secret-go"
+        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh secret "$RUNNER_TEMP/secret"
       - name: Go backend matrix
-        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh backends "$RUNNER_TEMP/secret-go-stub"
+        run: BASH_BIN="$BASH_BIN" bash tests/go-cli.sh backends "$RUNNER_TEMP/secret-stub"
       - name: CLI matrix
         run: '"$BASH_BIN" tests/test-secret.sh'
+      - name: Bash compatibility identity and broken final launcher
+        run: 'BASH_BIN="$BASH_BIN" "$BASH_BIN" tests/test-compat.sh'
       - name: Backend matrix
         run: '"$BASH_BIN" tests/test-backends.sh'
       - name: Guard matrix
@@ -297,10 +299,10 @@ jobs:
         run: '"$BASH_BIN" tests/test-guard-context.sh'
       - name: Go Claude hook divergence matrix
         if: runner.os == 'Linux'
-        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh guard "$RUNNER_TEMP/secret-go" claude
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh guard "$RUNNER_TEMP/secret" claude
       - name: Go Codex hook divergence matrix
         if: runner.os == 'Linux'
-        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh codex "$RUNNER_TEMP/secret-go" codex
+        run: BASH_BIN="$BASH_BIN" bash tests/go-hook.sh codex "$RUNNER_TEMP/secret" codex
       - name: Check synthetic inventory
         run: BASH_BIN="$BASH_BIN" bash tests/inventory.sh --check
       - name: Stock bash 3.2 (macOS)
@@ -311,6 +313,7 @@ jobs:
           /bin/bash tests/test-guard.sh
           /bin/bash tests/test-codex.sh
           /bin/bash tests/test-guard-context.sh
+          BASH_BIN=/bin/bash /bin/bash tests/test-compat.sh
           BASH_BIN=/bin/bash bash tests/inventory.sh --check
 
   windows-cli:

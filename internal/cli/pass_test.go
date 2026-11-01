@@ -79,7 +79,7 @@ func TestPassDiscoveryAndNoFileFallback(t *testing.T) {
 	if err != nil {
 		t.Skip("Bash unavailable")
 	}
-	cmd := exec.Command(bash, "../../bin/secret", "list")
+	cmd := exec.Command(bash, "../../compat/secret", "list")
 	cmd.Env = append(os.Environ(), "PATH="+originalPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil || strings.Contains(string(output), "pass:team") {
