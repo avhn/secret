@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /secret/
+
+Sitemap: https://avhn.github.io/secret/sitemap.xml

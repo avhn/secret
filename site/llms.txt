@@ -1,0 +1,15 @@
+# secret
+
+> Let coding agents use your credentials without reading them. A local credential CLI, a names-only MCP server and a guard hook for coding agents, in Go for Linux, macOS and Windows. Accident prevention, not a sandbox.
+
+This file is an entrypoint index. The linked documents are the references.
+
+- [Setup, one fetch for agents](https://raw.githubusercontent.com/avhn/secret/main/docs/setup.md): install, choose exact store references, register the names-only MCP server with Claude Code, Claude Desktop, Codex, ChatGPT desktop, OpenCode, Cursor or VS Code, verify, update, roll back, remove.
+- [Installation, pins and rollback](https://raw.githubusercontent.com/avhn/secret/main/docs/install.md): bootstrap trust, release and platform pins, checkout verification, guard plugins, explicit Bash rollback.
+- [Usage and workflows](https://raw.githubusercontent.com/avhn/secret/main/docs/usage.md): stores, providers, labels, run, operator commands, templates and MCP.
+- [Windows support](https://raw.githubusercontent.com/avhn/secret/main/docs/windows.md): Credential Manager stores, Job containment, long-lived exec launchers and limits.
+- [Encrypted age stores](https://raw.githubusercontent.com/avhn/secret/main/docs/age.md) and [pass stores](https://raw.githubusercontent.com/avhn/secret/main/docs/pass.md).
+- [Security model](https://raw.githubusercontent.com/avhn/secret/main/SECURITY.md): what it protects, what it does not, reporting.
+- [Agent skill](https://raw.githubusercontent.com/avhn/secret/main/skills/secrets/SKILL.md): how agents use stores by key name.
+
+Agents ask the human for exact store references and never discover or read stores, enter or retrieve values, run operator consent commands, or bypass a guard. The names-only MCP tools list, show, diff and health never return values, value hashes or lengths, but metadata can reveal key names, labels, paths and provider account IDs. get and exec are human-only. Installing the CLI, registering MCP or passing synthetic tests does not establish fail-closed host protection.

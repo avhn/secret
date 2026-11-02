@@ -5,7 +5,7 @@
 From v0.4.0 onward, the final CLI name is `secret` on Unix and `secret.exe` on Windows. The
 owner-approved CLI-only extraction from M4.1 puts the verified Go launcher at
 `bin/secret` and retains byte-identical executable Bash at `compat/secret`.
-v0.5.0 is prepared and unreleased. Published
+v0.5.0 is the published GitHub Latest release. Published
 tags and assets are immutable; fixes require a new patch version.
 Claude and Codex plugin hooks remain Bash. `hooks/guard-go` stays inactive.
 Claude cutover, `onFailure: "block"` and Go hook output-contract changes
