@@ -11,3 +11,4 @@
 /dist-local/
 *.test
 /secret
+__pycache__/

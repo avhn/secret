@@ -1,7 +1,7 @@
 # Set up secret MCP
 
 This is the canonical setup guide for the opt-in secret local stdio MCP server.
-v0.5.0 is prepared and unreleased. Install, choose exact references, register,
+v0.5.0 is the published GitHub Latest release. Install, choose exact references, register,
 reconnect and verify in that order. See [installation](install.md) for pins and
 checkout verification and [release approvals](release.md) for publication status.
 

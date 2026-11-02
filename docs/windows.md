@@ -2,10 +2,10 @@
 
 M5a's staged Go CLI gate passed on native Windows amd64 hosted runners (PR #29,
 run [40246119003](https://github.com/avhn/secret/actions/runs/40246119003)). The
-v0.5.0 installer simplification (prepared, unreleased) retains raw `secret-v0.5.0-windows-amd64.exe` and
-`secret-v0.5.0-windows-arm64.exe` assets plus `install.ps1`; native candidate and
-public-release installs on both architectures remain separate required evidence.
-This document does not claim those new installs have passed or publication exists.
+The published v0.5.0 installer simplification ships raw `secret-v0.5.0-windows-amd64.exe` and
+`secret-v0.5.0-windows-arm64.exe` assets plus `install.ps1`. Its public native installs on
+both architectures passed in Registry run
+[41378456500](https://github.com/avhn/secret/actions/runs/41378456500).
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
 Plugin manifests become 0.5.0
 without Go hook activation, which stays M4.1, waiting sponsorship.
@@ -67,7 +67,7 @@ in [release tooling security](release.md#packaging-tools-and-advisory-review) an
 | Children | `run` filters both output streams; `exec` supervises an unfiltered child rather than replacing the process. Both use native Job containment. |
 | Private files | Store files, templates, audit, locks, scratch and recovery use handle-checked, protected owner-only DACLs. Store parents use the trusted-principal rule below. |
 
-| Clipboard (unreleased) | `clip` uses native Unicode clipboard APIs and a detached, pipe-fed conditional clearer. No PowerShell or external clipboard utility is used. |
+| Clipboard | `clip` uses native Unicode clipboard APIs and a detached, pipe-fed conditional clearer. No PowerShell or external clipboard utility is used. |
 | Private files | Templates, audit, stores, locks, scratch and recovery use handle-checked, protected owner-only DACLs. |
 | File/patch hooks | Native checks retain protected paths across UNC and administrative shares, subst drives, junctions and resolvable 8.3 aliases, with public-file controls and ambiguous-path denial. |
 
@@ -151,7 +151,7 @@ Codex nor OpenCode startup/reconnect/shutdown compatibility, nor hook protection
 Versioned real-host sessions and applicable hosted Windows CI remain separate
 evidence gates; installed defaults and every agent-denial rule are unchanged.
 
-## Native clipboard (unreleased)
+## Native clipboard
 
 The staged Go CLI supports `secret clip FILE KEY [SECONDS]` on Windows, with
 existing selectors, exit statuses and the `copied KEY; clears in Ns if
@@ -253,7 +253,7 @@ locally.
   transformed values. Values that cannot round-trip through the Windows UTF-16
   environment, NUL and case-insensitive name collisions fail before child creation.
 - Age filesystem operations, pass and 1Password provider operations remain
-  unsupported on Windows. Native clipboard support above is a separate unreleased
+  unsupported on Windows. Native clipboard support above shipped in v0.4.0 as a separate
   extension, not evidence from the historical M5a gate.
 - The Windows hook denies every shell call with a fixed denial, including public
   commands. It does not parse PowerShell or CMD as Bash. M5e steps 1 to 4 have
