@@ -128,6 +128,10 @@ pins the snapshot archive to
 This digest was computed with `sha256sum` after downloading the commit-addressed
 `.tar.xz` snapshot from git.zx2c4.com into a new empty directory; extraction was
 into a separate new empty directory. Source archives are not shipped or vendored.
+The snapshot endpoint intermittently answers GitHub runners with HTTP 502, so the
+install retries with backoff and CI keeps the archive in the Actions cache once it
+has matched the pinned digest. The digest is rechecked on every run, and a cached
+copy that fails it is discarded and fetched again.
 
 `python3 -I tests/test-pass.py ABSOLUTE_GO_BINARY` is a GitHub-runner-only driver.
 It verifies the staged executable, version, selected Bash and Darwin getopt

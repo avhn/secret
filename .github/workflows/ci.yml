@@ -232,8 +232,17 @@ jobs:
             echo "SECRET_PASS_BASH=/usr/bin/bash" >>"$GITHUB_ENV"
           fi
           echo "SECRET_PASS_PREFIX=$RUNNER_TEMP/pass-1.7.4" >>"$GITHUB_ENV"
+      # git.zx2c4.com intermittently answers runners with HTTP 502. Reuse the
+      # archive once it has matched testdata/pass/upstream.sha256.
+      - name: Restore checksum-verified pass snapshot
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pass-snapshot
+          key: pass-snapshot-${{ runner.os }}-${{ hashFiles('testdata/pass/upstream.sha256') }}
       - name: Install checksum-pinned upstream pass with platform file
         shell: bash
+        env:
+          SECRET_PASS_CACHE: ${{ runner.temp }}/pass-snapshot
         run: PATH="$SECRET_PASS_TOOL_PATH:$PATH" sh scripts/install-test-pass.sh "$SECRET_PASS_PREFIX"
       - name: Build staged Go CLI
         run: go build -o "$RUNNER_TEMP/secret" ./cmd/secret
