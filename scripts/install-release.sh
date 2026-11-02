@@ -64,10 +64,15 @@ uid=$(id -u) || fail 4
 
 # GNU and BSD stat both report lstat information by default.
 attributes() {
+    bsd=no
     attrs=$(stat -c '%u %a %h' "$1" 2>/dev/null) ||
-        attrs=$(stat -f '%u %Lp %l' "$1" 2>/dev/null) || return 1
+        { attrs=$(stat -f '%u %p %l' "$1" 2>/dev/null) && bsd=yes; } || return 1
     owner=${attrs%% *}
     rest=${attrs#* }; mode=${rest%% *}; links=${rest#* }
+    # BSD %Lp drops the sticky bit, so macOS /private/tmp failed the sticky check
+    # below. %p keeps it but prefixes the file type: keep the last four octal
+    # digits and drop one leading zero so modes match GNU %a (755, 1777).
+    if [ "$bsd" = yes ]; then mode=${mode#"${mode%????}"}; mode=${mode#0}; fi
     case $owner:$links in *[!0-9:]*|:*) return 1 ;; esac
     case $mode in *[!0-7]*|'') return 1 ;; esac
     [ "$owner" = "$uid" ] || [ "$owner" = 0 ] || return 1

@@ -227,6 +227,30 @@ class Launchers(unittest.TestCase):
                 self.denial()
                 parent.chmod(before)
 
+    def test_root_owned_sticky_ancestor_is_trusted(self):
+        # A checkout under /tmp walks through a root-owned sticky directory.
+        # BSD stat %Lp once hid the sticky bit, so macOS rejected /private/tmp.
+        sticky = Path(os.path.realpath('/tmp'))
+        info = sticky.stat()
+        if info.st_uid != 0 or not info.st_mode & stat.S_ISVTX or not info.st_mode & 0o002:
+            self.skipTest('no root-owned, world-writable sticky /tmp')
+        outer = Path(tempfile.mkdtemp(prefix='secret-launcher-sticky-', dir=sticky))
+        try:
+            moved = outer / 'checkout'
+            shutil.copytree(self.root, moved, symlinks=True)
+            self.root, self.install = moved, moved / 'scripts/install-release.sh'
+            self.cli, self.hook = moved / 'bin/secret', moved / 'hooks/guard-go'
+            self.installed()
+            result = self.invoke([self.cli, 'version'])
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, VERSION, b''))
+            self.assertFalse(self.witness.exists())
+            # The exception covers only root-owned sticky directories, never the checkout.
+            moved.chmod(0o777)
+            self.denial()
+            moved.chmod(0o700)
+        finally:
+            shutil.rmtree(outer)
+
     def test_unsafe_owners_if_privileged(self):
         # Owner validation is exercised without needing chown by a stat fault.
         self.installed()
