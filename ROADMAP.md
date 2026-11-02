@@ -2,18 +2,18 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`) and is the GitHub Latest release. v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. The active MCP Registry record is `io.github.avhn/secret` 0.4.1; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.5.0 (anonymous latest-by-default installers) was published on 2026-11-02 at C `ff5cf56` (S `109449e`) and is the GitHub Latest release, with MCP Registry record `io.github.avhn/secret` 0.5.0. v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`). v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. The active MCP Registry record is `io.github.avhn/secret` 0.4.1; M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
-## v0.5.0: Installer simplification (prepared, unreleased)
+## v0.5.0: Installer simplification (done)
 
 Latest-by-default anonymous HTTPS installation and updates replace standalone gh
 and provenance dependencies. Explicit pins permit rollback; matching installed
 digests are no-ops without executing the old binary. Retain all path, ACL, lock
 and atomic publication protections and the separate authenticated checkout route.
 Current identities advance together to 0.5.0; published v0.4.1 remains immutable.
-Native Linux/macOS and Windows 5.1/7 regression evidence and the applicable hosted
-release matrix are required before completion. No tag, publication, hook activation
-or external metadata promotion is authorized by these working-tree changes.
+Native Linux/macOS (including Bash 3.2) and Windows 5.1/7 suites and the hosted
+ci, release and plugin install matrices passed; the six public native installs
+passed before Registry publication. Hook activation remains out of scope.
 
 ## Windows store parent policy (in progress)
 

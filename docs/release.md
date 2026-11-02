@@ -1,6 +1,8 @@
 # Release procedure
 
-v0.5.0 is prepared and unreleased. It simplifies the standalone installers to
+v0.5.0 was published on 2026-11-02 at checksum commit C `ff5cf56` (tag `v0.5.0`,
+source S `109449e`) and is the GitHub Latest release; its MCP Registry record
+is published. It simplifies the standalone installers to
 anonymous HTTPS checksum verification with latest-by-default updates, explicit
 version pins and digest no-ops. Script URLs are pinned to v0.5.0; the default
 binary is the latest release at invocation, resolved once. Commit pins are
@@ -11,9 +13,9 @@ All current release identities advance to 0.5.0. The release inventory remains
 eight payloads (six native executables, Desktop MCPB, server.json), nine attested
 subjects and eighteen public assets. Standalone installers no longer embed a
 binary version default; README/setup script URLs remain in the identity sweep.
-Publication still requires native hosted gates and separate owner approval for
-tags, drafts, publication, promotion and Registry metadata. No such action is
-performed by preparation. Earlier tags and checksum manifests remain immutable.
+Publication requires native hosted gates and separate owner approval for
+tags, drafts, publication, promotion and Registry metadata. Earlier tags and
+checksum manifests remain immutable.
 After publication main receives source S, never checksum child C. The verified
 checkout Go CLI launcher remains `bin/secret`, with byte-identical rollback at
 `compat/secret`. Installed Bash hooks and configuration remain unchanged; M4.1
@@ -82,10 +84,16 @@ the final CLI name `secret`, Windows trusted store parents, native Windows clip,
 Mute Agent branding and the opt-in release approval gate. Registry public-install
 jobs failed on Linux/macOS because the install test's expected mismatching
 `--version 0.4.0` equaled its `SECRET_VERSION=0.4.0` pin; Windows jobs passed.
-The GitHub release remains published, but the active MCP Registry record is still
-0.3.4. v0.5.0 fixes that synthetic fixture without changing product behavior.
+The GitHub release stayed published while the Registry record remained 0.3.4.
+v0.4.1 (2026-11-01, C `eeb628c`, source S `8d0d46c`) fixed that synthetic
+fixture without changing product behavior, and its Registry record published.
+v0.5.0 was published on 2026-11-02 at checksum commit C `ff5cf56` (tag `v0.5.0`,
+source S `109449e`) with all eight checksums and nine attestations verified; main
+was promoted to S, never C. Registry run
+[41378456500](https://github.com/avhn/secret/actions/runs/41378456500) passed its
+six public native installs and published `io.github.avhn/secret` 0.5.0.
 All changed inputs require new gates; never reuse the v0.3.0, v0.3.1, v0.3.2,
-v0.3.3, v0.3.4 or v0.4.0 tags or assets.
+v0.3.3, v0.3.4, v0.4.0, v0.4.1 or v0.5.0 tags or assets.
 
 ## Approval boundaries
 

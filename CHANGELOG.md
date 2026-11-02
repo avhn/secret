@@ -4,9 +4,26 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- Prepare v0.5.0 (unreleased): standalone install/update one-liners need no gh,
+- Checkout launchers (`bin/secret`, `hooks/guard-go`) and
+  `scripts/install-release.sh` read BSD modes with `stat -f %p` instead of `%Lp`,
+  which dropped the sticky bit, so a checkout or cache under macOS `/private/tmp`
+  was refused although root-owned sticky ancestors are meant to be trusted.
+  macOS now also sees setuid and setgid bits, so an exact-mode cache file or
+  directory carrying them is rejected there as it already was on Linux.
+
+## Published releases
+
+### 0.5.0 (2026-11-02, published)
+
+Published at checksum commit C `ff5cf56` (tag `v0.5.0`, source S `109449e`),
+the GitHub Latest release. The MCP Registry record `io.github.avhn/secret` 0.5.0
+was published after all six public native installs passed.
+
+#### Changed
+
+- Standalone install/update one-liners need no gh,
   GitHub account or Python. Resolve latest once, verify HTTPS checksums and the
   new executable, preserve matching installs, and allow explicit version rollback.
 - Add `secret --version` as an alias for `secret version`. Installer checks use
@@ -23,13 +40,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
   root-owned sticky parents like `/tmp` are accepted on macOS.
 - Installer tests build distinct release binaries instead of byte-patching one,
   which broke the ad-hoc Mach-O signature and got the fixture killed on macOS arm64.
-
 - Reorganize README onboarding and move detailed workflows to docs/usage.md,
   plugin and manual-hook setup to docs/install.md, and test guidance to CONTRIBUTING.md.
 - Correct published release and Windows exec launcher status, and record the
   v0.4.1 MCP Registry publication.
-
-## Published releases
 
 ### 0.4.1 (2026-11-01, published)
 

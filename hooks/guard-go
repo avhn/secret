@@ -21,10 +21,13 @@ bootstrap() {
     path=$root/scripts/install-release.sh
     while :; do
         [ ! -L "$path" ] || return 1
+        bsd=no
         attrs=$(stat -c '%u %a %h' "$path" 2>/dev/null) ||
-            attrs=$(stat -f '%u %Lp %l' "$path") || return 1
+            { attrs=$(stat -f '%u %p %l' "$path") && bsd=yes; } || return 1
         owner=${attrs%% *}
         rest=${attrs#* }; mode=${rest%% *}; links=${rest#* }
+        # BSD %Lp drops the sticky bit; %p keeps it after the file type digits.
+        if [ "$bsd" = yes ]; then mode=${mode#"${mode%????}"}; mode=${mode#0}; fi
         case $owner:$links in *[!0-9:]*|:*) return 1 ;; esac
         case $mode in *[!0-7]*|'') return 1 ;; esac
         if [ -f "$path" ]; then [ "$links" = 1 ] || return 1; fi
