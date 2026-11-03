@@ -7,7 +7,7 @@ The published v0.5.0 installer simplification ships raw `secret-v0.5.0-windows-a
 both architectures passed in Registry run
 [41378456500](https://github.com/avhn/secret/actions/runs/41378456500).
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
-Plugin manifests become 0.5.0
+Plugin manifests become 0.6.0
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -135,7 +135,7 @@ or consoleless hosts have no console-event delivery guarantee. Synthetic signal
 channels do not prove detached-host signal delivery.
 
 Graceful shutdown is server-owned: the host closes stdin, the server handles EOF
-and exits, then secret cleans remaining Job members. Secret does not consume stdin
+and exits, then Secret cleans remaining Job members. Secret does not consume stdin
 to detect host disappearance, watch parent lifetime or probe output. Killing an
 intermediary host need not terminate the wrapper. For an EOF-ignoring server, the
 host must terminate secret after its shutdown budget. Wrapper death closes its

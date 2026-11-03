@@ -15,18 +15,18 @@ package main
 import ("fmt"; "os")
 func main() {
     if len(os.Args) != 2 || os.Args[1] != "--version" { os.Exit(9) }
-    fmt.Println("secret 0.5.0 (go)")
+    fmt.Println("secret 0.6.0 (go)")
 }
 GO
-sed 's/--version/version/; s/0.5.0/0.4.1/' "$TMP/source/main.go" >"$TMP/source/legacy.go"
+sed 's/--version/version/; s/0.6.0/0.4.1/' "$TMP/source/main.go" >"$TMP/source/legacy.go"
 HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -o "$TMP/build/native" "$TMP/source/main.go"
 HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -o "$TMP/build/legacy" "$TMP/source/legacy.go"
 # Distinct real builds, never byte-patched copies: editing a signed Mach-O
 # invalidates its ad-hoc signature and macOS arm64 then kills it (SIGKILL).
-for fixture in next:0.5.1 wrong:9.9.9; do
-    sed "s/0.5.0/${fixture#*:}/" "$TMP/source/main.go" >"$TMP/source/${fixture%%:*}.go"
+for fixture in next:0.6.1 wrong:9.9.9; do
+    sed "s/0.6.0/${fixture#*:}/" "$TMP/source/main.go" >"$TMP/source/${fixture%%:*}.go"
     HOME="$TMP/home" GOTOOLCHAIN=local CGO_ENABLED=0 go build -trimpath -buildvcs=false \
         -o "$TMP/build/${fixture%%:*}" "$TMP/source/${fixture%%:*}.go"
 done
@@ -54,7 +54,7 @@ NEXT = (WORK / 'build/next').read_bytes()
 WRONG = (WORK / 'build/wrong').read_bytes()
 OS = {'Linux': 'linux', 'Darwin': 'darwin'}[os.uname().sysname]
 ARCH = {'x86_64': 'amd64', 'amd64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}[os.uname().machine]
-ASSET = f'secret-v0.5.0-{OS}-{ARCH}'
+ASSET = f'secret-v0.6.0-{OS}-{ARCH}'
 COMMIT = 'a' * 40
 
 CURL = r'''
@@ -72,7 +72,7 @@ assert not list(body.parent.iterdir()) and not list(headers.parent.iterdir())
 mode = os.environ.get('MODE', '')
 body.write_bytes(b''); headers.write_bytes(b'HTTP/1.1 200 OK\r\n\r\n')
 if url.endswith('/latest'):
-    headers.write_text('Location: ' + os.environ.get('LATEST', 'https://github.com/avhn/secret/releases/tag/v0.5.0') + '\r\n')
+    headers.write_text('Location: ' + os.environ.get('LATEST', 'https://github.com/avhn/secret/releases/tag/v0.6.0') + '\r\n')
     if mode == 'latest-nul': headers.write_bytes(headers.read_bytes().replace(b'/tag/', b'/tag/\x00'))
     print('302', end=''); sys.exit()
 if mode in ('interrupt', 'kill'):
@@ -118,11 +118,11 @@ class Install(unittest.TestCase):
         self.script('curl', CURL)
         for system in ('linux', 'darwin', 'windows'):
             for arch in ('amd64', 'arm64'):
-                name = f'secret-v0.5.0-{system}-{arch}' + ('.exe' if system == 'windows' else '')
+                name = f'secret-v0.6.0-{system}-{arch}' + ('.exe' if system == 'windows' else '')
                 (self.fixtures / name).write_bytes(NATIVE)
-        (self.fixtures / 'secret-v0.5.0-desktop.mcpb').write_bytes(b'synthetic bundle')
+        (self.fixtures / 'secret-v0.6.0-desktop.mcpb').write_bytes(b'synthetic bundle')
         (self.fixtures / 'server.json').write_bytes(b'{}\n')
-        self.manifest = self.fixtures / 'checksums-v0.5.0.txt'
+        self.manifest = self.fixtures / 'checksums-v0.6.0.txt'
         self.rehash()
 
     def script(self, name, body):
@@ -154,7 +154,7 @@ class Install(unittest.TestCase):
         self.assertEqual((result.returncode, result.stderr), (0, b''))
         self.assertEqual(self.target.read_bytes(), NATIVE)
         self.assertEqual(stat.S_IMODE(self.target.stat().st_mode), 0o500)
-        self.assertIn(b'Installed secret 0.5.0 at ', result.stdout)
+        self.assertIn(b'Installed secret 0.6.0 at ', result.stdout)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         self.assertEqual(sum(c[-1].endswith('/latest') for c in calls), 1)
         self.assertTrue(all(c[0] == 'curl' for c in calls))
@@ -165,12 +165,12 @@ class Install(unittest.TestCase):
         for args in [('--help',), ('-h',)]:
             self.assertEqual(self.run_install(*args).returncode, 0)
         for args in [('--wat',), ('--help', '--wat'), ('--version',), ('--commit',), ('--dir',),
-                     ('--version', '0.5.0', '--version', '0.5.0')]:
+                     ('--version', '0.6.0', '--version', '0.6.0')]:
             self.failure(*args)
-        for version in ('latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.5.0', 'v', 'vv0.5.0', '0.5.0\n'):
+        for version in ('latest', '0.03.0', '1.2', '1.2.3-rc1', '../0.6.0', 'v', 'vv0.6.0', '0.6.0\n'):
             self.env['SECRET_VERSION'] = version
             self.failure()
-        self.env['SECRET_VERSION'] = '0.5.0'
+        self.env['SECRET_VERSION'] = '0.6.0'
         self.failure('--version', '9.9.9')
         for commit in ('latest', 'a' * 39, 'A' * 40, 'a' * 40 + '\n'):
             self.env['SECRET_RELEASE_COMMIT'] = commit
@@ -178,8 +178,8 @@ class Install(unittest.TestCase):
         self.assertFalse(self.log.exists())
 
     def test_matching_pin_and_flags(self):
-        self.env['SECRET_VERSION'] = 'v0.5.0'
-        result = self.run_install('--version', '0.5.0', '--dir', str(self.destination))
+        self.env['SECRET_VERSION'] = 'v0.6.0'
+        result = self.run_install('--version', '0.6.0', '--dir', str(self.destination))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn('/latest', self.log.read_text())
 
@@ -190,13 +190,13 @@ class Install(unittest.TestCase):
                 self.failure()
 
     def test_latest_redirect_validation(self):
-        for url in ('http://github.com/avhn/secret/releases/tag/v0.5.0',
-                    'https://github.com/other/secret/releases/tag/v0.5.0',
+        for url in ('http://github.com/avhn/secret/releases/tag/v0.6.0',
+                    'https://github.com/other/secret/releases/tag/v0.6.0',
                     'https://github.com/avhn/secret/releases/tag/v01.2.3',
-                    'https://github.com/avhn/secret/releases/tag/v0.5.0?x=1',
-                    'https://github.com/avhn/secret/releases/tag/v0.5.0-rc1',
-                    'https://github.com@evil.invalid/avhn/secret/releases/tag/v0.5.0',
-                    'https://github.com/avhn/secret/releases/tag/v0.5.0\r\nLocation: https://evil.invalid/'):
+                    'https://github.com/avhn/secret/releases/tag/v0.6.0?x=1',
+                    'https://github.com/avhn/secret/releases/tag/v0.6.0-rc1',
+                    'https://github.com@evil.invalid/avhn/secret/releases/tag/v0.6.0',
+                    'https://github.com/avhn/secret/releases/tag/v0.6.0\r\nLocation: https://evil.invalid/'):
             self.env['LATEST'] = url
             self.failure()
 
@@ -220,21 +220,21 @@ class Install(unittest.TestCase):
         next_fixtures.mkdir(mode=0o700)
         for source in self.fixtures.iterdir():
             if source == self.manifest: continue
-            name = source.name.replace('v0.5.0', 'v0.5.1')
+            name = source.name.replace('v0.6.0', 'v0.6.1')
             (next_fixtures / name).write_bytes(newer if source.name == ASSET else source.read_bytes())
-        (next_fixtures / 'checksums-v0.5.1.txt').write_bytes(b''.join(
+        (next_fixtures / 'checksums-v0.6.1.txt').write_bytes(b''.join(
             hashlib.sha256(p.read_bytes()).hexdigest().encode() + b'  ' + p.name.encode() + b'\n'
             for p in sorted(next_fixtures.iterdir())))
-        self.env.update(FIXTURES=str(next_fixtures), LATEST='https://github.com/avhn/secret/releases/tag/v0.5.1',
-                        ASSET=ASSET.replace('v0.5.0', 'v0.5.1'), MODE='corrupt')
+        self.env.update(FIXTURES=str(next_fixtures), LATEST='https://github.com/avhn/secret/releases/tag/v0.6.1',
+                        ASSET=ASSET.replace('v0.6.0', 'v0.6.1'), MODE='corrupt')
         self.assertNotEqual(self.run_install().returncode, 0)
         self.assertEqual(self.target.read_bytes(), original)
         self.env.pop('MODE')
         result = self.run_install()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.target.read_bytes(), newer)
-        self.env.update(FIXTURES=str(self.fixtures), SECRET_VERSION='v0.5.0', ASSET=ASSET)
-        self.assertEqual(self.run_install('--version', '0.5.0').returncode, 0)
+        self.env.update(FIXTURES=str(self.fixtures), SECRET_VERSION='v0.6.0', ASSET=ASSET)
+        self.assertEqual(self.run_install('--version', '0.6.0').returncode, 0)
         self.assertEqual(self.target.read_bytes(), original)
         self.target.chmod(0o700); self.target.write_bytes(b'corrupt installed executable'); self.target.chmod(0o500)
         self.assertEqual(self.run_install().returncode, 0)
@@ -246,7 +246,7 @@ class Install(unittest.TestCase):
         data = (WORK / 'build/legacy').read_bytes()
         for source in self.fixtures.iterdir():
             if source == self.manifest: continue
-            (legacy / source.name.replace('v0.5.0', 'v0.4.1')).write_bytes(data if source.name == ASSET else source.read_bytes())
+            (legacy / source.name.replace('v0.6.0', 'v0.4.1')).write_bytes(data if source.name == ASSET else source.read_bytes())
         (legacy / 'checksums-v0.4.1.txt').write_bytes(b''.join(
             hashlib.sha256(p.read_bytes()).hexdigest().encode() + b'  ' + p.name.encode() + b'\n'
             for p in sorted(legacy.iterdir())))

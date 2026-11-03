@@ -11,13 +11,13 @@ param(
     [Parameter(Mandatory)][string] $Assets,
     [Parameter(Mandatory)][ValidateSet('amd64', 'arm64')][string] $ExpectedArchitecture,
     [switch] $Published,
-    [string] $Tag = 'v0.5.0',
+    [string] $Tag = 'v0.6.0',
     [string] $Commit = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$version = '0.5.0'
+$version = '0.6.0'
 $checkout = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object Text.UTF8Encoding($false)
 
@@ -28,7 +28,7 @@ function Assert-True([bool] $Condition, [string] $Name) {
 Assert-True ($env:OS -eq 'Windows_NT' -and $env:GITHUB_ACTIONS -eq 'true' -and
     $env:RUNNER_OS -eq 'Windows') 'native disposable hosted Windows required'
 Assert-True ([IO.Path]::IsPathRooted($Assets) -and (Test-Path -LiteralPath $Assets -PathType Container)) 'absolute candidate input'
-Assert-True ($Tag -ceq 'v0.5.0') 'exact release tag'
+Assert-True ($Tag -ceq 'v0.6.0') 'exact release tag'
 Assert-True (-not (Get-Item -LiteralPath (Join-Path $checkout '.secret-release-test-fixture') -Force -ErrorAction SilentlyContinue)) 'no shipped fixture marker'
 
 # OS architecture and process architecture must both be native. In particular,
@@ -355,7 +355,7 @@ try {
         $got = Invoke-Captured $shell $replacementArgs
         Assert-True ($got.Code -eq 0 -and (Hash $binary) -ceq $before) 'verified public digest no-op'
         $badArgs = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $installer,
-            '--version', '0.5.0/invalid', '--dir', $destination)
+            '--version', '0.6.0/invalid', '--dir', $destination)
         $got = Invoke-Captured $shell $badArgs
         Assert-True ($got.Code -ne 0 -and (Hash $binary) -ceq $before) 'failed install preserves existing binary'
         Assert-InstallAcl $binary $false

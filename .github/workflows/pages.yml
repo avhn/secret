@@ -1,15 +1,8 @@
 name: pages
 
+# Deploys static site bytes only, by manual dispatch from main after a release
+# is published. Pull request CI (ci.yml) validates the site; nothing deploys on push.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'site/**'
-      - 'scripts/site/**'
-      - 'README.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,6 +16,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

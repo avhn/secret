@@ -4,8 +4,37 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Fixed
+### 0.6.0 (in preparation)
 
+Site redesign, Secret naming and a coordinated identity bump. Builds on the
+launcher fix (#52), the pinned pass snapshot cache (#53) and the GitHub Pages
+site (#54). No CLI identifier, security boundary, hook activation or release
+inventory changes.
+
+#### Changed
+
+- The site home page is built around one concrete example: an agent reading an
+  environment file today versus `secret run` with literal `<redacted>` output.
+  Install one-liners come first, followed by `stash`, `show` and `run`; the
+  agent prompt and the long feature lists moved to the setup guide. The site
+  setup page puts the human install before the agent prompt and moves tag
+  governance, truncation, commit-pin removal, staging-name migration and the
+  Bash rollback into an advanced section; `docs/setup.md` keeps its order.
+- The product is named Secret in prose, titles, descriptions, the social card,
+  the MCPB display name and the Registry title. Commands, paths, the executable,
+  registration IDs, protocol strings and the Registry name stay lowercase.
+- All current release identities advance to 0.6.0: compiled version, installer
+  script URLs, launchers, manifests, packaging templates, workflows, tests and
+  docs. Installer suites use 0.6.1 as the synthetic next release.
+- The site validator checks that every SoftwareApplication `softwareVersion` and
+  every installer-script URL on the home and setup pages equals the MCPB
+  manifest template version. PR CI runs the three site validation commands;
+  the Pages workflow deploys only by manual dispatch.
+
+#### Fixed
+
+- CI retries the pinned pass snapshot download and caches it, so a transient
+  fetch failure no longer fails the isolated pass provider job (#53).
 - Checkout launchers (`bin/secret`, `hooks/guard-go`) and
   `scripts/install-release.sh` read BSD modes with `stat -f %p` instead of `%Lp`,
   which dropped the sticky bit, so a checkout or cache under macOS `/private/tmp`

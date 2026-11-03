@@ -1,4 +1,4 @@
-<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="resources/logo-mark-dark.svg"><img src="resources/logo-mark.svg" width="88" height="88" alt=""></picture><br>secret</h1>
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="resources/logo-mark-dark.svg"><img src="resources/logo-mark.svg" width="88" height="88" alt=""></picture><br>Secret</h1>
 
 <p align="center">
   Let coding agents use your credentials without reading them.
@@ -28,18 +28,18 @@ Accident prevention, not a sandbox.
 
 ## Install
 
-Install or update the secret CLI to the latest release.
+Install or update the Secret CLI to the latest release.
 
 Linux/macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1 | iex
+irm https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1 | iex
 ```
 
 No GitHub account or gh is needed; rerunning updates the installation.
@@ -84,7 +84,8 @@ see [client JSON, Windows paths and shutdown limits](docs/setup.md#configured-va
 ## Next steps
 
 - [Set up clients](docs/setup.md#clients), including the Claude Desktop MCPB and
-  MCP Registry name `io.github.avhn/secret`, which lists v0.5.0.
+  MCP Registry name `io.github.avhn/secret`; see the [release status](CHANGELOG.md)
+  for the currently published record.
 - [Verify, update or roll back](docs/install.md), with explicit Bash rollback at `compat/secret`.
 - [Windows support and limits](docs/windows.md).
 - [Security model and reporting](SECURITY.md).

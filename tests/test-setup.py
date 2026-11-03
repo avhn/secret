@@ -18,7 +18,7 @@ import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 DOCUMENT = ROOT / "docs/setup.md"
 UNIX_COMMAND = "/ABSOLUTE/INSTALL DIR/secret"
 UNIX_STORE = "file:/ABSOLUTE/STORE DIR/STORE.secret"
@@ -172,10 +172,10 @@ class SetupTests(unittest.TestCase):
                     commands += 1
                 else:
                     self.assertIn(language, ("sh", "powershell"))
-                    self.assertIn("https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.", body)
-                    expected = ('curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh | sh'
+                    self.assertIn("https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.", body)
+                    expected = ('curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh | sh'
                                 if language == 'sh' else
-                                'irm https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1 | iex')
+                                'irm https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1 | iex')
                     self.assertEqual(body.strip(), expected)
         self.assertEqual((configs, commands), (7, 3))
 
@@ -238,13 +238,17 @@ class SetupTests(unittest.TestCase):
     def test_bootstrap_examples_match_readme(self):
         def installers(document):
             return {language: body for language, body in blocks(document)
-                    if "https://raw.githubusercontent.com/avhn/secret/v0.5.0/install." in body}
+                    if "https://raw.githubusercontent.com/avhn/secret/v0.6.0/install." in body}
         canonical = installers(self.document)
         self.assertEqual(set(canonical), {"sh", "powershell"})
         self.assertEqual(installers((ROOT / "README.md").read_text()), canonical)
 
     def test_readme_onboarding_order_prompt_and_launcher(self):
         document = (ROOT / "README.md").read_text(encoding="utf-8")
+        # The product is named Secret in prose; the executable and IDs stay lowercase.
+        self.assertIn("<br>Secret</h1>", document)
+        self.assertIn("Install or update the Secret CLI", document)
+        self.assertEqual(self.document.splitlines()[0], "# Set up Secret MCP")
         headings = re.findall(r"^## (.+)$", document, re.MULTILINE)
         self.assertEqual(headings, ["How it works", "Install", "Use it",
                          "Use it to launch other MCP servers", "Next steps", "Guard hook",
@@ -286,15 +290,15 @@ class SetupTests(unittest.TestCase):
         self.assertIn("v0.3.4 installer uses `secret-go`", self.names_only_document)
         self.assertIn("re-register each MCP client", self.names_only_document)
         urls = re.findall(r"https://raw\.githubusercontent\.com/[^\s`]+", self.document)
-        self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh",
-                                "https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1"])
+        self.assertEqual(urls, ["https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh",
+                                "https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1"])
         self.assertIn("curl -fsSL " + urls[0] + " | sh", self.document)
         self.assertIn("irm " + urls[1] + " | iex", self.document)
         self.assertIn("io.github.avhn/secret", self.document)
-        self.assertIn("secret-v0.5.0-desktop.mcpb", self.document)
+        self.assertIn("secret-v0.6.0-desktop.mcpb", self.document)
         for installer in ("install.sh", "install.ps1"):
             source = (ROOT / installer).read_text()
-            self.assertNotIn("0.5.0", source)
+            self.assertNotIn("0.6.0", source)
             self.assertIn("releases/latest", source)
             for option in ("SECRET_VERSION", "SECRET_RELEASE_COMMIT", "INSTALL_DIR", "--version", "--commit", "--dir", "--help"):
                 self.assertIn(option, source)

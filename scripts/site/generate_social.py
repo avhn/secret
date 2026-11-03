@@ -36,7 +36,12 @@ FONT = {
     'X': '10001/10001/01010/00100/01010/10001/10001',
     'Y': '10001/10001/01010/00100/00100/00100/00100',
     'Z': '11111/00001/00010/00100/01000/10000/11111',
-    '-': '00000/00000/00000/11111/00000/00000/00000',
+    # Lowercase glyphs for the product name only; everything else stays uppercase.
+    'c': '00000/00000/01110/10000/10000/10001/01110',
+    'e': '00000/00000/01110/10001/11111/10000/01110',
+    'r': '00000/00000/10110/11001/10000/10000/10000',
+    't': '01000/01000/11110/01000/01000/01001/00110',
+    '-':'00000/00000/00000/11111/00000/00000/00000',
     '+': '00000/00100/00100/11111/00100/00100/00000',
     '/': '00001/00001/00010/00100/01000/10000/10000',
     '.': '00000/00000/00000/00000/00000/00110/00110',
@@ -101,7 +106,7 @@ def render_scanlines():
     def text(value, x, y, scale, color):
         if x + len(value) * scale * 6 - scale > WIDTH:
             raise ValueError('Text exceeds the image bounds')
-        for char in value.upper():
+        for char in value:
             for row, bits in enumerate(FONT[char].split('/')):
                 for col, bit in enumerate(bits):
                     if bit == '1':
@@ -126,9 +131,9 @@ def render_scanlines():
     rect(0, 0, WIDTH, 12, brand)
     mark(82, 66, 62, accent)
     text('GO CLI + NAMES-ONLY MCP + GUARD HOOK', 166, 86, 3, accent)
-    text('SECRET', 82, 177, 12, ink)
-    text('CREDENTIALS FOR CODING AGENTS,', 82, 300, 4, ink)
-    text('NEVER IN CONTEXT', 82, 346, 4, ink)
+    text('Secret', 82, 177, 12, ink)
+    text('CREDENTIALS FOR CODING AGENTS.', 82, 300, 4, ink)
+    text('NAMES-ONLY MCP. LITERAL REDACTION.', 82, 346, 4, ink)
     text('ACCIDENT PREVENTION, NOT A SANDBOX', 82, 414, 3, muted)
     rect(82, 486, 1036, 2, (63, 58, 90))
     text('LINUX + MACOS + WINDOWS', 82, 525, 4, accent)

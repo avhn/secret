@@ -1,6 +1,7 @@
 // Adds a copy button to every pre > code block. Clipboard API only, no dependencies.
+// Illustrative transcripts opt out with data-no-copy on the pre element.
 (() => {
-  const blocks = [...document.querySelectorAll('pre > code')];
+  const blocks = [...document.querySelectorAll('pre:not([data-no-copy]) > code')];
   if (!blocks.length) return;
   const status = document.createElement('div');
   status.className = 'sr-only';

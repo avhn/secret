@@ -3,36 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>secret tools: names-only MCP tools and CLI commands</title>
-<meta name="description" content="Reference for the four read-only, names-only MCP tools of secret (list, show, diff, health) and every secret CLI command, from stash and run to operator and age commands.">
+<title>Secret tools: names-only MCP tools and CLI commands</title>
+<meta name="description" content="Reference for the four read-only, names-only MCP tools of Secret (list, show, diff, health) and every Secret CLI command, from stash and run to operator and age commands.">
 <link rel="canonical" href="https://avhn.github.io/secret/tools/">
 <meta name="theme-color" content="#5b3df5">
 <meta property="og:type" content="website">
-<meta property="og:title" content="secret tools: names-only MCP tools and CLI commands">
-<meta property="og:description" content="Reference for the four read-only, names-only MCP tools of secret (list, show, diff, health) and every secret CLI command, from stash and run to operator and age commands.">
+<meta property="og:title" content="Secret tools: names-only MCP tools and CLI commands">
+<meta property="og:description" content="Reference for the four read-only, names-only MCP tools of Secret (list, show, diff, health) and every Secret CLI command, from stash and run to operator and age commands.">
 <meta property="og:url" content="https://avhn.github.io/secret/tools/">
 <meta property="og:image" content="https://avhn.github.io/secret/assets/social.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="secret: credentials for coding agents, never in context. Go CLI, names-only MCP server and guard hook.">
+<meta property="og:image:alt" content="Secret: credentials for coding agents. Names-only MCP. Literal redaction. Accident prevention, not a sandbox.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="secret tools: names-only MCP tools and CLI commands">
-<meta name="twitter:description" content="Reference for the four read-only, names-only MCP tools of secret (list, show, diff, health) and every secret CLI command, from stash and run to operator and age commands.">
+<meta name="twitter:title" content="Secret tools: names-only MCP tools and CLI commands">
+<meta name="twitter:description" content="Reference for the four read-only, names-only MCP tools of Secret (list, show, diff, health) and every Secret CLI command, from stash and run to operator and age commands.">
 <meta name="twitter:image" content="https://avhn.github.io/secret/assets/social.png">
-<meta name="twitter:image:alt" content="secret: credentials for coding agents, never in context. Go CLI, names-only MCP server and guard hook.">
+<meta name="twitter:image:alt" content="Secret: credentials for coding agents. Names-only MCP. Literal redaction. Accident prevention, not a sandbox.">
 <link rel="icon" href="/secret/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/secret/assets/style.css">
 <script src="/secret/assets/copy.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"secret","url":"https://avhn.github.io/secret/","description":"A local credential CLI, a names-only MCP server and a guard hook for coding agents. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.5.0","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"Secret","url":"https://avhn.github.io/secret/","description":"Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.6.0","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://avhn.github.io/secret/"},{"@type":"ListItem","position":2,"name":"Tools","item":"https://avhn.github.io/secret/tools/"}]}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
-<header class="site-header"><div class="wrap header-inner"><a class="brand" href="/secret/"><svg viewBox="80 80 352 352" data-mark="mute-agent" aria-hidden="true"><mask id="brand-cut" maskUnits="userSpaceOnUse" x="80" y="80" width="352" height="352"><rect x="80" y="80" width="352" height="352" fill="#fff"/><rect x="156" y="214" width="200" height="84" rx="18" fill="#000"/></mask><path mask="url(#brand-cut)" d="M 256 88 C 299.68 212.32 299.68 212.32 424 256 C 299.68 299.68 299.68 299.68 256 424 C 212.32 299.68 212.32 299.68 88 256 C 212.32 212.32 212.32 212.32 256 88 Z"/></svg><span>secret</span></a><nav class="site-nav" aria-label="Main navigation"><a href="/secret/setup/">Setup</a><a href="/secret/tools/" aria-current="page">Tools</a><a href="/secret/security/">Security</a></nav></div></header>
+<header class="site-header"><div class="wrap header-inner"><a class="brand" href="/secret/"><svg viewBox="80 80 352 352" data-mark="mute-agent" aria-hidden="true"><mask id="brand-cut" maskUnits="userSpaceOnUse" x="80" y="80" width="352" height="352"><rect x="80" y="80" width="352" height="352" fill="#fff"/><rect x="156" y="214" width="200" height="84" rx="18" fill="#000"/></mask><path mask="url(#brand-cut)" d="M 256 88 C 299.68 212.32 299.68 212.32 424 256 C 299.68 299.68 299.68 299.68 256 424 C 212.32 299.68 212.32 299.68 88 256 C 212.32 212.32 212.32 212.32 256 88 Z"/></svg><span>Secret</span></a><nav class="site-nav" aria-label="Main navigation"><a href="/secret/setup/">Setup</a><a href="/secret/tools/" aria-current="page">Tools</a><a href="/secret/security/">Security</a></nav></div></header>
 <main id="main" class="wrap">
 <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="/secret/">Home</a></li><li aria-current="page">Tools</li></ol></nav>
 <h1>MCP tools and CLI commands</h1><p class="lead">Four read-only, names-only MCP tools for agents, and the CLI that hands selected values to programs.</p>
-<nav class="toc" aria-label="Tool groups"><ul><li><a href="#mcp">Names-only MCP tools</a></li><li><a href="#mcp-protocol">Protocol limits</a></li><li><a href="#cli-everyday">Everyday CLI</a></li><li><a href="#cli-human">Human-only commands</a></li><li><a href="#cli-operator">Operator commands</a></li><li><a href="#cli-metadata">Metadata and diagnostics</a></li><li><a href="#references">Store references</a></li></ul></nav>
+<nav class="toc" aria-label="Tool groups"><ul><li><a href="#mcp">Names-only MCP tools</a></li><li><a href="#cli-everyday">Everyday CLI</a></li><li><a href="#cli-human">Human-only commands</a></li><li><a href="#cli-operator">Operator commands</a></li><li><a href="#cli-metadata">Metadata and diagnostics</a></li><li><a href="#references">Store references</a></li><li><a href="#mcp-protocol">Protocol details</a></li></ul></nav>
 <section aria-labelledby="mcp"><h2 id="mcp">Names-only MCP tools</h2>
 <p>MCP is off until explicitly allowlisted with <code>secret mcp --store REF [--store REF ...]</code>. Every tool is annotated read-only. No tool mutates stores or returns values, value hashes or lengths; there are no resources, prompts or network listeners. Requests cannot expand the configured allowlist. Results are one JSON text content item.</p>
 <dl class="tool-list">
@@ -46,8 +46,6 @@
 <dd>Report configured metadata service readiness, not host protection.<small>Parameters: none.</small><small>Returns: <code>version</code> (metadata schema), <code>status</code> (<code>ready</code>) and <code>stores</code> (count). Not provider availability, value validity or hook protection.</small></dd>
 </dl>
 <p>Unknown arguments are rejected rather than ignored, so an unexpected field cannot imply scoping. Metadata can still reveal key names, labels, presence, backend, references, paths and provider account IDs to the client, its model and its logs.</p></section>
-<section aria-labelledby="mcp-protocol"><h2 id="mcp-protocol">Protocol limits</h2>
-<ul><li>Newline-delimited JSON-RPC over stdio. The server identifies as <code>secret-metadata</code> version <code>1</code> and answers protocol <code>2025-06-18</code>, or <code>2024-11-05</code> and <code>2025-03-26</code> when the client requests them.</li><li>Input frames are bounded to 64 KiB and responses to 4 MiB. Batches and duplicate JSON keys are rejected.</li><li>Error messages never echo input, parser diagnostics, store errors, argv or provider stderr.</li><li>Up to 64 distinct <code>--store</code> references per server; file references must be absolute.</li></ul></section>
 <section aria-labelledby="cli-everyday"><h2 id="cli-everyday">Everyday CLI</h2>
 <p>Stores use <code>KEY=VALUE</code> lines: <code>~/.secrets.env</code> and <code>~/.secrets/*.secret</code> by default (<code>SECRETS_ENV</code> and <code>SECRETS_DIR</code> override them). <code>--env dev</code> means <code>--label env=dev</code>; repeat <code>--label name=value</code> to select multiple labels.</p>
 <dl class="tool-list">
@@ -62,7 +60,7 @@
 <dt id="cli-clip"><code>secret clip FILE KEY [SECONDS]</code></dt>
 <dd>Copies a value and clears the clipboard after 45 seconds unless you have copied something else since. Agents use it only when you ask for the clipboard.</dd>
 <dt id="cli-version"><code>secret version</code>, <code>secret --version</code></dt>
-<dd>Prints the release, for example <code>secret 0.5.0 (go)</code>.</dd>
+<dd>Prints the release, for example <code>secret 0.6.0 (go)</code>.</dd>
 <dt id="cli-help"><code>secret help</code></dt>
 <dd>The full reference, including exit statuses.</dd>
 </dl></section>
@@ -107,7 +105,9 @@
 <section aria-labelledby="references"><h2 id="references">Store references</h2>
 <ul><li>Bare names and paths use file stores; <code>file:PATH</code> forces a literal file path.</li><li><code>keychain:NAME</code> uses the macOS Keychain and <code>libsecret:NAME</code> the Linux Secret Service. Their manifests hold only key names, labels and random account identifiers.</li><li><code>pass:NAME</code> uses optional pass on Linux and macOS.</li><li><code>wincred:NAME</code> uses native Windows Credential Manager.</li><li><code>age:NAME</code> explicitly selects an encrypted store; defaults never discover it, and value commands need <code>--age-identity FILE</code>.</li></ul>
 <p>Full details are in <a href="https://github.com/avhn/secret/blob/main/docs/usage.md">docs/usage.md</a>. See <a href="/secret/setup/">setup</a> to register the MCP server and <a href="/secret/security/">security</a> for limits.</p></section>
+<section aria-labelledby="mcp-protocol"><h2 id="mcp-protocol">Protocol details</h2>
+<ul><li>Newline-delimited JSON-RPC over stdio. The server identifies as <code>secret-metadata</code> version <code>1</code> and answers protocol <code>2025-06-18</code>, or <code>2024-11-05</code> and <code>2025-03-26</code> when the client requests them.</li><li>Input frames are bounded to 64 KiB and responses to 4 MiB. Batches and duplicate JSON keys are rejected.</li><li>Error messages never echo input, parser diagnostics, store errors, argv or provider stderr.</li><li>Up to 64 distinct <code>--store</code> references per server; file references must be absolute.</li></ul></section>
 </main>
-<footer class="site-footer"><div class="wrap footer-inner"><div><p><strong>secret</strong> / Go CLI, names-only MCP server and guard hook. GPL-3.0-or-later licensed.</p><p>Accident prevention, not a sandbox. Installing it does not establish fail-closed host protection.</p></div><nav class="footer-links" aria-label="Project links"><a href="https://github.com/avhn/secret">Source</a><a href="https://github.com/avhn/secret/releases">Releases</a><a href="https://github.com/avhn/secret/blob/main/LICENSE">License</a></nav></div></footer>
+<footer class="site-footer"><div class="wrap footer-inner"><div><p><strong>Secret</strong> / Go CLI, names-only MCP server and guard hook. GPL-3.0-or-later licensed.</p><p>Accident prevention, not a sandbox. Installing it does not establish fail-closed host protection.</p></div><nav class="footer-links" aria-label="Project links"><a href="https://github.com/avhn/secret">Source</a><a href="https://github.com/avhn/secret/releases">Releases</a><a href="https://github.com/avhn/secret/blob/main/LICENSE">License</a></nav></div></footer>
 </body>
 </html>

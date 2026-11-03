@@ -3,65 +3,70 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>secret: let coding agents use your credentials without reading them</title>
-<meta name="description" content="A local credential CLI, a names-only MCP server and a guard hook for coding agents. Agents choose keys by name; selected values go straight to the program. Go, Linux, macOS and Windows.">
+<title>Secret: let coding agents use your credentials without reading them</title>
+<meta name="description" content="Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook for Linux, macOS and Windows.">
 <link rel="canonical" href="https://avhn.github.io/secret/">
 <meta name="theme-color" content="#5b3df5">
 <meta property="og:type" content="website">
-<meta property="og:title" content="secret: let coding agents use your credentials without reading them">
-<meta property="og:description" content="A local credential CLI, a names-only MCP server and a guard hook for coding agents. Agents choose keys by name; selected values go straight to the program. Go, Linux, macOS and Windows.">
+<meta property="og:title" content="Secret: let coding agents use your credentials without reading them">
+<meta property="og:description" content="Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook for Linux, macOS and Windows.">
 <meta property="og:url" content="https://avhn.github.io/secret/">
 <meta property="og:image" content="https://avhn.github.io/secret/assets/social.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="secret: credentials for coding agents, never in context. Go CLI, names-only MCP server and guard hook.">
+<meta property="og:image:alt" content="Secret: credentials for coding agents. Names-only MCP. Literal redaction. Accident prevention, not a sandbox.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="secret: let coding agents use your credentials without reading them">
-<meta name="twitter:description" content="A local credential CLI, a names-only MCP server and a guard hook for coding agents. Agents choose keys by name; selected values go straight to the program. Go, Linux, macOS and Windows.">
+<meta name="twitter:title" content="Secret: let coding agents use your credentials without reading them">
+<meta name="twitter:description" content="Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook for Linux, macOS and Windows.">
 <meta name="twitter:image" content="https://avhn.github.io/secret/assets/social.png">
-<meta name="twitter:image:alt" content="secret: credentials for coding agents, never in context. Go CLI, names-only MCP server and guard hook.">
+<meta name="twitter:image:alt" content="Secret: credentials for coding agents. Names-only MCP. Literal redaction. Accident prevention, not a sandbox.">
 <link rel="icon" href="/secret/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/secret/assets/style.css">
 <script src="/secret/assets/copy.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"secret","url":"https://avhn.github.io/secret/","description":"A local credential CLI, a names-only MCP server and a guard hook for coding agents. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.5.0","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"Secret","url":"https://avhn.github.io/secret/","description":"Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.6.0","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to main content</a>
-<header class="site-header"><div class="wrap header-inner"><a class="brand" href="/secret/"><svg viewBox="80 80 352 352" data-mark="mute-agent" aria-hidden="true"><mask id="brand-cut" maskUnits="userSpaceOnUse" x="80" y="80" width="352" height="352"><rect x="80" y="80" width="352" height="352" fill="#fff"/><rect x="156" y="214" width="200" height="84" rx="18" fill="#000"/></mask><path mask="url(#brand-cut)" d="M 256 88 C 299.68 212.32 299.68 212.32 424 256 C 299.68 299.68 299.68 299.68 256 424 C 212.32 299.68 212.32 299.68 88 256 C 212.32 212.32 212.32 212.32 256 88 Z"/></svg><span>secret</span></a><nav class="site-nav" aria-label="Main navigation"><a href="/secret/setup/">Setup</a><a href="/secret/tools/">Tools</a><a href="/secret/security/">Security</a></nav></div></header>
-<main id="main" class="wrap prose">
+<header class="site-header"><div class="wrap header-inner"><a class="brand" href="/secret/"><svg viewBox="80 80 352 352" data-mark="mute-agent" aria-hidden="true"><mask id="brand-cut" maskUnits="userSpaceOnUse" x="80" y="80" width="352" height="352"><rect x="80" y="80" width="352" height="352" fill="#fff"/><rect x="156" y="214" width="200" height="84" rx="18" fill="#000"/></mask><path mask="url(#brand-cut)" d="M 256 88 C 299.68 212.32 299.68 212.32 424 256 C 299.68 299.68 299.68 299.68 256 424 C 212.32 299.68 212.32 299.68 88 256 C 212.32 212.32 212.32 212.32 256 88 Z"/></svg><span>Secret</span></a><nav class="site-nav" aria-label="Main navigation"><a href="/secret/setup/">Setup</a><a href="/secret/tools/">Tools</a><a href="/secret/security/">Security</a></nav></div></header>
+<main id="main" class="wrap prose home">
 <h1>Let coding agents use your credentials without reading them.</h1>
-<p class="lead">A local credential CLI, a names-only MCP server, and a guard hook for coding agents.</p>
-<p>Agents see key names, labels and paths, never values through the names-only interface. The CLI passes selected values directly to programs; the guard denies known store-reading operations.</p>
-<section aria-labelledby="what"><h2 id="what">What you get</h2>
-<dl class="tool-list">
-<dt>The <code>secret</code> CLI</dt>
-<dd>Stash values with a hidden prompt, list masked names, and run a program with only the selected keys in its environment. <code>secret run</code> replaces every loaded value with <code>&lt;redacted&gt;</code> on the child's stdout and stderr.</dd>
-<dt>A names-only MCP server</dt>
-<dd>Opt-in local stdio with exact, human-approved <code>--store</code> references. Four read-only tools, <code>list</code>, <code>show</code>, <code>diff</code> and <code>health</code>, never return values, value hashes or lengths. <a href="/secret/tools/">Tool reference</a>.</dd>
-<dt>A guard hook</dt>
-<dd>The optional Claude Code and Codex plugins install the Bash guard and agent skill. The guard denies common accidents such as reading store files, dumping the environment and credential printers like <code>gh auth token</code>.</dd>
-</dl>
-<div class="note"><p>Accident prevention, not a sandbox. Read the <a href="/secret/security/">security model and limits</a>.</p></div></section>
-<section aria-labelledby="how"><h2 id="how">How it works</h2>
-<ol><li>The agent asks for a credential by key name, not its value.</li><li><code>secret</code> hands the selected value directly to the program's environment.</li><li><code>secret run</code> redacts loaded literal values from stdout and stderr.</li></ol></section>
+<p class="lead">When your coding agent reads an environment file to deploy your app, the token can end up in its conversation.</p>
+<p>Secret is a local CLI that runs your program with selected credentials and redacts their literal values from its output, with an optional names-only MCP server and guard hook.</p>
+<p class="qualifier"><a href="/secret/security/">Accident prevention, not a sandbox.</a> Transformed output and arbitrary child behavior remain outside that protection.</p>
+<section aria-labelledby="compare" class="compare-section"><h2 id="compare" class="sr-only">Before and after</h2>
+<div class="compare">
+<figure class="terminal"><figcaption><span class="terminal-label">Today</span><span class="sr-only">: </span> The agent reads the file. The value is now in its context.</figcaption>
+<pre data-no-copy><code class="language-text"><span class="prompt">$ </span>cat .env
+<span class="leak">API_TOKEN=synthetic-token</span></code></pre>
+<p class="caption">Illustrative transcripts. Whatever the command prints becomes part of the conversation.</p></figure>
+<figure class="terminal"><figcaption><span class="terminal-label">With Secret</span><span class="sr-only">: </span> You stash the value once. The agent selects the key by name.</figcaption>
+<pre data-no-copy><code class="language-text"><span class="prompt">$ </span>secret stash ~/.secrets.env API_TOKEN
+<span class="dim">API_TOKEN: </span>
+<span class="dim">stored API_TOKEN in /home/you/.secrets.env</span>
+<span class="prompt">$ </span>secret run -f ~/.secrets.env \
+    --key API_TOKEN -- ./deploy.sh
+API_TOKEN=<span class="redacted">&lt;redacted&gt;</span></code></pre>
+<p class="caption"><code>API_TOKEN</code> reaches <code>deploy.sh</code> through its environment; if the script echoes the loaded literal value, <code>run</code> prints <code>&lt;redacted&gt;</code> instead. The optional Claude Code or Codex plugin's guard also denies reading the store file itself, as accident prevention.</p></figure>
+</div></section>
 <section aria-labelledby="install"><h2 id="install">Install</h2>
-<p>Install or update the secret CLI to the latest release. Linux/macOS:</p>
-<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh | sh</code></pre>
-<p>Windows PowerShell:</p>
-<pre><code class="language-powershell">irm https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1 | iex</code></pre>
-<p>No GitHub account or gh is needed; rerunning updates the installation. Both installers print the concrete executable path. Neither reads stores, registers MCP, installs hooks or edits clients. See <a href="/secret/setup/">setup</a> for pins, rollback, paths and client registration.</p></section>
-<section aria-labelledby="agent"><h2 id="agent">Or let your agent set it up</h2>
-<pre><code class="language-text">Follow https://github.com/avhn/secret/blob/v0.5.0/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.</code></pre>
-<p>The agent asks you which exact stores may expose metadata to its client. You enter values yourself; the agent never sees them.</p></section>
-<section aria-labelledby="use"><h2 id="use">First commands</h2>
-<p>In your own terminal, stash a value with a hidden prompt. Agents can use <code>show</code> and <code>run</code>, but must never enter or retrieve values. These are illustrative paths:</p>
-<pre><code class="language-sh">secret stash ~/.secrets.env API_TOKEN
-secret show ~/.secrets.env
-secret run -f ~/.secrets.env --key API_TOKEN -- ./deploy.sh</code></pre>
-<ul><li><code>stash</code> reads the value from a hidden prompt and writes the store atomically.</li><li><code>show</code> prints key names with masked lengths, such as <code>API_TOKEN=&lt;40 bytes&gt;</code>.</li><li><code>run</code> exports only the selected keys to the child and redacts every loaded value from its output.</li></ul></section>
+<h3>Linux/macOS</h3>
+<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh | sh</code></pre>
+<h3>Windows PowerShell</h3>
+<pre><code class="language-powershell">irm https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1 | iex</code></pre>
+<p>Both scripts install the latest release by default and print the executable's absolute path. No GitHub account or gh is needed; rerunning updates the installation. Neither reads stores, registers MCP, installs hooks or edits clients. See <a href="/secret/setup/">setup</a> for pins, rollback, paths and the trust boundary.</p></section>
+<section aria-labelledby="use"><h2 id="use">Three commands</h2>
+<p>Example paths. You enter values in your own terminal; agents use <code>show</code> and <code>run</code>.</p>
+<div class="step"><pre><code class="language-sh">secret stash ~/.secrets.env API_TOKEN</code></pre>
+<p>Reads the value from a hidden prompt and writes the store with a private atomic replacement.</p></div>
+<div class="step"><pre><code class="language-sh">secret show ~/.secrets.env</code></pre>
+<p>Prints key names with masked byte lengths, such as <code>API_TOKEN=&lt;40 bytes&gt;</code>, never values.</p></div>
+<div class="step"><pre><code class="language-sh">secret run -f ~/.secrets.env --key API_TOKEN -- ./deploy.sh</code></pre>
+<p>Exports only the selected keys to the child's environment and replaces every loaded literal value with <code>&lt;redacted&gt;</code> on its stdout and stderr.</p></div></section>
+<section aria-labelledby="clients"><h2 id="clients">Clients</h2>
+<p>Setup guides for <a href="/secret/setup/#claude-code">Claude Code</a>, <a href="/secret/setup/#desktop-bundle">Claude Desktop via MCPB</a>, <a href="/secret/setup/#codex">Codex</a>, and other local MCP stdio clients. The names-only MCP tools <code>list</code>, <code>show</code>, <code>diff</code> and <code>health</code> never return values, value hashes or lengths; the optional Claude Code and Codex plugins install the Bash guard that denies known store-reading operations.</p></section>
 <section aria-labelledby="guides"><h2 id="guides">Guides</h2>
-<ul><li><a href="/secret/setup/">Setup</a>: install, update, pin, roll back, register MCP clients, launch other servers, uninstall</li><li><a href="/secret/tools/">Tools</a>: the four names-only MCP tools and every CLI command</li><li><a href="/secret/security/">Security</a>: threat model, limits and FAQ</li></ul></section>
+<ul><li><a href="/secret/setup/">Setup</a>: install, pin, roll back, register MCP clients, launch other servers, uninstall</li><li><a href="/secret/tools/">Tools</a>: the four names-only MCP tools and every CLI command</li><li><a href="/secret/security/">Security</a>: what it protects, what it does not, and FAQ</li></ul></section>
 </main>
-<footer class="site-footer"><div class="wrap footer-inner"><div><p><strong>secret</strong> / Go CLI, names-only MCP server and guard hook. GPL-3.0-or-later licensed.</p><p>Accident prevention, not a sandbox. Installing it does not establish fail-closed host protection.</p></div><nav class="footer-links" aria-label="Project links"><a href="https://github.com/avhn/secret">Source</a><a href="https://github.com/avhn/secret/releases">Releases</a><a href="https://github.com/avhn/secret/blob/main/LICENSE">License</a></nav></div></footer>
+<footer class="site-footer"><div class="wrap footer-inner"><div><p><strong>Secret</strong> / Go CLI, names-only MCP server and guard hook. GPL-3.0-or-later licensed.</p><p>Accident prevention, not a sandbox. Installing it does not establish fail-closed host protection.</p></div><nav class="footer-links" aria-label="Project links"><a href="https://github.com/avhn/secret">Source</a><a href="https://github.com/avhn/secret/releases">Releases</a><a href="https://github.com/avhn/secret/blob/main/LICENSE">License</a></nav></div></footer>
 </body>
 </html>

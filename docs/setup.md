@@ -1,14 +1,14 @@
-# Set up secret MCP
+# Set up Secret MCP
 
-This is the canonical setup guide for the opt-in secret local stdio MCP server.
-v0.5.0 is the published GitHub Latest release. Install, choose exact references, register,
+This is the canonical setup guide for the opt-in Secret local stdio MCP server.
+v0.6.0 is the release target of this guide; published tags and assets are immutable. Install, choose exact references, register,
 reconnect and verify in that order. See [installation](install.md) for pins and
 checkout verification and [release approvals](release.md) for publication status.
 
 ## Paste to your agent
 
 ```text
-Follow https://github.com/avhn/secret/blob/v0.5.0/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
+Follow https://github.com/avhn/secret/blob/v0.6.0/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.
 ```
 
 ## For an AI agent
@@ -31,13 +31,13 @@ Install or update to the latest release.
 Linux/macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/avhn/secret/v0.5.0/install.ps1 | iex
+irm https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1 | iex
 ```
 
 The script defaults to the latest release, resolved once from GitHub's release
@@ -167,13 +167,13 @@ For PowerShell, the same client command passes Windows paths as single arguments
 claude mcp add --transport stdio --scope user secret -- 'C:\ABSOLUTE\INSTALL DIR\secret.exe' mcp --store 'file:C:\ABSOLUTE\STORE DIR\STORE.secret'
 ```
 
-Open `/mcp` and select secret's Reconnect action, or restart Claude Code. User
+Open `/mcp` and select Secret's Reconnect action, or restart Claude Code. User
 scope is stored in `~/.claude.json`; do not replace that file manually.
 
 ### Claude Desktop: bundle
 
-The planned release asset is `secret-v0.5.0-desktop.mcpb`. Obtain it from the
-exact v0.5.0 release and verify its committed checksum and attestation using the
+The planned release asset is `secret-v0.6.0-desktop.mcpb`. Obtain it from the
+exact v0.6.0 release and verify its committed checksum and attestation using the
 trusted-checkout verifier in [install.md](install.md), not an adjacent checksum
 alone. The registry identity is `io.github.avhn/secret`; listing/publication is
 owner-gated and is not claimed here.
@@ -258,11 +258,11 @@ desktop app and shares MCP configuration with Codex CLI/IDE for the same Codex
 host. Use the Codex TOML entry above, or Settings > MCP servers > Add server,
 choose STDIO, and enter the same absolute command and three separate arguments.
 Save and restart the desktop app. This is not a claim about older desktop builds
-or a tested secret host integration.
+or a tested Secret host integration.
 
 Browser ChatGPT and remote custom-app connectors are not local stdio launchers.
 They cannot use these local commands directly. Use a supported local client
-instead; secret supplies no HTTP server, tunnel or remote bridge.
+instead; Secret supplies no HTTP server, tunnel or remote bridge.
 
 ### OpenCode
 
@@ -318,13 +318,13 @@ profile's `mcp.json`. This is the VS Code user-profile schema, not settings.json
 }
 ```
 
-Review the server trust prompt and use MCP: List Servers to restart secret after
+Review the server trust prompt and use MCP: List Servers to restart Secret after
 changes. Restart the agent session if needed. Do not accept unrelated trust grants.
 
 ## Verify and understand the limits
 
 Run the installed binary's `version` command in a terminal, using its absolute
-path. Expected release output is `secret 0.5.0 (go)`. The MCP initialize response
+path. Expected release output is `secret 0.6.0 (go)`. The MCP initialize response
 instead identifies `secret-metadata` version `1`; health reports metadata schema
 version, configured readiness and store count, not the release version.
 
@@ -339,14 +339,14 @@ paths and provider account IDs may reach the client, its model and its logs.
 File metadata parsing can open local file bytes internally; provider metadata
 never calls value Get. Unauthenticated age outer metadata is not integrity proof.
 
-All four plugin/marketplace manifests are version 0.5.0, but the installed hooks
+All four plugin/marketplace manifests are version 0.6.0, but the installed hooks
 remain the Bash guard. Go hook activation is M4.1 and remains waiting sponsorship.
 Installing an executable, registering MCP or passing synthetic tests does not
 establish fail-closed host protection. This is accident prevention, not a sandbox.
 
 ## Configured value-consuming launchers
 
-This separate, opt-in example is not the names-only secret MCP server above.
+This separate, opt-in example is not the names-only Secret MCP server above.
 Windows long-lived exec shipped in v0.3.4 and is included in the pinned release
 above; see the [Windows exec contract](design/windows-exec-plan.md). Unix exec
 remains unchanged.
@@ -388,7 +388,7 @@ This launcher consumes selected values in the third-party server's environment.
 Its output is unfiltered and can disclose values; the server owns its protocol,
 output and EOF handling. Windows file-backed stdio is inherited directly and has
 no runtime deadline. On orderly shutdown the host closes stdin, the server exits,
-and secret performs checked Job cleanup. A server ignoring EOF or blocked on
+and Secret performs checked Job cleanup. A server ignoring EOF or blocked on
 output can remain alive indefinitely: after its shutdown budget the host must
 terminate the wrapper. Killing only an intermediary host need not kill secret.
 Consoleless signal delivery is not guaranteed. See [Windows limits](windows.md).

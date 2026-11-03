@@ -1,6 +1,6 @@
-# secret
+# Secret
 
-> Let coding agents use your credentials without reading them. A local credential CLI, a names-only MCP server and a guard hook for coding agents, in Go for Linux, macOS and Windows. Accident prevention, not a sandbox.
+> Secret: credentials for coding agents. A local credential CLI with literal output redaction, a names-only MCP server and a guard hook, in Go for Linux, macOS and Windows. Accident prevention, not a sandbox.
 
 This file is an entrypoint index. The linked documents are the references.
 

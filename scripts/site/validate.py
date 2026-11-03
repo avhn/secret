@@ -29,6 +29,19 @@ EM_DASH, EN_DASH, MIDDLE_DOT, BULLET = chr(0x2014), chr(0x2013), chr(0xb7), chr(
 FORBIDDEN = re.compile('[' + EN_DASH + EM_DASH + MIDDLE_DOT + BULLET + chr(0x2600) + '-' + chr(0x27bf)
                        + chr(0x1f000) + '-' + chr(0x1faff) + ']')
 RAW_MAIN = 'https://raw.githubusercontent.com/avhn/secret/main/'
+# Pages whose installer-script URLs must carry the current release version.
+INSTALLER_PAGES = ('index.html', 'setup/index.html')
+INSTALLER_URL = re.compile(r'https://raw\.githubusercontent\.com/avhn/secret/v([^/]+)/install\.(?:sh|ps1)')
+MANIFEST_TEMPLATE = 'packaging/mcpb/manifest.template.json'
+
+
+def release_version(repo):
+    """The coordinated release identity, read from the MCPB manifest template with stdlib json."""
+    data = json.loads((repo / MANIFEST_TEMPLATE).read_text(encoding='utf-8'))
+    version = data.get('version')
+    if not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError(f'{MANIFEST_TEMPLATE}: expected a strict release version')
+    return version
 
 
 class Page(HTMLParser):
@@ -193,6 +206,32 @@ def validate(site, repo=ROOT):
             except ValueError:
                 fail(f'{name}: invalid JSON-LD')
 
+    try:
+        version = release_version(repo)
+    except (OSError, ValueError) as error:
+        version = None
+        fail(f'cannot read the release version: {error}')
+    for name, page in parsed.items():
+        for block in page.ld:
+            try:
+                data = json.loads(block)
+            except ValueError:
+                continue
+            if data.get('@type') != 'SoftwareApplication':
+                continue
+            if data.get('name') != 'Secret':
+                fail(f'{name}: SoftwareApplication name must be Secret')
+            if version is not None and data.get('softwareVersion') != version:
+                fail(f'{name}: softwareVersion {data.get("softwareVersion")!r} differs from {MANIFEST_TEMPLATE} {version}')
+        if name in INSTALLER_PAGES and version is not None:
+            text = (site / name).read_text(encoding='utf-8')
+            found = INSTALLER_URL.findall(text)
+            if not found:
+                fail(f'{name}: expected installer-script URLs')
+            for pinned in found:
+                if pinned != version:
+                    fail(f'{name}: installer-script URL pins v{pinned}, expected v{version}')
+
     for name, page in parsed.items():
         for link in page.links:
             parts = urlsplit(link)
@@ -262,7 +301,7 @@ def self_test():
     cases = {
         'second h1': ('index.html', '</main>', '<h1>Again</h1></main>'),
         'em dash': ('tools/index.html', '</main>', '<p>a ' + EM_DASH + ' b</p></main>'),
-        'middle dot': ('llms.txt', '# secret', '# secret ' + MIDDLE_DOT + ' x'),
+        'middle dot': ('llms.txt', '# Secret', '# Secret ' + MIDDLE_DOT + ' x'),
         'broken link': ('index.html', 'href="/secret/setup/"', 'href="/secret/missing/"'),
         'missing anchor': ('setup/index.html', 'href="#install"', 'href="#nowhere"'),
         'missing cross-page anchor': ('index.html', 'href="/secret/setup/"', 'href="/secret/setup/#nowhere"'),
@@ -271,9 +310,19 @@ def self_test():
         'missing canonical': ('tools/index.html', '<link rel="canonical" href="https://avhn.github.io/secret/tools/">', ''),
         'missing og:image': ('security/index.html', '<meta property="og:image" ', '<meta property="og:imagex" '),
         'sitemap drift': ('sitemap.xml', '</urlset>', '  <url><loc>https://avhn.github.io/secret/extra/</loc></url>\n</urlset>'),
-        'faq drift': ('security/index.html', '<h3 id="question-1">What is secret?</h3>', '<h3 id="question-1">What is it?</h3>'),
+        'faq drift': ('security/index.html', '<h3 id="question-1">What is Secret?</h3>', '<h3 id="question-1">What is it?</h3>'),
         'llms missing file': ('llms.txt', 'docs/setup.md', 'docs/missing.md'),
     }
+    version = release_version(ROOT)
+    bumped = version[:-1] + str((int(version[-1]) + 1) % 10)
+    for name in PAGES + NOINDEX:
+        cases[f'softwareVersion drift in {name}'] = (
+            name, f'"softwareVersion":"{version}"', f'"softwareVersion":"{bumped}"')
+        cases[f'lowercase SoftwareApplication name in {name}'] = (name, '"name":"Secret"', '"name":"secret"')
+    for name in INSTALLER_PAGES:
+        for script in ('install.sh', 'install.ps1'):
+            cases[f'{script} URL version drift in {name}'] = (
+                name, f'/v{version}/{script}', f'/v{bumped}/{script}')
     with tempfile.TemporaryDirectory(prefix='secret-site-') as temporary:
         clean = Path(temporary) / 'clean'
         shutil.copytree(ROOT / 'site', clean)
@@ -291,7 +340,17 @@ def self_test():
         (missing / '.nojekyll').unlink()
         if not validate(missing):
             raise SystemExit('FAIL self-test: validator accepted a missing .nojekyll')
-    print(f'PASS: validator self-test rejected {len(cases) + 1} broken copies')
+        # A drifted manifest template must fail every page's version identity.
+        repo = Path(temporary) / 'repo'
+        (repo / MANIFEST_TEMPLATE).parent.mkdir(parents=True)
+        for document in ('docs/setup.md', 'docs/install.md', 'docs/usage.md', 'docs/windows.md', 'docs/age.md',
+                         'docs/pass.md', 'SECURITY.md', 'skills/secrets/SKILL.md'):
+            (repo / document).parent.mkdir(parents=True, exist_ok=True)
+            (repo / document).write_text('synthetic\n', encoding='utf-8')
+        (repo / MANIFEST_TEMPLATE).write_text(json.dumps({'version': bumped}), encoding='utf-8')
+        if not validate(clean, repo):
+            raise SystemExit('FAIL self-test: validator accepted a manifest template version drift')
+    print(f'PASS: validator self-test rejected {len(cases) + 2} broken copies')
 
 
 def main():

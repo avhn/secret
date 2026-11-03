@@ -1,7 +1,7 @@
 {
   "name": "secret",
-  "version": "0.5.0",
-  "description": "Use credentials from coding agents without reading their values into context: a secret CLI, a PreToolUse guard, and a skill.",
+  "version": "0.6.0",
+  "description": "Use credentials from coding agents without reading their values into context: the Secret CLI, a PreToolUse guard, and a skill.",
   "keywords": ["secrets", "credentials", "env", "hooks", "security"],
   "skills": "./skills",
   "hooks": "./.codex-plugin/hooks.json"

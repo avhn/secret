@@ -31,7 +31,7 @@ REPO = "avhn/secret"
 REPOSITORY = "https://github.com/" + REPO
 NAME = "io.github.avhn/secret"
 SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
-PUBLISH_TAG = "v0.5.0"
+PUBLISH_TAG = "v0.6.0"
 PUBLISHER_VERSION = "1.8.1"
 PUBLISHER_SHA256 = "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
 PUBLISHER_URL = ("https://github.com/modelcontextprotocol/registry/releases/download/v"
@@ -102,7 +102,7 @@ def source_metadata(version):
     require(set(value) == {"$schema", "name", "title", "description", "repository"},
             "source must contain only reviewed metadata fields, without a version or packages")
     require(value["$schema"] == SCHEMA and value["name"] == NAME
-            and value["title"] == "secret", "unexpected schema or server identity")
+            and value["title"] == "Secret", "unexpected schema or server identity")
     require(value["repository"] == {"url": REPOSITORY, "source": "github"}, "unexpected repository")
     require(isinstance(value["description"], str) and 0 < len(value["description"]) <= 100,
             "invalid server description")
@@ -328,7 +328,7 @@ def git(*args):
 
 
 def verify_source(tag, commit=None):
-    require(tag == PUBLISH_TAG, "registry publication requires exactly v0.5.0")
+    require(tag == PUBLISH_TAG, "registry publication requires exactly v0.6.0")
     if commit is not None:
         require(re.fullmatch(r"[0-9a-f]{40}", commit), "expected full commit SHA")
     git("fetch", "--no-tags", "--force", "origin", f"refs/tags/{tag}:refs/tags/{tag}")
