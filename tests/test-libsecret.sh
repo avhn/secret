@@ -7,7 +7,7 @@ set -euo pipefail
 
 ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 if [[ "${1:-}" != --session ]]; then
-    for tool in dbus-run-session gnome-keyring-daemon secret-tool perl script; do
+    for tool in dbus-run-session dbus-send gnome-keyring-daemon secret-tool perl script; do
         if ! command -v "$tool" >/dev/null 2>&1; then
             if [[ "${SECRET_REQUIRE_LIBSECRET:-}" == 1 ]]; then
                 printf 'FAIL: %s is required\n' "$tool" >&2
@@ -50,6 +50,26 @@ printf '\n' | gnome-keyring-daemon --unlock --components=secrets >"$TMP/daemon-o
     printf 'FAIL: temporary keyring failed to start\n' >&2
     exit 1
 }
+# The daemon can return before it owns the Secret Service name. An early
+# secret-tool call then D-Bus-activates a second, locked daemon and the suite
+# dies mid-run (seen twice in CI). Wait for the unlocked daemon to own the name.
+ready=0 tries=0
+while [[ $tries -lt 100 ]]; do
+    if dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus.NameHasOwner string:org.freedesktop.secrets 2>/dev/null |
+        grep -q 'boolean true'; then
+        ready=1
+        break
+    fi
+    tries=$((tries + 1))
+    sleep 0.1
+done
+if [[ $ready != 1 ]]; then
+    printf 'FAIL: temporary keyring did not claim org.freedesktop.secrets\n' >&2
+    exit 1
+fi
+# Under set -e an unchecked command would otherwise end the suite silently.
+trap 'printf "FAIL: suite stopped at line %s (status %s)\n" "$LINENO" "$?" >&2' ERR
 SECRET="${SECRET_CLI:-$ROOT/compat/secret}"
 SECRET="$(cd -P "$(dirname "$SECRET")" && pwd -P)/${SECRET##*/}"
 if [[ "$SECRET" -ef "$ROOT/compat/secret" ]]; then
