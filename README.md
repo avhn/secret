@@ -5,7 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://avhn.github.io/secret/"><img alt="Website" src="https://img.shields.io/badge/website-avhn.github.io%2Fsecret-5B3DF5"></a>
   <a href="https://github.com/avhn/secret/releases"><img alt="Release" src="https://img.shields.io/github/v/release/avhn/secret"></a>
   <a href="https://github.com/avhn/secret/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/avhn/secret/ci.yml?branch=main&label=ci"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/avhn/secret"></a>
