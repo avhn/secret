@@ -166,7 +166,7 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4's v0.2.3 release is complete. The v0.6.0 preparation retains packaging and
+M4's v0.2.3 release is complete. The published v0.6.0 release retains packaging and
 advances all four manifests to 0.6.0. The owner-approved CLI-only extraction puts
 the verified launcher at `bin/secret`, retaining Bash at `compat/secret`.
 Claude/Codex hooks remain Bash. M4.1 still owns `onFailure: "block"`, `guard-go`
