@@ -1,11 +1,12 @@
 # Release procedure
 
-v0.6.0 is in preparation: a site redesign around one concrete example, the
-product name written as Secret in prose, and a coordinated identity bump. It
-changes no CLI identifier, security boundary, hook activation or release
-inventory. v0.5.0 was published on 2026-11-02 at checksum commit C `ff5cf56`
-(tag `v0.5.0`, source S `109449e`) and remains the GitHub Latest release until
-v0.6.0 is published; its history is recorded below. Standalone installers use
+v0.6.0 was published on 2026-11-03 at checksum commit C `032503a` (tag `v0.6.0`,
+source S `4431d3c`) and is the GitHub Latest release: a site redesign around one
+concrete example, the product name written as Secret in prose, and a coordinated
+identity bump. It changes no CLI identifier, security boundary, hook activation
+or release inventory. Its six public native installs passed and the Registry
+record published in run [41579780580](https://github.com/avhn/secret/actions/runs/41579780580); main was then fast-forwarded to
+S, never C, and Pages was dispatched from main. v0.5.0 history is recorded below. Standalone installers use
 anonymous HTTPS checksum verification with latest-by-default updates, explicit
 version pins and digest no-ops. Script URLs are pinned to v0.6.0; the default
 binary is the latest release at invocation, resolved once. Commit pins are

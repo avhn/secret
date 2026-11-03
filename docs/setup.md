@@ -1,7 +1,7 @@
 # Set up Secret MCP
 
 This is the canonical setup guide for the opt-in Secret local stdio MCP server.
-v0.6.0 is the release target of this guide; published tags and assets are immutable. Install, choose exact references, register,
+v0.6.0 is the published GitHub Latest release; published tags and assets are immutable. Install, choose exact references, register,
 reconnect and verify in that order. See [installation](install.md) for pins and
 checkout verification and [release approvals](release.md) for publication status.
 

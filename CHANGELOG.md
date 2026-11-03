@@ -4,7 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.6.0 (in preparation)
+## Published releases
+
+### 0.6.0 (2026-11-03, published)
+
+Published at checksum commit C `032503a` (tag `v0.6.0`, source S `4431d3c`),
+the GitHub Latest release. The MCP Registry record `io.github.avhn/secret` 0.6.0
+(title Secret) was published after all six public native installs passed in
+Registry run [41579780580](https://github.com/avhn/secret/actions/runs/41579780580).
 
 Site redesign, Secret naming and a coordinated identity bump. Builds on the
 launcher fix (#52), the pinned pass snapshot cache (#53) and the GitHub Pages
@@ -41,8 +48,6 @@ inventory changes.
   was refused although root-owned sticky ancestors are meant to be trusted.
   macOS now also sees setuid and setgid bits, so an exact-mode cache file or
   directory carrying them is rejected there as it already was on Linux.
-
-## Published releases
 
 ### 0.5.0 (2026-11-02, published)
 
