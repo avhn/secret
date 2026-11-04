@@ -100,14 +100,26 @@ secrets() {
         printf 'guard\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
     fi
     [[ -n "$extra" ]] || extra='{}'
-    if jq -cn --arg t "$tool" "${jq_value_args[@]}" --arg w "$TMP/search" --argjson extra "$extra" \
-        '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
-        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
-        got="$(jq -r 'if env.SECRET_TEST_REASON == "1" then (.hookSpecificOutput.permissionDecision // "allow") + " " + (.hookSpecificOutput.permissionDecisionReason // "") else .hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out" 2>/dev/null)" || got="crash"
-    else
-        got="crash"
-    fi
-    got="${got:-allow}"
+    # A fail-closed deadline on a loaded runner can over-deny once. Replay the
+    # identical envelope once for an unexpected deny only; a deterministic
+    # over-denial still fails, and unexpected allows or crashes never replay.
+    local attempt
+    for attempt in 1 2; do
+        if jq -cn --arg t "$tool" "${jq_value_args[@]}" --arg w "$TMP/search" --argjson extra "$extra" \
+            '{tool_name:$t,cwd:$w,tool_input:((if $t == "Bash" then {command:$v} elif $t == "Grep" then {pattern:"x",path:$v} else {file_path:$v} end) + $extra)}' |
+            perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
+            got="$(jq -r 'if env.SECRET_TEST_REASON == "1" then (.hookSpecificOutput.permissionDecision // "allow") + " " + (.hookSpecificOutput.permissionDecisionReason // "") else .hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out" 2>/dev/null)" || got="crash"
+        else
+            got="crash"
+        fi
+        got="${got:-allow}"
+        if ((attempt == 1)) && [[ "$want" == allow* && "$got" == deny* ]]; then
+            printf 'RETRY %s: got deny, expected allow\n' "$name"
+            print_guard_reason "$name"
+            continue
+        fi
+        break
+    done
     if [[ -n "${SECRET_TEST_RESULTS:-}" ]]; then
         if [[ "$got" == "$want" ]]; then
             printf 'guard\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"

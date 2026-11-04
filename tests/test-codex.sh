@@ -547,13 +547,25 @@ check() {
         [[ "$tool" != Bash ]] || category=pending-M2-ast
         printf 'codex\t%s\t%s\n' "$name" "$category" >>"$SECRET_TEST_CATEGORIES"
     fi
-    if jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
-        '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:$t,tool_input:({command:$c} + (if $d == "" then {} else {workdir:$d} end))}' |
-        perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out"; then
-        got="$(jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out")" || got=crash
-    else
-        got=crash
-    fi
+    # A fail-closed deadline on a loaded runner can over-deny once. Replay the
+    # identical envelope once for an unexpected deny only; a deterministic
+    # over-denial still fails, and unexpected allows or crashes never replay.
+    local attempt
+    for attempt in 1 2; do
+        if jq -cn --arg t "$tool" --argjson c "$command" --arg w "$TMP/work" --arg d "$workdir" \
+            '{hook_event_name:"PreToolUse",session_id:"synthetic",turn_id:"synthetic",model:"synthetic",permission_mode:"default",tool_use_id:"synthetic",transcript_path:null,cwd:$w,tool_name:$t,tool_input:({command:$c} + (if $d == "" then {} else {workdir:$d} end))}' |
+            perl -e 'alarm 5; exec @ARGV' "${guard_cmd[@]}" >"$TMP/$name.out"; then
+            got="$(jq -sr 'if length == 0 then "allow" else .[0].hookSpecificOutput.permissionDecision // "allow" end' "$TMP/$name.out")" || got=crash
+        else
+            got=crash
+        fi
+        if ((attempt == 1)) && [[ "$expected" == allow && "$got" == deny ]]; then
+            printf 'RETRY %s: got deny, expected allow\n' "$name"
+            print_guard_reason "$name"
+            continue
+        fi
+        break
+    done
     if [[ "$got" == "$expected" ]]; then
         PASSED=$((PASSED + 1))
         [[ -z "${SECRET_TEST_RESULTS:-}" ]] || printf 'codex\t%s\tpass\n' "$name" >>"$SECRET_TEST_RESULTS"

@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- The guard and Codex shell suites replay a case once when an expected allow
+  is denied, so a fail-closed deadline on a loaded runner no longer fails CI.
+  A repeated deny still fails; unexpected allows and crashes never replay, and
+  `tests/inventory.sh` prints every `RETRY` line. The hooks are unchanged.
+
 ## Published releases
 
 ### 0.6.0 (2026-11-03, published)

@@ -57,6 +57,8 @@ for suite in "${SUITES[@]}"; do
         FAILED=1
         continue
     fi
+    # Surface replayed over-denials even when the replay passed.
+    grep -A1 '^RETRY ' "$TMP/$suite.log" >&2 || true
     if [[ ! -s "$raw" ]]; then
         printf '%s: no cases recorded (suite may have skipped)\n' "$suite" >&2
         FAILED=1
