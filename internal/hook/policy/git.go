@@ -257,7 +257,7 @@ func (a *analyzer) gitCommand(args []string, depth int, cwd string, direct bool)
 				a.reason = roles.Indeterminate
 				return
 			}
-		} else if !optionIn("--no-pager -p --paginate --bare --literal-pathspecs --glob-pathspecs --noglob-pathspecs --icase-pathspecs --no-optional-locks --no-replace-objects --no-lazy-fetch", key) || attached {
+		} else if !optionIn("-P --no-pager -p --paginate --bare --literal-pathspecs --glob-pathspecs --noglob-pathspecs --icase-pathspecs --no-optional-locks --no-replace-objects --no-lazy-fetch", key) || attached {
 			a.reason = roles.Indeterminate
 			return
 		} else if key == "--bare" {

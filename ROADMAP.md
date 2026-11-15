@@ -4,6 +4,12 @@ Status: `done` = gate passed; `in progress` = work underway; `planned` = not sta
 
 **Current milestone:** v0.6.0 (site redesign, Secret naming, coordinated identity bump) was published on 2026-11-03 at C `032503a` (S `4431d3c`) and is the GitHub Latest release, with MCP Registry record `io.github.avhn/secret` 0.6.0. v0.5.0 (anonymous latest-by-default installers) was published on 2026-11-02 at C `ff5cf56` (S `109449e`). v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`). v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
 
+## Git global-option guard correction (in progress)
+
+Unify Bash Git option boundaries for policy, search and credential printers,
+with paired synthetic denial and metadata controls and Go `-P` parity.
+Local checks do not replace the applicable hosted CI gates or activate Go hooks.
+
 ## v0.5.0: Installer simplification (done)
 
 Latest-by-default anonymous HTTPS installation and updates replace standalone gh

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 
+- Share Git global-option roles across Bash policy, search and credential-printer
+  checks, preventing operand-taking options from hiding `credential fill`.
+  Recognize `-P` in both guards and retain direct-stash transport semantics.
+
 - The guard and Codex shell suites replay a case once when an expected allow
   is denied, so a fail-closed deadline on a loaded runner no longer fails CI.
   A repeated deny still fails; unexpected allows and crashes never replay, and

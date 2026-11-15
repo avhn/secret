@@ -4975,5 +4975,28 @@ jq -cn --arg cwd "$review_work" \
 HOME="$review_home" RIPGREP_CONFIG_PATH='lnk/../config' \
     audit23_envelope review_935ad4e_rg_config deny
 
+# Global options must not hide protected Git operations. No command executes.
+git_option_index=0
+for git_options in '-C /repo' '-C/repo' '-c color.ui=auto' '-ccolor.ui=auto' \
+    '--git-dir /repo/.git' '--git-dir=/repo/.git' \
+    '--work-tree /repo' '--work-tree=/repo' '--namespace audit' '--namespace=audit' \
+    '--exec-path /repo/bin' '--exec-path=/repo/bin' \
+    '--config-env color.ui=GUARD_GIT_TEST' '--config-env=color.ui=GUARD_GIT_TEST' \
+    '--super-prefix audit/' '--super-prefix=audit/' \
+    '--attr-source HEAD' '--attr-source=HEAD' '--list-cmds builtins' '--list-cmds=builtins' \
+    '-p' '--paginate' '-P' '--no-pager' '--bare' '--no-replace-objects' \
+    '--literal-pathspecs' '--glob-pathspecs' '--noglob-pathspecs' '--icase-pathspecs' \
+    '--no-optional-locks' '--no-lazy-fetch'; do
+    git_option_index=$((git_option_index + 1))
+    for git_operation in 'credential fill' 'credential-osxkeychain get' 'config --list' \
+        'show HEAD:.env' 'grep token -- .env' 'apply patch.diff'; do
+        git_case="${git_operation%% *}"
+        GUARD_GIT_TEST=auto secrets "git_globals_${git_option_index}_${git_case}" deny Bash "git $git_options $git_operation"
+    done
+    GUARD_GIT_TEST=auto secrets "git_globals_${git_option_index}_status" allow Bash "git $git_options status"
+done
+secrets git_globals_repeated deny Bash 'git -C /repo -c color.ui=auto -P --namespace=audit credential fill'
+secrets git_globals_stash allow Bash 'git -C /repo -P credential fill | secret stash svc KEY'
+
 printf '%s passed, %s failed (%s)\n' "$PASSED" "$FAILED" "$BASH_VERSION"
 [[ "$FAILED" -eq 0 ]]

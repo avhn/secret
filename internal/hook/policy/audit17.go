@@ -315,7 +315,7 @@ func (a *analyzer) gitListingSafe(args []string, cwd string) bool {
 			cwd, args = a.resolve(args[0], cwd), args[1:]
 		} else if strings.HasPrefix(arg, "-C") && len(arg) > 2 {
 			cwd = a.resolve(arg[2:], cwd)
-		} else if !optionIn("--no-pager --no-optional-locks", arg) {
+		} else if !optionIn("-P --no-pager --no-optional-locks", arg) {
 			// Other global repository/configuration overrides need a broader
 			// proof than a cwd-based names walk. Git dispatch checks them too.
 			return false

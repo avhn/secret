@@ -12,6 +12,19 @@ execute Git, a shell interpreter, child commands, or provider value APIs while
 making a decision. It reads only the bounded metadata described below. Real-host
 failure tests, dialect evidence, and supported-platform CI remain separate gates.
 
+## Git global options
+
+The Bash policy, search scope and credential-printer boundary now share global
+option roles. Options with operands cannot hide `credential fill`; `-P` is
+recognized by both guards. The direct-stash transport exception is unchanged.
+This closes an accidental-read gap, not an expansion of the threat model.
+
+Named tightening: `git_globals_11_status`, `git_globals_12_status`
+(deliberate-tightening). Go already rejects `--exec-path` overrides because
+alternate executable lookup cannot be certified. Bash retains its existing
+metadata allowance. These synthetic controls record that existing difference;
+no protected-operation expectation is weakened.
+
 ## M5e PowerShell and unknown Windows shell contracts
 
 Named tightening: `m5e-powershell-contract-denial` (deliberate-tightening).
