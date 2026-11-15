@@ -14,6 +14,11 @@ hook activation or release inventory changes.
 - All current release identities advance to 0.6.1: compiled version, installer
   script URLs, launchers, manifests, packaging templates, workflows, tests, site
   and docs. Installer suites use 0.6.2 as the synthetic next release.
+- The README leads with a redacted `run` example and a table of the CLI, the
+  names-only MCP server and the guard. It lists every store backend by
+  platform, shows the 1Password and Bitwarden import paths (live `onepassword:`
+  reads stay off), and adds an agent section that separates commands agents may
+  run from human-only commands, plus a command overview.
 
 #### Fixed
 

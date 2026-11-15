@@ -250,9 +250,9 @@ class SetupTests(unittest.TestCase):
         self.assertIn("Install or update the Secret CLI", document)
         self.assertEqual(self.document.splitlines()[0], "# Set up Secret MCP")
         headings = re.findall(r"^## (.+)$", document, re.MULTILINE)
-        self.assertEqual(headings, ["How it works", "Install", "Use it",
-                         "Use it to launch other MCP servers", "Next steps", "Guard hook",
-                         "More workflows", "Security limits", "Development", "License"])
+        self.assertEqual(headings, ["Install", "Quick start", "Where values can live",
+                         "For agents", "Connect your agent", "Command overview",
+                         "Security limits", "More", "License"])
         prompt = self.document.split("## Paste to your agent\n\n", 1)[1].split("\n\n", 1)[0]
         self.assertIn("never discover or read stores", prompt)
         self.assertNotIn(prompt, document)
