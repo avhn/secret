@@ -4,7 +4,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Fixed
+### 0.6.1 (in preparation)
+
+Guard and packaging patch with a coordinated identity bump. No CLI identifier,
+hook activation or release inventory changes.
+
+#### Changed
+
+- All current release identities advance to 0.6.1: compiled version, installer
+  script URLs, launchers, manifests, packaging templates, workflows, tests, site
+  and docs. Installer suites use 0.6.2 as the synthetic next release.
+
+#### Fixed
 
 - Share Git global-option roles across Bash policy, search and credential-printer
   checks, preventing operand-taking options from hiding `credential fill`.

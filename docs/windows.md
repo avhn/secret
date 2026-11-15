@@ -7,7 +7,7 @@ The published v0.5.0 installer simplification ships raw `secret-v0.5.0-windows-a
 both architectures passed in Registry run
 [41378456500](https://github.com/avhn/secret/actions/runs/41378456500).
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
-Plugin manifests become 0.6.0
+Plugin manifests become 0.6.1
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).

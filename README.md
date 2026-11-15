@@ -32,13 +32,13 @@ Install or update the Secret CLI to the latest release.
 Linux/macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/avhn/secret/v0.6.0/install.ps1 | iex
+irm https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.ps1 | iex
 ```
 
 No GitHub account or gh is needed; rerunning updates the installation.
