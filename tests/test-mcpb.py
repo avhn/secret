@@ -214,7 +214,7 @@ class BundleTests(unittest.TestCase):
         package = json.loads((mcpb.PACKAGING / "package.json").read_text())
         lock = json.loads((mcpb.PACKAGING / "package-lock.json").read_text())
         self.assertEqual(package["devDependencies"], {"@anthropic-ai/mcpb": "2.1.2"})
-        overrides = {"node-forge": "1.4.1", "tmp": "0.2.7", "zod": "3.25.76"}
+        overrides = {"node-forge": "1.4.3", "tmp": "0.2.7", "zod": "3.25.76"}
         self.assertEqual(package["overrides"], overrides)
         for name, version in overrides.items():
             installed = json.loads((mcpb.PACKAGING / "node_modules" / name / "package.json").read_text())

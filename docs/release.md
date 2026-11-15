@@ -165,7 +165,7 @@ The reviewed build-only exception in `scripts/package_mcpb.py` retains Zod
 v3 and the patched 4.6.6 is outside the declared dependency ranges. Only bounded,
 reviewed local manifests enter validation. An offline reachability test rejects
 any v4 load during real validation. This is not a general safety claim for Zod v3.
-Exact overrides fix node-forge at 1.4.1 and tmp at 0.2.7; inspect the script
+Exact overrides fix node-forge at 1.4.3 and tmp at 0.2.7; inspect the script
 and lock for the full license/dependency rationale.
 
 CI obtains fresh advisory data using `npm audit --prefix packaging/mcpb

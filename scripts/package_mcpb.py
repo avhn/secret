@@ -5,7 +5,7 @@ Release tooling pins: Python 3.14.8, Node 26.10.0, npm 11.19.1, MCPB 2.1.2.
 Install only with npm ci --prefix packaging/mcpb --ignore-scripts.
 The lock's build-only packages use MIT, ISC, BSD-3-Clause (node-forge's
 alternative) and MIT (type-fest's alternative) licenses. None ships in MCPB.
-Exact overrides fix node-forge (1.4.1) and tmp (0.2.7, including the additional
+Exact overrides fix node-forge (1.4.3) and tmp (0.2.7, including the additional
 GHSA-7c78-jf6q-g5cm found in 0.2.6). tmp is outside external-editor's ^0.0.33
 range; its tmpNameSync API remains compatible and the locked CLI is validated.
 
@@ -181,7 +181,7 @@ def check_cli():
 
 def check_v3_validation():
     """Prove the actual CLI validator cannot load the advisory's v4 implementation."""
-    for name, version in (("node-forge", "1.4.1"), ("tmp", "0.2.7"), ("zod", "3.25.76")):
+    for name, version in (("node-forge", "1.4.3"), ("tmp", "0.2.7"), ("zod", "3.25.76")):
         package = load_json(regular_bytes(PACKAGING / "node_modules" / name / "package.json", 64 << 10))
         if package["version"] != version:
             raise ValueError("installed packaging dependency differs from the reviewed override")

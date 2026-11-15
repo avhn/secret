@@ -15,6 +15,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
   A repeated deny still fails; unexpected allows and crashes never replay, and
   `tests/inventory.sh` prints every `RETRY` line. The hooks are unchanged.
 
+- Raise the build-only MCPB node-forge override from 1.4.1 to 1.4.3 for
+  GHSA-6889-vf6x-f3g5, GHSA-w4xr-hqv8-ch44, GHSA-6cv4-p8m7-4r25 and
+  GHSA-j8rw-jp99-435v, which failed the release audit gate. No npm code ships
+  in the bundle; the reviewed Zod exception is unchanged.
+
 ## Published releases
 
 ### 0.6.0 (2026-11-03, published)
