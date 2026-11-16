@@ -4,7 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### 0.6.1 (in preparation)
+## Published releases
+
+### 0.6.1 (2026-11-16, published)
+
+Published at checksum commit C `57a24d3` (tag `v0.6.1`, source S `e7f3a99`),
+the GitHub Latest release. The MCP Registry record `io.github.avhn/secret` 0.6.1
+was published after all six public native installs passed in Registry run
+[43823666672](https://github.com/avhn/secret/actions/runs/43823666672).
 
 Guard and packaging patch with a coordinated identity bump. No CLI identifier,
 hook activation or release inventory changes.
@@ -38,8 +45,6 @@ hook activation or release inventory changes.
   GHSA-6889-vf6x-f3g5, GHSA-w4xr-hqv8-ch44, GHSA-6cv4-p8m7-4r25 and
   GHSA-j8rw-jp99-435v, which failed the release audit gate. No npm code ships
   in the bundle; the reviewed Zod exception is unchanged.
-
-## Published releases
 
 ### 0.6.0 (2026-11-03, published)
 

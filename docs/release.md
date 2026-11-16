@@ -1,11 +1,13 @@
 # Release procedure
 
-v0.6.1 is in preparation: a patch that shares Git global-option roles across
-the Bash guard checks and raises the build-only MCPB node-forge override to
-1.4.3. It changes no CLI identifier, hook activation or release inventory.
-v0.6.0 was published on 2026-11-03 at checksum commit C `032503a` (tag
-`v0.6.0`, source S `4431d3c`) and remains the GitHub Latest release until
-v0.6.1 is published; its history is recorded below. Standalone installers use
+v0.6.1 was published on 2026-11-16 at checksum commit C `57a24d3` (tag
+`v0.6.1`, source S `e7f3a99`) and is the GitHub Latest release: a patch that
+shares Git global-option roles across the Bash guard checks and raises the
+build-only MCPB node-forge override to 1.4.3. It changes no CLI identifier,
+hook activation or release inventory. Its six public native installs passed
+and the Registry record published in run [43823666672](https://github.com/avhn/secret/actions/runs/43823666672); main was then fast-forwarded
+to S, never C, and Pages was dispatched from main. v0.6.0 history is recorded
+below. Standalone installers use
 anonymous HTTPS checksum verification with latest-by-default updates, explicit
 version pins and digest no-ops. Script URLs are pinned to v0.6.1; the default
 binary is the latest release at invocation, resolved once. Commit pins are

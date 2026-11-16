@@ -52,9 +52,8 @@ in a non-inheritable kill-on-close Job without breakaway fallback; redirected
 operator consent/value input is rejected. Literal output redaction covers UTF-8
 and UTF-16LE/BE, not transformed values or other code pages.
 
-The v0.6.1 release targets Windows amd64 and arm64; its native candidate/public
-installations are required gates. The published v0.6.0 native public asset
-installations passed in Registry run [41579780580](https://github.com/avhn/secret/actions/runs/41579780580).
+The v0.6.1 release covers Windows amd64 and arm64; its native public asset
+installations passed in Registry run [43823666672](https://github.com/avhn/secret/actions/runs/43823666672).
 Cross-builds and test compilation do not certify native installations. The native
 8.3 fixture volume lacked short names, so short-alias coverage remains synthetic.
 
