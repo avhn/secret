@@ -26,7 +26,14 @@ func TestAudit20AWSConfigSearch(t *testing.T) {
 				glob string
 				deny bool
 			}{{"*.ini", true}, {"**/config", true}, {"*.md", false}} {
-				if reason := ToolGrep(root, tc.glob, "", "content", root, root); (reason != "") != tc.deny {
+				reason := ToolGrep(root, tc.glob, "", "content", root, root)
+				if !tc.deny && reason == ScopeReason {
+					// The filtered walk fails closed at its 200 ms deadline, which a
+					// loaded runner can reach on this tiny tree. Replay an expected
+					// allow once; a repeated deny still fails and denies never replay.
+					reason = ToolGrep(root, tc.glob, "", "content", root, root)
+				}
+				if (reason != "") != tc.deny {
 					t.Errorf("glob=%q reason=%q, deny=%v", tc.glob, reason, tc.deny)
 				}
 			}

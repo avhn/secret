@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+
+- `TestAudit20AWSConfigSearch` replays an expected allow once when the
+  filtered search walk hits its 200 ms fail-closed deadline on a loaded
+  Windows runner. A repeated deny still fails; the guard is unchanged.
+
 ## Published releases
 
 ### 0.6.1 (2026-11-16, published)
