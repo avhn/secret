@@ -22,6 +22,9 @@ hook activation or release inventory changes.
 
 #### Fixed
 
+- The `go` CI job's limit rises from 60 to 90 minutes. Slow hosted macOS
+  runners cancelled the race step after every package had passed.
+
 - Share Git global-option roles across Bash policy, search and credential-printer
   checks, preventing operand-taking options from hiding `credential fill`.
   Recognize `-P` in both guards and retain direct-stash transport semantics.

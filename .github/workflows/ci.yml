@@ -452,7 +452,8 @@ jobs:
 
   go:
     name: go (${{ matrix.os }})
-    timeout-minutes: 60
+    # Hosted macOS runners have taken 40 minutes for the plain test step alone.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
