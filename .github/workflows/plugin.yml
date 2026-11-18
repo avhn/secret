@@ -5,13 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       published:
-        description: Repeat against published v0.6.1 assets from final checksum commit C
+        description: Repeat against published v0.6.2 assets from final checksum commit C
         type: boolean
         default: false
       tag:
         description: Exact published tag
         type: string
-        default: v0.6.1
+        default: v0.6.2
       commit:
         description: Authenticated full checksum commit C (required for published checks)
         type: string
@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.6.1
+          test "$RELEASE_TAG" = v0.6.2
           printf '%s\n' "$RELEASE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -93,7 +93,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -147,7 +147,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Record and require native Linux runner evidence
         env:
@@ -180,14 +180,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.6.1
+          test "$RELEASE_TAG" = v0.6.2
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.6.1.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.6.1.txt
+          test -f dist/checksums-v0.6.2.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.6.2.txt
           sh scripts/verify-release.sh --source
       - name: Public anonymous standalone and authenticated checkout installs
         if: inputs.published || inputs.commit != ''
@@ -223,7 +223,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Record and require native macOS and stock Bash evidence
         env:
@@ -275,14 +275,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.commit }}
         run: |
-          test "$RELEASE_TAG" = v0.6.1
+          test "$RELEASE_TAG" = v0.6.2
           git fetch --no-tags --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           test "$(git rev-parse --is-shallow-repository)" = false
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_COMMIT"
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
-          test -f dist/checksums-v0.6.1.txt
-          git diff --exit-code HEAD -- dist/checksums-v0.6.1.txt
+          test -f dist/checksums-v0.6.2.txt
+          git diff --exit-code HEAD -- dist/checksums-v0.6.2.txt
           sh scripts/verify-release.sh --source
       - name: Public anonymous standalone and authenticated checkout installs
         if: inputs.published || inputs.commit != ''
@@ -318,7 +318,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Prepare empty candidate input directory
         shell: pwsh

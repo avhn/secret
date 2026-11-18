@@ -7,7 +7,7 @@ import (
 
 func TestVersionAliases(t *testing.T) {
 	previous := Version
-	Version = "0.6.1"
+	Version = "0.6.2"
 	t.Cleanup(func() { Version = previous })
 	for _, test := range []struct {
 		name   string
@@ -16,8 +16,8 @@ func TestVersionAliases(t *testing.T) {
 		out    string
 		err    string
 	}{
-		{"subcommand", []string{"version"}, 0, "secret 0.6.1 (go)\n", ""},
-		{"flag", []string{"--version"}, 0, "secret 0.6.1 (go)\n", ""},
+		{"subcommand", []string{"version"}, 0, "secret 0.6.2 (go)\n", ""},
+		{"flag", []string{"--version"}, 0, "secret 0.6.2 (go)\n", ""},
 		{"subcommand arguments", []string{"version", "extra"}, 1, "", "secret: version takes no arguments\n"},
 		{"flag arguments", []string{"--version", "extra"}, 1, "", "secret: version takes no arguments\n"},
 	} {

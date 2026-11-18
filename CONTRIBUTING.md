@@ -2,7 +2,7 @@
 
 ## Set up
 
-Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.27.3 or newer; CI pins Go 1.27.3 with `GOTOOLCHAIN=local` for all checks, including bounded fuzzing. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
+Clone the repository and use Bash 3.2 or newer, Perl, jq, Python 3, ripgrep and ShellCheck for the current shell suites. The Go module requires Go 1.27.4 or newer; CI pins Go 1.27.4 with `GOTOOLCHAIN=local` for all checks, including bounded fuzzing. Provider integration needs an isolated Linux Secret Service session or a disposable macOS Keychain. Never run tests against your normal credential stores.
 
 ## Test locally
 
@@ -71,7 +71,7 @@ Operator tests exercise import/export, collision-before-fetch, fresh-account
 rotation/rename/delete, exact cleanup and provider-boundary argv sampling with
 synthetic sentinels. Do not enable these gates locally.
 
-Ubuntu CI runs each feature fuzz target with Go 1.27.3 and a bounded budget:
+Ubuntu CI runs each feature fuzz target with Go 1.27.4 and a bounded budget:
 
 ```bash
 for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
@@ -79,7 +79,7 @@ for target in FuzzMetadataSelection FuzzPrivateImporterJSON FuzzMCPProtocol; do
 done
 ```
 
-Use the same Go 1.27.3 toolchain and `GOTOOLCHAIN=local` for fuzzing, builds,
+Use the same Go 1.27.4 toolchain and `GOTOOLCHAIN=local` for fuzzing, builds,
 vet, ordinary tests, race tests and release builds. Do not retry or filter
 fuzz failures. Published releases remain reproducible with Go 1.26.10 from
 their tags; the historical release rehearsal retains that toolchain.
@@ -96,7 +96,7 @@ source, parse and statically bind without execution, and exercise a Windows-only
 test adapter through the full Go hook. They do not install hooks, invoke models,
 access credential providers or prove real-host failure blocking.
 
-Use Go 1.27.3 with `GOTOOLCHAIN=local`. From the checkout on Windows, invoke the
+Use Go 1.27.4 with `GOTOOLCHAIN=local`. From the checkout on Windows, invoke the
 committed driver under each tested executable, not an arbitrary `pwsh` on PATH:
 
 ```powershell
@@ -134,7 +134,7 @@ and [M5e plan](docs/design/m5e-plan.md); passing parser CI does not finish M5e.
 
 ## M5d encrypted-store tests
 
-Use Go 1.27.3 with `GOTOOLCHAIN=local`, including bounded fuzzing. Review
+Use Go 1.27.4 with `GOTOOLCHAIN=local`, including bounded fuzzing. Review
 the exact age pin, complete module graph, every new license, checksums and
 reachable vulnerability scan before any
 dependency change. See [the binding M5d plan](docs/design/m5d-plan.md) and
@@ -166,8 +166,8 @@ hosted jobs. Local tests alone do not establish new native or release evidence.
 
 ## M4 release, launcher and offline host tests
 
-M4's v0.2.3 release is complete. The published v0.6.1 release retains packaging and
-advances all four manifests to 0.6.1. The owner-approved CLI-only extraction puts
+M4's v0.2.3 release is complete. The v0.6.2 preparation retains packaging and
+advances all four manifests to 0.6.2. The owner-approved CLI-only extraction puts
 the verified launcher at `bin/secret`, retaining Bash at `compat/secret`.
 Claude/Codex hooks remain Bash. M4.1 still owns `onFailure: "block"`, `guard-go`
 activation and Go hook output-contract changes, waiting sponsorship. See [the release plan](docs/design/v0.3.0-plan.md),
@@ -179,7 +179,7 @@ are `release.yml`, `plugin.yml` and inactive `host-hooks.yml`. Synthetic fixture
 live in `testdata/plugin/` and `testdata/host-hooks/`; `tests/host-hook-fixture.go`
 is test-only under `-tags hosthookfixture`, never a shipped binary.
 
-Use exactly Go 1.27.3, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
+Use exactly Go 1.27.4, matching GOROOT/PATH and `GOTOOLCHAIN=local` for release
 builds. Complete assembly also requires native macOS lipo, Node 26.10.0,
 npm 11.19.1, Python 3.14.8 and the locked MCPB 2.1.2 validator. Install it with
 `npm ci --prefix packaging/mcpb --ignore-scripts`. Review the narrowly bounded
@@ -229,7 +229,7 @@ CI runs independent macOS full assembly plus native Linux/macOS/Windows
 amd64/arm64 candidate and public-install jobs. Release workflows explicitly use
 `--stage cli-only`, the final Go CLI plus unchanged Bash hook contract.
 The test default is `cli-only`; `--stage m4.1` preserves the stronger
-activation assertions for that milestone. Do not use it as a v0.6.1 gate or
+activation assertions for that milestone. Do not use it as a v0.6.2 gate or
 weaken other assertions. Tests assert
 statuses, JSON and filesystem execution witnesses, not diagnostics alone.
 `.secret-release-test-fixture` is forbidden in the shipped tree, S and C,

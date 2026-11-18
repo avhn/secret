@@ -2,7 +2,19 @@
 
 Status: `done` = gate passed; `in progress` = work underway; `planned` = not started; `conditional` = optional, pending its own gate; `waiting sponsorship` = remaining work needs paid model usage, accounts or owner-provisioned services before it can run.
 
-**Current milestone:** v0.6.1 (Git global-option guard correction and the MCPB node-forge override, coordinated identity bump) was published on 2026-11-16 at C `57a24d3` (S `e7f3a99`) and is the GitHub Latest release, with MCP Registry record `io.github.avhn/secret` 0.6.1. v0.6.0 (site redesign, Secret naming, coordinated identity bump) was published on 2026-11-03 at C `032503a` (S `4431d3c`). v0.5.0 (anonymous latest-by-default installers) was published on 2026-11-02 at C `ff5cf56` (S `109449e`). v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`). v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+**Current milestone:** v0.6.2 (Go dependency and toolchain security patch, coordinated identity bump) is in progress. v0.6.1 (Git global-option guard correction and the MCPB node-forge override, coordinated identity bump) was published on 2026-11-16 at C `57a24d3` (S `e7f3a99`) and remains the GitHub Latest release until v0.6.2 is published, with MCP Registry record `io.github.avhn/secret` 0.6.1. v0.6.0 (site redesign, Secret naming, coordinated identity bump) was published on 2026-11-03 at C `032503a` (S `4431d3c`). v0.5.0 (anonymous latest-by-default installers) was published on 2026-11-02 at C `ff5cf56` (S `109449e`). v0.4.1 (install test-fixture patch, no product change) was published on 2026-11-01 at C `eeb628c` (S `8d0d46c`). v0.4.0 was published on 2026-11-01 at C `06027fe` (S `5a54b17`); its Registry publication was blocked by an install-test fixture. M4.1, M5c, M5e steps 5 and 6, and M6 are waiting sponsorship. M0 to M4 are done; v0.2.3 is the first published release. Optional M5b (pass), M5d (age) and M5a (Windows CLI and Credential Manager) are done in the staged Go CLI, and M5c (1Password) is scaffolded with dispatch disabled; M5e (PowerShell) has steps 1 to 4 done with its parser gate green on 5.1 and 7.6.7. This tracker follows the [Go rewrite plan](docs/design/go-rewrite.md); estimates are engineer-days, excluding CI wait and review. M4 is the Linux/macOS release gate; M4.1 gates host evidence and Claude cutover; M5a-M5e are independent optional extensions.
+
+## v0.6.2: Security patch (in progress)
+
+Ship golang.org/x/crypto v0.59.0 with x/sys v0.50.0 and x/term v0.48.0,
+move release builds to Go 1.27.4 and advance all current identities to 0.6.2.
+Installer suites use 0.6.3 as the synthetic next release. The AWS config search
+test replays a deadline deny once. No CLI identifier, hook activation or release
+inventory changes; published tags remain immutable.
+
+- [ ] Two green integrated candidates (ci, release, plugin install) at source S
+- [ ] Checksum-only C, annotated tag, verified draft and publication
+- [ ] Six public native installs and the Registry record, then main promoted to S
 
 ## v0.6.1: Guard and packaging patch (done)
 

@@ -1,6 +1,6 @@
 {
   "name": "secret",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Use credentials from coding agents without reading their values into context: the Secret CLI, a PreToolUse guard, and a skill.",
   "keywords": ["secrets", "credentials", "env", "hooks", "security"],
   "skills": "./skills",

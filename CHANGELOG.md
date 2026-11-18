@@ -4,14 +4,26 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
-### Security
+### 0.6.2 (in preparation)
+
+Security patch with a coordinated identity bump. No CLI identifier, hook
+activation or release inventory changes.
+
+#### Changed
+
+- All current release identities advance to 0.6.2: compiled version, installer
+  script URLs, launchers, manifests, packaging templates, workflows, tests, site
+  and docs. Installer suites use 0.6.3 as the synthetic next release.
+
+#### Security
 
 - `golang.org/x/crypto` moves from v0.55.0 to v0.59.0 for GO-2026-6354,
   GO-2026-6355 and GO-2026-5932; govulncheck finds none of them reachable.
   `golang.org/x/sys` v0.50.0 and `golang.org/x/term` v0.48.0 follow as its
-  minimum versions. The Go 1.27.3 toolchain pin is unchanged.
+  minimum versions. Development and release builds move to Go 1.27.4 for
+  standard library advisory GO-2026-6859; the affected code is not called.
 
-### Fixed
+#### Fixed
 
 - `TestAudit20AWSConfigSearch` replays an expected allow once when the
   filtered search walk hits its 200 ms fail-closed deadline on a loaded

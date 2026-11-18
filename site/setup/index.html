@@ -23,7 +23,7 @@
 <link rel="icon" href="/secret/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/secret/assets/style.css">
 <script src="/secret/assets/copy.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"Secret","url":"https://avhn.github.io/secret/","description":"Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.6.1","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://avhn.github.io/secret/#software","name":"Secret","url":"https://avhn.github.io/secret/","description":"Secret: credentials for coding agents. A Go CLI that redacts literal values from program output, a names-only MCP server and a guard hook. Accident prevention, not a sandbox.","operatingSystem":"Linux, macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://github.com/avhn/secret/blob/main/LICENSE","softwareVersion":"0.6.2","downloadUrl":"https://github.com/avhn/secret/releases","codeRepository":"https://github.com/avhn/secret","programmingLanguage":"Go"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://avhn.github.io/secret/"},{"@type":"ListItem","position":2,"name":"Setup","item":"https://avhn.github.io/secret/setup/"}]}</script>
 </head>
 <body>
@@ -37,9 +37,9 @@
 <nav class="toc" aria-label="Setup guide sections"><ul><li><a href="#install">Install</a></li><li><a href="#update">Update, pin and roll back</a></li><li><a href="#paths">Paths</a></li><li><a href="#for-an-ai-agent">For an AI agent</a></li><li><a href="#store-scope">Store scope</a></li><li><a href="#clients">MCP clients</a></li><li><a href="#desktop-bundle">Claude Desktop bundle</a></li><li><a href="#registry">MCP Registry</a></li><li><a href="#verify">Verify</a></li><li><a href="#launchers">Launch other MCP servers</a></li><li><a href="#uninstall">Uninstall</a></li><li><a href="#advanced">Advanced and verification</a></li></ul></nav>
 <section aria-labelledby="install"><h2 id="install">Install</h2>
 <p>Linux/macOS:</p>
-<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.sh | sh</code></pre>
+<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.2/install.sh | sh</code></pre>
 <p>Windows PowerShell:</p>
-<pre><code class="language-powershell">irm https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.ps1 | iex</code></pre>
+<pre><code class="language-powershell">irm https://raw.githubusercontent.com/avhn/secret/v0.6.2/install.ps1 | iex</code></pre>
 <p>The script defaults to the latest release, resolved once from GitHub's release redirect, then downloads only that explicit tag. No GitHub account, gh, Python or credentials are required. Unix needs POSIX sh, curl, standard GNU/BSD utilities and sha256sum or shasum. Windows needs PowerShell 5.1 or 7 and curl.exe.</p>
 <ul>
 <li>Release binaries cover Linux, macOS and Windows on amd64 and arm64, as raw executables rather than archives.</li>
@@ -51,16 +51,16 @@
 <section aria-labelledby="update"><h2 id="update">Update, pin and roll back</h2>
 <p>Rerun either one-liner to update to the latest release. A matching installed digest is a no-op that preserves file identity, mtime and the Windows PATH. Review release changes and stop clients first, especially on Windows, where an open executable can block atomic replacement. Then restart or reconnect and verify.</p>
 <p>Set <code>SECRET_VERSION</code> to a strict release version (optional leading <code>v</code>) to pin or roll back. Pins skip latest resolution and may replace a newer version. <code>INSTALL_DIR</code> selects the destination, so you can review an older release before changing a registration path.</p>
-<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.sh | SECRET_VERSION=0.6.1 sh</code></pre>
+<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/avhn/secret/v0.6.2/install.sh | SECRET_VERSION=0.6.2 sh</code></pre>
 <p>File invocations also accept <code>--version V</code>, <code>--dir DIR</code> and <code>--help</code>; conflicting environment and flag pins fail. For <code>irm | iex</code>, set <code>SECRET_VERSION</code> and <code>INSTALL_DIR</code> in that PowerShell process rather than appending parameters:</p>
-<pre><code class="language-powershell">$env:SECRET_VERSION = '0.6.1'
-irm https://raw.githubusercontent.com/avhn/secret/v0.6.1/install.ps1 | iex</code></pre></section>
+<pre><code class="language-powershell">$env:SECRET_VERSION = '0.6.2'
+irm https://raw.githubusercontent.com/avhn/secret/v0.6.2/install.ps1 | iex</code></pre></section>
 <section aria-labelledby="paths"><h2 id="paths">Paths</h2>
 <div class="table-wrap"><table><thead><tr><th scope="col">Platform</th><th scope="col">Default executable</th><th scope="col">PATH</th></tr></thead><tbody><tr><td>Linux and macOS</td><td><code>~/.local/bin/secret</code></td><td>Not edited; profiles are not changed</td></tr><tr><td>Windows</td><td><code>$HOME\.local\bin\secret.exe</code>, falling back to the native user profile when HOME is absent</td><td>Only the install directory is added to the user PATH, once; open a new terminal afterward</td></tr></tbody></table></div>
 <p>Both installers print the concrete executable path. Use that path in client configuration. Installers never delete old binaries, remove old PATH entries or rewrite registrations.</p></section>
 <section aria-labelledby="for-an-ai-agent"><h2 id="for-an-ai-agent">For an AI agent</h2>
 <p>After you have installed the CLI yourself, you can hand the registration to your agent:</p>
-<pre><code class="language-text">Follow https://github.com/avhn/secret/blob/v0.6.1/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.</code></pre>
+<pre><code class="language-text">Follow https://github.com/avhn/secret/blob/v0.6.2/docs/setup.md to install and register secret MCP; ask me for the exact intended store references, never discover or read stores, handle values, run operator consent commands, or bypass a guard.</code></pre>
 <ol>
 <li>Resolve the installed executable's concrete absolute path on this machine.</li>
 <li>Ask the human which exact store references may expose metadata to this client. Do not search for stores or infer a scope from the working directory.</li>
@@ -140,13 +140,13 @@ args = ["mcp", "--store", "file:/path/to/STORE.secret"]</code></pre>
 <p>Review the server trust prompt and use MCP: List Servers to restart the server after changes.</p>
 <p>The schemas and configuration locations were checked against first-party client documentation on 2026-10-28. That is documentation verification, not real-host execution evidence.</p></section>
 <section aria-labelledby="desktop-bundle"><h2 id="desktop-bundle">Claude Desktop bundle (MCPB)</h2>
-<p>The release asset is <code>secret-v0.6.1-desktop.mcpb</code>. Obtain it from the exact v0.6.1 release and verify it with the <a href="https://github.com/avhn/secret/blob/main/docs/install.md#verify-the-complete-release-including-desktop-mcpb">trusted-checkout verifier</a>, not an adjacent checksum alone.</p>
+<p>The release asset is <code>secret-v0.6.2-desktop.mcpb</code>. Obtain it from the exact v0.6.2 release and verify it with the <a href="https://github.com/avhn/secret/blob/main/docs/install.md#verify-the-complete-release-including-desktop-mcpb">trusted-checkout verifier</a>, not an adjacent checksum alone.</p>
 <p>In Settings &gt; Extensions &gt; Advanced settings &gt; Extension Developer, choose Install Extension and select the verified bundle. Enter exactly one approved reference in the required <code>store_reference</code> field, never a value. There is no default or discovery. Fully quit and restart Desktop after configuration changes, and do not also add a manual registration with the same name.</p>
 <p>The bundle contains a macOS universal amd64/arm64 executable and a Windows amd64 executable. There is no Linux Desktop bundle or Windows on Arm Desktop support claim. Locked MCPB CLI validation and native payload smoke tests do not cover actual Desktop installation, configuration interpolation or restart; treat it as an opt-in, unverified host integration.</p></section>
 <section aria-labelledby="registry"><h2 id="registry">MCP Registry</h2>
 <p>The MCP Registry name is <code>io.github.avhn/secret</code>. Registry discovery is separate from Desktop installation and from your client registration; the store reference is always yours to choose.</p></section>
 <section aria-labelledby="verify"><h2 id="verify">Verify and understand the limits</h2>
-<p>Run the installed binary's <code>version</code> command with its absolute path. Expected release output is <code>secret 0.6.1 (go)</code>. The MCP initialize response identifies <code>secret-metadata</code> version <code>1</code> instead.</p>
+<p>Run the installed binary's <code>version</code> command with its absolute path. Expected release output is <code>secret 0.6.2 (go)</code>. The MCP initialize response identifies <code>secret-metadata</code> version <code>1</code> instead.</p>
 <p>After reconnecting, confirm the four tools <code>list</code>, <code>show</code>, <code>diff</code> and <code>health</code>, and call <code>health</code> first. Health reports metadata schema version, configured readiness and store count. It does not prove provider availability, value validity, successful store reads or hook protection.</p>
 <p>Names-only is not metadata-private: keys, labels, presence, backend, references, paths and provider account IDs may reach the client, its model and its logs.</p></section>
 <section aria-labelledby="launchers"><h2 id="launchers">Use Secret to launch other MCP servers</h2>

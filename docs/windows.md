@@ -7,7 +7,7 @@ The published v0.5.0 installer simplification ships raw `secret-v0.5.0-windows-a
 both architectures passed in Registry run
 [41378456500](https://github.com/avhn/secret/actions/runs/41378456500).
 The final CLI is `secret.exe`; installed hooks remain the Bash guard.
-Plugin manifests become 0.6.1
+Plugin manifests become 0.6.2
 without Go hook activation, which stays M4.1, waiting sponsorship.
 See [MCP setup](setup.md), [installation and rollback](install.md) and the
 [M5a implementation and evidence plan](design/m5a-plan.md).
@@ -51,7 +51,7 @@ smoke validation do not prove actual Desktop installation/configuration/restart.
 MCP metadata may expose names, labels, paths and provider account IDs to clients
 and models, never values, hashes or lengths. It grants no hook exception.
 
-Full bundle assembly runs on macOS with lipo, Go 1.27.3, Node 26.10.0,
+Full bundle assembly runs on macOS with lipo, Go 1.27.4, Node 26.10.0,
 npm 11.19.1 and Python 3.14.8, not on an end user's Windows installation.
 The narrowly reviewed build-only Zod exception and fresh audit gate are described
 in [release tooling security](release.md#packaging-tools-and-advisory-review) and

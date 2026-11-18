@@ -52,7 +52,8 @@ in a non-inheritable kill-on-close Job without breakaway fallback; redirected
 operator consent/value input is rejected. Literal output redaction covers UTF-8
 and UTF-16LE/BE, not transformed values or other code pages.
 
-The v0.6.1 release covers Windows amd64 and arm64; its native public asset
+The v0.6.2 release targets Windows amd64 and arm64; its native candidate/public
+installations are required gates. The published v0.6.1 native public asset
 installations passed in Registry run [43823666672](https://github.com/avhn/secret/actions/runs/43823666672).
 Cross-builds and test compilation do not certify native installations. The native
 8.3 fixture volume lacked short names, so short-alias coverage remains synthetic.
@@ -67,7 +68,7 @@ not jointly atomic. Windows age, pass and 1Password remain unsupported. The
 PowerShell parser is unwired: production Windows shell calls remain denied, and
 no installed-hook or fail-closed PowerShell/CMD host protection is claimed.
 
-## v0.6.1 installer and MCP boundaries
+## v0.6.2 installer and MCP boundaries
 
 Pinned HTTPS one-liners execute a script before payload verification and trust
 GitHub HTTPS, repository ownership/tag governance and the reviewed installer.
@@ -100,7 +101,7 @@ requires one approved store reference, with no default. Locked-CLI validation an
 native payload smoke are not actual Desktop install/interpolation/restart evidence;
 that host integration is not host-tested. Registry identity `io.github.avhn/secret`
 and versioned bundle metadata do not imply publication or host protection.
-All four plugin manifests become 0.6.1 without changing installed Bash hooks.
+All four plugin manifests become 0.6.2 without changing installed Bash hooks.
 M4.1 Go activation remains waiting sponsorship. No new fail-closed host claim
 follows from installers, MCP, the Registry or synthetic tests.
 
