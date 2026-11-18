@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Security
+
+- `golang.org/x/crypto` moves from v0.55.0 to v0.59.0 for GO-2026-6354,
+  GO-2026-6355 and GO-2026-5932; govulncheck finds none of them reachable.
+  `golang.org/x/sys` v0.50.0 and `golang.org/x/term` v0.48.0 follow as its
+  minimum versions. The Go 1.27.3 toolchain pin is unchanged.
+
 ### Fixed
 
 - `TestAudit20AWSConfigSearch` replays an expected allow once when the
